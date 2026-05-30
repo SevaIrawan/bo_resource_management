@@ -1,0 +1,1 @@
+{"root":["./vite.config.ts","./electron/main/index.ts","./electron/preload/index.ts"],"version":"5.9.3"}

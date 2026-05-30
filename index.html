@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Backend Operation</title>
+    <script>
+      (function () {
+        function shouldSkip(args) {
+          var text = Array.prototype.join.call(args, ' ');
+          return (
+            text.indexOf('Download the React DevTools') !== -1 ||
+            text.indexOf('Electron Security Warning') !== -1
+          );
+        }
+
+        ['info', 'warn', 'error'].forEach(function (level) {
+          var original = console[level].bind(console);
+          console[level] = function () {
+            if (shouldSkip(arguments)) return;
+            original.apply(console, arguments);
+          };
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

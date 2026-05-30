@@ -1,0 +1,95 @@
+import type { Messages } from './en';
+
+export const zh: Messages = {
+  nav: {
+    groupMonitoring: '群组监控',
+    admin: '管理',
+    settings: '设置',
+  },
+  pages: {
+    groupMonitoring: '群组监控',
+    admin: '管理',
+    settings: '设置',
+  },
+  subheader: {
+    adminDesc: '系统配置与会话管理',
+    settingsDesc: '应用偏好',
+  },
+  settings: {
+    title: '设置',
+    subtitle: '应用偏好',
+    language: '语言',
+    languageDesc: '选择仪表板界面显示语言。',
+    zh: '中文',
+    en: 'English',
+  },
+  header: {
+    welcome: '欢迎',
+    logout: '退出',
+    toggleSidebar: '切换侧边栏',
+    flagAlt: '马来西亚',
+  },
+  tabs: {
+    account: '账号',
+    ticket: '工单',
+  },
+  brand: {
+    name: '后端运营',
+    tagline: '资源管理',
+  },
+  kpi: {
+    account: {
+      brands: '品牌',
+      accounts: '账号总数',
+      active: '在线',
+      aligned: '已对齐',
+      issue: '需处理',
+    },
+    ticket: {
+      total: '工单总数',
+      pending: '待处理',
+      processing: '处理中',
+      done: '已完成',
+      closed: '已关闭',
+    },
+  },
+  groupMonitoring: {
+    noAccounts: '暂无关联账号',
+    noAccountsDesc: '关联第一个账号以开始群组监控。',
+    addAccount: '添加账号',
+    noTickets: '暂无工单',
+    noTicketsDesc: '工单将在可用时显示于此。',
+    accountFilters: '账号筛选',
+    ticketFilters: '工单筛选',
+  },
+  login: {
+    tagline: 'Telegram 与 WhatsApp 运营',
+    username: '用户名',
+    password: '密码',
+    usernamePlaceholder: '输入用户名',
+    passwordPlaceholder: '输入密码',
+    submit: '登录',
+    loading: '登录中…',
+    invalidCredentials: '用户名或密码错误',
+    supabaseNotConfigured: '数据库未配置，请检查 .env 文件。',
+    loginFailed: '登录失败，请重试。',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
+  },
+  admin: {
+    title: '系统状态',
+    subtitle: '配置与数据库连接',
+    supabase: 'Supabase',
+    activeSessions: '活跃会话',
+    platform: '平台',
+    sessionTables: '会话表',
+    connected: '已连接',
+    notConfigured: '未配置',
+    desktop: '桌面端',
+    web: '网页端',
+  },
+  common: {
+    appError: '应用出错',
+    reloadApp: '重新加载',
+  },
+};

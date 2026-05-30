@@ -1,0 +1,58 @@
+{
+  "name": "resource-management",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Resource Management Desktop — Group Monitoring Dashboard",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && electron-builder --win",
+    "build:dir": "vite build && electron-builder --win --dir",
+    "build:web": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.511.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.1",
+    "tailwind-merge": "^3.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.8",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.2",
+    "electron": "^36.4.0",
+    "electron-builder": "^26.0.12",
+    "tailwindcss": "^4.1.8",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "build": {
+    "appId": "com.resourcemanagement.app",
+    "productName": "Resource Management",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "public/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "your-github-username",
+      "repo": "resource-management"
+    }
+  }
+}

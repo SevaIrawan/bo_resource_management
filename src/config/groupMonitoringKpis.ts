@@ -1,4 +1,4 @@
-export type KpiTone = 'default' | 'success' | 'danger';
+export type KpiTone = 'default' | 'success' | 'danger' | 'warning';
 
 export interface KpiItem {
   value: number;
@@ -15,9 +15,9 @@ export const ACCOUNT_KPIS: KpiItem[] = [
 ];
 
 export const TICKET_KPIS: KpiItem[] = [
-  { value: 4, labelKey: 'kpi.ticket.total' },
-  { value: 2, labelKey: 'kpi.ticket.pending', tone: 'danger' },
-  { value: 1, labelKey: 'kpi.ticket.processing' },
-  { value: 1, labelKey: 'kpi.ticket.done', tone: 'success' },
-  { value: 0, labelKey: 'kpi.ticket.closed' },
+  { value: 4, labelKey: 'kpi.ticket.open', tone: 'danger' },
+  { value: 2, labelKey: 'kpi.ticket.missingGroup', tone: 'danger' },
+  { value: 2, labelKey: 'kpi.ticket.notAdmin', tone: 'warning' },
+  { value: 3, labelKey: 'kpi.ticket.accountsInvolved' },
+  { value: 2, labelKey: 'kpi.ticket.brandsInvolved' },
 ];

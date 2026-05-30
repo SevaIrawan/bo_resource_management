@@ -37,7 +37,13 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron/main',
             rollupOptions: {
-              external: ['electron'],
+              external: [
+                'electron',
+                'electron-updater',
+                'whatsapp-web.js',
+                'node-cron',
+                'dotenv',
+              ],
             },
           },
         },

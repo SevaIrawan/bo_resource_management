@@ -24,7 +24,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LOCALE_STORAGE_KEY, next);
   }, []);
 
-  const t = useCallback((key: string) => translate(locale, key), [locale]);
+  const t = useCallback(
+    (key: string, params?: Record<string, string | number>) => translate(locale, key, params),
+    [locale],
+  );
 
   const value = useMemo(
     () => ({ locale, setLocale, t }),

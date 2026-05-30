@@ -91,6 +91,8 @@ export interface GroupScrapeDaily {
   platform: Platform;
   brand: string;
   acc_name: string;
+  /** Phone/username akun WA/TG — bukan participant group. NULL jika user belum isi saat Add Account. */
+  phone_or_username: string | null;
   scrape_date: string;
   group_name: string | null;
   group_id: string;
@@ -114,6 +116,8 @@ export interface GroupsMaster {
   platform: Platform;
   brand: string;
   acc_name: string;
+  /** Phone/username akun WA/TG — bukan participant group. NULL jika user belum isi saat Add Account. */
+  phone_or_username: string | null;
   group_name: string;
   group_id: string;
   group_link: string | null;

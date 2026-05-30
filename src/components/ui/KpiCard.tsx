@@ -12,6 +12,7 @@ const VALUE_TONE: Record<KpiTone, string> = {
   default: 'text-text-primary',
   success: 'text-wa',
   danger: 'text-danger',
+  warning: 'text-amber-400',
 };
 
 export function KpiCard({ value, labelKey, tone = 'default' }: KpiCardProps) {

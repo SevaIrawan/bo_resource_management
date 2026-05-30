@@ -12,7 +12,7 @@ interface DashboardProvidersProps {
 export function DashboardProviders({ children }: DashboardProvidersProps) {
   const [collapsed, setCollapsed] = useState(SIDEBAR_DEFAULT_COLLAPSED);
   const [tab, setTab] = useState<MonitoringTab>('account');
-  const ticketCount = 0;
+  const ticketCount = 4;
 
   const toggle = useCallback(() => {
     setCollapsed((prev) => !prev);

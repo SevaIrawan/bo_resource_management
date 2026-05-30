@@ -25,6 +25,18 @@ function getByPath(obj: Record<string, unknown>, path: string): string {
   return typeof value === 'string' ? value : path;
 }
 
-export function translate(locale: Locale, key: string): string {
-  return getByPath(messages[locale] as unknown as Record<string, unknown>, key);
+export function translate(
+  locale: Locale,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  let text = getByPath(messages[locale] as unknown as Record<string, unknown>, key);
+
+  if (params) {
+    for (const [name, value] of Object.entries(params)) {
+      text = text.replace(new RegExp(`\\{\\{${name}\\}\\}`, 'g'), String(value));
+    }
+  }
+
+  return text;
 }

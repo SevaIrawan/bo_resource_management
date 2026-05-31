@@ -5,6 +5,7 @@ export const APP_TAGLINE = 'Resource Management';
 /** Sidebar dimulai collapsed (icon-only). */
 export const SIDEBAR_DEFAULT_COLLAPSED = true;
 
+/** Legacy path — redirects to Admin in router. */
 export const SETTINGS_PATH = '/settings';
 
 export const NAV_ITEMS = [

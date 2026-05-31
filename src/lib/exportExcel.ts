@@ -54,14 +54,6 @@ export function exportGroupLinksExcel(input: {
   saveWorkbook(workbook, `RM-${safeBrand}-${safeAcc}-groups-${stamp()}.xlsx`);
 }
 
-export function exportBrandAccountsExcel(group: AccountBrandGroup) {
-  const safeBrand = safeFilePart(group.brandName);
-  const sheet = XLSX.utils.json_to_sheet(accountRowsForExport(group.accounts));
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, 'Group links');
-  saveWorkbook(workbook, `RM-${safeBrand}-group-links-${stamp()}.xlsx`);
-}
-
 export function exportAllAccountsExcel(groups: AccountBrandGroup[]) {
   const rows = groups.flatMap((group) => group.accounts);
   const sheet = XLSX.utils.json_to_sheet(accountRowsForExport(rows));

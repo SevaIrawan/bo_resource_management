@@ -92,11 +92,8 @@ function ScraperColumnCell({
   const { t, locale } = useLanguage();
   const dateLocale = locale === 'zh' ? 'zh-CN' : 'en-GB';
   const isRunning = scraperLoading || row.actionProcess === 'scraper';
-  const showLastUpdate =
-    !isRunning &&
-    row.syncState === 'synced' &&
-    Boolean(row.lastSyncAt) &&
-    (row.sessionStatus === 'invalid' || !row.isMisaligned);
+  const canShowLastUpdate =
+    !isRunning && row.syncState === 'synced' && Boolean(row.lastSyncAt);
 
   if (row.sessionStatus === 'invalid') {
     return (
@@ -149,13 +146,14 @@ function ScraperColumnCell({
       <div className="brand-scraper-cell-stack">
         <button
           type="button"
-          className="brand-card-action-btn brand-card-action-btn--scraper brand-card-action-btn--nowrap"
+          className="brand-scraper-run-link"
           disabled={scraperLoading}
-          onClick={onRunScraper}
+          onClick={() => onRunScraper()}
+          aria-label={t('groupMonitoring.accountCard.runScraper')}
         >
-          {t('groupMonitoring.accountCard.runScraper')}
+          {t('groupMonitoring.accountCard.run')}
         </button>
-        {showLastUpdate ? (
+        {canShowLastUpdate ? (
           <time className="brand-scraper-last-update-time" dateTime={row.lastSyncAt ?? undefined}>
             {formatLastSyncAt(row.lastSyncAt, dateLocale)}
           </time>
@@ -164,11 +162,13 @@ function ScraperColumnCell({
     );
   }
 
-  if (row.syncState === 'synced' && showLastUpdate) {
+  if (row.syncState === 'synced' && canShowLastUpdate && !row.isMisaligned) {
     return (
-      <time className="brand-scraper-last-update-time" dateTime={row.lastSyncAt ?? undefined}>
-        {formatLastSyncAt(row.lastSyncAt, dateLocale)}
-      </time>
+      <div className="brand-scraper-cell-stack">
+        <time className="brand-scraper-last-update-time" dateTime={row.lastSyncAt ?? undefined}>
+          {formatLastSyncAt(row.lastSyncAt, dateLocale)}
+        </time>
+      </div>
     );
   }
 

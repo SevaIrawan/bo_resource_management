@@ -4,16 +4,11 @@ export const zh: Messages = {
   nav: {
     groupMonitoring: '群组监控',
     admin: '管理',
-    settings: '设置',
+    logout: '退出',
   },
   pages: {
     groupMonitoring: '群组监控',
     admin: '管理',
-    settings: '设置',
-  },
-  subheader: {
-    adminDesc: '系统配置与会话管理',
-    settingsDesc: '应用偏好',
   },
   settings: {
     title: '设置',
@@ -38,7 +33,6 @@ export const zh: Messages = {
     logout: '退出',
     toggleSidebar: '切换侧边栏',
     flagAlt: '马来西亚',
-    languageToggle: '界面语言',
   },
   tabs: {
     account: '账号',
@@ -79,6 +73,7 @@ export const zh: Messages = {
     viewToggle: '视图模式',
     viewCard: '卡片视图',
     viewTable: '表格视图',
+    exportFiltered: '导出筛选账号',
     searchPlaceholder: '搜索账号名 / 电话号码…',
     searchSubmit: '搜索',
     exportCsv: '导出群链接 (CSV)',
@@ -115,6 +110,7 @@ export const zh: Messages = {
       sessionInvalid: '无效',
       procSync: '同步中',
       procScraper: '抓取中',
+      run: '运行',
       runScraper: '运行抓取',
       useSyncToLogin: '请先点击同步 (↻) 登录',
       scraperRunning: '抓取中…',
@@ -348,8 +344,10 @@ export const zh: Messages = {
     hidePassword: '隐藏密码',
   },
   admin: {
-    title: '系统状态',
-    subtitle: '配置与数据库连接',
+    title: '管理',
+    subtitle: '系统状态与应用偏好设置',
+    systemSection: '系统状态',
+    preferencesSection: '偏好设置',
     supabase: 'Supabase',
     activeSessions: '活跃会话',
     platform: '平台',
@@ -358,6 +356,8 @@ export const zh: Messages = {
     notConfigured: '未配置',
     desktop: '桌面端',
     web: '网页端',
+    autoSyncSummaryOn: '开 · {{minutes}} 分钟',
+    autoSyncSummaryOff: '关',
   },
   common: {
     appError: '应用出错',

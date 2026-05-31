@@ -1,15 +1,13 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Power } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/hooks/useSidebar';
+import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { SidebarLabel } from '@/components/layout/SidebarLabel';
-import { NAV_ITEMS, SETTINGS_PATH } from '@/config/navigation';
-import {
-  IconAdmin,
-  IconGroupMonitoring,
-  IconSettings,
-} from '@/components/icons/NavIcons';
+import { NAV_ITEMS } from '@/config/navigation';
+import { IconAdmin, IconGroupMonitoring } from '@/components/icons/NavIcons';
 
 const ICONS = {
   monitor: IconGroupMonitoring,
@@ -24,6 +22,13 @@ const NAV_LABEL_KEYS: Record<(typeof NAV_ITEMS)[number]['id'], string> = {
 export function Sidebar() {
   const { collapsed } = useSidebar();
   const { t } = useLanguage();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
 
   return (
     <aside
@@ -64,21 +69,18 @@ export function Sidebar() {
       </nav>
 
       <div className="shrink-0 border-t border-border-subtle p-2">
-        <NavLink
-          to={SETTINGS_PATH}
-          title={collapsed ? t('nav.settings') : undefined}
-          className={({ isActive }) =>
-            cn(
-              'nav-item flex h-10 items-center rounded-xl px-3 transition-colors duration-200',
-              isActive ? 'nav-item-active' : 'text-text-muted',
-            )
-          }
+        <button
+          type="button"
+          onClick={handleLogout}
+          title={collapsed ? t('nav.logout') : undefined}
+          aria-label={t('nav.logout')}
+          className="nav-item flex h-10 w-full items-center rounded-xl px-3 text-text-muted transition-colors duration-200 hover:bg-white/6 hover:text-danger"
         >
           <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <IconSettings className="h-5 w-5" />
+            <Power className="h-5 w-5" strokeWidth={1.75} />
           </span>
-          <SidebarLabel collapsed={collapsed}>{t('nav.settings')}</SidebarLabel>
-        </NavLink>
+          <SidebarLabel collapsed={collapsed}>{t('nav.logout')}</SidebarLabel>
+        </button>
       </div>
     </aside>
   );

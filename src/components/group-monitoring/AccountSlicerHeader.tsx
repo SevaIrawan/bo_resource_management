@@ -1,7 +1,8 @@
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Download, Search } from 'lucide-react';
 import { useMemo } from 'react';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
+import { exportAllAccountsExcel } from '@/lib/exportExcel';
 import {
   uniqueAccountBrands,
   uniqueAccountPlatforms,
@@ -61,7 +62,17 @@ function platformLabel(t: (key: string) => string, platform: Platform): string {
 
 export function AccountSlicerHeader({ viewMode, onViewModeChange }: AccountSlicerHeaderProps) {
   const { t } = useLanguage();
-  const { groups, accountFilters, setAccountFilters } = useGroupMonitoring();
+  const { groups, filteredGroups, accountFilters, setAccountFilters } = useGroupMonitoring();
+
+  const exportableAccountCount = useMemo(
+    () => filteredGroups.reduce((n, group) => n + group.accounts.length, 0),
+    [filteredGroups],
+  );
+
+  function handleExportFiltered() {
+    if (exportableAccountCount === 0) return;
+    exportAllAccountsExcel(filteredGroups);
+  }
 
   const patchFilters = (partial: Partial<typeof accountFilters>) => {
     setAccountFilters((prev) => ({ ...prev, ...partial }));
@@ -155,6 +166,17 @@ export function AccountSlicerHeader({ viewMode, onViewModeChange }: AccountSlice
             </button>
           ))}
         </div>
+
+        <button
+          type="button"
+          className="account-slicer-export-btn"
+          disabled={exportableAccountCount === 0}
+          onClick={handleExportFiltered}
+          title={t('groupMonitoring.exportFiltered')}
+          aria-label={t('groupMonitoring.exportFiltered')}
+        >
+          <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </button>
       </div>
     </div>
   );

@@ -1,11 +1,16 @@
 import { Database, KeyRound, Server, Shield } from 'lucide-react';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { AdminExpandCard } from '@/components/admin/AdminExpandCard';
+import { AutoSyncSettingsSection } from '@/components/settings/AutoSyncSettingsSection';
+import { LanguageToggle } from '@/components/settings/LanguageToggle';
+import { useAutoSyncSettings } from '@/contexts/AutoSyncSettingsContext';
 import { RM_ACTIVE_TABLES } from '@/config/tables';
 import { useLanguage } from '@/hooks/useLanguage';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 export function AdminPage() {
-  const { t } = useLanguage();
+  const { locale, setLocale, t } = useLanguage();
   const supabaseReady = isSupabaseConfigured();
+  const { enabled, intervalMinutes } = useAutoSyncSettings();
 
   const items = [
     {
@@ -38,6 +43,12 @@ export function AdminPage() {
     },
   ] as const;
 
+  const autoSyncSummary = enabled
+    ? t('admin.autoSyncSummaryOn', { minutes: intervalMinutes })
+    : t('admin.autoSyncSummaryOff');
+
+  const languageSummary = locale === 'zh' ? 'ZH' : 'ENG';
+
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
       <div className="border-b border-border-subtle px-6 py-4">
@@ -45,30 +56,60 @@ export function AdminPage() {
         <p className="mt-0.5 text-xs text-text-muted">{t('admin.subtitle')}</p>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {items.map(({ id, icon: Icon, labelKey, value, ok }) => (
-            <div
-              key={id}
-              className="flex items-center gap-4 rounded-xl border border-border-subtle bg-bg-shell px-5 py-4"
+      <div className="flex-1 space-y-8 overflow-auto p-6">
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            {t('admin.systemSection')}
+          </h3>
+          <div className="admin-page-grid mt-3">
+            {items.map(({ id, icon: Icon, labelKey, value, ok }) => (
+              <div
+                key={id}
+                className="flex items-center gap-4 rounded-xl border border-border-subtle bg-bg-shell px-5 py-4"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-bg-active">
+                  <Icon className="h-5 w-5 text-text-muted" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-text-muted">{t(labelKey)}</p>
+                  <p
+                    className={`truncate text-sm font-medium ${ok ? 'text-text-primary' : 'text-text-secondary'}`}
+                  >
+                    {value}
+                  </p>
+                </div>
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${ok ? 'bg-wa' : 'bg-text-muted'}`}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="border-t border-border-subtle pt-8">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            {t('admin.preferencesSection')}
+          </h3>
+
+          <div className="admin-page-grid mt-3">
+            <AdminExpandCard
+              title={t('settings.autoSync.title')}
+              summary={autoSyncSummary}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-bg-active">
-                <Icon className="h-5 w-5 text-text-muted" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-text-muted">{t(labelKey)}</p>
-                <p
-                  className={`truncate text-sm font-medium ${ok ? 'text-text-primary' : 'text-text-secondary'}`}
-                >
-                  {value}
-                </p>
-              </div>
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${ok ? 'bg-wa' : 'bg-text-muted'}`}
-              />
-            </div>
-          ))}
-        </div>
+              <AutoSyncSettingsSection />
+            </AdminExpandCard>
+
+            <AdminExpandCard
+              title={t('settings.language')}
+              summary={languageSummary}
+            >
+              <p className="text-xs leading-relaxed text-text-muted">
+                {t('settings.languageDesc')}
+              </p>
+              <LanguageToggle value={locale} onChange={setLocale} />
+            </AdminExpandCard>
+          </div>
+        </section>
       </div>
     </div>
   );

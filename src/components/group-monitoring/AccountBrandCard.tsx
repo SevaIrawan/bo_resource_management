@@ -1,8 +1,7 @@
-import { ChevronDown, Download } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
-import { exportBrandAccountsExcel } from '@/lib/exportExcel';
 import { AddAccountHeaderMenu } from '@/components/group-monitoring/AddAccountHeaderMenu';
 import {
   AddAccountModal,
@@ -47,11 +46,6 @@ export function AccountBrandCard({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  function handleExportBrand() {
-    if (group.accounts.length === 0) return;
-    exportBrandAccountsExcel(group);
-  }
 
   const allAligned = group.misalignedCount === 0;
 
@@ -161,8 +155,7 @@ export function AccountBrandCard({
         </div>
 
         {expanded ? (
-          <>
-            <div className="brand-card-body">
+          <div className="brand-card-body">
               <table className="brand-card-table">
                 <AccountMonitoringTableColGroup />
                 <AccountMonitoringTableHead />
@@ -190,20 +183,7 @@ export function AccountBrandCard({
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            <footer className="brand-card-footer">
-              <button
-                type="button"
-                className="brand-card-export-btn"
-                disabled={group.accounts.length === 0}
-                onClick={handleExportBrand}
-              >
-                <Download className="h-3.5 w-3.5" strokeWidth={2} />
-                {t('groupMonitoring.accountCard.export')}
-              </button>
-            </footer>
-          </>
+          </div>
         ) : null}
       </article>
 

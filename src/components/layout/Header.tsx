@@ -1,9 +1,7 @@
-import { useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useSidebar } from '@/hooks/useSidebar';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { LanguageToggle } from '@/components/settings/LanguageToggle';
 import { LiveClock } from '@/components/ui/LiveClock';
 import { BrandImage } from '@/components/brand/BrandImage';
 
@@ -13,14 +11,8 @@ interface HeaderProps {
 
 export function Header({ title }: HeaderProps) {
   const { toggle } = useSidebar();
-  const { locale, setLocale, t } = useLanguage();
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  function handleLogout() {
-    logout();
-    navigate('/login', { replace: true });
-  }
+  const { t } = useLanguage();
+  const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 flex h-(--header-height) shrink-0 items-center justify-between border-b border-border-subtle bg-bg-shell px-6">
@@ -53,16 +45,6 @@ export function Header({ title }: HeaderProps) {
           alt={t('header.flagAlt')}
           className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/15"
         />
-
-        <LanguageToggle variant="header" value={locale} onChange={setLocale} />
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="rounded-md bg-danger px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-danger-hover"
-        >
-          {t('header.logout')}
-        </button>
       </div>
     </header>
   );

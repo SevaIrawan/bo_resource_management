@@ -29,8 +29,7 @@ export function MonitoringTabs({
       {TAB_IDS.map((id) => {
         const isActive = value === id;
         const label = t(TAB_LABEL_KEYS[id]);
-        const displayLabel =
-          id === 'ticket' && ticketCount > 0 ? `${label} (${ticketCount})` : label;
+        const showTicketBadge = id === 'ticket' && ticketCount > 0;
 
         return (
           <button
@@ -38,7 +37,7 @@ export function MonitoringTabs({
             type="button"
             onClick={() => onChange(id)}
             className={cn(
-              'monitoring-tab-btn rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+              'monitoring-tab-btn inline-flex items-center gap-0.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
               id === 'account' && 'monitoring-tab-btn--account',
               id === 'ticket' && 'monitoring-tab-btn--ticket',
               isActive
@@ -46,7 +45,12 @@ export function MonitoringTabs({
                 : 'text-text-muted hover:text-text-secondary',
             )}
           >
-            {displayLabel}
+            {label}
+            {showTicketBadge ? (
+              <span className="monitoring-tab-badge" aria-label={String(ticketCount)}>
+                ({ticketCount})
+              </span>
+            ) : null}
           </button>
         );
       })}

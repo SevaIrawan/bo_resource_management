@@ -2,16 +2,11 @@ export const en = {
   nav: {
     groupMonitoring: 'Group Monitoring',
     admin: 'Admin',
-    settings: 'Settings',
+    logout: 'Logout',
   },
   pages: {
     groupMonitoring: 'Group Monitoring',
     admin: 'Admin',
-    settings: 'Settings',
-  },
-  subheader: {
-    adminDesc: 'System configuration & session management',
-    settingsDesc: 'Application preferences',
   },
   settings: {
     title: 'Settings',
@@ -36,7 +31,6 @@ export const en = {
     logout: 'Logout',
     toggleSidebar: 'Toggle sidebar',
     flagAlt: 'Malaysia',
-    languageToggle: 'Display language',
   },
   tabs: {
     account: 'Account',
@@ -77,6 +71,7 @@ export const en = {
     viewToggle: 'View mode',
     viewCard: 'Card view',
     viewTable: 'Table view',
+    exportFiltered: 'Export filtered accounts',
     searchPlaceholder: 'Search account name / phone number…',
     searchSubmit: 'Search',
     exportCsv: 'Export group links (CSV)',
@@ -113,6 +108,7 @@ export const en = {
       sessionInvalid: 'Invalid',
       procSync: 'PROC SYNC',
       procScraper: 'PROC SCRAPER',
+      run: 'Run',
       runScraper: 'Run Scraper',
       useSyncToLogin: 'Use Sync (↻) to log in first',
       scraperRunning: 'Scraping…',
@@ -350,8 +346,10 @@ export const en = {
     hidePassword: 'Hide password',
   },
   admin: {
-    title: 'System status',
-    subtitle: 'Configuration & database connection',
+    title: 'Admin',
+    subtitle: 'System status and application preferences',
+    systemSection: 'System status',
+    preferencesSection: 'Preferences',
     supabase: 'Supabase',
     activeSessions: 'Active sessions',
     platform: 'Platform',
@@ -360,6 +358,8 @@ export const en = {
     notConfigured: 'Not configured',
     desktop: 'Desktop',
     web: 'Web',
+    autoSyncSummaryOn: 'On · {{minutes}} min',
+    autoSyncSummaryOff: 'Off',
   },
   common: {
     appError: 'Application error',

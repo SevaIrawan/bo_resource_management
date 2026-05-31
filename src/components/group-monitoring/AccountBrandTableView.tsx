@@ -1,4 +1,3 @@
-import { Download } from 'lucide-react';
 import { AccountTableRow } from '@/components/group-monitoring/AccountMonitoringCells';
 import {
   ACCOUNT_TABLE_COLUMN_COUNT,
@@ -6,7 +5,6 @@ import {
   AccountMonitoringTableHead,
 } from '@/components/group-monitoring/AccountMonitoringTableParts';
 import { flattenBrandAccounts } from '@/lib/accountBrandUtils';
-import { exportAllAccountsExcel } from '@/lib/exportExcel';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
@@ -80,18 +78,6 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
           </tbody>
         </table>
       </div>
-
-      <footer className="account-table-view-footer">
-        <button
-          type="button"
-          className="brand-card-export-btn"
-          disabled={rows.length === 0}
-          onClick={() => exportAllAccountsExcel(groups)}
-        >
-          <Download className="h-3.5 w-3.5" strokeWidth={2} />
-          {t('groupMonitoring.accountCard.export')}
-        </button>
-      </footer>
     </div>
   );
 }

@@ -8,7 +8,6 @@ import { useLanguage } from '@/hooks/useLanguage';
 const PAGE_TITLE_KEYS: Record<string, string> = {
   '/': 'pages.groupMonitoring',
   '/admin': 'pages.admin',
-  '/settings': 'pages.settings',
 };
 
 export function DashboardLayout() {

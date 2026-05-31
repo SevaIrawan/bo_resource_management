@@ -98,6 +98,25 @@ export function addAccountToGroup(
   return rebuildGroupMetrics({ ...group, accounts, emptySlots });
 }
 
+/** Hapus baris akun dari card dan kembalikan satu slot kosong. */
+export function removeAccountFromGroup(
+  group: AccountBrandGroup,
+  accountId: string,
+): AccountBrandGroup {
+  const accounts = group.accounts.filter((account) => account.id !== accountId);
+  const slotId =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? `${group.id}-slot-${crypto.randomUUID()}`
+      : `${group.id}-slot-${Date.now()}`;
+
+  const emptySlots = [
+    ...group.emptySlots,
+    { id: slotId, brandName: group.brandName },
+  ];
+
+  return rebuildGroupMetrics({ ...group, accounts, emptySlots });
+}
+
 function countMisaligned(accounts: AccountBrandGroup['accounts']) {
   return accounts.filter((account) => account.isMisaligned).length;
 }

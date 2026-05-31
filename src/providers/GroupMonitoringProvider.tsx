@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GroupMonitoringContext } from '@/contexts/group-monitoring-context';
 import { useAuth } from '@/hooks/useAuth';
+import { useAutoAccountSync } from '@/hooks/useAutoAccountSync';
 import { useRealtimeAccountSessions } from '@/hooks/useRealtimeAccountSessions';
 import { useRealtimeMonitoring } from '@/hooks/useRealtimeMonitoring';
 import { useMonitoringTab } from '@/hooks/useMonitoringTab';
@@ -107,11 +108,27 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     void reloadAll();
   }, [reloadAll]);
 
+  const autoSyncState = useAutoAccountSync({
+    userId: user?.id,
+    groups,
+    onGroupsChange: setGroups,
+    enabled: Boolean(user?.id),
+    loading,
+    suspendAccountIds: probeSuspendAccountIds,
+  });
+  const autoSyncRunning = autoSyncState?.isRunning ?? false;
+
+  const realtimeSuspendIds = useMemo(() => {
+    if (!autoSyncRunning) return probeSuspendAccountIds;
+    const all = groups.flatMap((g) => g.accounts.map((a) => a.id));
+    return [...new Set([...probeSuspendAccountIds, ...all])];
+  }, [autoSyncRunning, groups, probeSuspendAccountIds]);
+
   useRealtimeAccountSessions({
     groups,
     onGroupsChange: setGroups,
     enabled: Boolean(user?.id) && !loading,
-    suspendProbeAccountIds: probeSuspendAccountIds,
+    suspendProbeAccountIds: realtimeSuspendIds,
   });
 
   useRealtimeMonitoring({

@@ -56,6 +56,7 @@ declare global {
           platform: Platform;
           storedSessionString?: string | null;
         }) => Promise<{ ready: boolean; message?: string }>;
+        hasWaDiskAuth?: (sessionId: string) => Promise<{ hasAuth: boolean }>;
         onQr: (callback: (payload: PlatformLoginEvent & { dataUrl: string }) => void) => () => void;
         onPairingCode: (
           callback: (payload: PlatformLoginEvent & { code: string }) => void,
@@ -82,14 +83,24 @@ declare global {
           adminGroups: number;
           message?: string;
         }>;
-        validateSession: (payload: {
-          sessionId: string;
-          platform: Platform;
-          storedSessionString?: string | null;
-        }) => Promise<{ valid: boolean; message?: string }>;
+    validateSession: (payload: {
+      sessionId: string;
+      platform: Platform;
+      storedSessionString?: string | null;
+      strict?: boolean;
+    }) => Promise<{ valid: boolean; message?: string }>;
         exportTelegramSession: (
           sessionId: string,
         ) => Promise<{ sessionString: string; loginMethod?: string }>;
+        onProgress?: (
+          callback: (payload: {
+            sessionId: string;
+            phase: string;
+            current?: number;
+            total?: number;
+            label?: string;
+          }) => void,
+        ) => () => void;
       };
       onSessionInvalid?: (
         callback: (payload: {

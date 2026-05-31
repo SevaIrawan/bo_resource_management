@@ -12,5 +12,5 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host ""
 Write-Host "Setup complete." -ForegroundColor Green
 Write-Host "  1. Copy .env.example -> .env and fill Supabase + Telegram keys"
-Write-Host "  2. Supabase SQL: 003_auth_login_rpc.sql lalu 017 (DB lama: +018_drop_legacy_rm.sql sekali)"
+Write-Host "  2. Supabase SQL: baca SUPABASE_RUNBOOK.md (003->017->020->023 ATAU 018->020->023)"
 Write-Host "  3. npm run dev"

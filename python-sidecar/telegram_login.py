@@ -146,19 +146,29 @@ async def start_telegram_qr(session_id: str) -> dict:
         await cancel_telegram(session_id)
         return {"status": "error", "message": str(exc)}
 
-async def _refresh_qr_login_status(session: TgLoginSession) -> None:
-    """Update fase UI saat scan — tidak set ready sebelum wait() selesai."""
+async def _finalize_qr_login_if_live(session: TgLoginSession) -> None:
+    """Setelah scan: jika session sudah live di server TG, langsung ready (jangan hang di wait())."""
     if session.status not in ("pending", "confirming"):
         return
 
     ok, err = await _verify_client_live(session.client)
     if ok:
-        session.status = "confirming"
-        session.error = None
+        if session.wait_task and not session.wait_task.done():
+            session.wait_task.cancel()
+            try:
+                await session.wait_task
+            except asyncio.CancelledError:
+                pass
+        session.qr_login = None
+        await _apply_login_ready(session)
         return
     if err == "2FA":
         session.status = "need_2fa"
         session.error = None
+
+
+async def _refresh_qr_login_status(session: TgLoginSession) -> None:
+    await _finalize_qr_login_if_live(session)
 
 
 async def _wait_for_qr_scan(session_id: str) -> None:
@@ -168,16 +178,22 @@ async def _wait_for_qr_scan(session_id: str) -> None:
 
     try:
         await asyncio.wait_for(session.qr_login.wait(), timeout=180)
+        if session.status in ("ready", "need_2fa"):
+            return
         await _apply_login_ready(session)
     except SessionPasswordNeededError:
         session.status = "need_2fa"
         session.error = None
     except asyncio.TimeoutError:
+        if session.status == "ready":
+            return
         session.status = "error"
         session.error = "QR login timed out. Scan again or use phone login."
     except asyncio.CancelledError:
-        raise
+        return
     except Exception as exc:  # noqa: BLE001
+        if session.status == "ready":
+            return
         session.status = "error"
         session.error = str(exc)
 

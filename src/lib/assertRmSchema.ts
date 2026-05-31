@@ -9,7 +9,7 @@ import { RM_ACTIVE_TABLES, TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
 
 export const RM_SCHEMA_HINT =
-  'SCHEMA_OUTDATED: Instal baru → 003 + 017. DB lama → 018_drop_legacy_rm.sql (sekali), lalu scrape ulang.';
+  'SCHEMA_OUTDATED: Instal baru → 003 + 017 + 020 + 023. DB lama → 018 (sekali) + 020 + 023.';
 
 function isSchemaError(message: string | undefined): boolean {
   if (!message) return false;
@@ -22,11 +22,13 @@ function isSchemaError(message: string | undefined): boolean {
     lower.includes('phone_number') ||
     lower.includes('invite_link') ||
     lower.includes('account_id') ||
-    lower.includes('brand_id')
+    lower.includes('brand_id') ||
+    lower.includes('session_status') ||
+    lower.includes('sync_source')
   );
 }
 
-/** Verifikasi otomatis — semua tabel RM + kolom kritikal (tanpa perintah manual user). */
+/** Verifikasi tabel/kolom RM sekali saat load — tanpa RPC probe, tanpa UUID palsu. */
 export async function assertRmSchema(): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
@@ -35,7 +37,11 @@ export async function assertRmSchema(): Promise<void> {
     { table: TABLES.brands, select: BRAND_SELECT },
     { table: TABLES.messagingAccounts, select: MESSAGING_ACCOUNT_SELECT },
     { table: TABLES.platformSessions, select: 'id, account_id, is_active' },
-    { table: TABLES.platformSessionLogs, select: 'id, account_id, event_type' },
+    {
+      table: TABLES.platformSessionLogs,
+      select: 'id, account_id, event_type, session_status, updated_at',
+    },
+    { table: TABLES.syncActivityLogs, select: 'id, account_id, sync_source, session_status' },
     { table: TABLES.scrapeRuns, select: 'id, account_id, status' },
     { table: TABLES.groupScrapeDaily, select: DAILY_GROUP_SELECT },
     { table: TABLES.groupsMaster, select: MASTER_GROUP_SELECT },
@@ -51,10 +57,13 @@ export async function assertRmSchema(): Promise<void> {
     probes.map((p) => supabase.from(p.table).select(p.select).limit(1)),
   );
 
-  for (const result of results) {
-    if (result.error && isSchemaError(result.error.message)) {
-      throw new Error(RM_SCHEMA_HINT);
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const probe = probes[i];
+    if (!result.error) continue;
+    if (isSchemaError(result.error.message)) {
+      throw new Error(`${RM_SCHEMA_HINT} (${probe.table}: ${result.error.message})`);
     }
-    if (result.error) throw result.error;
+    throw new Error(`${probe.table}: ${result.error.message}`);
   }
 }

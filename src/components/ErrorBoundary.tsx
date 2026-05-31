@@ -1,5 +1,4 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { useLanguage } from '@/hooks/useLanguage';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -10,8 +9,6 @@ interface ErrorBoundaryState {
 }
 
 function ErrorFallback({ error }: { error: Error }) {
-  const { t } = useLanguage();
-
   return (
     <div
       style={{
@@ -27,7 +24,7 @@ function ErrorFallback({ error }: { error: Error }) {
         textAlign: 'center',
       }}
     >
-      <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>{t('common.appError')}</p>
+      <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>Something went wrong</p>
       <p style={{ maxWidth: '28rem', fontSize: '0.75rem', color: '#a8a4c0' }}>
         {error.message}
       </p>
@@ -45,7 +42,7 @@ function ErrorFallback({ error }: { error: Error }) {
           cursor: 'pointer',
         }}
       >
-        {t('common.reloadApp')}
+        Reload app
       </button>
     </div>
   );

@@ -41,7 +41,8 @@ function accountRowFromDb(
     groupsTotal: 0,
     adminCurrent: 0,
     adminTotal: 0,
-    sessionStatus: hasSession ? 'valid' : 'invalid',
+    // VALID hanya bila snapshot terakhir dari operasi live; baris DB saja ≠ device CONNECTED.
+    sessionStatus: hasSession && snap?.session_status === 'valid' ? 'valid' : 'invalid',
     actionProcess: null,
     syncState: 'pending',
     isMisaligned: false,
@@ -129,7 +130,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
       const master = masterByAccount.get(account.id);
       if (master) {
         row = applyMasterStatsToAccountRow(row, master, {
-          deviceConnected: hasSession,
+          deviceConnected: row.sessionStatus === 'valid',
           brandStandard: brandX,
         });
         if (
@@ -141,8 +142,8 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
           const result = buildAccountSyncResult({
             master,
             device: {
-              valid: hasSession,
-              totalGroups: snap.groups_current,
+              valid: snap.session_status === 'valid',
+              totalGroups: snap.session_status === 'valid' ? snap.groups_current : 0,
               adminGroups: 0,
             },
             brandStandard: brandX,

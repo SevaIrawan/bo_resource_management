@@ -15,14 +15,17 @@ import {
 } from '@/components/group-monitoring/AccountMonitoringTableParts';
 import type { AddAccountInput, AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
+import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 interface AccountBrandCardProps {
   group: AccountBrandGroup;
   onAddAccount: (input: AddAccountInput) => Promise<void>;
   onSyncAccount?: (accountId: string) => void;
+  onRemoveFromSlot?: (account: import('@/types/accountMonitoringUi').AccountBrandRow) => void;
   onRunScraper?: (accountId: string) => void;
   checkingAccountId?: string | null;
   scraperAccountId?: string | null;
+  getScrapeProgress?: (accountId: string) => UiScrapeProgress | null;
   defaultExpanded?: boolean;
 }
 
@@ -30,9 +33,11 @@ export function AccountBrandCard({
   group,
   onAddAccount,
   onSyncAccount,
+  onRemoveFromSlot,
   onRunScraper,
   checkingAccountId = null,
   scraperAccountId = null,
+  getScrapeProgress,
   defaultExpanded = true,
 }: AccountBrandCardProps) {
   const { t } = useLanguage();
@@ -168,8 +173,12 @@ export function AccountBrandCard({
                       row={row}
                       syncLoading={checkingAccountId === row.id}
                       scraperLoading={scraperAccountId === row.id}
+                      scrapeProgress={getScrapeProgress?.(row.id) ?? null}
                       onSync={() => onSyncAccount?.(row.id)}
                       onRunScraper={() => onRunScraper?.(row.id)}
+                      onRemoveFromSlot={
+                        onRemoveFromSlot ? () => onRemoveFromSlot(row) : undefined
+                      }
                     />
                   ))}
                   {group.emptySlots.map((slot) => (

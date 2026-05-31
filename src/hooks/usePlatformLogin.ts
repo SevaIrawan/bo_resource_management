@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLanguage } from '@/hooks/useLanguage';
 import { loginQrTimeoutMessage } from '@/lib/platformSyncCopy';
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
 import { withTimeout } from '@/lib/withTimeout';
 import type { Platform } from '@/types/database';
 
-const LOGIN_RESTORE_TIMEOUT_MS = 12_000;
+const TG_LOGIN_RESTORE_TIMEOUT_MS = 12_000;
+/** Setelah Chromium mulai, tunggu event QR (bukan 24 jam — maks ~2 menit). */
+const WA_QR_TIMEOUT_MS = 120_000;
+const DEFAULT_QR_TIMEOUT_MS = 45_000;
 
 export type LoginView = 'qr' | 'phone' | 'code' | '2fa';
 export type LoginStatus =
   | 'loading'
+  | 'restoring'
+  | 'starting-qr'
   | 'idle'
   | 'qr'
   | 'confirming'
@@ -26,11 +30,16 @@ export function usePlatformLogin(
   platform: Platform | null,
   sessionId: string,
   defaultPhone = '',
-  options?: { accountId?: string; attemptRestore?: boolean },
+  options?: {
+    accountId?: string;
+    attemptRestore?: boolean;
+    t?: (key: string, vars?: Record<string, string | number>) => string;
+  },
 ) {
   const accountId = options?.accountId ?? sessionId;
   const attemptRestore = options?.attemptRestore !== false;
   const skipDiskRestore = options?.attemptRestore === false;
+  const t = options?.t ?? ((key: string) => key);
   const [view, setView] = useState<LoginView>('qr');
   const [status, setStatus] = useState<LoginStatus>('loading');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -40,9 +49,16 @@ export function usePlatformLogin(
   const sessionReadyRef = useRef(false);
   const loginStartedRef = useRef(false);
   const electronSessionIdRef = useRef(sessionId);
-  const { t, locale } = useLanguage();
+  const qrTimeoutIdRef = useRef<number | undefined>(undefined);
 
   electronSessionIdRef.current = sessionId;
+
+  const clearQrTimeout = useCallback(() => {
+    if (qrTimeoutIdRef.current !== undefined) {
+      window.clearTimeout(qrTimeoutIdRef.current);
+      qrTimeoutIdRef.current = undefined;
+    }
+  }, []);
 
   const reset = useCallback(() => {
     setView('qr');
@@ -101,6 +117,7 @@ export function usePlatformLogin(
         setError(payload.message ?? null);
       }
       if (payload.phase === 'confirming') {
+        clearQrTimeout();
         setView('qr');
         setStatus('confirming');
         setError(null);
@@ -109,6 +126,7 @@ export function usePlatformLogin(
 
     const offReady = api.onReady((payload) => {
       if (!matchesSession(payload)) return;
+      clearQrTimeout();
       sessionReadyRef.current = true;
       setStatus('ready');
       setError(null);
@@ -116,6 +134,7 @@ export function usePlatformLogin(
 
     const offError = api.onError((payload) => {
       if (!matchesSession(payload)) return;
+      clearQrTimeout();
       setQrDataUrl(null);
       setStatus('error');
       setError(payload.message ?? 'Login failed');
@@ -128,7 +147,7 @@ export function usePlatformLogin(
       offReady();
       offError();
     };
-  }, [open, platform, sessionId]);
+  }, [clearQrTimeout, open, platform, sessionId]);
 
   // Start / cancel login — cancel hanya saat modal ditutup
   useEffect(() => {
@@ -137,9 +156,6 @@ export function usePlatformLogin(
         const api = window.electronAPI?.platformLogin;
         if (api) {
           void api.cancel(electronSessionIdRef.current);
-          if (electronSessionIdRef.current !== sessionId) {
-            void api.cancel(sessionId);
-          }
         }
       }
       if (!open) {
@@ -152,9 +168,14 @@ export function usePlatformLogin(
     const api = window.electronAPI?.platformLogin;
     if (!api) return;
 
+    // Scan sudah sukses — jangan start QR lagi (hindari cancel session di sidecar).
+    if (sessionReadyRef.current) return;
+
     reset();
     loginStartedRef.current = true;
     sessionReadyRef.current = false;
+
+    let cancelled = false;
 
     void (async () => {
       setStatus('loading');
@@ -164,9 +185,12 @@ export function usePlatformLogin(
         platform,
         accountId,
       });
+      if (cancelled) return;
       electronSessionIdRef.current = deviceSessionId;
 
-      if (attemptRestore) {
+      // Telegram: coba restore string DB dulu. WA: langsung ke Electron (hindari double restore 90s+45s).
+      if (attemptRestore && platform === 'telegram') {
+        setStatus('restoring');
         try {
           const warmed = await withTimeout(
             tryWarmPlatformSession({
@@ -174,9 +198,10 @@ export function usePlatformLogin(
               platform,
               accountId,
             }),
-            LOGIN_RESTORE_TIMEOUT_MS,
+            TG_LOGIN_RESTORE_TIMEOUT_MS,
             'Restore session',
           );
+          if (cancelled) return;
           if (warmed) {
             sessionReadyRef.current = true;
             setStatus('ready');
@@ -187,31 +212,83 @@ export function usePlatformLogin(
         }
       }
 
-      await api.start({
-        sessionId: deviceSessionId,
-        platform,
-        mode: 'qr',
-        skipDiskRestore,
-      });
+      if (cancelled) return;
+
+      // Session invalid / logout: buang client + cache disk supaya QR tidak hang di restore lama.
+      if (platform === 'whatsapp' && skipDiskRestore) {
+        try {
+          await api.cancel(deviceSessionId);
+          await api.release(deviceSessionId, { purgeWaDisk: true });
+        } catch {
+          // lanjut — Electron start juga clear disk
+        }
+      }
+
+      if (cancelled) return;
+
+      setStatus('starting-qr');
+
+      const qrTimeoutMs =
+        platform === 'whatsapp' ? WA_QR_TIMEOUT_MS : DEFAULT_QR_TIMEOUT_MS;
+      clearQrTimeout();
+      qrTimeoutIdRef.current = window.setTimeout(() => {
+        setStatus((current) => {
+          if (
+            current === 'ready' ||
+            current === 'confirming' ||
+            current === 'pairing' ||
+            current === 'code' ||
+            current === '2fa'
+          ) {
+            return current;
+          }
+          if (
+            current === 'loading' ||
+            current === 'restoring' ||
+            current === 'starting-qr' ||
+            current === 'qr'
+          ) {
+            setError(loginQrTimeoutMessage(platform, t));
+            return 'error';
+          }
+          return current;
+        });
+      }, qrTimeoutMs);
+
+      // Jangan await initialize Chromium — QR dikirim lewat IPC saat siap.
+      void api
+        .start({
+          sessionId: deviceSessionId,
+          platform,
+          mode: 'qr',
+          skipDiskRestore: skipDiskRestore,
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setStatus('error');
+          setError(err instanceof Error ? err.message : 'Failed to start login');
+        });
     })().catch((err: unknown) => {
+      if (cancelled) return;
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to start login');
     });
 
-    const qrTimeout = window.setTimeout(() => {
-      setStatus((current) => {
-        if (current === 'loading') {
-          setError(loginQrTimeoutMessage(platform, t));
-          return 'error';
-        }
-        return current;
-      });
-    }, 45000);
-
     return () => {
-      window.clearTimeout(qrTimeout);
+      cancelled = true;
+      clearQrTimeout();
     };
-  }, [accountId, attemptRestore, open, platform, sessionId, reset, skipDiskRestore, locale, t]);
+  }, [
+    accountId,
+    attemptRestore,
+    clearQrTimeout,
+    open,
+    platform,
+    sessionId,
+    reset,
+    skipDiskRestore,
+    t,
+  ]);
 
   const switchToPhoneForm = useCallback(async () => {
     const api = window.electronAPI?.platformLogin;
@@ -251,11 +328,19 @@ export function usePlatformLogin(
         accountId,
       });
       electronSessionIdRef.current = deviceSessionId;
-      await api.start({
+      if (platform === 'whatsapp') {
+        try {
+          await api.cancel(deviceSessionId);
+          await api.release(deviceSessionId, { purgeWaDisk: true });
+        } catch {
+          // ignore
+        }
+      }
+      setStatus('starting-qr');
+      void api.start({
         sessionId: deviceSessionId,
         platform,
         mode: 'qr',
-        // Ganti ke QR = auth disk lama harus dibuang supaya event `qr` keluar.
         skipDiskRestore: platform === 'whatsapp' ? true : skipDiskRestore,
       });
     } catch (err) {

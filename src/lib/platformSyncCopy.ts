@@ -53,6 +53,19 @@ export function syncSessionValidDetailMessage(
   });
 }
 
+/** Popup Step 1 / Step 2 — ringkas sesuai standar sync. */
+export function syncConnectedSummaryMessage(
+  platform: Platform,
+  metrics: { device: number; brand: number },
+  t: TFn,
+): string {
+  return t(`${SYNC}.syncConnectedSummary`, {
+    platform: platformDisplayName(platform),
+    brand: metrics.brand,
+    device: metrics.device,
+  });
+}
+
 export function loginQrTimeoutMessage(platform: Platform, t: TFn): string {
   return platform === 'whatsapp'
     ? t(`${SYNC}.qrTimeoutWa`)
@@ -91,15 +104,8 @@ export function scrapeProgressMessage(platform: Platform, t: TFn): string {
     : t(`${SYNC}.scrapingMessageTg`);
 }
 
-export function postLoginScrapeMessage(
-  platform: Platform,
-  account: string,
-  t: TFn,
-): string {
-  return t(`${SYNC}.postLoginScrapeMessage`, {
-    account,
-    platform: platformDisplayName(platform),
-  });
+export function postLoginScrapeMessage(_platform: Platform, _account: string, t: TFn): string {
+  return t(`${SYNC}.postLoginScrapeMessage`);
 }
 
 /** Sematkan nama platform pada subtitle akun di modal. */

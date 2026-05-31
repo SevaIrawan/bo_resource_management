@@ -26,7 +26,7 @@ function DashboardShell() {
   const title = t(titleKey);
 
   return (
-    <div className="flex h-full overflow-hidden bg-bg-base">
+    <div className="locale-switch-surface flex h-full overflow-hidden bg-bg-base">
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">

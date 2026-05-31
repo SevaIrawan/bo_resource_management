@@ -3,6 +3,7 @@ import { Menu } from 'lucide-react';
 import { useSidebar } from '@/hooks/useSidebar';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
+import { LanguageToggle } from '@/components/settings/LanguageToggle';
 import { LiveClock } from '@/components/ui/LiveClock';
 import { BrandImage } from '@/components/brand/BrandImage';
 
@@ -12,7 +13,7 @@ interface HeaderProps {
 
 export function Header({ title }: HeaderProps) {
   const { toggle } = useSidebar();
-  const { t } = useLanguage();
+  const { locale, setLocale, t } = useLanguage();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -33,8 +34,8 @@ export function Header({ title }: HeaderProps) {
           <Menu className="h-5 w-5" strokeWidth={1.75} />
         </button>
 
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold leading-tight text-text-primary">
+        <div className="header-title-block min-w-0">
+          <h1 className="header-page-title truncate text-lg font-semibold leading-tight text-text-primary">
             {title}
           </h1>
           <LiveClock />
@@ -42,8 +43,8 @@ export function Header({ title }: HeaderProps) {
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
-        <span className="text-sm text-text-secondary">
-          👋 {t('header.welcome')},{' '}
+        <span className="header-welcome text-sm text-text-secondary">
+          <span className="header-welcome-greeting">{t('header.welcome')},</span>{' '}
           <span className="font-medium text-text-primary">{user?.userName ?? '—'}</span>
         </span>
 
@@ -52,6 +53,8 @@ export function Header({ title }: HeaderProps) {
           alt={t('header.flagAlt')}
           className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/15"
         />
+
+        <LanguageToggle variant="header" value={locale} onChange={setLocale} />
 
         <button
           type="button"

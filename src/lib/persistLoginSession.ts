@@ -1,5 +1,8 @@
-import { resolveMessagingAccountId } from '@/lib/accountScraper';
+import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
+import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
+import { withTimeout } from '@/lib/withTimeout';
 import {
+  hasActivePlatformSession,
   saveTelegramPlatformSession,
   saveWhatsAppPlatformSession,
 } from '@/lib/platformSessions';
@@ -16,21 +19,33 @@ export async function persistTelegramLoginSession(input: {
     throw new Error('SCRAPER_DESKTOP_REQUIRED');
   }
 
-  const dbAccountId = await resolveMessagingAccountId({
+  const { accountId: dbAccountId } = await resolveDbAccountForRow({
     userId: input.userId,
-    platform: input.account.platform,
-    brand: input.account.brandName,
-    accName: input.account.accountName,
-    phoneNumber: input.account.phoneNumber,
-    localId: input.account.id,
+    account: input.account,
   });
 
-  const exported = await exporter(input.account.id);
+  const deviceSessionId = await resolveDeviceSessionId({
+    sessionId: input.account.id,
+    platform: 'telegram',
+    accountId: dbAccountId,
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
+  const exported = await withTimeout(
+    exporter(deviceSessionId),
+    60_000,
+    'Export Telegram session',
+  );
   await saveTelegramPlatformSession({
     accountId: dbAccountId,
     sessionString: exported.sessionString,
     loginMethod: (exported.loginMethod as LoginMethod | undefined) ?? input.loginMethod ?? 'qr',
   });
+
+  if (!(await hasActivePlatformSession(dbAccountId))) {
+    throw new Error('SESSION_DB_WRITE_FAILED: Telegram session not saved to Supabase');
+  }
 
   return dbAccountId;
 }
@@ -40,20 +55,28 @@ export async function persistWhatsAppLoginSession(input: {
   account: AccountBrandRow;
   loginMethod?: LoginMethod;
 }): Promise<string> {
-  const dbAccountId = await resolveMessagingAccountId({
+  const { accountId: dbAccountId } = await resolveDbAccountForRow({
     userId: input.userId,
-    platform: input.account.platform,
-    brand: input.account.brandName,
-    accName: input.account.accountName,
-    phoneNumber: input.account.phoneNumber,
-    localId: input.account.id,
+    account: input.account,
+  });
+
+  const deviceSessionId = await resolveDeviceSessionId({
+    sessionId: input.account.id,
+    platform: 'whatsapp',
+    accountId: dbAccountId,
   });
 
   await saveWhatsAppPlatformSession({
     accountId: dbAccountId,
-    localAuthClientId: input.account.id,
+    localAuthClientId: deviceSessionId,
     loginMethod: input.loginMethod ?? 'qr',
   });
+
+  if (!(await hasActivePlatformSession(dbAccountId))) {
+    throw new Error(
+      'SESSION_DB_WRITE_FAILED: WhatsApp session not saved to platform_sessions. Run scripts/repair-wa-session.mjs',
+    );
+  }
 
   return dbAccountId;
 }

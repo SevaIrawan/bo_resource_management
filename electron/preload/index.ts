@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       platform: Platform;
       storedSessionString?: string | null;
     }) => ipcRenderer.invoke('platform-login:try-restore', payload),
+    hasWaDiskAuth: (sessionId: string) =>
+      ipcRenderer.invoke('platform-login:has-wa-disk-auth', sessionId) as Promise<{
+        hasAuth: boolean;
+      }>,
     onQr: (callback: (payload: PlatformLoginEvent & { dataUrl: string }) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, payload: PlatformLoginEvent) => {
         if (payload.dataUrl) callback(payload as PlatformLoginEvent & { dataUrl: string });
@@ -94,6 +98,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) => ipcRenderer.invoke('scraper:validate-session', payload),
     exportTelegramSession: (sessionId: string) =>
       ipcRenderer.invoke('scraper:export-telegram-session', sessionId),
+    onProgress: (
+      callback: (payload: {
+        sessionId: string;
+        phase: string;
+        current?: number;
+        total?: number;
+        label?: string;
+      }) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: {
+          sessionId: string;
+          phase: string;
+          current?: number;
+          total?: number;
+          label?: string;
+        },
+      ) => {
+        callback(payload);
+      };
+      ipcRenderer.on('scraper:progress', listener);
+      return () => ipcRenderer.removeListener('scraper:progress', listener);
+    },
   },
   onSessionInvalid: (
     callback: (payload: { sessionId: string; platform: Platform; message?: string }) => void,

@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { RefreshCw, X } from 'lucide-react';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { GroupLinksModal } from '@/components/group-monitoring/GroupLinksModal';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { AccountBrandEmptySlot, AccountBrandRow } from '@/types/accountMonitoringUi';
+import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 export function PlatformBadge({ platform }: { platform: AccountBrandRow['platform'] }) {
   const asset = platform === 'whatsapp' ? 'whatsapp' : 'telegram';
@@ -77,46 +78,20 @@ export function AdminProgress({ current, total }: { current: number; total: numb
   );
 }
 
-function useScraperProgress(active: boolean): number {
-  const [pct, setPct] = useState(0);
-  const [visible, setVisible] = useState(active);
-
-  useEffect(() => {
-    if (active) {
-      setVisible(true);
-      setPct(8);
-      const timer = window.setInterval(() => {
-        setPct((prev) => {
-          if (prev >= 92) return prev;
-          return Math.min(prev + 6 + Math.floor(Math.random() * 10), 92);
-        });
-      }, 350);
-      return () => window.clearInterval(timer);
-    }
-
-    const hideTimer = window.setTimeout(() => {
-      setVisible(false);
-      setPct(0);
-    }, 400);
-    return () => window.clearTimeout(hideTimer);
-  }, [active]);
-
-  return visible ? pct : 0;
-}
-
 function ScraperColumnCell({
   row,
   scraperLoading,
+  scrapeProgress,
   onRunScraper,
 }: {
   row: AccountBrandRow;
   scraperLoading: boolean;
+  scrapeProgress?: UiScrapeProgress | null;
   onRunScraper?: () => void;
 }) {
   const { t, locale } = useLanguage();
   const dateLocale = locale === 'zh' ? 'zh-CN' : 'en-GB';
   const isRunning = scraperLoading || row.actionProcess === 'scraper';
-  const progress = useScraperProgress(isRunning);
   const showLastUpdate =
     !isRunning &&
     row.syncState === 'synced' &&
@@ -132,16 +107,40 @@ function ScraperColumnCell({
   }
 
   if (isRunning) {
-    return (
-      <div className="brand-scraper-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-        <div className="brand-scraper-progress-bar">
-          <div
-            className="brand-scraper-progress-fill"
-            style={{ width: `${Math.max(progress, 6)}%` }}
-          />
+    const hasRealPercent =
+      scrapeProgress?.percent != null &&
+      scrapeProgress.total > 0 &&
+      scrapeProgress.phase === 'group';
+
+    if (hasRealPercent) {
+      const pct = scrapeProgress.percent!;
+      return (
+        <div
+          className="brand-scraper-progress"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-busy="true"
+        >
+          <div className="brand-scraper-progress-bar">
+            <div
+              className="brand-scraper-progress-fill"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="brand-scraper-progress-pct">
+            {scrapeProgress.current}/{scrapeProgress.total}
+          </span>
         </div>
-        <span className="brand-scraper-progress-pct">{progress}%</span>
-      </div>
+      );
+    }
+
+    const statusLabel = scrapeProgress?.label ?? t('groupMonitoring.accountCard.scraperRunning');
+    return (
+      <span className="brand-scraper-status-text" role="status" aria-busy="true">
+        {statusLabel}
+      </span>
     );
   }
 
@@ -202,6 +201,25 @@ function AccountSyncIcon({
   );
 }
 
+function AccountRemoveSlotIcon({ onRemove }: { onRemove: () => void }) {
+  const { t } = useLanguage();
+
+  return (
+    <button
+      type="button"
+      className="brand-account-remove-btn"
+      title={t('groupMonitoring.accountCard.removeFromSlotAria')}
+      aria-label={t('groupMonitoring.accountCard.removeFromSlotAria')}
+      onClick={(event) => {
+        event.stopPropagation();
+        onRemove();
+      }}
+    >
+      <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+    </button>
+  );
+}
+
 function ProcessActionLabel({ action }: { action: 'sync' | 'scraper' }) {
   const { t } = useLanguage();
   const label =
@@ -217,24 +235,31 @@ export function AccountTableRow({
   showAction = true,
   onSync,
   onRunScraper,
+  onRemoveFromSlot,
   syncLoading = false,
   scraperLoading = false,
+  scrapeProgress = null,
 }: {
   row: AccountBrandRow;
   showAction?: boolean;
   onSync?: () => void;
   onRunScraper?: () => void;
+  onRemoveFromSlot?: () => void;
   syncLoading?: boolean;
   scraperLoading?: boolean;
+  scrapeProgress?: UiScrapeProgress | null;
 }) {
   const { t } = useLanguage();
   const [linksOpen, setLinksOpen] = useState(false);
   const isPending = row.syncState === 'pending';
   const isProcessing = row.actionProcess !== null;
 
+  const showRemoveHover =
+    Boolean(onRemoveFromSlot) && !isPending && !isProcessing;
+
   return (
     <>
-      <tr>
+      <tr className={cn('brand-account-row', showRemoveHover && 'brand-account-row--removable')}>
         <td className="brand-col-cell brand-col-cell--account">
           <div className="brand-account-cell">
             <PlatformBadge platform={row.platform} />
@@ -248,6 +273,7 @@ export function AccountTableRow({
                 )}
               </p>
             </div>
+            {showRemoveHover ? <AccountRemoveSlotIcon onRemove={onRemoveFromSlot!} /> : null}
             <AccountSyncIcon onSync={onSync} loading={syncLoading} />
           </div>
         </td>
@@ -295,6 +321,7 @@ export function AccountTableRow({
             <ScraperColumnCell
               row={row}
               scraperLoading={scraperLoading}
+              scrapeProgress={scrapeProgress}
               onRunScraper={onRunScraper}
             />
           </div>

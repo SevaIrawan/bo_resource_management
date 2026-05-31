@@ -9,7 +9,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import {
   parseSyncMetricsPayload,
   resolveSyncFlowMessage,
-  syncSessionValidDetailMessage,
+  syncConnectedSummaryMessage,
   syncSessionValidMessage,
 } from '@/lib/platformSyncCopy';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
@@ -32,11 +32,18 @@ function resolveAlertMessage(
   if (code === 'SCRAPER_DESKTOP_REQUIRED') {
     return t('groupMonitoring.sync.scraperDesktopRequired');
   }
-  if (code === 'SCRAPER_NO_GROUPS') {
+  if (code === 'SCRAPER_NO_GROUPS' || code.startsWith('SCRAPER_NO_GROUPS:')) {
+    if (code.includes(':')) return code.replace('SCRAPER_NO_GROUPS: ', '');
     return t('groupMonitoring.sync.scraperNoGroups');
+  }
+  if (code.startsWith('WA_CLIENT_NOT_READY') || code.startsWith('WA_NOT_CONNECTED')) {
+    return code.replace(/^WA_[A-Z_]+:\s*/, '');
   }
   if (code === 'AUTH_REQUIRED') {
     return t('groupMonitoring.sync.authRequired');
+  }
+  if (code === 'SYNC_FAILED') {
+    return t('groupMonitoring.sync.syncFailed');
   }
   if (code === 'SCRAPER_WRITE_FAILED' || code === 'SCRAPER_FAILED') {
     return t('groupMonitoring.sync.scraperFailed');
@@ -72,7 +79,6 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
     closeFlow,
     phoneSaving,
     syncMessage,
-    loginIntent,
   } = sync;
 
   const alertMessage = resolveAlertMessage(checkError, t);
@@ -91,7 +97,6 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
 
       <SyncAlertModal
         open={step === 'sync-error'}
-        title={t('groupMonitoring.sync.errorTitle')}
         message={alertMessage}
         accountName={target?.account.accountName}
         platform={target?.account.platform}
@@ -100,12 +105,13 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
 
       <SyncSessionModal
         open={step === 'session-valid'}
-        title={t('groupMonitoring.sync.sessionValidTitle')}
         message={(() => {
           const platform = target?.account.platform;
           if (!platform) return t('groupMonitoring.sync.sessionValidMessageTg');
           const metrics = parseSyncMetricsPayload(syncMessage);
-          if (metrics) return syncSessionValidDetailMessage(platform, metrics, t);
+          if (metrics) {
+            return syncConnectedSummaryMessage(platform, metrics, t);
+          }
           return syncSessionValidMessage(platform, t);
         })()}
         accountName={target?.account.accountName ?? ''}
@@ -136,9 +142,13 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
         platform={activePlatform}
         accountName={target?.account.accountName ?? ''}
         sessionId={target?.account.id ?? ''}
+        dbAccountId={target?.dbAccountId}
         phoneNumber={target?.account.phoneNumber ?? ''}
         loginHint={resolveSyncFlowMessage(syncMessage, activePlatform, t)}
-        attemptRestore={loginIntent !== 'sync'}
+        attemptRestore={
+          syncMessage !== 'SESSION_INVALID_RELOGIN' &&
+          syncMessage !== 'SESSION_INVALID_FORCE_SCRAPER'
+        }
         onClose={closeFlow}
         onLoginSuccess={handleLoginSuccess}
       />

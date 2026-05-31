@@ -5,6 +5,7 @@ export interface LanguageContextValue {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
+  isLocaleSwitching: boolean;
 }
 
 export const LanguageContext = createContext<LanguageContextValue | null>(null);

@@ -1,4 +1,6 @@
 import { ensureBrand } from '@/lib/brands';
+import { markPlatformSessionInvalid } from '@/lib/platformSessions';
+import { invalidatePlatformSessionEverywhere } from '@/lib/platformSessionSync';
 import { getSupabase } from '@/lib/supabase';
 import { TABLES } from '@/config/tables';
 import type { Platform } from '@/types/database';
@@ -44,4 +46,37 @@ export async function createMessagingAccount(
   if (!data?.id) throw new Error('INSERT_FAILED');
 
   return data.id as string;
+}
+
+/**
+ * Lepas akun dari slot card: nonaktifkan di DB, cabut session device, kosongkan slot UI.
+ */
+export async function deactivateMessagingAccount(
+  accountId: string,
+  platform: Platform,
+  reason = 'removed_from_slot',
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('SUPABASE_NOT_CONFIGURED');
+  }
+
+  if (window.electronAPI?.isElectron) {
+    await invalidatePlatformSessionEverywhere(accountId, reason, platform, {
+      purgeWaDisk: platform === 'whatsapp',
+    });
+  } else {
+    await markPlatformSessionInvalid(accountId, reason, platform);
+  }
+
+  const { error } = await supabase
+    .from(TABLES.messagingAccounts)
+    .update({
+      is_active: false,
+      updated_at: new Date().toISOString(),
+      notes: reason,
+    })
+    .eq('id', accountId);
+
+  if (error) throw error;
 }

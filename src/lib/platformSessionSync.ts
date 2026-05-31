@@ -1,10 +1,21 @@
-import { logPlatformSessionEvent } from '@/lib/platformSessionLogs';
 import {
+  findAccountIdBySessionData,
   hasActivePlatformSession,
   markPlatformSessionInvalid,
   savePlatformSession,
 } from '@/lib/platformSessions';
 import type { Platform } from '@/types/database';
+
+/** Map LocalAuth id / device sessionId → UUID akun di Supabase. */
+export async function resolveAccountIdFromDeviceSession(
+  sessionId: string,
+  platform: Platform,
+): Promise<string | null> {
+  const fromData = await findAccountIdBySessionData(sessionId, platform);
+  if (fromData) return fromData;
+  if (await hasActivePlatformSession(sessionId)) return sessionId;
+  return null;
+}
 
 /**
  * Database session invalid → lepas session di device (Electron).
@@ -30,13 +41,7 @@ export async function invalidatePlatformSessionEverywhere(
   platform: Platform = 'telegram',
   options?: { purgeWaDisk?: boolean },
 ): Promise<void> {
-  await markPlatformSessionInvalid(accountId, reason);
-  await logPlatformSessionEvent({
-    accountId,
-    platform,
-    eventType: 'db_invalidated',
-    message: reason,
-  });
+  await markPlatformSessionInvalid(accountId, reason, platform);
   await releasePlatformSessionOnDevice(accountId, {
     purgeWaDisk: options?.purgeWaDisk,
   });
@@ -77,12 +82,12 @@ export async function handleDeviceSessionInvalid(
   const reason =
     payload.message?.slice(0, 120) ||
     (payload.platform === 'whatsapp' ? 'disconnected' : 'session_expired');
-  await markPlatformSessionInvalid(payload.sessionId, reason);
-  await logPlatformSessionEvent({
-    accountId: payload.sessionId,
-    platform: payload.platform,
-    eventType: 'device_logout',
-    message: reason,
+
+  const accountId =
+    (await resolveAccountIdFromDeviceSession(payload.sessionId, payload.platform)) ??
+    payload.sessionId;
+
+  await invalidatePlatformSessionEverywhere(accountId, reason, payload.platform, {
+    purgeWaDisk: payload.platform === 'whatsapp',
   });
-  await releasePlatformSessionOnDevice(payload.sessionId);
 }

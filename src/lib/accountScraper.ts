@@ -10,6 +10,10 @@ import { buildGroupRowId } from '@/lib/groupRowId';
 import { phonesMatch } from '@/lib/phoneNormalize';
 import { ensureBrand } from '@/lib/brands';
 import { createMessagingAccount } from '@/lib/messagingAccounts';
+import {
+  findAccountIdBySessionData,
+  hasActivePlatformSession,
+} from '@/lib/platformSessions';
 import { rebuildBrandGroupsMaster } from '@/lib/syncMasterAfterScrape';
 import { getSupabase } from '@/lib/supabase';
 import type { Platform } from '@/types/database';
@@ -71,22 +75,77 @@ export async function resolveMessagingAccountId(input: {
 
   if (error) throw error;
 
-  const match = (rows as MessagingAccount[] | null)?.find((row) => {
+  const brandMatches = (metaBrand: string | undefined) => {
+    if (!metaBrand) return true;
+    return metaBrand.trim().toLowerCase() === brandKey.toLowerCase();
+  };
+
+  const labelMatches = (label: string) => label.trim().toLowerCase() === accKey.toLowerCase();
+
+  const candidates = (rows as MessagingAccount[] | null)?.filter((row) => {
     const meta = row.metadata as { brand?: string } | null;
-    if (meta?.brand !== brandKey) return false;
-    if (String(row.label).trim() !== accKey) return false;
+    if (!brandMatches(meta?.brand)) return false;
+    if (!labelMatches(String(row.label))) return false;
     const dbPhone = readPhoneFromAccount(row);
     if (!phoneRaw) return true;
     if (!dbPhone) return true;
     return phonesMatch(dbPhone, phoneRaw);
   });
 
-  if (match?.id) {
+  if (candidates?.length === 1) {
+    const match = candidates[0];
     const dbPhone = readPhoneFromAccount(match);
     if (hasValidAccountPhone(phoneRaw) && (!dbPhone || !phonesMatch(dbPhone, phoneRaw))) {
       await updateMessagingAccountPhone(match.id, phoneRaw);
     }
     return match.id;
+  }
+
+  if (candidates && candidates.length > 1) {
+    for (const row of candidates) {
+      if (await hasActivePlatformSession(row.id)) return row.id;
+    }
+    const dbPhone = readPhoneFromAccount(candidates[0]);
+    if (hasValidAccountPhone(phoneRaw) && (!dbPhone || !phonesMatch(dbPhone, phoneRaw))) {
+      await updateMessagingAccountPhone(candidates[0].id, phoneRaw);
+    }
+    return candidates[0].id;
+  }
+
+  const byLabelOnly = (rows as MessagingAccount[] | null)?.filter((row) =>
+    labelMatches(String(row.label)),
+  );
+  if (byLabelOnly?.length === 1) {
+    const match = byLabelOnly[0];
+    const dbPhone = readPhoneFromAccount(match);
+    if (hasValidAccountPhone(phoneRaw) && (!dbPhone || !phonesMatch(dbPhone, phoneRaw))) {
+      await updateMessagingAccountPhone(match.id, phoneRaw);
+    }
+    return match.id;
+  }
+  if (byLabelOnly && byLabelOnly.length > 1) {
+    for (const row of byLabelOnly) {
+      if (await hasActivePlatformSession(row.id)) return row.id;
+    }
+  }
+
+  if (input.localId?.trim()) {
+    const fromSession = await findAccountIdBySessionData(input.localId.trim(), input.platform);
+    if (fromSession) return fromSession;
+    if (candidateId && candidateId !== input.localId) {
+      const fromCandidate = await findAccountIdBySessionData(candidateId, input.platform);
+      if (fromCandidate) return fromCandidate;
+    }
+  }
+
+  const sameLabelAnyUser = (rows as MessagingAccount[] | null)?.filter((row) =>
+    labelMatches(String(row.label)),
+  );
+  if (sameLabelAnyUser?.length) {
+    for (const row of sameLabelAnyUser) {
+      if (await hasActivePlatformSession(row.id)) return row.id;
+    }
+    return sameLabelAnyUser[0].id;
   }
 
   if (!hasValidAccountPhone(phoneRaw)) {

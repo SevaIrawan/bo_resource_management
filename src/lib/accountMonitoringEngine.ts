@@ -32,19 +32,24 @@ export async function probeLivePlatformSession(input: {
 }
 
 /** Probe + hitung grup di device (count-only, tanpa QR). */
-export async function fetchDeviceGroupCounts(input: {
-  sessionId: string;
-  platform: Platform;
-  accountId: string;
-}): Promise<DeviceGroupCountResult> {
-  const probe = await probeLivePlatformSession(input);
-  if (!probe.valid) {
-    return {
-      valid: false,
-      totalGroups: 0,
-      adminGroups: 0,
-      message: probe.message ?? 'Session invalid',
-    };
+export async function fetchDeviceGroupCounts(
+  input: {
+    sessionId: string;
+    platform: Platform;
+    accountId: string;
+  },
+  options?: { assumeSessionValid?: boolean },
+): Promise<DeviceGroupCountResult> {
+  if (!options?.assumeSessionValid) {
+    const probe = await probeLivePlatformSession(input);
+    if (!probe.valid) {
+      return {
+        valid: false,
+        totalGroups: 0,
+        adminGroups: 0,
+        message: probe.message ?? 'Session invalid',
+      };
+    }
   }
 
   return countDeviceGroups(input);
@@ -64,6 +69,8 @@ export interface RefreshAccountMetricsInput {
   dbAccountId: string;
   /** X — total grup standar brand (dinamis). */
   brandStandard?: number;
+  /** Sudah di-probe di Sync manual — jangan buka WA/TG dua kali. */
+  assumeSessionValid?: boolean;
 }
 
 export interface RefreshAccountMetricsResult {
@@ -95,11 +102,14 @@ export async function refreshAccountMetrics(
     dbAccountId,
   );
 
-  const device = await fetchDeviceGroupCounts({
-    sessionId: account.id,
-    platform: account.platform,
-    accountId: dbAccountId,
-  });
+  const device = await fetchDeviceGroupCounts(
+    {
+      sessionId: account.id,
+      platform: account.platform,
+      accountId: dbAccountId,
+    },
+    { assumeSessionValid: input.assumeSessionValid },
+  );
 
   return {
     hasDailyToday,
@@ -111,17 +121,4 @@ export async function refreshAccountMetrics(
       brandStandard: input.brandStandard ?? 0,
     }),
   };
-}
-
-/**
- * Probe gagal tidak lagi mencabut session DB — hanya UI/login ulang di device.
- * @deprecated Panggil invalidate hanya dari aksi logout eksplisit user.
- */
-export async function revokePlatformSessionIfNeeded(_input: {
-  platform: Platform;
-  dbAccountId: string;
-  sessionId: string;
-  probeMessage?: string;
-}): Promise<void> {
-  // no-op: auto-revoke setelah probe menyebabkan loop logout setelah QR sukses
 }

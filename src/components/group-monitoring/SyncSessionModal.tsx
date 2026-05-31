@@ -7,7 +7,6 @@ import type { Platform } from '@/types/database';
 
 interface SyncSessionModalProps {
   open: boolean;
-  title: string;
   message: string;
   accountName: string;
   platform?: Platform;
@@ -17,7 +16,6 @@ interface SyncSessionModalProps {
 
 export function SyncSessionModal({
   open,
-  title,
   message,
   accountName,
   platform,
@@ -45,18 +43,18 @@ export function SyncSessionModal({
         className="brand-modal-panel brand-modal-panel--sync"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="sync-session-line"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="brand-modal-header">
-          <h2 className="brand-modal-title">{title}</h2>
+          <h2 id="sync-session-line" className="brand-modal-title">
+            {platform ? accountPlatformSubtitle(accountName, platform) : accountName}
+          </h2>
           <button type="button" className="brand-modal-close" onClick={onClose}>
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </header>
         <div className="brand-modal-form">
-          <p className="sync-modal-subtitle">
-            {platform ? accountPlatformSubtitle(accountName, platform) : accountName}
-          </p>
           <p className="sync-modal-message">{message}</p>
           <div className="brand-modal-actions">
             <button type="button" className="brand-modal-btn brand-modal-btn--ghost" onClick={onClose}>

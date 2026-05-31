@@ -10,6 +10,7 @@ import {
 import { tryRestorePlatformSession } from './restore';
 import {
   clearWhatsAppLocalAuth,
+  hasWhatsAppDiskAuth,
   startWhatsAppQrLogin,
   startWhatsAppPhoneLogin,
   stopWhatsAppLogin,
@@ -119,6 +120,10 @@ export function registerPlatformLoginIpc() {
   ipcMain.handle('platform-login:purge-wa-auth', async (_event, sessionId: string) => {
     clearWhatsAppLocalAuth(sessionId);
     return { ok: true };
+  });
+
+  ipcMain.handle('platform-login:has-wa-disk-auth', async (_event, sessionId: string) => {
+    return { hasAuth: hasWhatsAppDiskAuth(sessionId) };
   });
 
   ipcMain.handle(

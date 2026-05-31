@@ -1,4 +1,5 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
+import { emitScrapeProgress } from './scrapeProgress';
 import type { ScrapedGroupRow } from './index';
 
 export async function exportTelegramSession(sessionId: string): Promise<{
@@ -96,13 +97,16 @@ export async function runTelegramScrape(
   groups: ScrapedGroupRow[];
   count: number;
 }> {
+  emitScrapeProgress({ sessionId, phase: 'start' });
   await ensureSidecarRunning();
 
   const sessionString = storedSessionString?.trim() || null;
   if (sessionString) {
+    emitScrapeProgress({ sessionId, phase: 'connect', label: 'Restoring Telegram session' });
     await restoreTelegramSession(sessionId, sessionString);
   }
 
+  emitScrapeProgress({ sessionId, phase: 'discover', label: 'Reading groups from Telegram' });
   let json = await postTelegramScrape(sessionId, sessionString);
 
   const needsRestore =
@@ -116,12 +120,25 @@ export async function runTelegramScrape(
   }
 
   if (json.status === 'error') {
-    throw new Error(json.message ?? 'Telegram scrape failed');
+    const message = json.message ?? 'Telegram scrape failed';
+    emitScrapeProgress({ sessionId, phase: 'error', label: message });
+    throw new Error(message);
   }
+
+  const count = json.count ?? json.groups?.length ?? 0;
+  emitScrapeProgress({
+    sessionId,
+    phase: 'done',
+    current: count,
+    total: count,
+    label: `Scrape finished: ${count} groups`,
+  });
 
   return {
     ok: true,
     groups: json.groups ?? [],
-    count: json.count ?? json.groups?.length ?? 0,
+    count,
+    hint: (json as { hint?: string }).hint,
+    telegramUser: (json as { telegramUser?: string }).telegramUser,
   };
 }

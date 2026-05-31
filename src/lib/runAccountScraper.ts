@@ -1,8 +1,6 @@
-import {
-  resolveMessagingAccountId,
-  writeScrapeDailyRows,
-  type ScrapedGroupPayload,
-} from '@/lib/accountScraper';
+import { writeScrapeDailyRows, type ScrapedGroupPayload } from '@/lib/accountScraper';
+import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
+import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import { finishScrapeRun, startScrapeRun } from '@/lib/scrapeRuns';
 import {
   loadTelegramPlatformSession,
@@ -46,13 +44,15 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     throw new Error('SCRAPER_DESKTOP_REQUIRED');
   }
 
-  const accountId = await resolveMessagingAccountId({
+  const { accountId } = await resolveDbAccountForRow({
     userId: input.userId,
+    account: input.account,
+  });
+
+  const deviceSessionId = await resolveDeviceSessionId({
+    sessionId: input.account.id,
     platform: input.account.platform,
-    brand: input.account.brandName,
-    accName: input.account.accountName,
-    phoneNumber: input.account.phoneNumber,
-    localId: input.account.id,
+    accountId,
   });
 
   const storedSessionString =
@@ -67,7 +67,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
 
   try {
     const result = await api.run({
-      sessionId: input.sessionId,
+      sessionId: deviceSessionId,
       platform: input.account.platform,
       storedSessionString,
     });
@@ -84,7 +84,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     const masterCount = scrapeWrite.masterCount;
 
     if (input.account.platform === 'telegram') {
-      await persistTelegramSession(accountId, input.sessionId);
+      await persistTelegramSession(accountId, deviceSessionId);
     }
 
     await markPlatformSessionSynced(accountId);
@@ -130,7 +130,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     }
     if (input.account.platform === 'telegram') {
       try {
-        await persistTelegramSession(accountId, input.sessionId);
+        await persistTelegramSession(accountId, deviceSessionId);
       } catch {
         // session may already be gone
       }

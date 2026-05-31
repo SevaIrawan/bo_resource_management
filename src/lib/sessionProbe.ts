@@ -11,6 +11,8 @@ export async function probePlatformSession(input: {
   sessionId: string;
   platform: Platform;
   accountId: string;
+  /** Scrape / tampilan LIVE — tidak terima “disk ada” sebagai valid. */
+  strict?: boolean;
 }): Promise<SessionProbeResult> {
   const api = window.electronAPI?.scraper?.validateSession;
   if (!api) {
@@ -29,6 +31,7 @@ export async function probePlatformSession(input: {
       sessionId,
       platform: input.platform,
       storedSessionString,
+      strict: input.strict,
     });
   } catch (error) {
     return {

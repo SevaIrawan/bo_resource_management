@@ -38,7 +38,9 @@ export function MonitoringTabs({
             type="button"
             onClick={() => onChange(id)}
             className={cn(
-              'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+              'monitoring-tab-btn rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+              id === 'account' && 'monitoring-tab-btn--account',
+              id === 'ticket' && 'monitoring-tab-btn--ticket',
               isActive
                 ? 'bg-bg-shell text-text-primary shadow-sm'
                 : 'text-text-muted hover:text-text-secondary',

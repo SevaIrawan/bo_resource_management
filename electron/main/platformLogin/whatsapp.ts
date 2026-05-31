@@ -17,11 +17,25 @@ interface WaSession {
 
 const sessions = new Map<string, WaSession>();
 const sessionLocks = new Map<string, Promise<unknown>>();
+/** Satu operasi WA global — cegah scrape akun B destroy client akun A yang masih getChats(). */
+let globalWaQueue: Promise<unknown> = Promise.resolve();
 const WA_INIT_TIMEOUT_MS = 120_000;
 const WA_DESTROY_SETTLE_MS = 900;
 
 function waSessionsRoot() {
   return path.join(app.getPath('userData'), 'wa-sessions');
+}
+
+/** Fakta di disk: folder LocalAuth ada (login WA pernah sukses di PC ini). */
+export function hasWhatsAppDiskAuth(sessionId: string): boolean {
+  const sessionDir = path.join(waSessionsRoot(), `session-${sessionId}`);
+  if (!fs.existsSync(sessionDir)) return false;
+  const markers = [
+    path.join(sessionDir, 'Default', 'IndexedDB'),
+    path.join(sessionDir, 'Default', 'Local Storage'),
+    path.join(sessionDir, '.wwebjs_auth'),
+  ];
+  return markers.some((p) => fs.existsSync(p));
 }
 
 function isBrowserAlreadyRunningError(error: unknown): boolean {
@@ -74,11 +88,48 @@ function normalizeWaPhone(phone: string): string {
   return digits;
 }
 
+function getNotifierWindow(): BrowserWindow | null {
+  const wins = BrowserWindow.getAllWindows();
+  return wins.find((w) => !w.isDestroyed()) ?? null;
+}
+
+/** Logout di HP / auth failure → IPC invalid (login + scrape client). */
+function attachSessionIntegrityHandlers(
+  sessionId: string,
+  client: InstanceType<typeof Client>,
+) {
+  if ((client as unknown as { __rmIntegrity?: boolean }).__rmIntegrity) return;
+  (client as unknown as { __rmIntegrity?: boolean }).__rmIntegrity = true;
+
+  client.on('auth_failure', (message) => {
+    const win = getNotifierWindow();
+    if (!win) return;
+    win.webContents.send('platform-session:invalid', {
+      sessionId,
+      platform: 'whatsapp',
+      message: String(message),
+    });
+  });
+
+  client.on('disconnected', (reason) => {
+    const raw = String(reason ?? 'WhatsApp disconnected');
+    const message = formatWhatsAppDisconnectMessage(raw);
+    const win = getNotifierWindow();
+    if (!win) return;
+    win.webContents.send('platform-session:invalid', {
+      sessionId,
+      platform: 'whatsapp',
+      message,
+    });
+  });
+}
+
 function attachCommonHandlers(
   sessionId: string,
   client: InstanceType<typeof Client>,
   win: BrowserWindow,
 ) {
+  attachSessionIntegrityHandlers(sessionId, client);
   client.on('qr', (qr) => {
     const session = sessions.get(sessionId);
     if (!session || session.mode !== 'qr') return;
@@ -289,7 +340,9 @@ export async function stopWhatsAppLogin(
   sessionId: string,
   options?: { clearDiskAuth?: boolean },
 ): Promise<void> {
-  return withWaSessionLock(sessionId, () => destroyWhatsAppSession(sessionId, options));
+  return enqueueGlobalWaOperation(() =>
+    withWaSessionLock(sessionId, () => destroyWhatsAppSession(sessionId, options)),
+  );
 }
 
 async function emitWhatsAppReady(sessionId: string, win: BrowserWindow) {
@@ -303,7 +356,7 @@ async function emitWhatsAppReady(sessionId: string, win: BrowserWindow) {
   }
 }
 
-const WA_DISK_RESTORE_TIMEOUT_MS = 18_000;
+const WA_DISK_RESTORE_TIMEOUT_MS = 22_000;
 
 /** Restore dari LocalAuth di disk (tanpa hapus folder). */
 async function restoreWhatsAppFromDisk(
@@ -341,46 +394,82 @@ async function restoreWhatsAppFromDisk(
   }
 }
 
+/** Tutup client WA lain — cegah scrape akun B pakai browser/session akun A. */
+export async function releaseOtherWhatsAppSessions(keepSessionId: string): Promise<void> {
+  const others = [...sessions.keys()].filter((id) => id !== keepSessionId);
+  for (const id of others) {
+    await destroyWhatsAppSession(id);
+  }
+}
+
+function enqueueGlobalWaOperation<T>(fn: () => Promise<T>): Promise<T> {
+  const next = globalWaQueue.then(fn, fn);
+  globalWaQueue = next.catch(() => undefined);
+  return next;
+}
+
+async function ensureWhatsAppClientInner(
+  sessionId: string,
+): Promise<InstanceType<typeof Client>> {
+  const existing = sessions.get(sessionId);
+  if (existing) {
+    try {
+      const state = await existing.client.getState();
+      if (state === 'CONNECTED') {
+        existing.loggedIn = true;
+        return existing.client;
+      }
+      return waitForClientReady(sessionId, existing.client, existing.mode);
+    } catch {
+      await destroyWhatsAppSession(sessionId);
+    }
+  }
+
+  const client = createClient(sessionId, 'qr');
+  attachSessionIntegrityHandlers(sessionId, client);
+  const readyPromise = waitForClientReady(sessionId, client, 'qr');
+  sessions.set(sessionId, { client, mode: 'qr' });
+
+  try {
+    await initializeClientWithRetry(sessionId, client);
+  } catch (error) {
+    await destroyWhatsAppSession(sessionId);
+    throw error;
+  }
+
+  try {
+    const state = await client.getState();
+    if (state === 'CONNECTED') {
+      sessions.set(sessionId, { client, mode: 'qr', loggedIn: true });
+      return client;
+    }
+  } catch {
+    // wait for ready event
+  }
+
+  return readyPromise;
+}
+
+/**
+ * Jalankan operasi WA dengan lock per session + antrian global.
+ * Lock tetap aktif sampai scrape/count selesai — hindari client undefined saat getChats().
+ */
+export async function withWhatsAppClient<T>(
+  sessionId: string,
+  fn: (client: InstanceType<typeof Client>) => Promise<T>,
+): Promise<T> {
+  return enqueueGlobalWaOperation(() =>
+    withWaSessionLock(sessionId, async () => {
+      await releaseOtherWhatsAppSessions(sessionId);
+      const client = await ensureWhatsAppClientInner(sessionId);
+      return fn(client);
+    }),
+  );
+}
+
 /** Restore atau buka sesi WA dari LocalAuth (scrape / validate). */
 export async function ensureWhatsAppClient(sessionId: string): Promise<InstanceType<typeof Client>> {
-  return withWaSessionLock(sessionId, async () => {
-    const existing = sessions.get(sessionId);
-    if (existing) {
-      try {
-        const state = await existing.client.getState();
-        if (state === 'CONNECTED') {
-          existing.loggedIn = true;
-          return existing.client;
-        }
-        return waitForClientReady(sessionId, existing.client, existing.mode);
-      } catch {
-        await destroyWhatsAppSession(sessionId);
-      }
-    }
-
-    const client = createClient(sessionId, 'qr');
-    const readyPromise = waitForClientReady(sessionId, client, 'qr');
-    sessions.set(sessionId, { client, mode: 'qr' });
-
-    try {
-      await initializeClientWithRetry(sessionId, client);
-    } catch (error) {
-      await destroyWhatsAppSession(sessionId);
-      throw error;
-    }
-
-    try {
-      const state = await client.getState();
-      if (state === 'CONNECTED') {
-        sessions.set(sessionId, { client, mode: 'qr', loggedIn: true });
-        return client;
-      }
-    } catch {
-      // wait for ready event
-    }
-
-    return readyPromise;
-  });
+  return withWhatsAppClient(sessionId, (client) => Promise.resolve(client));
 }
 
 function armWhatsAppLoginTimeout(
@@ -409,12 +498,32 @@ function armWhatsAppLoginTimeout(
   client.once('auth_failure', () => clearTimeout(timeout));
 }
 
+function sendWhatsAppLoginError(
+  sessionId: string,
+  win: BrowserWindow,
+  error: unknown,
+) {
+  if (win.isDestroyed()) return;
+  const message = isBrowserAlreadyRunningError(error)
+    ? 'WhatsApp is still starting from a previous attempt. Wait a few seconds and tap Sync again.'
+    : error instanceof Error
+      ? error.message
+      : 'WhatsApp failed to start';
+  win.webContents.send('platform-login:error', {
+    sessionId,
+    platform: 'whatsapp',
+    message,
+  });
+}
+
 export async function startWhatsAppQrLogin(
   sessionId: string,
   win: BrowserWindow,
   options?: { skipDiskRestore?: boolean },
 ) {
-  return withWaSessionLock(sessionId, async () => {
+  return enqueueGlobalWaOperation(() =>
+    withWaSessionLock(sessionId, async () => {
+    await releaseOtherWhatsAppSessions(sessionId);
     await destroyWhatsAppSession(sessionId);
 
     if (!options?.skipDiskRestore) {
@@ -431,18 +540,12 @@ export async function startWhatsAppQrLogin(
     armWhatsAppLoginTimeout(sessionId, client, win);
     sessions.set(sessionId, { client, mode: 'qr' });
 
-    try {
-      await initializeClientWithRetry(sessionId, client);
-    } catch (error) {
+    void initializeClientWithRetry(sessionId, client).catch(async (error) => {
       await destroyWhatsAppSession(sessionId);
-      if (isBrowserAlreadyRunningError(error)) {
-        throw new Error(
-          'WhatsApp is still starting from a previous attempt. Wait a few seconds and tap Sync again.',
-        );
-      }
-      throw error;
-    }
-  });
+      sendWhatsAppLoginError(sessionId, win, error);
+    });
+    }),
+  );
 }
 
 export async function startWhatsAppPhoneLogin(
@@ -450,7 +553,8 @@ export async function startWhatsAppPhoneLogin(
   phone: string,
   win: BrowserWindow,
 ) {
-  return withWaSessionLock(sessionId, async () => {
+  return enqueueGlobalWaOperation(() =>
+    withWaSessionLock(sessionId, async () => {
     await destroyWhatsAppSession(sessionId);
     clearWhatsAppLocalAuth(sessionId);
 
@@ -460,13 +564,12 @@ export async function startWhatsAppPhoneLogin(
     armWhatsAppLoginTimeout(sessionId, client, win);
     sessions.set(sessionId, { client, mode: 'phone' });
 
-    try {
-      await initializeClientWithRetry(sessionId, client);
-    } catch (error) {
+    void initializeClientWithRetry(sessionId, client).catch(async (error) => {
       await destroyWhatsAppSession(sessionId);
-      throw error;
-    }
-  });
+      sendWhatsAppLoginError(sessionId, win, error);
+    });
+    }),
+  );
 }
 
 export function getWhatsAppSessionClient(sessionId: string) {

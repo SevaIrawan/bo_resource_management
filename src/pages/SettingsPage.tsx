@@ -1,3 +1,4 @@
+import { AutoSyncSettingsSection } from '@/components/settings/AutoSyncSettingsSection';
 import { LanguageToggle } from '@/components/settings/LanguageToggle';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -11,7 +12,9 @@ export function SettingsPage() {
         <p className="mt-0.5 text-xs text-text-muted">{t('settings.subtitle')}</p>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 space-y-4 overflow-auto p-6">
+        <AutoSyncSettingsSection />
+
         <section className="max-w-lg rounded-xl border border-border-subtle bg-bg-shell p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>

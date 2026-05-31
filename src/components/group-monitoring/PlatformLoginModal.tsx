@@ -20,6 +20,8 @@ interface PlatformLoginModalProps {
   platform: Platform | null;
   accountName: string;
   sessionId: string;
+  /** UUID akun di Supabase — wajib untuk restore session dari `platform_sessions`. */
+  dbAccountId?: string;
   phoneNumber?: string;
   loginHint?: string;
   attemptRestore?: boolean;
@@ -32,6 +34,7 @@ export function PlatformLoginModal({
   platform,
   accountName,
   sessionId,
+  dbAccountId,
   phoneNumber = '',
   loginHint = '',
   attemptRestore = true,
@@ -40,6 +43,7 @@ export function PlatformLoginModal({
 }: PlatformLoginModalProps) {
   const { t } = useLanguage();
   const isTelegram = platform === 'telegram';
+  const platformAccountId = dbAccountId ?? sessionId;
   const {
     view,
     status,
@@ -52,9 +56,10 @@ export function PlatformLoginModal({
     startPhoneLogin,
     submitCode,
     submit2fa,
-  } = usePlatformLogin(open, platform, sessionId, phoneNumber, {
-    accountId: sessionId,
+  } = usePlatformLogin(open, platform, platformAccountId, phoneNumber, {
+    accountId: platformAccountId,
     attemptRestore,
+    t,
   });
 
   const [phone, setPhone] = useState(phoneNumber);
@@ -84,7 +89,6 @@ export function PlatformLoginModal({
     setPersisting(true);
     void Promise.resolve(onLoginSuccess?.())
       .catch((err: unknown) => {
-        loginHandledRef.current = false;
         setPersistError(
           err instanceof Error
             ? err.message
@@ -160,9 +164,17 @@ export function PlatformLoginModal({
                 ? t('groupMonitoring.sync.enterPairingCode')
                 : status === 'qr'
                   ? t('groupMonitoring.sync.scanQr')
-                  : isTelegram
-                    ? t('groupMonitoring.sync.generatingQr')
-                    : t('groupMonitoring.sync.loadingQr');
+                  : status === 'restoring'
+                    ? t('groupMonitoring.sync.restoringSession')
+                    : status === 'starting-qr'
+                      ? isTelegram
+                        ? t('groupMonitoring.sync.generatingQr')
+                        : t('groupMonitoring.sync.startingWhatsApp')
+                      : isTelegram
+                        ? t('groupMonitoring.sync.generatingQr')
+                        : qrDataUrl
+                          ? t('groupMonitoring.sync.scanQr')
+                          : t('groupMonitoring.sync.loadingQr');
 
   return (
     <BrandModalRoot onBackdropClick={onClose}>

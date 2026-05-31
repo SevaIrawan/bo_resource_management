@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { TABLES } from '@/config/tables';
 import { patchAccountSnapshotInGroups } from '@/lib/accountSessionPatch';
-import { patchAccountMasterInGroups } from '@/lib/patchAccountMasterInGroups';
+import { patchBrandPlatformMasterInGroups } from '@/lib/patchAccountMasterInGroups';
 import { getSupabase } from '@/lib/supabase';
 import type { AccountSnapshot } from '@/types/database';
+import type { Platform } from '@/types/database';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { Dispatch, SetStateAction } from 'react';
 
@@ -15,6 +16,15 @@ interface UseRealtimeMonitoringOptions {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   onTicketsChange: () => void;
   onRegistryChange: () => void;
+}
+
+type GroupsMasterRow = {
+  brand?: string;
+  platform?: Platform;
+};
+
+function brandPlatformKey(brand: string, platform: Platform): string {
+  return `${brand.trim()}|${platform}`;
 }
 
 export function useRealtimeMonitoring({
@@ -41,19 +51,24 @@ export function useRealtimeMonitoring({
     const supabase = getSupabase();
     if (!supabase) return;
 
-    const pendingMasterAccounts = new Set<string>();
+    const pendingBrandPlatform = new Set<string>();
     let masterFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
     const flushMasterPatches = () => {
-      const ids = [...pendingMasterAccounts];
-      pendingMasterAccounts.clear();
-      if (!ids.length) return;
+      const keys = [...pendingBrandPlatform];
+      pendingBrandPlatform.clear();
+      if (!keys.length) return;
 
       onGroupsChangeRef.current((prev) => {
         void (async () => {
           let next = prev;
-          for (const accountId of ids) {
-            next = await patchAccountMasterInGroups(next, accountId);
+          for (const key of keys) {
+            const sep = key.indexOf('|');
+            if (sep < 0) continue;
+            const brand = key.slice(0, sep);
+            const platform = key.slice(sep + 1) as Platform;
+            if (platform !== 'whatsapp' && platform !== 'telegram') continue;
+            next = await patchBrandPlatformMasterInGroups(next, brand, platform);
           }
           onGroupsChangeRef.current(() => next);
           onTicketsChangeRef.current();
@@ -62,13 +77,22 @@ export function useRealtimeMonitoring({
       });
     };
 
-    const scheduleMasterPatch = (accountId: string) => {
-      pendingMasterAccounts.add(accountId);
+    const scheduleBrandPlatformPatch = (brand: string, platform: Platform) => {
+      const key = brandPlatformKey(brand, platform);
+      if (!key || key === '|') return;
+      pendingBrandPlatform.add(key);
       if (masterFlushTimer) clearTimeout(masterFlushTimer);
       masterFlushTimer = setTimeout(() => {
         masterFlushTimer = null;
         flushMasterPatches();
       }, 400);
+    };
+
+    const handleMasterChange = (row: GroupsMasterRow | undefined) => {
+      const brand = row?.brand?.trim();
+      const platform = row?.platform;
+      if (!brand || (platform !== 'whatsapp' && platform !== 'telegram')) return;
+      scheduleBrandPlatformPatch(brand, platform);
     };
 
     const channel = supabase
@@ -115,8 +139,17 @@ export function useRealtimeMonitoring({
         'postgres_changes',
         { event: '*', schema: 'public', table: TABLES.groupsMaster },
         (payload) => {
-          const row = (payload.new ?? payload.old) as { account_id?: string } | undefined;
-          if (row?.account_id) scheduleMasterPatch(row.account_id);
+          handleMasterChange((payload.new ?? payload.old) as GroupsMasterRow | undefined);
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: TABLES.groupScrapeDaily },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as
+            | { brand?: string; platform?: Platform }
+            | undefined;
+          handleMasterChange(row);
         },
       )
       .subscribe();

@@ -1,23 +1,28 @@
 # Supabase migrations
 
-Hanya **3 file** — migrasi incremental lama sudah dihapus agar tidak jadi boomerang.
+Migrasi di folder ini — jalankan urutan di `SUPABASE_RUNBOOK.md` / `JALANKAN_INI.md`.
+
+**Panduan lengkap step-by-step:** baca `SUPABASE_RUNBOOK.md` di root project.
 
 ## Instal baru (kosong / boleh reset data RM)
 
 | Urutan | File |
 |--------|------|
-| 1 | `003_auth_login_rpc.sql` — RLS login `public.users` |
-| 2 | `017_rm_full_reset.sql` — **9 tabel RM** + master brand + RPC + Realtime |
-
-**Peringatan:** `017` menghapus semua data `resource_management_*`. `public.users` tidak disentuh.
+| 1 | `003_auth_login_rpc.sql` |
+| 2 | `017_rm_full_reset.sql` — **hapus semua data RM** |
+| 3 | `020_fix_duplicate_active_sessions.sql` |
+| 4 | `023_session_and_sync_logs_bundle.sql` — session log + sync activity (fix 404/400) |
 
 ## DB production yang sudah jalan (tanpa full reset)
 
-Jalankan **sekali**:
+| Urutan | File |
+|--------|------|
+| 1 | `018_drop_legacy_rm.sql` — **sekali saja** jika DB lama |
+| 2 | `019_realtime_group_scrape_daily.sql` — opsional |
+| 3 | `020_fix_duplicate_active_sessions.sql` |
+| 4 | `023_session_and_sync_logs_bundle.sql` — **wajib** untuk auto-sync log |
 
-| File | Fungsi |
-|------|--------|
-| `018_drop_legacy_rm.sql` | Hapus RPC/trigger/tabel lama + upgrade master brand + ticket types |
+**Jangan** jalankan `017` lagi.
 
 Lalu di app: **scrape ulang** semua akun (rebuild master + ticket).
 
@@ -30,7 +35,7 @@ Lalu di app: **scrape ulang** semua akun (rebuild master + ticket).
 | `resource_management_platform_sessions` | Session aktif | Ya |
 | `resource_management_platform_session_logs` | Audit login | — |
 | `resource_management_scrape_runs` | Log scrape | Ya |
-| `resource_management_group_scrape_daily` | Snapshot device per akun | — |
+| `resource_management_group_scrape_daily` | Snapshot device per akun | Ya (019) |
 | `resource_management_groups_master` | Join Group List per brand+platform | Ya |
 | `resource_management_account_snapshots` | Metrik dashboard | Ya |
 | `resource_management_tickets` | Issue (missing, admin, junk, …) | Ya |

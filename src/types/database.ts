@@ -67,13 +67,18 @@ export type PlatformSessionEventType =
   | 'session_expired'
   | 'probe_failed'
   | 'device_logout'
-  | 'db_invalidated';
+  | 'db_invalidated'
+  | 'sync_valid'
+  | 'session_replaced';
+
+export type SessionActivityStatus = 'valid' | 'logout' | 'invalid' | 'replaced';
 
 export interface PlatformSessionLog {
   id: string;
   account_id: string;
   platform_session_id: string | null;
   platform: Platform;
+  session_status: SessionActivityStatus | null;
   event_type: PlatformSessionEventType;
   login_method: LoginMethod | null;
   message: string | null;

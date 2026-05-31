@@ -7,21 +7,27 @@ import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import { addAccountToGroup, createEmptyBrandGroup } from '@/lib/accountBrandUtils';
 import { ensureBrand } from '@/lib/brands';
 import { createMessagingAccount } from '@/lib/messagingAccounts';
-import type { AccountBrandGroup, AddAccountInput } from '@/types/accountMonitoringUi';
-
+import type { AccountBrandGroup, AccountBrandRow, AddAccountInput } from '@/types/accountMonitoringUi';
 type SyncFlow = ReturnType<typeof useAccountSyncFlow>;
 
 interface AccountBrandCardListProps {
   groups: AccountBrandGroup[];
   onGroupsChange: (groups: AccountBrandGroup[]) => void;
   sync: SyncFlow;
+  onRemoveFromSlot: (groupId: string, account: AccountBrandRow) => void;
 }
 
-export function AccountBrandCardList({ groups, onGroupsChange, sync }: AccountBrandCardListProps) {
+export function AccountBrandCardList({
+  groups,
+  onGroupsChange,
+  sync,
+  onRemoveFromSlot,
+}: AccountBrandCardListProps) {
   const { user } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
 
-  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper } = sync;
+  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, getScrapeProgress } =
+    sync;
 
   async function handleAddBrand(brandName: string) {
     let dbBrandId: string | undefined;
@@ -45,6 +51,7 @@ export function AccountBrandCardList({ groups, onGroupsChange, sync }: AccountBr
         label: input.accountName,
         phoneNumber: input.phoneNumber,
         brand: group.brandName,
+        brandId: group.dbBrandId,
       });
     }
 
@@ -72,6 +79,7 @@ export function AccountBrandCardList({ groups, onGroupsChange, sync }: AccountBr
             group={group}
             onAddAccount={(input) => handleAddAccount(group.id, input)}
             onSyncAccount={(accountId) => handleSyncByAccountId(group.id, accountId)}
+            onRemoveFromSlot={(account) => onRemoveFromSlot(group.id, account)}
             onRunScraper={(accountId) => {
               const account = group.accounts.find((row) => row.id === accountId);
               if (account) void handleRunScraper(group.id, account);
@@ -82,6 +90,7 @@ export function AccountBrandCardList({ groups, onGroupsChange, sync }: AccountBr
             scraperAccountId={
               processingAction === 'scraper' ? processingAccountId : null
             }
+            getScrapeProgress={getScrapeProgress}
           />
         ))}
         <AddBrandCard onClick={() => setModalOpen(true)} />

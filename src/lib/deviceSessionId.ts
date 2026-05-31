@@ -10,6 +10,8 @@ export async function resolveDeviceSessionId(input: {
   if (input.platform === 'whatsapp') {
     const localAuthId = await loadWhatsAppLocalAuthClientId(input.accountId);
     if (localAuthId) return localAuthId;
+    return input.accountId;
   }
-  return input.sessionId;
+  /** Sidecar Telethon: kunci stabil = UUID akun DB (sama login + scrape + persist). */
+  return input.accountId;
 }

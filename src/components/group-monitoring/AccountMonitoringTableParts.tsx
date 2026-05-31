@@ -37,12 +37,10 @@ export function AccountMonitoringTableHead() {
           {t('groupMonitoring.accountCard.colSession')}
         </th>
         <th className="brand-col-head brand-col-head--groups">
-          <span className="brand-col-head-label">{t('groupMonitoring.accountCard.colGroups')}</span>
-          <span className="brand-col-head-hint">{t('groupMonitoring.accountCard.colGroupsHint')}</span>
+          {t('groupMonitoring.accountCard.colGroups')}
         </th>
         <th className="brand-col-head brand-col-head--admin">
-          <span className="brand-col-head-label">{t('groupMonitoring.accountCard.colAdmin')}</span>
-          <span className="brand-col-head-hint">{t('groupMonitoring.accountCard.colAdminHint')}</span>
+          {t('groupMonitoring.accountCard.colAdmin')}
         </th>
         <th className="brand-col-head brand-col-head--scraper">
           {t('groupMonitoring.accountCard.colScraper')}

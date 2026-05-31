@@ -146,13 +146,22 @@ async def _collect_groups(session_id: str) -> dict:
         )
 
     admin_count = sum(1 for group in groups if group["is_admin"] == "yes")
-    return {
+    me_label = me.username or me.phone or str(me.id)
+    payload = {
         "status": "ok",
         "valid": True,
         "groups": groups,
         "count": len(groups),
         "adminCount": admin_count,
+        "telegramUser": me_label,
     }
+    if len(groups) == 0:
+        payload["hint"] = "ZERO_GROUPS_ON_ACCOUNT"
+        payload["message"] = (
+            f"Telegram @{me_label} tidak punya grup terdeteksi. "
+            "Login ulang jika ini bukan akun yang dimaksud."
+        )
+    return payload
 
 
 async def scrape_telegram_groups(

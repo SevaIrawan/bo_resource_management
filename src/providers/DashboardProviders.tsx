@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { AutoSyncSettingsProvider } from '@/contexts/AutoSyncSettingsContext';
 import { SidebarContext } from '@/contexts/sidebar-context';
 import { MonitoringTabContext } from '@/contexts/monitoring-tab-context';
 import { SIDEBAR_DEFAULT_COLLAPSED } from '@/config/navigation';
@@ -29,10 +30,12 @@ export function DashboardProviders({ children }: DashboardProvidersProps) {
   );
 
   return (
-    <SidebarContext.Provider value={sidebarValue}>
-      <MonitoringTabContext.Provider value={monitoringValue}>
-        {children}
-      </MonitoringTabContext.Provider>
-    </SidebarContext.Provider>
+    <AutoSyncSettingsProvider>
+      <SidebarContext.Provider value={sidebarValue}>
+        <MonitoringTabContext.Provider value={monitoringValue}>
+          {children}
+        </MonitoringTabContext.Provider>
+      </SidebarContext.Provider>
+    </AutoSyncSettingsProvider>
   );
 }

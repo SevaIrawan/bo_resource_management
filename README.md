@@ -67,16 +67,12 @@ Output: `release/` folder
 
 ## Supabase Setup
 
-### Database Supabase (desktop-ready, realtime)
+**Urutan SQL wajib (jangan tebak-tebak):** lihat **[SUPABASE_RUNBOOK.md](./SUPABASE_RUNBOOK.md)** di root project.
 
-1. `supabase/migrations/003_auth_login_rpc.sql`
-2. `supabase/migrations/017_rm_full_reset.sql` — **9 tabel RM** + master brand + RPC + Realtime
-
-**DB yang sudah production (tanpa reset data):** jalankan sekali `018_drop_legacy_rm.sql`, lalu scrape ulang.
-
-**Peringatan:** `017` menghapus semua data RM. `public.users` tidak disentuh. Migrasi `001–011`, `019–021` sudah dihapus dari repo — jangan jalankan lagi di Supabase.
-
-Detail tabel: `supabase/migrations/README.md`.
+Ringkas:
+- **DB baru:** `003` → `017` → `020` → `023`
+- **DB sudah jalan:** `018` (sekali) → `019` (opsional) → `020` → `023`
+- Error console `404 sync_activity_logs` / `400 session_status` = belum jalankan **`023`**
 
 **Prinsip:** Semua data bisnis di Supabase; session WA/TG tersimpan + Realtime; metrik sync di `account_snapshots`; audit di `platform_session_logs` & `scrape_runs`.
 

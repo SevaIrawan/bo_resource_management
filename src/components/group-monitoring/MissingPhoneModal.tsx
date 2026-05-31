@@ -55,16 +55,18 @@ export function MissingPhoneModal({
         className="brand-modal-panel brand-modal-panel--sync"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="missing-phone-line"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="brand-modal-header">
-          <h2 className="brand-modal-title">{t('groupMonitoring.sync.missingPhoneTitle')}</h2>
+          <h2 id="missing-phone-line" className="brand-modal-title">
+            {accountName}
+          </h2>
           <button type="button" className="brand-modal-close" onClick={onClose} disabled={saving}>
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </header>
         <form className="brand-modal-form" onSubmit={handleSubmit}>
-          <p className="sync-modal-subtitle">{accountName}</p>
           <p className="sync-modal-message">{t('groupMonitoring.sync.missingPhoneMessage')}</p>
           <label className="platform-login-label" htmlFor="missing-phone-input">
             {t('groupMonitoring.accountCard.phoneLabel')}

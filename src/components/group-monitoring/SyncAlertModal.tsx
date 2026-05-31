@@ -7,7 +7,6 @@ import type { Platform } from '@/types/database';
 
 interface SyncAlertModalProps {
   open: boolean;
-  title: string;
   message: string;
   accountName?: string;
   platform?: Platform;
@@ -16,7 +15,6 @@ interface SyncAlertModalProps {
 
 export function SyncAlertModal({
   open,
-  title,
   message,
   accountName,
   platform,
@@ -35,26 +33,29 @@ export function SyncAlertModal({
 
   if (!open) return null;
 
+  const headerLine =
+    accountName && platform
+      ? accountPlatformSubtitle(accountName, platform)
+      : accountName ?? t('groupMonitoring.sync.errorTitle');
+
   return (
     <BrandModalRoot onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--sync"
         role="alertdialog"
         aria-modal="true"
+        aria-labelledby="sync-alert-line"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="brand-modal-header">
-          <h2 className="brand-modal-title">{title}</h2>
+          <h2 id="sync-alert-line" className="brand-modal-title">
+            {headerLine}
+          </h2>
           <button type="button" className="brand-modal-close" onClick={onClose}>
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </header>
         <div className="brand-modal-form">
-          {accountName ? (
-            <p className="sync-modal-subtitle">
-              {platform ? accountPlatformSubtitle(accountName, platform) : accountName}
-            </p>
-          ) : null}
           <p className="sync-modal-message sync-modal-message--error">{message}</p>
           <div className="brand-modal-actions">
             <button type="button" className="brand-modal-btn brand-modal-btn--primary" onClick={onClose}>

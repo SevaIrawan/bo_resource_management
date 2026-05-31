@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { useLanguage } from '@/hooks/useLanguage';
-import { postLoginScrapeMessage } from '@/lib/platformSyncCopy';
+import { accountPlatformSubtitle } from '@/lib/platformSyncCopy';
 import type { Platform } from '@/types/database';
 
 interface SyncScrapeConfirmModalProps {
@@ -10,7 +10,6 @@ interface SyncScrapeConfirmModalProps {
   accountName: string;
   platform?: Platform;
   rescrape?: boolean;
-  /** Setelah login sukses — tanya jalankan scraper atau nanti */
   postLogin?: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -40,22 +39,24 @@ export function SyncScrapeConfirmModal({
 
   if (!open) return null;
 
+  const message = postLogin
+    ? t('groupMonitoring.sync.postLoginScrapeMessage')
+    : rescrape
+      ? t('groupMonitoring.sync.rescrapeMessage', { account: accountName })
+      : t('groupMonitoring.sync.noDataMessage');
+
   return (
     <BrandModalRoot onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--sync"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="sync-scrape-title"
+        aria-labelledby="sync-scrape-line"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="brand-modal-header">
-          <h2 id="sync-scrape-title" className="brand-modal-title">
-            {postLogin
-              ? t('groupMonitoring.sync.postLoginScrapeTitle')
-              : rescrape
-                ? t('groupMonitoring.sync.rescrapeTitle')
-                : t('groupMonitoring.sync.noDataTitle')}
+          <h2 id="sync-scrape-line" className="brand-modal-title">
+            {accountPlatformSubtitle(accountName, platform)}
           </h2>
           <button
             type="button"
@@ -68,13 +69,7 @@ export function SyncScrapeConfirmModal({
         </header>
 
         <div className="brand-modal-form">
-          <p className="sync-modal-message">
-            {postLogin
-              ? postLoginScrapeMessage(platform, accountName, t)
-              : rescrape
-                ? t('groupMonitoring.sync.rescrapeMessage', { account: accountName })
-                : t('groupMonitoring.sync.noDataMessage', { account: accountName })}
-          </p>
+          <p className="sync-modal-message">{message}</p>
 
           <div className="brand-modal-actions">
             <button

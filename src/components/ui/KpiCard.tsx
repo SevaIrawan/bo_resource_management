@@ -19,11 +19,11 @@ export function KpiCard({ value, labelKey, tone = 'default' }: KpiCardProps) {
   const { t } = useLanguage();
 
   return (
-    <div className="rounded-xl border border-border-subtle bg-bg-card px-5 py-4">
+    <div className="kpi-card rounded-xl border border-border-subtle bg-bg-card px-5 py-4">
       <p className={cn('text-3xl font-semibold leading-none tabular-nums', VALUE_TONE[tone])}>
         {value}
       </p>
-      <p className="mt-2 text-xs leading-snug text-text-muted">{t(labelKey)}</p>
+      <p className="kpi-card-label mt-2 text-xs leading-snug text-text-muted">{t(labelKey)}</p>
     </div>
   );
 }

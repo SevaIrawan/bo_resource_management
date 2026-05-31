@@ -1,10 +1,12 @@
 import pkg from 'whatsapp-web.js';
-import { ensureWhatsAppClient } from '../platformLogin/whatsapp';
+import { withWhatsAppClient } from '../platformLogin/whatsapp';
 import {
   fetchGroupParticipants,
   meParticipantStats,
 } from './whatsappParticipants';
 import type { ScrapedGroupRow } from './index';
+import { isWhatsAppGroupChat } from './whatsappGroupFilter';
+import { emitScrapeProgress } from './scrapeProgress';
 
 const { Client } = pkg;
 
@@ -30,33 +32,81 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
   groups: ScrapedGroupRow[];
   count: number;
 }> {
-  const client = (await ensureWhatsAppClient(sessionId)) as InstanceType<typeof Client>;
+  emitScrapeProgress({ sessionId, phase: 'start' });
 
-  const state = await client.getState();
-  if (state !== 'CONNECTED') {
-    throw new Error(`WhatsApp is not connected (${state ?? 'unknown'}). Log in again.`);
-  }
+  try {
+    return await withWhatsAppClient(sessionId, async (client) => {
+      if (!client || typeof client.getChats !== 'function') {
+        throw new Error('WA_CLIENT_NOT_READY: WhatsApp client lost during scrape. Try again.');
+      }
 
-  const chats = await client.getChats();
-  const groups = chats.filter((chat) => chat.isGroup);
-  const rows: ScrapedGroupRow[] = [];
-  const meId = client.info?.wid?._serialized;
+      emitScrapeProgress({ sessionId, phase: 'connect', label: 'Checking WhatsApp connection' });
 
-  for (const chat of groups) {
-    const participants = await fetchGroupParticipants(client, chat);
-    const stats = meParticipantStats(participants, meId);
-    const inviteLink = await resolveInviteLink(chat);
+      const waUser = client.info?.wid?.user ?? client.info?.me?.user ?? 'unknown';
+      console.info(`[wa-scrape] sessionId=${sessionId} loggedInAs=${waUser}`);
 
-    rows.push({
-      group_id: chat.id._serialized,
-      group_name: chat.name ?? chat.id._serialized,
-      invite_link: inviteLink,
-      is_admin: adminLabel(stats.isAdmin),
-      member_count: stats.memberCount,
-      admin_count: stats.adminCount,
-      owner_count: stats.ownerCount,
+      const state = await client.getState();
+      if (state !== 'CONNECTED') {
+        throw new Error(
+          `WA_NOT_CONNECTED: WhatsApp is not connected (${state ?? 'unknown'}). Log in again.`,
+        );
+      }
+
+      emitScrapeProgress({ sessionId, phase: 'discover', label: 'Reading chat list from device' });
+      const chats = await client.getChats();
+      const groups = chats.filter((chat) => isWhatsAppGroupChat(chat));
+      const total = groups.length;
+
+      emitScrapeProgress({
+        sessionId,
+        phase: 'discover',
+        current: total,
+        total,
+        label: `${total} groups on device (${waUser})`,
+      });
+
+      const rows: ScrapedGroupRow[] = [];
+      const meId = client.info?.wid?._serialized;
+
+      for (let i = 0; i < groups.length; i += 1) {
+        const chat = groups[i];
+        const groupName = chat.name ?? chat.id._serialized;
+        emitScrapeProgress({
+          sessionId,
+          phase: 'group',
+          current: i + 1,
+          total,
+          label: groupName,
+        });
+
+        const participants = await fetchGroupParticipants(client, chat);
+        const stats = meParticipantStats(participants, meId);
+        const inviteLink = await resolveInviteLink(chat);
+
+        rows.push({
+          group_id: chat.id._serialized,
+          group_name: groupName,
+          invite_link: inviteLink,
+          is_admin: adminLabel(stats.isAdmin),
+          member_count: stats.memberCount,
+          admin_count: stats.adminCount,
+          owner_count: stats.ownerCount,
+        });
+      }
+
+      emitScrapeProgress({
+        sessionId,
+        phase: 'done',
+        current: rows.length,
+        total: rows.length,
+        label: `Scrape finished: ${rows.length} groups`,
+      });
+
+      return { ok: true, groups: rows, count: rows.length };
     });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'WhatsApp scrape failed';
+    emitScrapeProgress({ sessionId, phase: 'error', label: message });
+    throw error;
   }
-
-  return { ok: true, groups: rows, count: rows.length };
 }

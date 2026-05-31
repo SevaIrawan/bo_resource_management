@@ -2,8 +2,10 @@ import { useEffect, useMemo } from 'react';
 import { AccountBrandCardList } from '@/components/group-monitoring/AccountBrandCardList';
 import { AccountBrandTableView } from '@/components/group-monitoring/AccountBrandTableView';
 import { AccountMonitoringSyncModals } from '@/components/group-monitoring/AccountMonitoringSyncModals';
+import { RemoveAccountModal } from '@/components/group-monitoring/RemoveAccountModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
+import { useRemoveAccountFromSlot } from '@/hooks/useRemoveAccountFromSlot';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountViewMode } from '@/types/accountMonitoringUi';
@@ -31,6 +33,8 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
       void reloadTickets();
     },
   });
+
+  const removeSlot = useRemoveAccountFromSlot(groups, onGroupsChange, user?.id);
 
   const probeSuspendIds = useMemo(() => {
     const ids = new Set<string>();
@@ -66,14 +70,32 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     <>
       <AccountMonitoringSyncModals sync={sync} />
 
+      {removeSlot.removeTarget ? (
+        <RemoveAccountModal
+          open
+          accountName={removeSlot.removeTarget.account.accountName}
+          platform={removeSlot.removeTarget.account.platform}
+          brandName={removeSlot.removeTarget.account.brandName}
+          saving={removeSlot.removeSaving}
+          error={removeSlot.removeError}
+          onClose={removeSlot.closeRemoveModal}
+          onConfirm={() => void removeSlot.commitRemoveFromSlot()}
+        />
+      ) : null}
+
       {hasFiltered ? (
         viewMode === 'table' ? (
-          <AccountBrandTableView groups={filteredGroups} sync={sync} />
+          <AccountBrandTableView
+            groups={filteredGroups}
+            sync={sync}
+            onRemoveFromSlot={removeSlot.openRemoveModal}
+          />
         ) : (
           <AccountBrandCardList
             groups={filteredGroups}
             onGroupsChange={onGroupsChange}
             sync={sync}
+            onRemoveFromSlot={removeSlot.openRemoveModal}
           />
         )
       ) : (

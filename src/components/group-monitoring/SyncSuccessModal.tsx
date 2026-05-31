@@ -31,12 +31,12 @@ export function SyncSuccessModal({ open, accountName, onClose }: SyncSuccessModa
         className="brand-modal-panel brand-modal-panel--sync"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="sync-success-title"
+        aria-labelledby="sync-success-line"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="brand-modal-header">
-          <h2 id="sync-success-title" className="brand-modal-title">
-            {t('groupMonitoring.sync.successTitle')}
+          <h2 id="sync-success-line" className="brand-modal-title">
+            {accountName}
           </h2>
           <button
             type="button"
@@ -51,9 +51,7 @@ export function SyncSuccessModal({ open, accountName, onClose }: SyncSuccessModa
         <div className="brand-modal-form">
           <div className="sync-success-body">
             <CheckCircle2 className="sync-success-icon" strokeWidth={1.75} aria-hidden />
-            <p className="sync-modal-message">
-              {t('groupMonitoring.sync.successMessage', { account: accountName })}
-            </p>
+            <p className="sync-modal-message">{t('groupMonitoring.sync.successMessage')}</p>
           </div>
 
           <div className="brand-modal-actions">

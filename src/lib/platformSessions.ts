@@ -1,10 +1,19 @@
 import { TABLES } from '@/config/tables';
+import { logSessionLogoutActivity, logSessionValidActivity } from '@/lib/platformSessionLogs';
 import { getSupabase } from '@/lib/supabase';
+import type { Platform } from '@/types/database';
 
 export type SessionUiStatus = 'valid' | 'invalid' | 'unknown';
 
 export const PLATFORM_SESSION_RLS_HINT =
   'PLATFORM_SESSION_RLS: Run Supabase migrations 003 and 017 (or 018 on legacy DB).';
+
+export type ActivePlatformSessionRow = {
+  id: string;
+  session_data: string;
+  session_type: string;
+  updated_at?: string;
+};
 
 function isRlsError(code: string | undefined, message: string | undefined): boolean {
   if (code === '42501') return true;
@@ -27,12 +36,72 @@ async function deactivatePlatformSessionsRpc(
   return !error;
 }
 
-export async function markPlatformSessionInvalid(accountId: string, reason = 'revoked'): Promise<void> {
+/** Ambil baris session aktif terbaru — jangan pakai maybeSingle (gagal jika >1 baris aktif). */
+export async function fetchActivePlatformSessions(
+  accountId: string,
+  options?: { sessionType?: 'telethon_string' | 'whatsapp_local_auth' },
+): Promise<ActivePlatformSessionRow[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from(TABLES.platformSessions)
+    .select('id, session_data, session_type, updated_at')
+    .eq('account_id', accountId)
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .limit(5);
+
+  if (options?.sessionType) {
+    query = query.eq('session_type', options.sessionType);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    if (isRlsError(error.code, error.message)) {
+      console.error('[platformSessions]', PLATFORM_SESSION_RLS_HINT, error);
+    } else {
+      console.error('[platformSessions] fetch active failed', accountId, error);
+    }
+    return [];
+  }
+
+  return (data as ActivePlatformSessionRow[] | null) ?? [];
+}
+
+async function resolvePlatformForAccount(accountId: string): Promise<Platform> {
+  const supabase = getSupabase();
+  if (!supabase) return 'whatsapp';
+  const { data } = await supabase
+    .from(TABLES.messagingAccounts)
+    .select('platform')
+    .eq('id', accountId)
+    .maybeSingle();
+  return (data?.platform as Platform) ?? 'whatsapp';
+}
+
+export async function markPlatformSessionInvalid(
+  accountId: string,
+  reason = 'revoked',
+  platformHint?: Platform,
+): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
 
   const rpcOk = await deactivatePlatformSessionsRpc(accountId, reason);
   if (rpcOk) return;
+
+  const platform = platformHint ?? (await resolvePlatformForAccount(accountId));
+  const activeRows = await fetchActivePlatformSessions(accountId);
+  for (const row of activeRows) {
+    await logSessionLogoutActivity({
+      accountId,
+      platform,
+      reason,
+      platformSessionId: row.id,
+    });
+  }
 
   const { error } = await supabase
     .from(TABLES.platformSessions)
@@ -51,53 +120,67 @@ export async function markPlatformSessionInvalid(accountId: string, reason = 're
 }
 
 export async function loadWhatsAppLocalAuthClientId(accountId: string): Promise<string | null> {
-  const supabase = getSupabase();
-  if (!supabase) return null;
-
-  const { data, error } = await supabase
-    .from(TABLES.platformSessions)
-    .select('session_data')
-    .eq('account_id', accountId)
-    .eq('is_active', true)
-    .eq('session_type', 'whatsapp_local_auth')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data?.session_data) return null;
-  return String(data.session_data).trim() || null;
+  const rows = await fetchActivePlatformSessions(accountId, {
+    sessionType: 'whatsapp_local_auth',
+  });
+  const data = rows[0]?.session_data;
+  if (!data) return null;
+  return String(data).trim() || null;
 }
 
 export async function loadTelegramPlatformSession(accountId: string): Promise<string | null> {
-  const supabase = getSupabase();
-  if (!supabase) return null;
-
-  const { data, error } = await supabase
-    .from(TABLES.platformSessions)
-    .select('session_data')
-    .eq('account_id', accountId)
-    .eq('is_active', true)
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data?.session_data) return null;
-  return data.session_data as string;
+  const rows = await fetchActivePlatformSessions(accountId);
+  const telethon = rows.find((r) => r.session_type === 'telethon_string') ?? rows[0];
+  if (!telethon?.session_data) return null;
+  return telethon.session_data as string;
 }
 
 export async function hasActivePlatformSession(accountId: string): Promise<boolean> {
+  const rows = await fetchActivePlatformSessions(accountId);
+  return rows.length > 0;
+}
+
+/** Cari account_id dari session_data (LocalAuth id / acc-xxx) bila UUID UI tidak cocok. */
+function sessionDataLookupKeys(sessionData: string): string[] {
+  const trimmed = sessionData.trim();
+  if (!trimmed) return [];
+  const keys = [trimmed];
+  if (trimmed.startsWith('acc-')) {
+    const bare = trimmed.slice(4);
+    if (bare) keys.push(bare);
+  }
+  return keys;
+}
+
+export async function findAccountIdBySessionData(
+  sessionData: string,
+  platform?: Platform,
+): Promise<string | null> {
   const supabase = getSupabase();
-  if (!supabase) return false;
+  if (!supabase) return null;
 
-  const { data } = await supabase
-    .from(TABLES.platformSessions)
-    .select('id')
-    .eq('account_id', accountId)
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
+  for (const key of sessionDataLookupKeys(sessionData)) {
+    let query = supabase
+      .from(TABLES.platformSessions)
+      .select('account_id, session_type')
+      .eq('is_active', true)
+      .eq('session_data', key)
+      .order('updated_at', { ascending: false })
+      .limit(3);
 
-  return Boolean(data?.id);
+    if (platform === 'whatsapp') {
+      query = query.eq('session_type', 'whatsapp_local_auth');
+    } else if (platform === 'telegram') {
+      query = query.eq('session_type', 'telethon_string');
+    }
+
+    const { data, error } = await query;
+    if (error || !data?.length) continue;
+    const accountId = (data[0] as { account_id: string }).account_id;
+    if (accountId) return accountId;
+  }
+
+  return null;
 }
 
 export async function savePlatformSession(input: {
@@ -129,9 +212,12 @@ export async function savePlatformSession(input: {
     if (rpcError) throw rpcError;
   }
 
-  await markPlatformSessionInvalid(input.accountId, 'replaced');
+  const platform = input.sessionType === 'whatsapp_local_auth' ? 'whatsapp' : 'telegram';
+  await markPlatformSessionInvalid(input.accountId, 'replaced', platform);
 
-  const { error } = await supabase.from(TABLES.platformSessions).insert({
+  const { data: inserted, error } = await supabase
+    .from(TABLES.platformSessions)
+    .insert({
     account_id: input.accountId,
     session_data: input.sessionData,
     session_type: input.sessionType,
@@ -141,7 +227,9 @@ export async function savePlatformSession(input: {
     disconnected_at: null,
     disconnect_reason: null,
     last_sync_at: new Date().toISOString(),
-  });
+  })
+    .select('id')
+    .single();
 
   if (error) {
     if (isRlsError(error.code, error.message)) {
@@ -149,6 +237,14 @@ export async function savePlatformSession(input: {
     }
     throw error;
   }
+
+  const newId = (inserted as { id: string } | null)?.id;
+  await logSessionValidActivity({
+    accountId: input.accountId,
+    platform,
+    message: 'Session saved (fallback)',
+    platformSessionId: newId ?? null,
+  });
 }
 
 export async function saveTelegramPlatformSession(input: {

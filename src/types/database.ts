@@ -1,7 +1,5 @@
 // Resource Management — TypeScript types (reference)
-// Generate types from Supabase CLI later: supabase gen types typescript
 
-/** Tabel public.users — existing Supabase (login: username + password) */
 export interface UserRecord {
   id: string;
   username: string;
@@ -14,41 +12,27 @@ export interface UserRecord {
 
 export type Platform = 'whatsapp' | 'telegram';
 export type LoginMethod = 'qr' | 'phone';
-export type GroupStatus = 'active' | 'left' | 'banned' | 'broken' | 'empty' | 'error';
+export type AdminYesNo = 'yes' | 'no';
 
-export interface UserSession {
+export interface Brand {
   id: string;
   user_id: string;
-  session_token: string;
-  platform: 'desktop' | 'web';
-  device_info: Record<string, unknown>;
-  ip_address: string | null;
+  name: string;
+  standard_group_count: number;
+  empty_slot_count: number;
   is_active: boolean;
-  started_at: string;
-  last_seen_at: string;
-  ended_at: string | null;
-  end_reason: 'logout' | 'expired' | 'revoked' | 'replaced' | 'forced' | null;
-  created_at: string;
-}
-
-export interface SessionLog {
-  id: string;
-  user_id: string | null;
-  session_id: string | null;
-  event_type: 'login' | 'logout' | 'refresh' | 'expired' | 'failed' | 'revoked';
-  platform: string;
-  device_info: Record<string, unknown>;
-  ip_address: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
+  updated_at: string;
 }
 
 export interface MessagingAccount {
   id: string;
   user_id: string;
+  brand_id: string;
   platform: Platform;
   label: string;
-  phone_or_username: string | null;
+  phone_number: string | null;
   is_active: boolean;
   notes: string | null;
   metadata: Record<string, unknown>;
@@ -72,82 +56,127 @@ export interface PlatformSession {
   updated_at: string;
 }
 
+export type PlatformSessionEventType =
+  | 'connect'
+  | 'disconnect'
+  | 'login_qr'
+  | 'login_phone'
+  | 'login_success'
+  | 'login_failed'
+  | 'session_restored'
+  | 'session_expired'
+  | 'probe_failed'
+  | 'device_logout'
+  | 'db_invalidated';
+
 export interface PlatformSessionLog {
   id: string;
   account_id: string;
   platform_session_id: string | null;
   platform: Platform;
-  event_type: string;
+  event_type: PlatformSessionEventType;
   login_method: LoginMethod | null;
   message: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
 }
 
-export interface GroupScrapeDaily {
-  id: string;
-  scrape_log_id: string | null;
-  account_id: string;
-  platform: Platform;
-  brand: string;
-  acc_name: string;
-  /** Phone/username akun WA/TG — bukan participant group. NULL jika user belum isi saat Add Account. */
-  phone_or_username: string | null;
-  scrape_date: string;
-  group_name: string | null;
-  group_id: string;
-  group_link: string | null;
-  is_admin: boolean;
-  count_owner: number;
-  count_admin: number;
-  count_member: number;
-  count_participant: number;
-  group_status: GroupStatus;
-  error_message: string | null;
-  is_archived: boolean;
-  is_readonly: boolean;
-  scraped_at: string;
-  created_at: string;
-}
+export type ScrapeRunStatus = 'started' | 'running' | 'completed' | 'failed' | 'partial';
 
-export interface GroupsMaster {
-  id: string;
-  account_id: string;
-  platform: Platform;
-  brand: string;
-  acc_name: string;
-  /** Phone/username akun WA/TG — bukan participant group. NULL jika user belum isi saat Add Account. */
-  phone_or_username: string | null;
-  group_name: string;
-  group_id: string;
-  group_link: string | null;
-  is_admin: boolean;
-  count_owner: number;
-  count_admin: number;
-  count_member: number;
-  count_participant: number;
-  is_archived: boolean;
-  is_readonly: boolean;
-  first_seen_at: string;
-  last_verified_at: string;
-  last_daily_id: string | null;
-  is_active: boolean;
-  metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ScrapeLog {
+export interface ScrapeRun {
   id: string;
   account_id: string;
   platform: Platform;
   trigger_type: 'scheduled' | 'manual';
-  status: 'started' | 'running' | 'completed' | 'failed' | 'partial';
+  status: ScrapeRunStatus;
   groups_total: number;
   groups_success: number;
   groups_failed: number;
   started_at: string;
   completed_at: string | null;
   error_message: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface GroupScrapeRow {
+  id: string;
+  account_id: string;
+  group_name: string | null;
+  group_id: string;
+  invite_link: string | null;
+  owner_count: number;
+  admin_count: number;
+  member_count: number;
+  is_admin: AdminYesNo;
+  platform: Platform;
+  scrape_date: string;
+  scraped_at: string;
+  created_at: string;
+  brand: string;
+  acc_name: string;
+  phone_number: string;
+}
+
+export type GroupScrapeDaily = GroupScrapeRow;
+
+/** Master brand — rekap per brand+platform (bukan per account). */
+export interface GroupsMaster {
+  id: string;
+  group_id: string;
+  group_name: string;
+  invite_link: string;
+  brand: string;
+  platform: Platform;
+  last_sync: string;
+}
+
+export interface AccountSnapshot {
+  account_id: string;
+  brand_id: string;
+  platform: Platform;
+  status: 'active' | 'logout';
+  session_status: 'valid' | 'invalid';
+  sync_state: 'pending' | 'synced';
+  groups_current: number;
+  groups_total: number;
+  admin_current: number;
+  admin_total: number;
+  is_misaligned: boolean;
+  last_sync_at: string | null;
+  updated_at: string;
+}
+
+export interface BrandStandardGroup {
+  id: string;
+  brand_id: string;
+  group_name: string;
+  group_id: string | null;
+  invite_link: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export type TicketType =
+  | 'missing_group'
+  | 'not_admin'
+  | 'group_count_mismatch'
+  | 'duplicate_group_id'
+  | 'duplicate_group_name'
+  | 'daily_junk_group';
+export type TicketStatus = 'open' | 'resolved' | 'dismissed';
+
+export interface Ticket {
+  id: string;
+  account_id: string;
+  brand_id: string;
+  platform: Platform;
+  ticket_type: TicketType;
+  status: TicketStatus;
+  description: string;
+  group_link: string | null;
+  group_id: string | null;
+  group_name: string | null;
+  created_at: string;
+  resolved_at: string | null;
   metadata: Record<string, unknown>;
 }

@@ -1,0 +1,142 @@
+import { ipcMain, type BrowserWindow } from 'electron';
+import {
+  startTelegramQrLogin,
+  startTelegramPhoneLogin,
+  submitTelegramCode,
+  submitTelegram2fa,
+  stopTelegramLogin,
+  shutdownSidecar,
+} from './telegramSidecar';
+import { tryRestorePlatformSession } from './restore';
+import {
+  clearWhatsAppLocalAuth,
+  startWhatsAppQrLogin,
+  startWhatsAppPhoneLogin,
+  stopWhatsAppLogin,
+} from './whatsapp';
+
+type Platform = 'whatsapp' | 'telegram';
+type LoginMode = 'qr' | 'phone';
+
+interface StartPayload {
+  sessionId: string;
+  platform: Platform;
+  mode?: LoginMode;
+  phone?: string;
+  /** true = langsung QR baru (sync relogin), jangan hang di restore disk */
+  skipDiskRestore?: boolean;
+}
+
+interface SubmitPayload {
+  sessionId: string;
+  platform: Platform;
+  kind: 'code' | '2fa' | 'phone';
+  value: string;
+}
+
+let mainWindow: BrowserWindow | null = null;
+
+function getWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error('Main window is not available');
+  }
+  return mainWindow;
+}
+
+export function setPlatformLoginWindow(win: BrowserWindow) {
+  mainWindow = win;
+}
+
+export function registerPlatformLoginIpc() {
+  ipcMain.handle('platform-login:start', async (_event, payload: StartPayload) => {
+    const win = getWindow();
+    const mode = payload.mode ?? 'qr';
+
+    if (payload.platform === 'whatsapp') {
+      if (mode === 'phone') {
+        if (!payload.phone?.trim()) {
+          throw new Error('Phone number is required');
+        }
+        await startWhatsAppPhoneLogin(payload.sessionId, payload.phone.trim(), win);
+      } else {
+        await startWhatsAppQrLogin(payload.sessionId, win, {
+          skipDiskRestore: Boolean(payload.skipDiskRestore),
+        });
+      }
+      return { ok: true };
+    }
+
+    if (mode === 'phone') {
+      if (!payload.phone?.trim()) {
+        throw new Error('Phone number is required');
+      }
+      await startTelegramPhoneLogin(payload.sessionId, payload.phone.trim(), win);
+    } else {
+      await startTelegramQrLogin(payload.sessionId, win);
+    }
+
+    return { ok: true };
+  });
+
+  ipcMain.handle('platform-login:submit', async (_event, payload: SubmitPayload) => {
+    const win = getWindow();
+
+    if (payload.platform === 'whatsapp' && payload.kind === 'phone') {
+      await startWhatsAppPhoneLogin(payload.sessionId, payload.value.trim(), win);
+      return { ok: true };
+    }
+
+    if (payload.platform === 'telegram') {
+      if (payload.kind === 'phone') {
+        await startTelegramPhoneLogin(payload.sessionId, payload.value.trim(), win);
+      } else if (payload.kind === 'code') {
+        await submitTelegramCode(payload.sessionId, payload.value.trim(), win);
+      } else if (payload.kind === '2fa') {
+        await submitTelegram2fa(payload.sessionId, payload.value, win);
+      }
+    }
+
+    return { ok: true };
+  });
+
+  ipcMain.handle('platform-login:cancel', async (_event, sessionId: string) => {
+    await stopWhatsAppLogin(sessionId);
+    await stopTelegramLogin(sessionId);
+    return { ok: true };
+  });
+
+  ipcMain.handle(
+    'platform-login:release',
+    async (_event, sessionId: string, options?: { purgeWaDisk?: boolean }) => {
+      await stopWhatsAppLogin(sessionId, {
+        clearDiskAuth: Boolean(options?.purgeWaDisk),
+      });
+      await stopTelegramLogin(sessionId);
+      return { ok: true };
+    },
+  );
+
+  ipcMain.handle('platform-login:purge-wa-auth', async (_event, sessionId: string) => {
+    clearWhatsAppLocalAuth(sessionId);
+    return { ok: true };
+  });
+
+  ipcMain.handle(
+    'platform-login:try-restore',
+    async (
+      _event,
+      payload: {
+        sessionId: string;
+        platform: Platform;
+        storedSessionString?: string | null;
+      },
+    ) => {
+      const win = getWindow();
+      return tryRestorePlatformSession(win, payload);
+    },
+  );
+}
+
+export function cleanupPlatformLogin() {
+  shutdownSidecar();
+}

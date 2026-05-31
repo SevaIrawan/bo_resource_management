@@ -20,8 +20,12 @@ Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary
 ## Development
 
 ```bash
-# Install dependencies
+# One-shot setup (Node + Python sidecar deps)
+npm run setup
+
+# Or manual:
 npm install
+npm run setup:python
 
 # Copy env
 cp .env.example .env
@@ -53,15 +57,28 @@ npm run electron:build
 
 Output: `release/` folder
 
+## Export (Excel)
+
+- Library: **xlsx** (SheetJS) — `src/lib/exportExcel.ts`
+- **Brand card** → `RM-{brand}-group-links-YYYYMMDD.xlsx`
+- **Table view** → `RM-all-accounts-YYYYMMDD.xlsx`
+- **Tickets** → `RM-tickets-YYYYMMDD.xlsx`
+- Python sidecar also has **openpyxl** for server-side export later.
+
 ## Supabase Setup
 
-Run migration in Supabase SQL Editor:
+### Database Supabase (desktop-ready, realtime)
 
-```
-supabase/migrations/001_foundation.sql
-```
+1. `supabase/migrations/003_auth_login_rpc.sql`
+2. `supabase/migrations/017_rm_full_reset.sql` — **9 tabel RM** + master brand + RPC + Realtime
 
-**Catatan:** Semua table diawali prefix `resource_management_`. Migration tidak membuat `users`. FK → `public.users(id)`.
+**DB yang sudah production (tanpa reset data):** jalankan sekali `018_drop_legacy_rm.sql`, lalu scrape ulang.
+
+**Peringatan:** `017` menghapus semua data RM. `public.users` tidak disentuh. Migrasi `001–011`, `019–021` sudah dihapus dari repo — jangan jalankan lagi di Supabase.
+
+Detail tabel: `supabase/migrations/README.md`.
+
+**Prinsip:** Semua data bisnis di Supabase; session WA/TG tersimpan + Realtime; metrik sync di `account_snapshots`; audit di `platform_session_logs` & `scrape_runs`.
 
 ## Layout
 

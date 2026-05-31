@@ -3,22 +3,33 @@ import { AccountBrandCard } from '@/components/group-monitoring/AccountBrandCard
 import { AddBrandCard } from '@/components/group-monitoring/AddBrandCard';
 import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
 import { useAuth } from '@/hooks/useAuth';
-import { addAccountToGroup, createEmptyBrandGroup, nextBrandLabel } from '@/lib/accountBrandUtils';
+import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
+import { addAccountToGroup, createEmptyBrandGroup } from '@/lib/accountBrandUtils';
+import { ensureBrand } from '@/lib/brands';
 import { createMessagingAccount } from '@/lib/messagingAccounts';
 import type { AccountBrandGroup, AddAccountInput } from '@/types/accountMonitoringUi';
+
+type SyncFlow = ReturnType<typeof useAccountSyncFlow>;
 
 interface AccountBrandCardListProps {
   groups: AccountBrandGroup[];
   onGroupsChange: (groups: AccountBrandGroup[]) => void;
+  sync: SyncFlow;
 }
 
-export function AccountBrandCardList({ groups, onGroupsChange }: AccountBrandCardListProps) {
+export function AccountBrandCardList({ groups, onGroupsChange, sync }: AccountBrandCardListProps) {
   const { user } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
 
-  function handleAddBrand(brandName: string) {
-    const label = nextBrandLabel(groups);
-    const nextGroup = createEmptyBrandGroup(brandName, label);
+  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper } = sync;
+
+  async function handleAddBrand(brandName: string) {
+    let dbBrandId: string | undefined;
+    if (user?.id) {
+      const brand = await ensureBrand({ userId: user.id, brandName });
+      dbBrandId = brand.id;
+    }
+    const nextGroup = { ...createEmptyBrandGroup(brandName), dbBrandId };
     onGroupsChange([...groups, nextGroup]);
   }
 
@@ -26,23 +37,30 @@ export function AccountBrandCardList({ groups, onGroupsChange }: AccountBrandCar
     const group = groups.find((item) => item.id === groupId);
     if (!group) return;
 
-    onGroupsChange(
-      groups.map((item) =>
-        item.id === groupId ? addAccountToGroup(item, input) : item,
-      ),
-    );
-
+    let dbAccountId: string | undefined;
     if (user?.id) {
-      void createMessagingAccount({
+      dbAccountId = await createMessagingAccount({
         userId: user.id,
         platform: input.platform,
         label: input.accountName,
-        phoneOrUsername: input.phoneOrUsername,
+        phoneNumber: input.phoneNumber,
         brand: group.brandName,
-      }).catch((error) => {
-        console.warn('[RM] Account saved to list; database write deferred:', error);
       });
     }
+
+    onGroupsChange(
+      groups.map((item) =>
+        item.id === groupId ? addAccountToGroup(item, { ...input, dbAccountId }) : item,
+      ),
+    );
+  }
+
+  function handleSyncByAccountId(groupId: string, accountId: string) {
+    const group = groups.find((item) => item.id === groupId);
+    const account = group?.accounts.find((row) => row.id === accountId);
+    if (!account) return;
+
+    handleSyncAccount(groupId, account);
   }
 
   return (
@@ -53,6 +71,17 @@ export function AccountBrandCardList({ groups, onGroupsChange }: AccountBrandCar
             key={group.id}
             group={group}
             onAddAccount={(input) => handleAddAccount(group.id, input)}
+            onSyncAccount={(accountId) => handleSyncByAccountId(group.id, accountId)}
+            onRunScraper={(accountId) => {
+              const account = group.accounts.find((row) => row.id === accountId);
+              if (account) void handleRunScraper(group.id, account);
+            }}
+            checkingAccountId={
+              processingAction === 'sync' ? processingAccountId : null
+            }
+            scraperAccountId={
+              processingAction === 'scraper' ? processingAccountId : null
+            }
           />
         ))}
         <AddBrandCard onClick={() => setModalOpen(true)} />

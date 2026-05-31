@@ -1,0 +1,127 @@
+/**
+ * Satu sumber logika monitoring akun (sync / scraper / hydrate).
+ * Groups UI: Y/X (device / standar brand). Admin: admin master / X.
+ */
+import { buildAccountSyncResult } from '@/lib/accountDisplayMetrics';
+import { fetchHasDailyData, fetchMasterGroupStats } from '@/lib/accountSyncData';
+import { countDeviceGroups, type DeviceGroupCountResult } from '@/lib/runAccountCount';
+import { probePlatformSession } from '@/lib/sessionProbe';
+import type { AccountSyncResult } from '@/lib/accountBrandUtils';
+import type { MasterGroupStats } from '@/lib/accountSyncData';
+import type { AccountBrandRow } from '@/types/accountMonitoringUi';
+import type { Platform } from '@/types/database';
+
+export function todayScrapeDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Probe session di device (TG/WA) — tidak bergantung row DB untuk WhatsApp. */
+export async function probeLivePlatformSession(input: {
+  sessionId: string;
+  platform: Platform;
+  accountId: string;
+}): Promise<{ valid: boolean; message?: string }> {
+  if (!window.electronAPI?.isElectron) {
+    return { valid: false, message: 'SCRAPER_DESKTOP_REQUIRED' };
+  }
+  return probePlatformSession(input);
+}
+
+/** Probe + hitung grup di device (count-only, tanpa QR). */
+export async function fetchDeviceGroupCounts(input: {
+  sessionId: string;
+  platform: Platform;
+  accountId: string;
+}): Promise<DeviceGroupCountResult> {
+  const probe = await probeLivePlatformSession(input);
+  if (!probe.valid) {
+    return {
+      valid: false,
+      totalGroups: 0,
+      adminGroups: 0,
+      message: probe.message ?? 'Session invalid',
+    };
+  }
+
+  return countDeviceGroups(input);
+}
+
+/** @deprecated Gunakan buildAccountSyncResult — Y/X + admin/X. */
+export function buildSyncResultFromCounts(
+  master: MasterGroupStats,
+  device: DeviceGroupCountResult,
+  brandStandard = 0,
+): AccountSyncResult {
+  return buildAccountSyncResult({ master, device, brandStandard });
+}
+
+export interface RefreshAccountMetricsInput {
+  account: AccountBrandRow;
+  dbAccountId: string;
+  /** X — total grup standar brand (dinamis). */
+  brandStandard?: number;
+}
+
+export interface RefreshAccountMetricsResult {
+  result: AccountSyncResult;
+  hasDailyToday: boolean;
+  device: DeviceGroupCountResult;
+  master: MasterGroupStats;
+}
+
+/** Satu putaran sync: daily hari ini → master → probe device → counts. */
+export async function refreshAccountMetrics(
+  input: RefreshAccountMetricsInput,
+): Promise<RefreshAccountMetricsResult> {
+  const { account, dbAccountId } = input;
+
+  const hasDailyToday = await fetchHasDailyData(
+    account.brandName,
+    account.accountName,
+    account.phoneNumber,
+    account.platform,
+    todayScrapeDate(),
+  );
+
+  const master = await fetchMasterGroupStats(
+    account.brandName,
+    account.accountName,
+    account.phoneNumber,
+    account.platform,
+    dbAccountId,
+  );
+
+  const device = await fetchDeviceGroupCounts({
+    sessionId: account.id,
+    platform: account.platform,
+    accountId: dbAccountId,
+  });
+
+  return {
+    hasDailyToday,
+    device,
+    master,
+    result: buildAccountSyncResult({
+      master,
+      device,
+      brandStandard: input.brandStandard ?? 0,
+    }),
+  };
+}
+
+/**
+ * Probe gagal tidak lagi mencabut session DB — hanya UI/login ulang di device.
+ * @deprecated Panggil invalidate hanya dari aksi logout eksplisit user.
+ */
+export async function revokePlatformSessionIfNeeded(_input: {
+  platform: Platform;
+  dbAccountId: string;
+  sessionId: string;
+  probeMessage?: string;
+}): Promise<void> {
+  // no-op: auto-revoke setelah probe menyebabkan loop logout setelah QR sukses
+}

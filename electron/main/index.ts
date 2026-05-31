@@ -1,6 +1,15 @@
 import './env';
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
+import dotenv from 'dotenv';
+import {
+  cleanupPlatformLogin,
+  registerPlatformLoginIpc,
+  setPlatformLoginWindow,
+} from './platformLogin';
+import { registerScraperIpc } from './scraper';
+
+dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
@@ -57,9 +66,19 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(app.getAppPath(), 'dist/index.html'), { hash: '/' });
   }
+
+  setPlatformLoginWindow(mainWindow);
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  registerPlatformLoginIpc();
+  registerScraperIpc();
+  createWindow();
+});
+
+app.on('before-quit', () => {
+  cleanupPlatformLogin();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

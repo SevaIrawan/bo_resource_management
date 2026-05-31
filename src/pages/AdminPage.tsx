@@ -1,6 +1,6 @@
 import { Database, KeyRound, Server, Shield } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { TABLES } from '@/config/tables';
+import { RM_ACTIVE_TABLES } from '@/config/tables';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export function AdminPage() {
@@ -33,7 +33,7 @@ export function AdminPage() {
       id: 'tables',
       icon: Shield,
       labelKey: 'admin.sessionTables',
-      value: TABLES.userSessions,
+      value: `${RM_ACTIVE_TABLES.length} RM tables`,
       ok: true,
     },
   ] as const;

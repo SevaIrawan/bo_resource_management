@@ -1,8 +1,15 @@
 import { ChevronDown, Search } from 'lucide-react';
-import { useState } from 'react';
-import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
+import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
-import type { AccountViewMode } from '@/types/accountMonitoringUi';
+import {
+  uniqueAccountBrands,
+  uniqueAccountPlatforms,
+  uniqueAccountStatuses,
+} from '@/lib/filterAccountGroups';
+import { cn } from '@/lib/utils';
+import type { AccountConnectionStatus, AccountViewMode } from '@/types/accountMonitoringUi';
+import type { Platform } from '@/types/database';
 
 export type { AccountViewMode };
 
@@ -37,47 +44,58 @@ function SlicerSelect({ value, onChange, options, className }: FilterSelectProps
   );
 }
 
-const FILTER_DEFAULT = {
-  brand: 'all',
-  platform: 'all',
-  status: 'all',
-  adminStatus: 'all',
-  search: '',
-};
+function statusLabel(
+  t: (key: string) => string,
+  status: AccountConnectionStatus,
+): string {
+  return status === 'active'
+    ? t('groupMonitoring.accountCard.statusActive')
+    : t('groupMonitoring.accountCard.statusLogout');
+}
+
+function platformLabel(t: (key: string) => string, platform: Platform): string {
+  return platform === 'whatsapp'
+    ? t('groupMonitoring.platform.whatsapp')
+    : t('groupMonitoring.platform.telegram');
+}
 
 export function AccountSlicerHeader({ viewMode, onViewModeChange }: AccountSlicerHeaderProps) {
   const { t } = useLanguage();
-  const [filters, setFilters] = useState(FILTER_DEFAULT);
+  const { groups, accountFilters, setAccountFilters } = useGroupMonitoring();
 
-  const patchFilters = (partial: Partial<typeof FILTER_DEFAULT>) => {
-    setFilters((prev) => ({ ...prev, ...partial }));
+  const patchFilters = (partial: Partial<typeof accountFilters>) => {
+    setAccountFilters((prev) => ({ ...prev, ...partial }));
   };
 
-  const brandOptions = [
-    { value: 'all', label: t('groupMonitoring.filters.allBrands') },
-  ];
+  const brandOptions = useMemo(() => {
+    const brands = uniqueAccountBrands(groups);
+    return [
+      { value: 'all', label: t('groupMonitoring.filters.allBrands') },
+      ...brands.map((name) => ({ value: name, label: name })),
+    ];
+  }, [groups, t]);
 
-  const platformOptions = [
-    { value: 'all', label: t('groupMonitoring.filters.allPlatforms') },
-    { value: 'whatsapp', label: 'WhatsApp' },
-    { value: 'telegram', label: 'Telegram' },
-  ];
+  const platformOptions = useMemo(() => {
+    const platforms = uniqueAccountPlatforms(groups);
+    return [
+      { value: 'all', label: t('groupMonitoring.filters.allPlatforms') },
+      ...platforms.map((value) => ({
+        value,
+        label: platformLabel(t, value),
+      })),
+    ];
+  }, [groups, t]);
 
-  const statusOptions = [
-    { value: 'all', label: t('groupMonitoring.filters.allStatus') },
-    { value: 'active', label: t('groupMonitoring.status.active') },
-    { value: 'left', label: t('groupMonitoring.status.left') },
-    { value: 'banned', label: t('groupMonitoring.status.banned') },
-    { value: 'broken', label: t('groupMonitoring.status.broken') },
-    { value: 'empty', label: t('groupMonitoring.status.empty') },
-    { value: 'error', label: t('groupMonitoring.status.error') },
-  ];
-
-  const adminOptions = [
-    { value: 'all', label: t('groupMonitoring.filters.allAdmin') },
-    { value: 'yes', label: t('groupMonitoring.filters.adminYes') },
-    { value: 'no', label: t('groupMonitoring.filters.adminNo') },
-  ];
+  const statusOptions = useMemo(() => {
+    const statuses = uniqueAccountStatuses(groups);
+    return [
+      { value: 'all', label: t('groupMonitoring.filters.allStatus') },
+      ...statuses.map((value) => ({
+        value,
+        label: statusLabel(t, value),
+      })),
+    ];
+  }, [groups, t]);
 
   return (
     <div className="account-slicer-row">
@@ -85,7 +103,7 @@ export function AccountSlicerHeader({ viewMode, onViewModeChange }: AccountSlice
         <div className="account-slicer-search-group">
           <input
             type="search"
-            value={filters.search}
+            value={accountFilters.search}
             onChange={(e) => patchFilters({ search: e.target.value })}
             placeholder={t('groupMonitoring.searchPlaceholder')}
             className="account-slicer-search"
@@ -104,24 +122,19 @@ export function AccountSlicerHeader({ viewMode, onViewModeChange }: AccountSlice
       <div className="account-slicer-right">
         <div className="account-slicer-filters">
           <SlicerSelect
-            value={filters.brand}
+            value={accountFilters.brand}
             onChange={(brand) => patchFilters({ brand })}
             options={brandOptions}
           />
           <SlicerSelect
-            value={filters.platform}
+            value={accountFilters.platform}
             onChange={(platform) => patchFilters({ platform })}
             options={platformOptions}
           />
           <SlicerSelect
-            value={filters.status}
+            value={accountFilters.status}
             onChange={(status) => patchFilters({ status })}
             options={statusOptions}
-          />
-          <SlicerSelect
-            value={filters.adminStatus}
-            onChange={(adminStatus) => patchFilters({ adminStatus })}
-            options={adminOptions}
           />
         </div>
 

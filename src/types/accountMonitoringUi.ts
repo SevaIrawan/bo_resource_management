@@ -7,7 +7,6 @@ export interface AccountSlicerState {
   brand: string;
   platform: string;
   status: string;
-  adminStatus: string;
   search: string;
 }
 
@@ -15,19 +14,30 @@ export type AccountConnectionStatus = 'active' | 'logout';
 
 export type AccountSyncState = 'pending' | 'synced';
 
+export type SessionUiStatus = 'valid' | 'invalid';
+export type AccountProcessAction = 'sync' | 'scraper' | null;
+
 export interface AccountBrandRow {
   id: string;
   platform: Platform;
   accountName: string;
-  phoneOrUsername: string;
+  phoneNumber: string;
   brandName: string;
   status: AccountConnectionStatus;
+  /** Y — jumlah grup di device (realtime) */
   groupsCurrent: number;
+  /** X — total grup standar brand (dinamis) */
   groupsTotal: number;
+  /** Admin di master untuk akun ini */
   adminCurrent: number;
+  /** X — denominator admin (standar brand) */
   adminTotal: number;
-  /** pending = baru ditambah user, kolom monitoring kosong sampai Sync */
+  sessionStatus: SessionUiStatus;
+  actionProcess: AccountProcessAction;
   syncState: AccountSyncState;
+  isMisaligned: boolean;
+  /** ISO timestamp — scrape/sync selesai (dari snapshot DB). */
+  lastSyncAt?: string | null;
 }
 
 export interface AccountBrandEmptySlot {
@@ -37,10 +47,15 @@ export interface AccountBrandEmptySlot {
 
 export interface AccountBrandGroup {
   id: string;
+  /** UUID di Supabase `resource_management_brands` */
+  dbBrandId?: string;
   brandLabel: string;
   brandName: string;
   accountCount: number;
+  /** @deprecated Gunakan standardGroupCountByPlatform — X per platform berbeda */
   standardGroupCount: number;
+  /** X standar per platform (whatsapp / telegram) */
+  standardGroupCountByPlatform: Partial<Record<Platform, number>>;
   misalignedCount: number;
   accounts: AccountBrandRow[];
   emptySlots: AccountBrandEmptySlot[];
@@ -49,7 +64,7 @@ export interface AccountBrandGroup {
 export interface AddAccountInput {
   platform: Platform;
   accountName: string;
-  phoneOrUsername?: string;
+  phoneNumber?: string;
   slotId?: string;
   dbAccountId?: string;
 }

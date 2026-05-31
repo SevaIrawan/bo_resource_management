@@ -1,0 +1,84 @@
+import type { Platform } from '@/types/database';
+import type { TicketAccent, TicketItem, TicketType } from '@/types/ticketMonitoringUi';
+
+export interface TicketDetailLine {
+  id: string;
+  groupId: string | null;
+  groupName: string | null;
+  groupLink: string | null;
+  description: string;
+}
+
+export interface TicketSummaryGroup {
+  key: string;
+  ticketType: TicketType;
+  accent: TicketAccent;
+  accountName: string;
+  brandName: string;
+  platform: Platform;
+  phoneNumber: string;
+  itemCount: number;
+  lines: TicketDetailLine[];
+}
+
+export function ticketGroupKey(ticket: Pick<TicketItem, 'accountName' | 'brandName' | 'platform' | 'ticketType'>): string {
+  return [
+    ticket.accountName.trim(),
+    ticket.brandName.trim(),
+    ticket.platform,
+    ticket.ticketType,
+  ].join('|');
+}
+
+export function groupOpenTickets(tickets: TicketItem[]): TicketSummaryGroup[] {
+  const map = new Map<string, TicketSummaryGroup>();
+
+  for (const ticket of tickets) {
+    const key = ticketGroupKey(ticket);
+    let group = map.get(key);
+
+    if (!group) {
+      group = {
+        key,
+        ticketType: ticket.ticketType,
+        accent: ticket.accent,
+        accountName: ticket.accountName,
+        brandName: ticket.brandName,
+        platform: ticket.platform,
+        phoneNumber: ticket.phoneNumber,
+        itemCount: 0,
+        lines: [],
+      };
+      map.set(key, group);
+    }
+
+    group.lines.push({
+      id: ticket.id,
+      groupId: ticket.groupId ?? null,
+      groupName: ticket.groupName ?? null,
+      groupLink: ticket.groupLink ?? null,
+      description: ticket.description,
+    });
+    group.itemCount = group.lines.length;
+  }
+
+  return [...map.values()].sort((a, b) => {
+    const brand = a.brandName.localeCompare(b.brandName);
+    if (brand !== 0) return brand;
+    const acc = a.accountName.localeCompare(b.accountName);
+    if (acc !== 0) return acc;
+    return a.ticketType.localeCompare(b.ticketType);
+  });
+}
+
+export function ticketTypeExportLabel(type: TicketType): string {
+  const labels: Record<TicketType, string> = {
+    missing_group: 'Missing group',
+    not_admin: 'Not admin',
+    group_count_mismatch: 'Group count mismatch',
+    duplicate_group_id: 'Duplicate group ID',
+    duplicate_group_name: 'Duplicate group name',
+    daily_junk_group: 'Device junk group',
+  };
+  return labels[type];
+}

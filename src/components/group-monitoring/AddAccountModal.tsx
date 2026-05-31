@@ -1,13 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
+import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { AddAccountPlatformBadge } from '@/components/group-monitoring/AddAccountHeaderMenu';
+import { normalizePhoneDigits } from '@/lib/phoneNormalize';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { Platform } from '@/types/database';
 
 export interface AddAccountFormValues {
   accountName: string;
-  phoneOrUsername: string;
+  phoneNumber: string;
 }
 
 interface AddAccountModalProps {
@@ -32,7 +34,7 @@ export function AddAccountModal({
   const { t } = useLanguage();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(platform);
   const [accountName, setAccountName] = useState('');
-  const [phoneOrUsername, setPhoneOrUsername] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export function AddAccountModal({
 
     setSelectedPlatform(platform);
     setAccountName('');
-    setPhoneOrUsername('');
+    setPhoneNumber('');
     setLocalError(null);
   }, [open, platform]);
 
@@ -66,21 +68,26 @@ export function AddAccountModal({
     }
 
     const name = accountName.trim();
-    const phone = phoneOrUsername.trim();
+    const phone = phoneNumber.trim();
 
     if (!name) {
       setLocalError(t('groupMonitoring.accountCard.accNameRequired'));
       return;
     }
 
+    if (!phone || normalizePhoneDigits(phone).length < 8) {
+      setLocalError(t('groupMonitoring.accountCard.phoneRequired'));
+      return;
+    }
+
     setLocalError(null);
-    onSubmit({ accountName: name, phoneOrUsername: phone }, selectedPlatform);
+    onSubmit({ accountName: name, phoneNumber: phone }, selectedPlatform);
   }
 
   const displayError = localError ?? error;
 
   return (
-    <div className="brand-modal-root" role="presentation" onClick={saving ? undefined : onClose}>
+    <BrandModalRoot onBackdropClick={saving ? undefined : onClose}>
       <div
         className="brand-modal-panel"
         role="dialog"
@@ -164,9 +171,9 @@ export function AddAccountModal({
               <input
                 id="add-account-phone"
                 type="text"
-                value={phoneOrUsername}
+                value={phoneNumber}
                 onChange={(event) => {
-                  setPhoneOrUsername(event.target.value);
+                  setPhoneNumber(event.target.value);
                   if (localError) setLocalError(null);
                 }}
                 placeholder={t('groupMonitoring.accountCard.phonePlaceholder')}
@@ -201,6 +208,6 @@ export function AddAccountModal({
           </div>
         </form>
       </div>
-    </div>
+    </BrandModalRoot>
   );
 }

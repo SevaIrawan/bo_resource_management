@@ -12,7 +12,7 @@ interface DashboardProvidersProps {
 export function DashboardProviders({ children }: DashboardProvidersProps) {
   const [collapsed, setCollapsed] = useState(SIDEBAR_DEFAULT_COLLAPSED);
   const [tab, setTab] = useState<MonitoringTab>('account');
-  const ticketCount = 4;
+  const [ticketCount, setTicketCount] = useState(0);
 
   const toggle = useCallback(() => {
     setCollapsed((prev) => !prev);
@@ -24,7 +24,7 @@ export function DashboardProviders({ children }: DashboardProvidersProps) {
   );
 
   const monitoringValue = useMemo(
-    () => ({ tab, setTab, ticketCount }),
+    () => ({ tab, setTab, ticketCount, setTicketCount }),
     [tab, ticketCount],
   );
 

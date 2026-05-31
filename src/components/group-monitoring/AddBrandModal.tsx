@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
+import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { useLanguage } from '@/hooks/useLanguage';
 
 interface AddBrandModalProps {
@@ -47,7 +48,7 @@ export function AddBrandModal({ open, onClose, onSubmit }: AddBrandModalProps) {
   }
 
   return (
-    <div className="brand-modal-root" role="presentation" onClick={onClose}>
+    <BrandModalRoot onBackdropClick={onClose}>
       <div
         className="brand-modal-panel"
         role="dialog"
@@ -97,6 +98,6 @@ export function AddBrandModal({ open, onClose, onSubmit }: AddBrandModalProps) {
           </div>
         </form>
       </div>
-    </div>
+    </BrandModalRoot>
   );
 }

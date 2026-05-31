@@ -2,11 +2,102 @@
 
 export {};
 
+type Platform = 'whatsapp' | 'telegram';
+type LoginMode = 'qr' | 'phone';
+type LoginPhase = 'pending' | 'need_code' | 'need_2fa' | 'confirming';
+
+/** Output scraper WA/TG — selaras kolom group_scrape_daily / groups_master. */
+interface ScrapedGroupRow {
+  group_id: string;
+  group_name: string;
+  invite_link: string | null;
+  is_admin: 'yes' | 'no';
+  member_count: number;
+  admin_count: number;
+  owner_count: number;
+}
+
+interface PlatformLoginEvent {
+  sessionId: string;
+  platform: Platform;
+  dataUrl?: string;
+  code?: string;
+  message?: string;
+  phase?: LoginPhase;
+}
+
 declare global {
   interface Window {
     electronAPI?: {
       platform: string;
       isElectron: boolean;
+      platformLogin?: {
+        start: (payload: {
+          sessionId: string;
+          platform: Platform;
+          mode?: LoginMode;
+          phone?: string;
+          skipDiskRestore?: boolean;
+        }) => Promise<{ ok: boolean }>;
+        submit: (payload: {
+          sessionId: string;
+          platform: Platform;
+          kind: 'code' | '2fa' | 'phone';
+          value: string;
+        }) => Promise<{ ok: boolean }>;
+        cancel: (sessionId: string) => Promise<{ ok: boolean }>;
+        release: (
+          sessionId: string,
+          options?: { purgeWaDisk?: boolean },
+        ) => Promise<{ ok: boolean }>;
+        purgeWaAuth?: (sessionId: string) => Promise<{ ok: boolean }>;
+        tryRestore?: (payload: {
+          sessionId: string;
+          platform: Platform;
+          storedSessionString?: string | null;
+        }) => Promise<{ ready: boolean; message?: string }>;
+        onQr: (callback: (payload: PlatformLoginEvent & { dataUrl: string }) => void) => () => void;
+        onPairingCode: (
+          callback: (payload: PlatformLoginEvent & { code: string }) => void,
+        ) => () => void;
+        onPhase: (
+          callback: (payload: PlatformLoginEvent & { phase: LoginPhase }) => void,
+        ) => () => void;
+        onReady: (callback: (payload: PlatformLoginEvent) => void) => () => void;
+        onError: (callback: (payload: PlatformLoginEvent) => void) => () => void;
+      };
+      scraper?: {
+        run: (payload: {
+          sessionId: string;
+          platform: Platform;
+          storedSessionString?: string | null;
+        }) => Promise<{ ok: boolean; groups: ScrapedGroupRow[]; count: number }>;
+        countGroups: (payload: {
+          sessionId: string;
+          platform: Platform;
+          storedSessionString?: string | null;
+        }) => Promise<{
+          valid: boolean;
+          totalGroups: number;
+          adminGroups: number;
+          message?: string;
+        }>;
+        validateSession: (payload: {
+          sessionId: string;
+          platform: Platform;
+          storedSessionString?: string | null;
+        }) => Promise<{ valid: boolean; message?: string }>;
+        exportTelegramSession: (
+          sessionId: string,
+        ) => Promise<{ sessionString: string; loginMethod?: string }>;
+      };
+      onSessionInvalid?: (
+        callback: (payload: {
+          sessionId: string;
+          platform: Platform;
+          message?: string;
+        }) => void,
+      ) => () => void;
     };
   }
 }

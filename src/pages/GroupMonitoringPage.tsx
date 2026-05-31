@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { AccountMonitoringBody } from '@/components/group-monitoring/AccountMonitoringBody';
 import { TicketMonitoringBody } from '@/components/group-monitoring/TicketMonitoringBody';
-import {
-  ContentAreaCard,
-} from '@/components/group-monitoring/ContentAreaCard';
+import { ContentAreaCard } from '@/components/group-monitoring/ContentAreaCard';
 import { KpiGrid } from '@/components/group-monitoring/KpiGrid';
 import { useMonitoringTab } from '@/hooks/useMonitoringTab';
-import { ACCOUNT_KPIS, TICKET_KPIS } from '@/config/groupMonitoringKpis';
+import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
+import { GroupMonitoringProvider } from '@/providers/GroupMonitoringProvider';
 import type { AccountViewMode } from '@/types/accountMonitoringUi';
 
-export function GroupMonitoringPage() {
+function GroupMonitoringContent() {
   const { tab } = useMonitoringTab();
+  const { accountKpis, ticketKpis } = useGroupMonitoring();
   const [accountViewMode, setAccountViewMode] = useState<AccountViewMode>('card');
 
   return (
     <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">
-      <KpiGrid items={tab === 'ticket' ? TICKET_KPIS : ACCOUNT_KPIS} />
+      <KpiGrid items={tab === 'ticket' ? ticketKpis : accountKpis} />
 
       <ContentAreaCard
         tab={tab}
@@ -29,5 +29,13 @@ export function GroupMonitoringPage() {
         )}
       </ContentAreaCard>
     </div>
+  );
+}
+
+export function GroupMonitoringPage() {
+  return (
+    <GroupMonitoringProvider>
+      <GroupMonitoringContent />
+    </GroupMonitoringProvider>
   );
 }

@@ -1,12 +1,9 @@
 import { ChevronDown, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo } from 'react';
+import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
-
-const FILTER_DEFAULT = {
-  brand: 'all',
-  ticketType: 'all',
-  search: '',
-};
+import { uniqueTicketBrands, uniqueTicketPlatforms } from '@/lib/filterTicketSummaries';
+import type { TicketType } from '@/types/ticketMonitoringUi';
 
 interface FilterSelectProps {
   value: string;
@@ -33,23 +30,55 @@ function SlicerSelect({ value, onChange, options }: FilterSelectProps) {
   );
 }
 
+const TICKET_TYPE_OPTIONS: TicketType[] = [
+  'missing_group',
+  'not_admin',
+  'group_count_mismatch',
+  'duplicate_group_id',
+  'duplicate_group_name',
+  'daily_junk_group',
+];
+
 export function TicketSlicerHeader() {
   const { t } = useLanguage();
-  const [filters, setFilters] = useState(FILTER_DEFAULT);
+  const { ticketSummaries, ticketFilters, setTicketFilters } = useGroupMonitoring();
 
-  const patchFilters = (partial: Partial<typeof FILTER_DEFAULT>) => {
-    setFilters((prev) => ({ ...prev, ...partial }));
+  const patchFilters = (partial: Partial<typeof ticketFilters>) => {
+    setTicketFilters((prev) => ({ ...prev, ...partial }));
   };
 
-  const brandOptions = [
-    { value: 'all', label: t('groupMonitoring.ticketPanel.filters.allBrands') },
-  ];
+  const brandOptions = useMemo(() => {
+    const brands = uniqueTicketBrands(ticketSummaries);
+    return [
+      { value: 'all', label: t('groupMonitoring.ticketPanel.filters.allBrands') },
+      ...brands.map((name) => ({ value: name, label: name })),
+    ];
+  }, [ticketSummaries, t]);
 
-  const typeOptions = [
-    { value: 'all', label: t('groupMonitoring.ticketPanel.filters.allTypes') },
-    { value: 'missing_group', label: t('groupMonitoring.ticketPanel.types.missingGroup') },
-    { value: 'not_admin', label: t('groupMonitoring.ticketPanel.types.notAdmin') },
-  ];
+  const typeOptions = useMemo(
+    () => [
+      { value: 'all', label: t('groupMonitoring.ticketPanel.filters.allTypes') },
+      ...TICKET_TYPE_OPTIONS.map((value) => ({
+        value,
+        label: t(`groupMonitoring.ticketPanel.types.${ticketTypeI18nKey(value)}`),
+      })),
+    ],
+    [t],
+  );
+
+  const platformOptions = useMemo(() => {
+    const platforms = uniqueTicketPlatforms(ticketSummaries);
+    return [
+      { value: 'all', label: t('groupMonitoring.filters.allPlatforms') },
+      ...platforms.map((value) => ({
+        value,
+        label:
+          value === 'whatsapp'
+            ? t('groupMonitoring.platform.whatsapp')
+            : t('groupMonitoring.platform.telegram'),
+      })),
+    ];
+  }, [ticketSummaries, t]);
 
   return (
     <div className="account-slicer-row">
@@ -57,7 +86,7 @@ export function TicketSlicerHeader() {
         <div className="account-slicer-search-group">
           <input
             type="search"
-            value={filters.search}
+            value={ticketFilters.search}
             onChange={(event) => patchFilters({ search: event.target.value })}
             placeholder={t('groupMonitoring.ticketPanel.searchPlaceholder')}
             className="account-slicer-search"
@@ -76,12 +105,17 @@ export function TicketSlicerHeader() {
       <div className="account-slicer-right">
         <div className="account-slicer-filters">
           <SlicerSelect
-            value={filters.brand}
+            value={ticketFilters.brand}
             onChange={(brand) => patchFilters({ brand })}
             options={brandOptions}
           />
           <SlicerSelect
-            value={filters.ticketType}
+            value={ticketFilters.platform}
+            onChange={(platform) => patchFilters({ platform })}
+            options={platformOptions}
+          />
+          <SlicerSelect
+            value={ticketFilters.ticketType}
             onChange={(ticketType) => patchFilters({ ticketType })}
             options={typeOptions}
           />
@@ -89,4 +123,16 @@ export function TicketSlicerHeader() {
       </div>
     </div>
   );
+}
+
+function ticketTypeI18nKey(type: TicketType): string {
+  const map: Record<TicketType, string> = {
+    missing_group: 'missingGroup',
+    not_admin: 'notAdmin',
+    group_count_mismatch: 'countMismatch',
+    duplicate_group_id: 'duplicateGroupId',
+    duplicate_group_name: 'duplicateGroupName',
+    daily_junk_group: 'dailyJunk',
+  };
+  return map[type];
 }

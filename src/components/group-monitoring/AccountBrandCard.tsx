@@ -2,6 +2,7 @@ import { ChevronDown, Download } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
+import { exportBrandAccountsExcel } from '@/lib/exportExcel';
 import { AddAccountHeaderMenu } from '@/components/group-monitoring/AddAccountHeaderMenu';
 import {
   AddAccountModal,
@@ -18,12 +19,20 @@ import type { Platform } from '@/types/database';
 interface AccountBrandCardProps {
   group: AccountBrandGroup;
   onAddAccount: (input: AddAccountInput) => Promise<void>;
+  onSyncAccount?: (accountId: string) => void;
+  onRunScraper?: (accountId: string) => void;
+  checkingAccountId?: string | null;
+  scraperAccountId?: string | null;
   defaultExpanded?: boolean;
 }
 
 export function AccountBrandCard({
   group,
   onAddAccount,
+  onSyncAccount,
+  onRunScraper,
+  checkingAccountId = null,
+  scraperAccountId = null,
   defaultExpanded = true,
 }: AccountBrandCardProps) {
   const { t } = useLanguage();
@@ -33,6 +42,11 @@ export function AccountBrandCard({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  function handleExportBrand() {
+    if (group.accounts.length === 0) return;
+    exportBrandAccountsExcel(group);
+  }
 
   const allAligned = group.misalignedCount === 0;
 
@@ -69,7 +83,7 @@ export function AccountBrandCard({
       await onAddAccount({
         platform,
         accountName: values.accountName,
-        phoneOrUsername: values.phoneOrUsername,
+        phoneNumber: values.phoneNumber,
         slotId: addSlotId,
       });
       setAddModalOpen(false);
@@ -103,10 +117,7 @@ export function AccountBrandCard({
               aria-hidden
             />
             <span className="brand-card-title">
-              {t('groupMonitoring.accountCard.brandTitle', {
-                label: group.brandLabel,
-                name: group.brandName,
-              })}
+              Brand : {group.brandName}
             </span>
           </button>
 
@@ -114,9 +125,22 @@ export function AccountBrandCard({
             <span className="brand-card-badge brand-card-badge--neutral">
               {t('groupMonitoring.accountCard.accountCount', { count: group.accountCount })}
             </span>
-            <span className="brand-card-badge brand-card-badge--neutral">
-              {t('groupMonitoring.accountCard.standardGroups', { count: group.standardGroupCount })}
-            </span>
+            {group.standardGroupCountByPlatform?.whatsapp != null &&
+            group.standardGroupCountByPlatform.whatsapp > 0 ? (
+              <span className="brand-card-badge brand-card-badge--neutral">
+                {t('groupMonitoring.accountCard.standardGroupsWa', {
+                  count: group.standardGroupCountByPlatform.whatsapp,
+                })}
+              </span>
+            ) : null}
+            {group.standardGroupCountByPlatform?.telegram != null &&
+            group.standardGroupCountByPlatform.telegram > 0 ? (
+              <span className="brand-card-badge brand-card-badge--neutral">
+                {t('groupMonitoring.accountCard.standardGroupsTg', {
+                  count: group.standardGroupCountByPlatform.telegram,
+                })}
+              </span>
+            ) : null}
             <span
               className={cn(
                 'brand-card-badge',
@@ -139,7 +163,14 @@ export function AccountBrandCard({
                 <AccountMonitoringTableHead />
                 <tbody>
                   {group.accounts.map((row) => (
-                    <AccountTableRow key={row.id} row={row} />
+                    <AccountTableRow
+                      key={row.id}
+                      row={row}
+                      syncLoading={checkingAccountId === row.id}
+                      scraperLoading={scraperAccountId === row.id}
+                      onSync={() => onSyncAccount?.(row.id)}
+                      onRunScraper={() => onRunScraper?.(row.id)}
+                    />
                   ))}
                   {group.emptySlots.map((slot) => (
                     <AccountEmptySlotRow
@@ -153,7 +184,12 @@ export function AccountBrandCard({
             </div>
 
             <footer className="brand-card-footer">
-              <button type="button" className="brand-card-export-btn">
+              <button
+                type="button"
+                className="brand-card-export-btn"
+                disabled={group.accounts.length === 0}
+                onClick={handleExportBrand}
+              >
                 <Download className="h-3.5 w-3.5" strokeWidth={2} />
                 {t('groupMonitoring.accountCard.export')}
               </button>

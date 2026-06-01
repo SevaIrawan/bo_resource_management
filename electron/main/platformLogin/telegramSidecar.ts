@@ -133,7 +133,13 @@ function stopPolling(sessionId: string) {
 function emitTelegramResult(
   win: BrowserWindow,
   sessionId: string,
-  json: { status: string; qrDataUrl?: string | null; message?: string | null; hint?: string },
+  json: {
+    status: string;
+    qrDataUrl?: string | null;
+    qrGeneration?: number;
+    message?: string | null;
+    hint?: string;
+  },
 ) {
   if (json.status === 'ready') {
     stopPolling(sessionId);
@@ -177,6 +183,7 @@ function emitTelegramResult(
       sessionId,
       platform: 'telegram',
       dataUrl: json.qrDataUrl,
+      generation: json.qrGeneration ?? 1,
     });
   }
 }

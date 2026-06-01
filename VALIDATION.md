@@ -1,6 +1,6 @@
 # Validasi fungsi & anti-deadlock
 
-**Tanggal:** 2026-05-30  
+**Tanggal:** 2026-06-01 (diperbarui)  
 **Build:** `npm run typecheck` + `npm run build:web` harus hijau sebelum uji manual.
 
 ---
@@ -13,8 +13,10 @@
 | Simpan session setelah login | 90s | `useAccountSyncFlow.ts` |
 | Sync setelah login | 120s | `useAccountSyncFlow.ts` |
 | Export Telegram | 60s (+ retry di Electron) | `persistLoginSession.ts` |
-| QR login UI (TG) | 45s | `usePlatformLogin.ts` |
-| QR login UI (WA) | 120s | `usePlatformLogin.ts` |
+| QR login UI (TG) | 120s | `usePlatformLogin.ts` |
+| QR login UI (WA) | 180s | `usePlatformLogin.ts` |
+| Gate warm | 75s | `deviceSessionGate.ts` |
+| Gate probe | 40s | `deviceSessionGate.ts` |
 | Fase **Confirm login** | Tidak di-timeout ke error | `usePlatformLogin.ts` |
 | Auto-sync per akun | 120s lalu skip | `useAutoAccountSync.ts` |
 | WA init / login arm | 120s | `whatsapp.ts` |
@@ -28,8 +30,7 @@
 
 | Mekanisme | Perilaku |
 |-----------|----------|
-| `globalWaQueue` | Semua operasi WA (login, stop, scrape, validate strict) **antri satu per satu** |
-| `withWaSessionLock` | Satu Puppeteer per `sessionId` |
+| `withWaSessionLock` | Satu operasi per `sessionId`; **multi-akun** boleh paralel (2026-06-01) |
 | `runningRef` auto-sync | Satu siklus auto-sync; tidak overlap |
 | `sessionReadyRef` login | Setelah QR sukses, tidak start login ulang |
 | `loginHandledRef` modal | Tidak loop `onLoginSuccess` |
@@ -48,7 +49,7 @@ Jalankan: `npm run dev` → restart setelah setiap ubah main/python.
 
 ### Telegram
 - [ ] Sync akun logout → modal QR
-- [ ] Scan + Confirm di HP → **Menyimpan session** → popup valid (bukan QR lagi)
+- [ ] Scan + Confirm di HP → **Menyimpan session** → popup **Scrape now / Not now** (atau resume OK jika 0/0)
 - [ ] Card: session **valid**, angka grup terisi
 
 ### WhatsApp

@@ -30,26 +30,39 @@ import {
 import { requireLiveDeviceSession } from '@/lib/liveDeviceSession';
 import { invalidatePlatformSessionEverywhere } from '@/lib/platformSessionSync';
 import { runAccountScraper } from '@/lib/runAccountScraper';
-import { backfillPlatformSessionIfNeeded, hasUsableLoginSession } from '@/lib/sessionAvailability';
+import {
+  backfillPlatformSessionIfNeeded,
+  hasStoredPlatformSession,
+  hasUsableLoginSession,
+} from '@/lib/sessionAvailability';
+import { gateDeviceSession } from '@/lib/deviceSessionGate';
 import { patchBrandPlatformMasterInGroups } from '@/lib/patchAccountMasterInGroups';
 import { syncResultForInvalidSession } from '@/lib/accountSessionUi';
 import { completeSyncAfterLiveSession } from '@/lib/syncAccountFlow';
 import { persistLoginSessionAfterSuccess } from '@/lib/persistLoginSession';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
-import { markAccountLoginGrace } from '@/lib/sessionRealtimePolicy';
+import {
+  isAccountInLoginGrace,
+  markAccountLoginGrace,
+} from '@/lib/sessionRealtimePolicy';
+import { isRowMisaligned, postSyncModalStep } from '@/lib/accountSyncUiFlow';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
-import { hasValidAccountPhone, updateMessagingAccountPhone } from '@/lib/accountPhone';
-import { probePlatformSession } from '@/lib/sessionProbe';
+import {
+  accountMissingRequiredPhone,
+  updateMessagingAccountPhone,
+} from '@/lib/accountPhone';
+import { scrapeFailureNeedsLoginModal } from '@/lib/scrapeErrorUi';
 import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
-/** Satu probe per klik Sync (manual). */
-const SYNC_PROBE_TIMEOUT_MS = 45_000;
 const LOGIN_PERSIST_TIMEOUT_MS = 90_000;
 const LOGIN_SYNC_AFTER_TIMEOUT_MS = 120_000;
-function accountShowsLoggedOut(account: AccountBrandRow): boolean {
+/** Manual Sync (VALID): gate + hitung grup device — lewat ini = error, bukan PROC SYNC selamanya. */
+const MANUAL_SYNC_TIMEOUT_MS = 180_000;
+/** Slot INACTIVE = session INVALID di badge atau status logout. */
+function accountNeedsLoginFirst(account: AccountBrandRow): boolean {
   return account.sessionStatus === 'invalid' || account.status === 'logout';
 }
 
@@ -57,9 +70,7 @@ export type SyncFlowStep =
   | 'idle'
   | 'missing-phone'
   | 'sync-error'
-  | 'session-valid'
-  | 'session-invalid'
-  | 'confirm-scrape'
+  | 'resume-empty'
   | 'scrape-prompt'
   | 'platform-login';
 
@@ -124,6 +135,10 @@ export function useAccountSyncFlow({
   const [loginIntent, setLoginIntent] = useState<'sync' | 'scraper' | null>(null);
   const [phoneSaving, setPhoneSaving] = useState(false);
   const scrapeSessionByAccountRef = useRef<Map<string, string>>(new Map());
+  const scrapeActiveAccountIdsRef = useRef<Set<string>>(new Set());
+  const [loginModalEpoch, setLoginModalEpoch] = useState(0);
+  /** UUID DB saat sync/scrape — jangan useState (urutan hook harus stabil). */
+  const processingDbAccountIdRef = useRef<string | null>(null);
   const [scrapeProgressBySession, setScrapeProgressBySession] = useState<
     Record<string, UiScrapeProgress>
   >({});
@@ -184,6 +199,7 @@ export function useAccountSyncFlow({
     setSyncMessage(null);
     setLoginIntent(null);
     setProcessingAccountId(null);
+    processingDbAccountIdRef.current = null;
     setProcessingAction(null);
   }, []);
 
@@ -201,6 +217,7 @@ export function useAccountSyncFlow({
   const clearRowProcessing = useCallback(
     (groupId: string, accountId: string) => {
       setProcessingAccountId(null);
+      processingDbAccountIdRef.current = null;
       setProcessingAction(null);
       updateGroups((groups) =>
         patchGroup(groups, groupId, (group) => setAccountProcessAction(group, accountId, null)),
@@ -226,12 +243,9 @@ export function useAccountSyncFlow({
         const group = prev.find((g) => g.id === groupId);
         const account = group?.accounts.find((r) => r.id === accountId);
         const brandStandard =
-          (group &&
-            account &&
-            (group.standardGroupCountByPlatform?.[account.platform] ??
-              account.groupsTotal)) ??
-          account?.groupsTotal ??
-          0;
+          group && account
+            ? (group.standardGroupCountByPlatform?.[account.platform] ?? 0)
+            : 0;
 
         if (group?.dbBrandId && account) {
           snapshotPending.push({
@@ -272,6 +286,10 @@ export function useAccountSyncFlow({
       message: string,
       knownDbAccountId?: string,
     ) => {
+      if (scrapeActiveAccountIdsRef.current.has(account.id)) {
+        return;
+      }
+      setLoginModalEpoch((n) => n + 1);
       setTarget({ groupId, account, dbAccountId: knownDbAccountId });
       setLoginIntent(intent);
       setSyncMessage(message);
@@ -310,27 +328,27 @@ export function useAccountSyncFlow({
         return;
       }
 
-      if (!hasValidAccountPhone(account.phoneNumber)) {
+      if (accountMissingRequiredPhone(account.platform, account.phoneNumber)) {
         setTarget({ groupId, account });
         setCheckError(null);
         setStep('missing-phone');
         return;
       }
 
-      // Logout/INVALID + Sync = buka login sekarang. Tanpa PROC SYNC, tanpa query master/probe.
-      if (accountShowsLoggedOut(account)) {
+      if (accountNeedsLoginFirst(account)) {
         try {
           const { accountId: dbAccountId } = await resolveDbAccountForRow({
             userId,
             account,
           });
-          const brandX = account.groupsTotal > 0 ? account.groupsTotal : 0;
-          void applyResult(
-            groupId,
-            account.id,
-            syncResultForInvalidSession(brandX, account.adminCurrent),
+          const hasStored = await hasStoredPlatformSession(
+            dbAccountId,
+            account.platform,
           );
-          showLoginModal(groupId, account, 'sync', 'SESSION_INVALID_RELOGIN', dbAccountId);
+          const loginCode = hasStored
+            ? 'SESSION_INVALID_RELOGIN'
+            : 'SESSION_INVALID_FORCE_SCRAPER';
+          showLoginModal(groupId, account, 'sync', loginCode, dbAccountId);
         } catch (error) {
           showSyncError(getErrorMessage(error, 'SYNC_FAILED'), groupId, account);
         }
@@ -348,6 +366,7 @@ export function useAccountSyncFlow({
           userId,
           account,
         });
+        processingDbAccountIdRef.current = dbAccountId;
 
         const hasDaily = await fetchHasDailyData(
           account.brandName,
@@ -357,6 +376,12 @@ export function useAccountSyncFlow({
           todayScrapeDate(),
         );
 
+        const hasStoredEarly = await hasStoredPlatformSession(dbAccountId, account.platform);
+        const reloginCode =
+          hasDaily || hasStoredEarly
+            ? 'SESSION_INVALID_RELOGIN'
+            : 'SESSION_INVALID_FORCE_SCRAPER';
+
         const master = await fetchMasterGroupStats(
           account.brandName,
           account.accountName,
@@ -365,48 +390,17 @@ export function useAccountSyncFlow({
           dbAccountId,
         );
 
-        const reloginCode = hasDaily
-          ? 'SESSION_INVALID_RELOGIN'
-          : 'SESSION_INVALID_FORCE_SCRAPER';
-
-        const brandX =
-          account.groupsTotal > 0 ? account.groupsTotal : master.brandMasterTotal;
+        const brandX = master.brandMasterTotal;
 
         const promptLogin = () => {
           void applyResult(
             groupId,
             account.id,
-            syncResultForInvalidSession(brandX, master.adminInMaster),
+            syncResultForInvalidSession(brandX, 0),
             { masterTotal: master.joinedInMaster },
           );
           stopLoading();
           showLoginModal(groupId, account, 'sync', reloginCode, dbAccountId);
-        };
-
-        const runSessionProbe = (timeoutMs: number) =>
-          withTimeout(
-            probePlatformSession({
-              sessionId: account.id,
-              platform: account.platform,
-              accountId: dbAccountId,
-              strict: true,
-            }),
-            timeoutMs,
-            'Session check',
-          );
-
-        const probeWithTimeout = async (timeoutMs: number) => {
-          try {
-            return await runSessionProbe(timeoutMs);
-          } catch (probeError) {
-            if (probeError instanceof OperationTimeoutError) {
-              return {
-                valid: false as const,
-                message: 'Session check timed out — log in again.',
-              };
-            }
-            throw probeError;
-          }
         };
 
         if (account.platform === 'whatsapp') {
@@ -447,16 +441,37 @@ export function useAccountSyncFlow({
 
         await backfillPlatformSessionIfNeeded({ userId, account, dbAccountId });
 
-        const probe = await probeWithTimeout(SYNC_PROBE_TIMEOUT_MS);
+        const gate = await gateDeviceSession(
+          {
+            sessionId: account.id,
+            platform: account.platform,
+            accountId: dbAccountId,
+            uiSessionStatus: account.sessionStatus,
+            hasDaily,
+          },
+          'sync',
+        );
 
-        if (!probe.valid) {
-          // Step 2 — session gagal → logout DB + UI, buka login QR/phone.
-          await invalidatePlatformSessionEverywhere(
-            dbAccountId,
-            probe.message ?? 'device_not_connected',
-            account.platform,
-          );
-          const invalidResult = syncResultForInvalidSession(brandX, master.adminInMaster);
+        if (!gate.ok) {
+          if (gate.kind !== 'need_login') {
+            stopLoading();
+            showSyncError('SYNC_FAILED', groupId, account);
+            return;
+          }
+
+          const reloginCode = gate.relogin
+            ? 'SESSION_INVALID_RELOGIN'
+            : 'SESSION_INVALID_FORCE_SCRAPER';
+
+          if (gate.shouldInvalidate) {
+            await invalidatePlatformSessionEverywhere(
+              dbAccountId,
+              gate.message,
+              account.platform,
+            );
+          }
+
+          const invalidResult = syncResultForInvalidSession(brandX, 0);
           await recordSyncActivity({
             accountId: dbAccountId,
             platform: account.platform,
@@ -465,21 +480,26 @@ export function useAccountSyncFlow({
             deviceGroups: 0,
             brandGroups: invalidResult.groupsTotal,
             adminGroups: invalidResult.adminCurrent,
-            message: probe.message ?? 'device_not_connected',
+            message: gate.message,
           });
-          promptLogin();
+          stopLoading();
+          showLoginModal(groupId, account, 'sync', reloginCode, dbAccountId);
           return;
         }
 
-        // Step 1 — session valid + connected: persist DB, sync grup brand & device, popup.
-        const brandStandard = account.groupsTotal > 0 ? account.groupsTotal : master.brandMasterTotal;
-        const syncPayload = await completeSyncAfterLiveSession({
-          userId,
-          account,
-          dbAccountId,
-          brandStandardHint: brandStandard,
-          assumeSessionValid: true,
-        });
+        const brandStandard = master.brandMasterTotal;
+        const uiAlreadyValid = account.sessionStatus === 'valid';
+        const syncPayload = await withTimeout(
+          completeSyncAfterLiveSession({
+            userId,
+            account,
+            dbAccountId,
+            brandStandardHint: brandStandard,
+            assumeSessionValid: uiAlreadyValid,
+          }),
+          MANUAL_SYNC_TIMEOUT_MS,
+          'Manual sync',
+        );
 
         await applyResult(groupId, account.id, syncPayload.result, {
           masterTotal: syncPayload.masterJoined,
@@ -525,15 +545,23 @@ export function useAccountSyncFlow({
             ...syncPayload.result,
             status: 'active',
             sessionStatus: 'valid',
-            isMisaligned: syncPayload.result.groupsCurrent !== syncPayload.result.groupsTotal,
+            isMisaligned: isRowMisaligned(syncPayload.result),
           },
           dbAccountId,
         });
         setSyncMessage(syncPayload.syncMessage);
-        setStep('session-valid');
+        setStep(
+          postSyncModalStep({
+            result: syncPayload.result,
+            deviceGroupCount: syncPayload.deviceGroupCount,
+            hasDailyToday: syncPayload.hasDailyToday,
+          }),
+        );
       } catch (error) {
         stopLoading();
-        showSyncError(getErrorMessage(error, 'SYNC_FAILED'), groupId, account);
+        const code =
+          error instanceof OperationTimeoutError ? 'SYNC_TIMED_OUT' : 'SYNC_FAILED';
+        showSyncError(code, groupId, account);
       }
     },
     [
@@ -554,10 +582,12 @@ export function useAccountSyncFlow({
     [runSyncCheck],
   );
 
-  const runScrapeInBackground = useCallback(async () => {
-    if (!target || !userId) return;
+  const runScrapeInBackground = useCallback(async (override?: SyncTarget) => {
+    const ctx = override ?? target;
+    if (!ctx || !userId) return;
 
-    const { groupId, account } = target;
+    const { groupId, account } = ctx;
+    scrapeActiveAccountIdsRef.current.add(account.id);
     setRowProcessing(groupId, account.id, 'scraper');
     setCheckError(null);
 
@@ -570,20 +600,37 @@ export function useAccountSyncFlow({
       });
       scrapeSessionByAccountRef.current.set(account.id, deviceSessionId);
 
-      const live = await requireLiveDeviceSession({
-        sessionId: account.id,
-        platform: account.platform,
-        accountId: dbAccountId,
-      });
-      if (!live.ok) {
-        await invalidatePlatformSessionEverywhere(
-          dbAccountId,
-          live.message,
-          account.platform,
-        );
-        clearRowProcessing(groupId, account.id);
-        showLoginModal(groupId, account, 'scraper', 'SESSION_INVALID_FORCE_SCRAPER');
-        return;
+      const skipDeviceGate =
+        isAccountInLoginGrace(account.id) || account.sessionStatus === 'valid';
+
+      if (!skipDeviceGate) {
+        const live = await requireLiveDeviceSession({
+          sessionId: account.id,
+          platform: account.platform,
+          accountId: dbAccountId,
+          uiSessionStatus: account.sessionStatus,
+          skipWarmProbe: isAccountInLoginGrace(account.id),
+        });
+        if (!live.ok) {
+          clearRowProcessing(groupId, account.id);
+          if (live.warmPending) {
+            showSyncError('SESSION_WARM_PENDING', groupId, account);
+            return;
+          }
+          if (live.shouldInvalidate) {
+            await invalidatePlatformSessionEverywhere(
+              dbAccountId,
+              live.message,
+              account.platform,
+            );
+          }
+          if (scrapeFailureNeedsLoginModal(live.message)) {
+            showLoginModal(groupId, account, 'scraper', 'SESSION_INVALID_RELOGIN', dbAccountId);
+          } else {
+            showSyncError(live.message, groupId, account);
+          }
+          return;
+        }
       }
 
       const scrapeCounts = await runAccountScraper({
@@ -602,12 +649,12 @@ export function useAccountSyncFlow({
             .maybeSingle()
         )?.data?.brand_id as string | undefined;
 
-      let brandX = account.groupsTotal;
+      let brandX = 0;
       if (brandId) {
         brandX = await resolveBrandStandardTotal(
           brandId,
           account.platform,
-          account.groupsTotal,
+          0,
           account.brandName,
         );
       }
@@ -619,6 +666,7 @@ export function useAccountSyncFlow({
         brandStandard: brandX,
         sessionValid: true,
         deviceGroupCount: scrapeCounts.deviceGroupCount,
+        deviceAdminCount: scrapeCounts.deviceAdminCount,
       });
 
       await applyResult(groupId, account.id, resultWithBrand, {
@@ -663,16 +711,23 @@ export function useAccountSyncFlow({
       onTicketsReload?.();
     } catch (error) {
       const message = getErrorMessage(error, 'SCRAPER_FAILED');
-      if (
-        message.toLowerCase().includes('log in') ||
-        message.toLowerCase().includes('session')
-      ) {
-        clearRowProcessing(groupId, account.id);
-        showLoginModal(groupId, account, 'scraper', 'SESSION_INVALID_FORCE_SCRAPER');
+      clearRowProcessing(groupId, account.id);
+      if (scrapeFailureNeedsLoginModal(message)) {
+        const { accountId: dbForLogin } = await resolveDbAccountForRow({ userId, account }).catch(
+          () => ({ accountId: account.id, matchedBy: 'none' as const }),
+        );
+        showLoginModal(
+          groupId,
+          account,
+          'scraper',
+          'SESSION_INVALID_RELOGIN',
+          dbForLogin,
+        );
         return;
       }
       showSyncError(message, groupId, account);
     } finally {
+      scrapeActiveAccountIdsRef.current.delete(account.id);
       clearScrapeProgress(account.id);
       clearRowProcessing(groupId, account.id);
     }
@@ -688,28 +743,18 @@ export function useAccountSyncFlow({
     userId,
   ]);
 
-  const openScrapePrompt = useCallback(() => {
-    setStep('scrape-prompt');
-    setCheckError(null);
-  }, []);
-
   const confirmScrapePrompt = useCallback(() => {
+    if (!target) return;
+    const scrapeTarget = target;
     setStep('idle');
     setSyncMessage(null);
-    void runScrapeInBackground();
-  }, [runScrapeInBackground]);
+    void runScrapeInBackground(scrapeTarget);
+  }, [runScrapeInBackground, target]);
 
   const dismissScrapePrompt = useCallback(() => {
     setStep('idle');
     setSyncMessage(null);
   }, []);
-
-  /** Dari modal "Session valid" → konfirmasi jalankan scraper. */
-  const openScraperFromSessionValid = useCallback(() => {
-    setStep('idle');
-    setSyncMessage(null);
-    void runScrapeInBackground();
-  }, [runScrapeInBackground]);
 
   const handleRunScraper = useCallback(
     async (groupId: string, account: AccountBrandRow) => {
@@ -721,7 +766,7 @@ export function useAccountSyncFlow({
         return;
       }
 
-      if (!hasValidAccountPhone(account.phoneNumber)) {
+      if (accountMissingRequiredPhone(account.platform, account.phoneNumber)) {
         setStep('missing-phone');
         return;
       }
@@ -747,77 +792,26 @@ export function useAccountSyncFlow({
           return;
         }
 
-        const live = await requireLiveDeviceSession({
-          sessionId: account.id,
-          platform: account.platform,
-          accountId: dbAccountId,
-        });
-        if (!live.ok) {
-          await invalidatePlatformSessionEverywhere(
-            dbAccountId,
-            live.message,
-            account.platform,
-          );
-          showLoginModal(
-            groupId,
-            account,
-            'scraper',
-            'SESSION_INVALID_FORCE_SCRAPER',
-            dbAccountId,
-          );
-          return;
-        }
-
         await backfillPlatformSessionIfNeeded({ userId, account, dbAccountId });
-        setTarget({ groupId, account, dbAccountId });
-        openScrapePrompt();
+        const scrapeTarget = { groupId, account, dbAccountId };
+        setTarget(scrapeTarget);
+        void runScrapeInBackground(scrapeTarget);
       } catch (error) {
         showSyncError(getErrorMessage(error, 'Scraper gagal'), groupId, account);
         clearRowProcessing(groupId, account.id);
       }
     },
-    [clearRowProcessing, openScrapePrompt, showLoginModal, showSyncError, userId],
+    [clearRowProcessing, runScrapeInBackground, showLoginModal, showSyncError, userId],
   );
-
-  const confirmScrape = useCallback(() => {
-    if (!target || !userId) return;
-
-    void (async () => {
-      const { groupId, account } = target;
-      try {
-        const { accountId: dbAccountId } = await resolveDbAccountForRow({ userId, account });
-
-        const hasSession = await hasUsableLoginSession({
-          sessionId: account.id,
-          platform: account.platform,
-          accountId: dbAccountId,
-          accountName: account.accountName,
-        });
-
-        if (hasSession) {
-          await backfillPlatformSessionIfNeeded({ userId, account, dbAccountId });
-          setTarget({ groupId, account, dbAccountId });
-          openScrapePrompt();
-          return;
-        }
-
-        showLoginModal(
-          groupId,
-          account,
-          'scraper',
-          'SESSION_INVALID_FORCE_SCRAPER',
-          dbAccountId,
-        );
-      } catch (error) {
-        showSyncError(getErrorMessage(error, 'SCRAPER_FAILED'), groupId, account);
-      }
-    })();
-  }, [openScrapePrompt, showLoginModal, showSyncError, target, userId]);
 
   const handleLoginSuccess = useCallback(async () => {
     if (!target || !userId) return;
 
     const { groupId, account } = target;
+    const savedIntent = loginIntent;
+    setLoginIntent(null);
+    setRowProcessing(groupId, account.id, 'sync');
+
     try {
       const { accountId: dbAccountId } = await resolveDbAccountForRow({ userId, account });
 
@@ -838,7 +832,6 @@ export function useAccountSyncFlow({
           userId,
           account,
           dbAccountId,
-          assumeSessionValid: true,
           skipPersist: true,
         }),
         LOGIN_SYNC_AFTER_TIMEOUT_MS,
@@ -849,25 +842,46 @@ export function useAccountSyncFlow({
         masterTotal: syncPayload.masterJoined,
       });
 
-      setLoginIntent(null);
-      setTarget({
-        groupId,
-        account: {
-          ...account,
-          ...syncPayload.result,
-          status: 'active',
-          sessionStatus: 'valid',
-          isMisaligned: syncPayload.result.groupsCurrent !== syncPayload.result.groupsTotal,
-        },
-        dbAccountId,
-      });
+      const updatedAccount: AccountBrandRow = {
+        ...account,
+        ...syncPayload.result,
+        status: 'active',
+        sessionStatus: 'valid',
+        isMisaligned: isRowMisaligned(syncPayload.result),
+      };
+
+      setTarget({ groupId, account: updatedAccount, dbAccountId });
       setSyncMessage(syncPayload.syncMessage);
-      setStep('session-valid');
+      clearRowProcessing(groupId, account.id);
+      setStep('idle');
+
+      if (savedIntent === 'scraper') {
+        void runScrapeInBackground({ groupId, account: updatedAccount, dbAccountId });
+        return;
+      }
+
+      setStep(
+        postSyncModalStep({
+          result: syncPayload.result,
+          deviceGroupCount: syncPayload.deviceGroupCount,
+          hasDailyToday: syncPayload.hasDailyToday,
+        }),
+      );
     } catch (error) {
+      clearRowProcessing(groupId, account.id);
       showSyncError(getErrorMessage(error, 'Gagal menyimpan session setelah login'), groupId, account);
       setStep('sync-error');
     }
-  }, [applyResult, showSyncError, target, userId]);
+  }, [
+    applyResult,
+    clearRowProcessing,
+    loginIntent,
+    runScrapeInBackground,
+    setRowProcessing,
+    showSyncError,
+    target,
+    userId,
+  ]);
 
   const handleSavePhoneAndSync = useCallback(
     async (phoneNumber: string) => {
@@ -877,7 +891,10 @@ export function useAccountSyncFlow({
       setCheckError(null);
 
       try {
-        await updateMessagingAccountPhone(target.account.id, phoneNumber);
+        const phoneAccountId =
+          target.dbAccountId ??
+          (await resolveDbAccountForRow({ userId, account: target.account })).accountId;
+        await updateMessagingAccountPhone(phoneAccountId, phoneNumber);
         const updatedAccount = { ...target.account, phoneNumber };
         updateGroups((groups) =>
           patchAccountPhone(groups, target.groupId, target.account.id, phoneNumber),
@@ -898,6 +915,7 @@ export function useAccountSyncFlow({
 
   return {
     processingAccountId,
+    processingDbAccountId: processingDbAccountIdRef.current,
     processingAction,
     postLoginGraceAccountId,
     step,
@@ -905,14 +923,13 @@ export function useAccountSyncFlow({
     checkError,
     syncMessage,
     loginIntent,
+    loginModalEpoch,
     phoneSaving,
     activePlatform,
     handleSyncAccount,
     handleRunScraper,
-    confirmScrape,
     confirmScrapePrompt,
     dismissScrapePrompt,
-    openScraperFromSessionValid,
     handleLoginSuccess,
     handleSavePhoneAndSync,
     reportBlockingError,

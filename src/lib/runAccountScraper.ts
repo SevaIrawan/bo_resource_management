@@ -34,7 +34,12 @@ async function persistTelegramSession(accountId: string, sessionId: string): Pro
 
 export interface ScrapeRunCounts {
   deviceGroupCount: number;
+  deviceAdminCount: number;
   masterCount: number;
+}
+
+function countAdminGroupsOnDevice(groups: ScrapedGroupPayload[]): number {
+  return groups.filter((g) => g.is_admin === 'yes').length;
 }
 
 export async function runAccountScraper(input: RunAccountScraperInput): Promise<ScrapeRunCounts> {
@@ -81,6 +86,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
       groups: result.groups as ScrapedGroupPayload[],
     });
     const deviceGroupCount = scrapeWrite.count;
+    const deviceAdminCount = countAdminGroupsOnDevice(result.groups as ScrapedGroupPayload[]);
     const masterCount = scrapeWrite.masterCount;
 
     if (input.account.platform === 'telegram') {
@@ -118,7 +124,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
       }
     }
 
-    return { deviceGroupCount, masterCount };
+    return { deviceGroupCount, deviceAdminCount, masterCount };
   } catch (error) {
     if (runId) {
       await finishScrapeRun({

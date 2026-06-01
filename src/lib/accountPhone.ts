@@ -1,7 +1,7 @@
 import { TABLES } from '@/config/tables';
 import { normalizePhoneDigits } from '@/lib/phoneNormalize';
 import { getSupabase } from '@/lib/supabase';
-import type { MessagingAccount } from '@/types/database';
+import type { MessagingAccount, Platform } from '@/types/database';
 
 export function readPhoneFromAccount(account: Pick<MessagingAccount, 'phone_number'>): string {
   return (account.phone_number ?? '').trim();
@@ -12,6 +12,18 @@ export const readPhoneFromRow = readPhoneFromAccount;
 
 export function hasValidAccountPhone(phone: string): boolean {
   return normalizePhoneDigits(phone).length >= 8;
+}
+
+/** WA wajib nomor; Telegram boleh @username / kosong untuk sync awal. */
+export function accountRequiresPhone(platform: Platform): boolean {
+  return platform === 'whatsapp';
+}
+
+export function accountMissingRequiredPhone(
+  platform: Platform,
+  phone: string,
+): boolean {
+  return accountRequiresPhone(platform) && !hasValidAccountPhone(phone);
 }
 
 export async function updateMessagingAccountPhone(

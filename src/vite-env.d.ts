@@ -21,6 +21,7 @@ interface PlatformLoginEvent {
   sessionId: string;
   platform: Platform;
   dataUrl?: string;
+  generation?: number;
   code?: string;
   message?: string;
   phase?: LoginPhase;
@@ -45,7 +46,7 @@ declare global {
           kind: 'code' | '2fa' | 'phone';
           value: string;
         }) => Promise<{ ok: boolean }>;
-        cancel: (sessionId: string) => Promise<{ ok: boolean }>;
+        cancel: (sessionId: string, platform?: Platform) => Promise<{ ok: boolean }>;
         release: (
           sessionId: string,
           options?: { purgeWaDisk?: boolean },

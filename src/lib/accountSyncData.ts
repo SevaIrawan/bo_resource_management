@@ -131,6 +131,8 @@ export async function buildMetricsFromScrapeDaily(input: {
   sessionValid?: boolean;
   /** Jumlah grup dari hasil scrape (sama dengan baris daily yang di-insert). */
   deviceGroupCount?: number;
+  /** Admin di device (grup scrape is_admin=yes). */
+  deviceAdminCount?: number;
 }): Promise<{ result: AccountSyncResult; master: MasterGroupStats }> {
   const master = await fetchMasterGroupStatsForAccount({
     accountId: input.accountId,
@@ -144,18 +146,22 @@ export async function buildMetricsFromScrapeDaily(input: {
     (dbId ? await fetchDailyGroupCount(input.brand, '', '', dbId) : 0);
 
   const brandX =
-    input.brandStandard && input.brandStandard > 0
-      ? input.brandStandard
-      : master.brandMasterTotal;
+    input.brandStandard != null ? Math.max(0, input.brandStandard) : master.brandMasterTotal;
 
   const sessionValid = input.sessionValid !== false;
+  const adminY =
+    input.deviceAdminCount != null && input.deviceAdminCount >= 0
+      ? input.deviceAdminCount
+      : dailyCount > 0
+        ? 0
+        : 0;
 
   return {
     master,
     result: {
       groupsCurrent: dailyCount,
       groupsTotal: brandX,
-      adminCurrent: master.adminInMaster,
+      adminCurrent: adminY,
       adminTotal: brandX,
       sessionStatus: sessionValid ? 'valid' : 'invalid',
     },
@@ -187,44 +193,31 @@ export function applyMasterStatsToAccountRow(
   master: MasterGroupStats,
   options?: { deviceConnected?: boolean; brandStandard?: number },
 ): AccountBrandRow {
-  const brandX = options?.brandStandard ?? master.brandMasterTotal ?? row.groupsTotal;
-  if (brandX <= 0 && master.brandMasterTotal <= 0) return row;
-
+  const brandX = Math.max(0, options?.brandStandard ?? master.brandMasterTotal);
   const deviceConnected = options?.deviceConnected ?? row.sessionStatus === 'valid';
-  const x = brandX > 0 ? brandX : master.brandMasterTotal;
   const deviceY = deviceConnected ? row.groupsCurrent : 0;
+  const adminY = deviceConnected ? row.adminCurrent : master.adminInMaster;
 
-  if (!deviceConnected) {
-    return {
-      ...row,
-      groupsCurrent: 0,
-      adminCurrent: master.adminInMaster,
-      groupsTotal: x,
-      adminTotal: x,
-      syncState: row.syncState === 'pending' ? 'synced' : row.syncState,
-      isMisaligned: computeIsMisaligned({
-        brandStandard: x,
-        deviceTotal: 0,
-        sessionValid: false,
-        masterTotal: master.joinedInMaster,
-      }),
-    };
-  }
-
-  const y = deviceY > 0 ? deviceY : row.groupsCurrent;
+  const draft = {
+    groupsCurrent: deviceY,
+    groupsTotal: brandX,
+    adminCurrent: adminY,
+    adminTotal: brandX,
+    sessionStatus: deviceConnected ? ('valid' as const) : ('invalid' as const),
+  };
 
   return {
     ...row,
-    groupsCurrent: y,
-    adminCurrent: master.adminInMaster,
-    groupsTotal: x,
-    adminTotal: x,
+    ...draft,
+    groupsCurrent: deviceConnected ? deviceY : 0,
+    adminCurrent: deviceConnected ? adminY : master.adminInMaster,
     syncState: row.syncState === 'pending' ? 'synced' : row.syncState,
     isMisaligned: computeIsMisaligned({
-      brandStandard: x,
-      deviceTotal: y,
-      sessionValid: true,
-      masterTotal: master.joinedInMaster,
+      groupsCurrent: draft.groupsCurrent,
+      groupsTotal: draft.groupsTotal,
+      adminCurrent: draft.adminCurrent,
+      adminTotal: draft.adminTotal,
+      sessionValid: deviceConnected,
     }),
   };
 }

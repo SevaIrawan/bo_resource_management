@@ -64,7 +64,7 @@
 | File | Baris | Status | Fungsi | IPC / event | Risiko |
 |------|-------|--------|--------|-------------|--------|
 | `index.ts` | 127 | AKTIF | Router login WA/TG | `platform-login:*` | K |
-| `whatsapp.ts` | 501 | AKTIF | Puppeteer WA, QR/phone, LocalAuth | start/cancel/release | K — antrian global WA |
+| `whatsapp.ts` | ~590 | AKTIF | Puppeteer WA, QR/phone, LocalAuth | start/cancel/release | K — lock per `sessionId` (multi-akun) |
 | `telegramSidecar.ts` | 319 | AKTIF | HTTP ke Python :8765, poll QR | QR/ready/phase/error | K |
 | `restore.ts` | 63 | AKTIF | `try-restore` IPC | warm session | T |
 
@@ -403,29 +403,177 @@ Login sukses → persistLoginSession → completeSync → session-valid modal
 
 ---
 
-## 12. Risiko terbuka (prioritas)
+## 12. Session / Sync — audit bug (2026-05-30)
+
+### Gejala (YUKI · WhatsApp)
+
+| Gejala | Penyebab akar |
+|--------|----------------|
+| Badge **VALID** jam-jam, Sync → modal QR + teks “session expired” | UI = snapshot/DB; Sync = **probe strict** + warm gagal/timeout → `showLoginModal` |
+| HP masih **Linked devices**, app minta scan lagi | `tryRestore` WA pakai `getState()` cepat; LocalAuth belum `CONNECTED` dalam 22s |
+| Console: **Hooks order** di `AccountMonitoringBody` | `useState(processingDbAccountId)` disisipkan sebelum `useRef` → HMR crash |
+
+### Alur Sync (setelah perbaikan)
+
+```mermaid
+sequenceDiagram
+  participant UI as React Sync
+  participant DB as platform_sessions
+  participant EL as Electron WA
+
+  UI->>DB: hasUsableLoginSession
+  UI->>EL: tryWarm (90s)
+  alt warm ready
+    EL-->>UI: CONNECTED
+    UI->>UI: completeSync (tanpa probe strict)
+  else warm gagal
+    UI->>EL: probe strict 45s
+    alt UI valid + DB ada + timeout
+      UI->>UI: alert SESSION_WARM_PENDING (bukan QR)
+    else benar-benar logout
+      UI->>UI: login modal attemptRestore=true
+  end
+```
+
+### Perbaikan produksi (2026-05-30 batch 2 — semua akun WA/TG)
+
+| Bug | Fix |
+|-----|-----|
+| Modal login pakai UUID sebagai `sessionId` → event `ready` tidak match | `PlatformLoginModal` + `usePlatformLogin`: `sessionId`=baris UI, `accountId`=UUID DB |
+| StrictMode remount → `cancel()` bunuh scan QR / persist | `loginRunIdRef`; cancel **hanya** saat modal tutup |
+| `cancel()` stop WA **dan** TG sekaligus | IPC `cancel(sessionId, platform?)` |
+| `startWhatsAppQrLogin` selalu `destroy` sebelum restore | CONNECTED / restore disk dulu; destroy hanya untuk QR baru |
+| Sync VALID + DB → tetap QR | `gateDeviceSession(..., 'sync')` → **tidak** `need_login` |
+| `hasUsableLoginSession` warm 35s tiap cek | Hapus fallback warm — DB/disk cukup |
+| QR timeout 45s → loop scan | WA 180s / TG 120s; reset timer saat QR tiba |
+| Login start TG tanpa restore string | Main `tryRestore` sebelum `startTelegramQrLogin` |
+
+### Matriks keputusan (satu pintu: `deviceSessionGate.ts`)
+
+| UI session | DB `platform_sessions` | Warm | Probe | Hasil |
+|------------|------------------------|------|-------|--------|
+| VALID | ada | OK | — | **Lanjut sync/scrape** |
+| VALID | ada | gagal | timeout / skip msg | **Alert warm pending**, tidak QR, tidak invalidate |
+| VALID | ada | gagal | logout nyata | QR `RELOGIN`, invalidate |
+| INVALID | — | — | — | QR langsung (tanpa PROC SYNC panjang) |
+
+**PROC SYNC lama:** warm 90s + probe 45s ×2. **Sekarang:** max ~75s warm + 40s probe (satu siklus).
+
+### Perbaikan kode
+
+| File | Perubahan |
+|------|-----------|
+| `deviceSessionGate.ts` | **Baru** — satu logika warm/probe untuk Sync + Scraper |
+| `useAccountSyncFlow.ts` | Pakai gate; scraper tidak invalidate saat warm pending |
+| `liveDeviceSession.ts` | Delegasi ke gate + `uiSessionStatus` |
+| `syncAccountFlow.ts` | `assumeSessionValid` → count gagal tidak ubah badge ke INVALID |
+| `restore.ts` + `whatsapp.ts` | `restoreWhatsAppFromDisk` + timeout disk 60s |
+| `usePlatformLogin.ts` | Warm WA/TG sebelum QR; phone/code pakai `deviceSessionId` |
+| `AccountMonitoringSyncModals.tsx` | `attemptRestore` kecuali `FORCE_SCRAPER` |
+| `platformSessionSync.ts` | `release` pakai LocalAuth id WA |
+| i18n | `sessionWarmPending` TG+WA |
+
+### Risiko masih terbuka
+
+| ID | Severity | Masalah |
+|----|----------|---------|
+| R1 | K | `useAccountSyncFlow` ~980 baris — perlu pecah modul |
+| R7 | T | Probe strict scrape/run tetap bisa gagal saat Chromium lambat |
+| R8 | T | `rm_save_platform_session` deactivate→insert bisa flicker Realtime |
+
+---
+
+## 13. Risiko terbuka (prioritas umum)
 
 | ID | Severity | Masalah | File |
 |----|----------|---------|------|
-| R1 | K | `useAccountSyncFlow` terlalu besar — sulit debug | 821 baris |
-| R2 | K | WA global queue — login vs scrape bentrok | `whatsapp.ts` |
+| R1 | K | `useAccountSyncFlow` terlalu besar — sulit debug | ~970 baris |
+| R2 | T | ~~WA global queue~~ **Dihapus 2026-06-01** — lock per session | `whatsapp.ts` |
 | R3 | T | TG sidecar harus hidup + API ID di `.env` | `telegramSidecar`, python |
 | R5 | T | Tanpa 019, daily scrape tidak realtime di UI | migrasi |
 | R6 | R | StrictMode double-mount bisa ganggu login (dev) | `main.tsx` |
 
 ---
 
-## 13. Validasi & checklist
+## 14. Validasi & checklist
 
 **Dokumen lengkap timeout / anti-deadlock:** [`VALIDATION.md`](VALIDATION.md)
 
-**Otomatis (lulus 2026-05-30):** `npm run typecheck`, `npm run build:web`
+**Otomatis (lulus 2026-06-01):** `npm run typecheck`, `npm run build:web` (+ bundle Electron main/preload).
 
-**Manual wajib:** lihat §3 di `VALIDATION.md` (TG/WA login, sync, scraper, stabilitas 3 menit).
+**Manual wajib:** lihat §16 di bawah dan `VALIDATION.md`.
 
 ---
 
-## 14. Diagram dependensi tingkat tinggi
+## 16. Validasi logic bisnis — audit 2026-06-01
+
+**Kontrak operator (ringkas):** Session INVALID → Sync → QR default → detect X (master brand di card) & Y (device real, 0 jika kosong) → popup Scrape now/Not now (kecuali 0/0 resume OK) · Session VALID → Sync → gate → sama · RUN kolom → scrape langsung · MATCH = Group **dan** Admin · INVALID scraper = teks Sync dulu saja.
+
+### 16.1 Build otomatis
+
+| Perintah | Hasil 2026-06-01 |
+|----------|------------------|
+| `npm run typecheck` | **LULUS** |
+| `npm run build:web` | **LULUS** (Vite + `dist-electron/main`) |
+
+### 16.2 Matriks spec vs implementasi (manual sync)
+
+| # | Aturan | Status | Bukti / catatan |
+|---|--------|--------|-----------------|
+| S1 | INVALID → Sync → login QR (phone opsional) | **OK** | `accountNeedsLoginFirst` → `showLoginModal` |
+| S2 | VALID → Sync → cek device → detect → popup scrape | **OK** | `gateDeviceSession` → `completeSyncAfterLiveSession` → `postSyncModalStep` → `scrape-prompt` |
+| S3 | DB hilang, UI VALID → Sync → lost → login + pesan relogin | **OK** | `gate` `need_login` + `SESSION_INVALID_RELOGIN` + i18n `reloginHint*` |
+| S4 | X hanya master brand card, kosong = 0 | **OK** | `resolveBrandStandardTotal` → `countBrandMasterGroups`; `runSyncCheck` pakai `master.brandMasterTotal` |
+| S5 | Tanpa fallback Y = X saat device 0 | **OK** | Hapus blok di `syncAccountFlow.ts`; perbaikan `runAutoSyncAccount.ts` (audit ini) |
+| S6 | 0 grup device + no daily + X=0 → popup OK saja | **OK** | `shouldShowResumeOnlyEmpty` → step `resume-empty` |
+| S7 | Ada data DB+device → Scrape now \| Not now | **OK** | `postSyncModalStep` → `scrape-prompt` |
+| S8 | RUN + session valid → scrape tanpa popup | **OK** | `handleRunScraper` → `runScrapeInBackground(scrapeTarget)` |
+| S9 | INVALID → scraper "Use Sync…" bukan RUN | **OK** | `ScraperColumnCell` baris 98–103 |
+| S10 | MATCH Group **dan** Admin | **OK** | `isRowMisaligned` di `accountSyncUiFlow.ts` |
+| S11 | Login default QR TG+WA | **OK** | `usePlatformLogin` `view='qr'`; footer phone |
+| S12 | QR tidak tunggu restore panjang | **OK** | `startQrLogin()` paralel; TG warm opsional |
+| S13 | Multi-akun WA paralel | **OK** | Hapus `globalWaQueue` + `releaseOtherWhatsAppSessions` |
+| S14 | Realtime DB ↔ UI logout | **OK** | `useRealtimeAccountSessions` + `platform-session:invalid` |
+| S15 | Auto-sync sama tanpa popup scrape | **N/A** | `runAutoSyncAccount` — background, tidak buka modal |
+
+### 16.3 File inti (perilaku)
+
+| File | Peran | Audit |
+|------|-------|-------|
+| `useAccountSyncFlow.ts` | Orkestrator Sync/login/scrape UI | Steps: `platform-login`, `scrape-prompt`, `resume-empty`. **DEAD:** step `confirm-scrape` tidak pernah di-set (modal + `confirmScrape` legacy). |
+| `accountSyncUiFlow.ts` | MATCH + pilih popup pasca-sync | **AKTIF** |
+| `syncAccountFlow.ts` | Persist + `refreshAccountMetrics` | Tanpa inflate Y |
+| `deviceSessionGate.ts` | Warm 75s / probe 40s | VALID+DB → `warm_pending` (bukan QR) — bisa terasa "putar" jika PC lambat |
+| `usePlatformLogin.ts` | QR IPC | Timeout WA 180s / TG 120s |
+| `whatsapp.ts` | WA login/scrape | Lock per `sessionId` |
+| `AccountMonitoringCells.tsx` | Kolom scraper | Sesuai spec standby/progress |
+| `runAutoSyncAccount.ts` | Auto background | Fallback Y=X **dihapus** 2026-06-01 |
+
+### 16.4 Temuan / risiko tersisa
+
+| ID | Severity | Temuan |
+|----|----------|--------|
+| V1 | T | Step `confirm-scrape` + `confirmScrape()` — **kode mati**; aman dihapus nanti |
+| V2 | T | `warm_pending` saat Sync VALID — bukan login; operator harus Sync ulang (bukan bug session HP) |
+| V3 | T | Admin `adminCurrent` setelah scrape dari **master join**, bukan recount admin di device — MATCH admin bisa salah jika master ≠ device |
+| V4 | K | Banyak Chromium WA paralel = RAM tinggi; error "browser already running" masih mungkin |
+| V5 | T | TG: satu sidecar :8765 — multi-akun via `sessionId` berbeda di Python (uji 2 akun TG bersamaan) |
+| V6 | R | `assumeSessionValid: true` di manual sync setelah gate — count gagal tetap bisa invalidate di `syncAccountFlow` |
+
+### 16.5 Checklist uji manual (wajib)
+
+1. **NEW/INVALID** · Sync → QR muncul &lt; 60s · login → angka real · popup Scrape now/Not now.
+2. **VALID** · Sync → tanpa QR jika device hidup · popup scrape (bukan modal "Session valid" lama).
+3. **VALID, DB session hilang** · Sync → pesan relogin · QR.
+4. **STANDBY** · INVALID → teks Sync; VALID match → timestamp; not match → RUN.
+5. **RUN** · langsung progress X/Y · tanpa popup tengah.
+6. **0/0** · master X=0, device 0 → popup OK saja.
+7. **2 akun WA** · login/sync akun A lalu B tanpa A tertutup paksa.
+8. Restart `npm run dev` setelah ubah `electron/main`.
+
+---
+
+## 15. Diagram dependensi tingkat tinggi
 
 ```mermaid
 flowchart TB

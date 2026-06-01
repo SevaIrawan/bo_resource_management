@@ -8,6 +8,7 @@ interface PlatformLoginEvent {
   sessionId: string;
   platform: Platform;
   dataUrl?: string;
+  generation?: number;
   code?: string;
   message?: string;
   phase?: LoginPhase;
@@ -30,7 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       kind: 'code' | '2fa' | 'phone';
       value: string;
     }) => ipcRenderer.invoke('platform-login:submit', payload),
-    cancel: (sessionId: string) => ipcRenderer.invoke('platform-login:cancel', sessionId),
+    cancel: (sessionId: string, platform?: Platform) =>
+      ipcRenderer.invoke('platform-login:cancel', sessionId, platform),
     release: (sessionId: string, options?: { purgeWaDisk?: boolean }) =>
       ipcRenderer.invoke('platform-login:release', sessionId, options),
     purgeWaAuth: (sessionId: string) =>

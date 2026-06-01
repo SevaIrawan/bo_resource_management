@@ -1,7 +1,10 @@
 import type { BrowserWindow } from 'electron';
 import { restoreTelegramSession } from '../scraper/telegramScrape';
 import { validateTelegramSession } from '../scraper/validateSession';
-import { ensureWhatsAppClient } from './whatsapp';
+import {
+  hasWhatsAppDiskAuth,
+  restoreWhatsAppFromDiskForLogin,
+} from './whatsapp';
 
 type Platform = 'whatsapp' | 'telegram';
 
@@ -15,18 +18,14 @@ export async function tryRestorePlatformSession(
 ): Promise<{ ready: boolean; message?: string }> {
   if (payload.platform === 'whatsapp') {
     try {
-      const client = await ensureWhatsAppClient(payload.sessionId);
-      const state = await client.getState();
-      if (state === 'CONNECTED') {
-        if (!win.isDestroyed()) {
-          win.webContents.send('platform-login:ready', {
-            sessionId: payload.sessionId,
-            platform: 'whatsapp',
-          });
+      if (hasWhatsAppDiskAuth(payload.sessionId)) {
+        const restored = await restoreWhatsAppFromDiskForLogin(payload.sessionId, win);
+        if (restored) {
+          return { ready: true };
         }
-        return { ready: true };
       }
-      return { ready: false, message: `WhatsApp state: ${state ?? 'disconnected'}` };
+
+      return { ready: false, message: 'WhatsApp not connected. Scan QR to link.' };
     } catch (error) {
       return {
         ready: false,

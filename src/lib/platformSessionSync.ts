@@ -1,6 +1,7 @@
 import {
   findAccountIdBySessionData,
   hasActivePlatformSession,
+  loadWhatsAppLocalAuthClientId,
   markPlatformSessionInvalid,
   savePlatformSession,
 } from '@/lib/platformSessions';
@@ -42,7 +43,12 @@ export async function invalidatePlatformSessionEverywhere(
   options?: { purgeWaDisk?: boolean },
 ): Promise<void> {
   await markPlatformSessionInvalid(accountId, reason, platform);
-  await releasePlatformSessionOnDevice(accountId, {
+  let deviceSessionId = accountId;
+  if (platform === 'whatsapp') {
+    const localAuthId = await loadWhatsAppLocalAuthClientId(accountId);
+    if (localAuthId) deviceSessionId = localAuthId;
+  }
+  await releasePlatformSessionOnDevice(deviceSessionId, {
     purgeWaDisk: options?.purgeWaDisk,
   });
 }

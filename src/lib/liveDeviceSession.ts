@@ -1,43 +1,51 @@
-import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
-import { loadTelegramPlatformSession } from '@/lib/platformSessions';
+import { gateDeviceSession } from '@/lib/deviceSessionGate';
 import type { Platform } from '@/types/database';
+import type { SessionUiStatus } from '@/types/accountMonitoringUi';
 
 export interface LiveSessionCheckInput {
   sessionId: string;
   platform: Platform;
   accountId: string;
+  uiSessionStatus?: SessionUiStatus;
+  /** Lewati warm/probe — pakai sesi yang baru saja login. */
+  skipWarmProbe?: boolean;
 }
 
 /**
- * Session hidup di device (CONNECTED / Telethon authorized).
- * Bukan cukup baris DB atau folder disk — wajib sebelum scrape.
+ * Session hidup di device — warm + probe (sama dengan Sync).
  */
 export async function requireLiveDeviceSession(
   input: LiveSessionCheckInput,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const api = window.electronAPI?.scraper?.validateSession;
-  if (!api) {
+): Promise<
+  | { ok: true }
+  | { ok: false; message: string; warmPending?: boolean; shouldInvalidate?: boolean }
+> {
+  if (!window.electronAPI?.isElectron) {
     return { ok: false, message: 'SCRAPER_DESKTOP_REQUIRED' };
   }
 
-  const storedSessionString =
-    input.platform === 'telegram'
-      ? await loadTelegramPlatformSession(input.accountId)
-      : null;
+  const gate = await gateDeviceSession(
+    {
+      sessionId: input.sessionId,
+      platform: input.platform,
+      accountId: input.accountId,
+      uiSessionStatus: input.uiSessionStatus ?? 'valid',
+      skipWarmProbe: input.skipWarmProbe,
+    },
+    'scrape',
+  );
 
-  const deviceSessionId = await resolveDeviceSessionId(input);
-
-  const result = await api({
-    sessionId: deviceSessionId,
-    platform: input.platform,
-    storedSessionString,
-    strict: true,
-  });
-
-  if (!result.valid) {
-    const msg = result.message ?? 'Session not connected on device. Log in again.';
-    return { ok: false, message: msg };
+  if (gate.ok) {
+    return { ok: true };
   }
 
-  return { ok: true };
+  if (gate.kind === 'warm_pending') {
+    return { ok: false, message: 'SESSION_WARM_PENDING', warmPending: true, shouldInvalidate: false };
+  }
+
+  return {
+    ok: false,
+    message: gate.message,
+    shouldInvalidate: gate.shouldInvalidate,
+  };
 }

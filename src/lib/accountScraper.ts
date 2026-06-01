@@ -228,8 +228,8 @@ export async function writeScrapeDailyRows(input: {
 
   const scrapeDate = new Date().toISOString().slice(0, 10);
   const scrapedAt = new Date().toISOString();
-  const phone = input.phoneNumber?.trim();
-  if (!phone || !hasValidAccountPhone(phone)) {
+  const phone = input.phoneNumber?.trim() ?? '';
+  if (input.platform === 'whatsapp' && !hasValidAccountPhone(phone)) {
     throw new Error('PHONE_MISSING');
   }
 

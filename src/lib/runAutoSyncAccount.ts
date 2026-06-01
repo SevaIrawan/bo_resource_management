@@ -170,25 +170,9 @@ export async function runAccountSyncCheck(
     account,
     dbAccountId,
     brandStandard,
-    assumeSessionValid: true,
   });
 
-  let result = metrics.result;
-  if (
-    !metrics.hasDailyToday &&
-    brandStandard > 0 &&
-    metrics.device.totalGroups === 0 &&
-    metrics.device.valid
-  ) {
-    result = {
-      ...result,
-      groupsCurrent: brandStandard,
-      groupsTotal: brandStandard,
-      sessionStatus: 'valid',
-      adminCurrent: result.adminCurrent,
-      adminTotal: brandStandard,
-    };
-  }
+  const result = metrics.result;
 
   if (result.sessionStatus === 'valid') {
     const activeRows = await fetchActivePlatformSessions(dbAccountId);

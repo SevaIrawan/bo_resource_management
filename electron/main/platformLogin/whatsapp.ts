@@ -13,12 +13,14 @@ interface WaSession {
   client: InstanceType<typeof Client>;
   mode: WaMode;
   loggedIn?: boolean;
+  /** false saat restore disk — QR tidak boleh ke UI (client bisa langsung di-destroy). */
+  forwardQrToUi?: boolean;
+  qrGeneration?: number;
 }
 
 const sessions = new Map<string, WaSession>();
 const sessionLocks = new Map<string, Promise<unknown>>();
-/** Satu operasi WA global — cegah scrape akun B destroy client akun A yang masih getChats(). */
-let globalWaQueue: Promise<unknown> = Promise.resolve();
+/** Lock per sessionId — multi-akun WA boleh paralel (folder LocalAuth terpisah). */
 const WA_INIT_TIMEOUT_MS = 120_000;
 const WA_DESTROY_SETTLE_MS = 900;
 
@@ -132,7 +134,10 @@ function attachCommonHandlers(
   attachSessionIntegrityHandlers(sessionId, client);
   client.on('qr', (qr) => {
     const session = sessions.get(sessionId);
-    if (!session || session.mode !== 'qr') return;
+    if (!session || session.mode !== 'qr' || !session.forwardQrToUi) return;
+
+    const generation = (session.qrGeneration ?? 0) + 1;
+    session.qrGeneration = generation;
 
     void QRCode.toDataURL(qr, { width: 200, margin: 1 }).then((dataUrl) => {
       if (!win.isDestroyed()) {
@@ -140,6 +145,7 @@ function attachCommonHandlers(
           sessionId,
           platform: 'whatsapp',
           dataUrl,
+          generation,
         });
       }
     });
@@ -340,8 +346,8 @@ export async function stopWhatsAppLogin(
   sessionId: string,
   options?: { clearDiskAuth?: boolean },
 ): Promise<void> {
-  return enqueueGlobalWaOperation(() =>
-    withWaSessionLock(sessionId, () => destroyWhatsAppSession(sessionId, options)),
+  return runWhatsAppLoginOperation(sessionId, () =>
+    destroyWhatsAppSession(sessionId, options),
   );
 }
 
@@ -356,16 +362,42 @@ async function emitWhatsAppReady(sessionId: string, win: BrowserWindow) {
   }
 }
 
-const WA_DISK_RESTORE_TIMEOUT_MS = 22_000;
+/** Restore disk saat buka modal login — gagal cepat, lanjut QR. */
+const WA_DISK_RESTORE_TIMEOUT_MS = 15_000;
 
-/** Restore dari LocalAuth di disk (tanpa hapus folder). */
-async function restoreWhatsAppFromDisk(
+/** Client sudah hidup dari login QR — jangan buka Puppeteer kedua. */
+async function reuseConnectedWhatsAppSession(
   sessionId: string,
   win: BrowserWindow,
 ): Promise<boolean> {
+  const existing = sessions.get(sessionId);
+  if (!existing) return false;
+
+  try {
+    const state = await existing.client.getState();
+    if (state === 'CONNECTED') {
+      existing.loggedIn = true;
+      await emitWhatsAppReady(sessionId, win);
+      return true;
+    }
+  } catch {
+    await destroyWhatsAppSession(sessionId);
+  }
+  return false;
+}
+
+/** Restore dari LocalAuth di disk (tanpa hapus folder). */
+export async function restoreWhatsAppFromDisk(
+  sessionId: string,
+  win: BrowserWindow,
+): Promise<boolean> {
+  if (await reuseConnectedWhatsAppSession(sessionId, win)) {
+    return true;
+  }
+
   const client = createClient(sessionId, 'qr');
   attachCommonHandlers(sessionId, client, win);
-  sessions.set(sessionId, { client, mode: 'qr' });
+  sessions.set(sessionId, { client, mode: 'qr', forwardQrToUi: false });
 
   const restoreWork = (async () => {
     await initializeClientWithRetry(sessionId, client);
@@ -394,18 +426,9 @@ async function restoreWhatsAppFromDisk(
   }
 }
 
-/** Tutup client WA lain — cegah scrape akun B pakai browser/session akun A. */
-export async function releaseOtherWhatsAppSessions(keepSessionId: string): Promise<void> {
-  const others = [...sessions.keys()].filter((id) => id !== keepSessionId);
-  for (const id of others) {
-    await destroyWhatsAppSession(id);
-  }
-}
-
-function enqueueGlobalWaOperation<T>(fn: () => Promise<T>): Promise<T> {
-  const next = globalWaQueue.then(fn, fn);
-  globalWaQueue = next.catch(() => undefined);
-  return next;
+/** Login/restore — lock per akun saja (multi-akun paralel). */
+function runWhatsAppLoginOperation<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+  return withWaSessionLock(sessionId, fn);
 }
 
 async function ensureWhatsAppClientInner(
@@ -418,6 +441,9 @@ async function ensureWhatsAppClientInner(
       if (state === 'CONNECTED') {
         existing.loggedIn = true;
         return existing.client;
+      }
+      if (existing.loggedIn) {
+        return waitForClientReady(sessionId, existing.client, existing.mode);
       }
       return waitForClientReady(sessionId, existing.client, existing.mode);
     } catch {
@@ -458,13 +484,10 @@ export async function withWhatsAppClient<T>(
   sessionId: string,
   fn: (client: InstanceType<typeof Client>) => Promise<T>,
 ): Promise<T> {
-  return enqueueGlobalWaOperation(() =>
-    withWaSessionLock(sessionId, async () => {
-      await releaseOtherWhatsAppSessions(sessionId);
-      const client = await ensureWhatsAppClientInner(sessionId);
-      return fn(client);
-    }),
-  );
+  return withWaSessionLock(sessionId, async () => {
+    const client = await ensureWhatsAppClientInner(sessionId);
+    return fn(client);
+  });
 }
 
 /** Restore atau buka sesi WA dari LocalAuth (scrape / validate). */
@@ -521,31 +544,36 @@ export async function startWhatsAppQrLogin(
   win: BrowserWindow,
   options?: { skipDiskRestore?: boolean },
 ) {
-  return enqueueGlobalWaOperation(() =>
-    withWaSessionLock(sessionId, async () => {
-    await releaseOtherWhatsAppSessions(sessionId);
-    await destroyWhatsAppSession(sessionId);
+  return runWhatsAppLoginOperation(sessionId, async () => {
+    if (await reuseConnectedWhatsAppSession(sessionId, win)) {
+      return;
+    }
+
+    const existing = sessions.get(sessionId);
+    if (existing) {
+      await destroyWhatsAppSession(sessionId);
+    }
 
     if (!options?.skipDiskRestore) {
       if (await restoreWhatsAppFromDisk(sessionId, win)) {
         return;
       }
     } else {
-      // Session invalid di HP — auth lama di disk bikin initialize hang tanpa event QR.
       clearWhatsAppLocalAuth(sessionId);
     }
+
+    await destroyWhatsAppSession(sessionId);
 
     const client = createClient(sessionId, 'qr');
     attachCommonHandlers(sessionId, client, win);
     armWhatsAppLoginTimeout(sessionId, client, win);
-    sessions.set(sessionId, { client, mode: 'qr' });
+    sessions.set(sessionId, { client, mode: 'qr', forwardQrToUi: true, qrGeneration: 0 });
 
     void initializeClientWithRetry(sessionId, client).catch(async (error) => {
       await destroyWhatsAppSession(sessionId);
       sendWhatsAppLoginError(sessionId, win, error);
     });
-    }),
-  );
+  });
 }
 
 export async function startWhatsAppPhoneLogin(
@@ -553,8 +581,7 @@ export async function startWhatsAppPhoneLogin(
   phone: string,
   win: BrowserWindow,
 ) {
-  return enqueueGlobalWaOperation(() =>
-    withWaSessionLock(sessionId, async () => {
+  return runWhatsAppLoginOperation(sessionId, async () => {
     await destroyWhatsAppSession(sessionId);
     clearWhatsAppLocalAuth(sessionId);
 
@@ -568,10 +595,16 @@ export async function startWhatsAppPhoneLogin(
       await destroyWhatsAppSession(sessionId);
       sendWhatsAppLoginError(sessionId, win, error);
     });
-    }),
-  );
+  });
 }
 
 export function getWhatsAppSessionClient(sessionId: string) {
   return sessions.get(sessionId)?.client ?? null;
+}
+
+export function restoreWhatsAppFromDiskForLogin(
+  sessionId: string,
+  win: BrowserWindow,
+): Promise<boolean> {
+  return runWhatsAppLoginOperation(sessionId, () => restoreWhatsAppFromDisk(sessionId, win));
 }

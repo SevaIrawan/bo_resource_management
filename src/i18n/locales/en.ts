@@ -198,6 +198,7 @@ export const en = {
       startingWhatsApp: 'Starting WhatsApp… QR in ~15–60s. Empty 2 min? Use phone login below.',
       loadingQr: 'Loading QR…',
       scanQr: 'Scan with your phone',
+      qrUpdated: 'New QR — scan this code only',
       loginReady: 'Connected. You can close this.',
       loginFailed: 'Login failed. Try again.',
       desktopRequired: 'QR login needs the desktop app.',
@@ -222,9 +223,12 @@ export const en = {
       whatsappPhoneStep2: 'Settings → Linked devices → Link with phone number',
       whatsappPhoneStep3: 'Enter the pairing code shown on the right',
       rescrapeMessage: 'Scrape {{account}} again?',
-      postLoginScrapeMessage: 'Run scraper now?',
+      postLoginScrapeMessage:
+        'Login OK. Device group & admin counts are updated. Save the full group list to the database now?',
       scrapeProgressHint: 'Scraping in background. Counts update in the table.',
       syncFailed: 'Sync failed. Try again.',
+      syncTimedOut:
+        'Sync took too long (over 3 minutes). Telegram may have many groups — try again. If it keeps failing, restart the app.',
       scraperFailed: 'Scraper failed. Try again.',
       scraperNoGroups: 'No groups found.',
       scraperDesktopRequired: 'Scraper needs the desktop app.',
@@ -235,8 +239,14 @@ export const en = {
       sessionInvalidMessage: 'Logged out on device. Run scraper to log in again.',
       forceLoginHintTg: 'Telegram not logged in. Scan QR or use phone login.',
       forceLoginHintWa: 'WhatsApp not logged in. Scan QR or use phone login.',
-      reloginHintTg: 'Telegram session expired. Log in to continue.',
-      reloginHintWa: 'WhatsApp session expired. Log in to continue.',
+      reloginHintTg:
+        'Your session is no longer valid. Log in again — scan the QR code (default) or use phone login.',
+      reloginHintWa:
+        'Your session is no longer valid. Log in again — scan the QR code (default) or use phone login.',
+      resumeEmptyGroups:
+        'No groups on this account and none in the database for this brand. Nothing to scrape. Tap OK to continue.',
+      sessionWarmPending:
+        'Device session is still starting on this PC (up to ~2 min). Tap Sync again — your Telegram/WhatsApp link on the phone is unchanged.',
       sessionValidMessageTg: 'Telegram OK. Counts updated.',
       sessionValidMessageWa: 'WhatsApp OK. Counts updated.',
       sessionValidDetail:

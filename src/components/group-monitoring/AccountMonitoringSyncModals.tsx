@@ -1,16 +1,13 @@
 import { PlatformLoginModal } from '@/components/group-monitoring/PlatformLoginModal';
 import { SyncScrapeConfirmModal } from '@/components/group-monitoring/SyncScrapeConfirmModal';
-import { SyncSessionModal } from '@/components/group-monitoring/SyncSessionModal';
+import { SyncResumeEmptyModal } from '@/components/group-monitoring/SyncResumeEmptyModal';
 import { MissingPhoneModal } from '@/components/group-monitoring/MissingPhoneModal';
 import { SyncAlertModal } from '@/components/group-monitoring/SyncAlertModal';
 import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
 import { PLATFORM_SESSION_RLS_HINT } from '@/lib/platformSessions';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
-  parseSyncMetricsPayload,
   resolveSyncFlowMessage,
-  syncConnectedSummaryMessage,
-  syncSessionValidMessage,
 } from '@/lib/platformSyncCopy';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 
@@ -45,6 +42,12 @@ function resolveAlertMessage(
   if (code === 'SYNC_FAILED') {
     return t('groupMonitoring.sync.syncFailed');
   }
+  if (code === 'SYNC_TIMED_OUT') {
+    return t('groupMonitoring.sync.syncTimedOut');
+  }
+  if (code === 'SESSION_WARM_PENDING') {
+    return t('groupMonitoring.sync.sessionWarmPending');
+  }
   if (code === 'SCRAPER_WRITE_FAILED' || code === 'SCRAPER_FAILED') {
     return t('groupMonitoring.sync.scraperFailed');
   }
@@ -70,15 +73,14 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
     target,
     checkError,
     activePlatform,
-    confirmScrape,
     confirmScrapePrompt,
     dismissScrapePrompt,
-    openScraperFromSessionValid,
     handleLoginSuccess,
     handleSavePhoneAndSync,
     closeFlow,
     phoneSaving,
     syncMessage,
+    loginModalEpoch,
   } = sync;
 
   const alertMessage = resolveAlertMessage(checkError, t);
@@ -103,29 +105,11 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
         onClose={closeFlow}
       />
 
-      <SyncSessionModal
-        open={step === 'session-valid'}
-        message={(() => {
-          const platform = target?.account.platform;
-          if (!platform) return t('groupMonitoring.sync.sessionValidMessageTg');
-          const metrics = parseSyncMetricsPayload(syncMessage);
-          if (metrics) {
-            return syncConnectedSummaryMessage(platform, metrics, t);
-          }
-          return syncSessionValidMessage(platform, t);
-        })()}
+      <SyncResumeEmptyModal
+        open={step === 'resume-empty'}
         accountName={target?.account.accountName ?? ''}
         platform={target?.account.platform}
         onClose={closeFlow}
-        onRunScraper={openScraperFromSessionValid}
-      />
-
-      <SyncScrapeConfirmModal
-        open={step === 'confirm-scrape'}
-        accountName={target?.account.accountName ?? ''}
-        platform={target?.account.platform}
-        onClose={closeFlow}
-        onConfirm={confirmScrape}
       />
 
       <SyncScrapeConfirmModal
@@ -138,6 +122,7 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
       />
 
       <PlatformLoginModal
+        key={`login-${target?.account.id ?? 'none'}-${loginModalEpoch}`}
         open={step === 'platform-login'}
         platform={activePlatform}
         accountName={target?.account.accountName ?? ''}
@@ -145,10 +130,7 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
         dbAccountId={target?.dbAccountId}
         phoneNumber={target?.account.phoneNumber ?? ''}
         loginHint={resolveSyncFlowMessage(syncMessage, activePlatform, t)}
-        attemptRestore={
-          syncMessage !== 'SESSION_INVALID_RELOGIN' &&
-          syncMessage !== 'SESSION_INVALID_FORCE_SCRAPER'
-        }
+        attemptRestore={syncMessage !== 'SESSION_INVALID_FORCE_SCRAPER'}
         onClose={closeFlow}
         onLoginSuccess={handleLoginSuccess}
       />

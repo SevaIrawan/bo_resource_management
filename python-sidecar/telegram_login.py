@@ -5,6 +5,7 @@ import base64
 import io
 import os
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -30,6 +31,8 @@ class TgLoginSession:
     phone: str | None = None
     phone_code_hash: str | None = None
     qr_login: object | None = None
+    qr_created_at: float = 0.0
+    qr_generation: int = 0
     wait_task: asyncio.Task | None = field(default=None, repr=False)
 
 SESSIONS: dict[str, TgLoginSession] = {}
@@ -61,6 +64,7 @@ def _session_payload(session: TgLoginSession, qr_data_url: str | None = None) ->
     }
     if qr_data_url:
         payload["qrDataUrl"] = qr_data_url
+        payload["qrGeneration"] = session.qr_generation
     if session.status == "need_2fa" and not session.error:
         payload["hint"] = "Two-step verification password required"
     if session.status == "need_code" and not session.error:
@@ -131,6 +135,8 @@ async def start_telegram_qr(session_id: str) -> dict:
             mode="qr",
             status="pending",
             qr_login=qr_login,
+            qr_created_at=time.time(),
+            qr_generation=1,
         )
         SESSIONS[session_id] = session
         session.wait_task = asyncio.create_task(_wait_for_qr_scan(session_id))
@@ -165,6 +171,24 @@ async def _finalize_qr_login_if_live(session: TgLoginSession) -> None:
     if err == "2FA":
         session.status = "need_2fa"
         session.error = None
+
+
+async def _maybe_rotate_telegram_qr(session: TgLoginSession) -> str | None:
+    """QR di server TG terikat ke qr_login aktif — jangan tampilkan URL dari sesi yang sudah di-cancel."""
+    if session.status != "pending" or not session.qr_login:
+        return None
+
+    age = time.time() - session.qr_created_at
+    if age < 25:
+        return _qr_data_url(session.qr_login.url)
+
+    try:
+        session.qr_login = await session.qr_login.recreate()
+        session.qr_created_at = time.time()
+        session.qr_generation += 1
+        return _qr_data_url(session.qr_login.url)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 async def _refresh_qr_login_status(session: TgLoginSession) -> None:
@@ -288,6 +312,9 @@ async def get_telegram_status(session_id: str) -> dict:
 
     if session.mode == "qr" and session.status in ("pending", "confirming"):
         await _refresh_qr_login_status(session)
+        qr_url = await _maybe_rotate_telegram_qr(session)
+        if qr_url:
+            return _session_payload(session, qr_url)
 
     return _session_payload(session)
 

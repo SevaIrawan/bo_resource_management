@@ -57,18 +57,16 @@ export async function resolveBrandNameFromId(brandId: string): Promise<string | 
 /**
  * X untuk satu brand + satu platform (WA ≠ TG).
  */
+/** X = hitung master table brand + platform; kosong → 0 (tanpa fallback metadata/UI). */
 export async function resolveBrandStandardTotal(
   brandId: string,
   platform: Platform,
-  storedPlatformCount = 0,
+  _storedPlatformCount = 0,
   brandName?: string,
 ): Promise<number> {
   const name = brandName?.trim() || (await resolveBrandNameFromId(brandId));
-  if (!name) return Math.max(0, storedPlatformCount);
-
-  const fromMaster = await countBrandMasterGroups(name, platform);
-  if (fromMaster > 0) return fromMaster;
-  return Math.max(0, storedPlatformCount);
+  if (!name) return 0;
+  return countBrandMasterGroups(name, platform);
 }
 
 export async function fetchBrandStandardTotalsByPlatform(

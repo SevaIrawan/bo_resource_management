@@ -11,21 +11,25 @@ export function accountRowAfterSessionInvalid(account: AccountBrandRow): Account
     groupsCurrent: 0,
     groupsTotal: x,
     adminTotal: x,
-    adminCurrent: account.adminCurrent,
-    isMisaligned: x > 0 || account.adminCurrent > 0,
+    adminCurrent: 0,
+    isMisaligned:
+      x > 0 ||
+      account.adminCurrent > 0 ||
+      account.adminCurrent !== account.adminTotal ||
+      account.groupsCurrent !== x,
     syncState: account.syncState === 'pending' ? 'pending' : 'synced',
   };
 }
 
 export function syncResultForInvalidSession(
   brandStandard: number,
-  adminFromMaster = 0,
+  _adminFromMaster = 0,
 ): AccountSyncResult {
-  const x = brandStandard > 0 ? brandStandard : 0;
+  const x = Math.max(0, brandStandard);
   return {
     groupsCurrent: 0,
     groupsTotal: x,
-    adminCurrent: adminFromMaster,
+    adminCurrent: 0,
     adminTotal: x,
     sessionStatus: 'invalid',
   };

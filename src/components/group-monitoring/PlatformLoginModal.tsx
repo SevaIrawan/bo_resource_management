@@ -43,11 +43,11 @@ export function PlatformLoginModal({
 }: PlatformLoginModalProps) {
   const { t } = useLanguage();
   const isTelegram = platform === 'telegram';
-  const platformAccountId = dbAccountId ?? sessionId;
   const {
     view,
     status,
     qrDataUrl,
+    qrGeneration,
     pairingCode,
     error,
     submitting,
@@ -56,8 +56,8 @@ export function PlatformLoginModal({
     startPhoneLogin,
     submitCode,
     submit2fa,
-  } = usePlatformLogin(open, platform, platformAccountId, phoneNumber, {
-    accountId: platformAccountId,
+  } = usePlatformLogin(open, platform, sessionId, phoneNumber, {
+    accountId: dbAccountId ?? sessionId,
     attemptRestore,
     t,
   });
@@ -72,16 +72,16 @@ export function PlatformLoginModal({
 
   useEffect(() => {
     if (!open) {
-      loginHandledRef.current = false;
       setPersisting(false);
       setPersistError(null);
       return;
     }
+    loginHandledRef.current = false;
     setPhone(phoneNumber);
     setCode('');
     setTwoFa('');
     setPhoneError(null);
-  }, [open, phoneNumber, sessionId]);
+  }, [open, phoneNumber, sessionId, platform]);
 
   useEffect(() => {
     if (!open || status !== 'ready' || loginHandledRef.current) return;
@@ -96,7 +96,7 @@ export function PlatformLoginModal({
         );
       })
       .finally(() => setPersisting(false));
-  }, [open, onLoginSuccess, status]);
+  }, [onLoginSuccess, open, status]);
 
   useEffect(() => {
     if (!open) return;
@@ -366,7 +366,12 @@ export function PlatformLoginModal({
                     {error ?? statusLabel}
                   </p>
                 ) : qrDataUrl && status !== 'confirming' ? (
-                  <img src={qrDataUrl} alt="Login QR code" className="platform-login-qr-img" />
+                  <img
+                    key={`qr-${qrGeneration}`}
+                    src={qrDataUrl}
+                    alt="Login QR code"
+                    className="platform-login-qr-img"
+                  />
                 ) : (
                   <Loader2 className="platform-login-qr-spinner" strokeWidth={2} aria-hidden />
                 )}
@@ -378,6 +383,9 @@ export function PlatformLoginModal({
                 {status !== 'error' ? (
                   <p className="platform-login-qr-status">
                     {statusLabel}
+                    {qrGeneration > 1
+                      ? ` · ${t('groupMonitoring.sync.qrUpdated')}`
+                      : ''}
                   </p>
                 ) : null}
                 {!isTelegram && pairingCode ? (

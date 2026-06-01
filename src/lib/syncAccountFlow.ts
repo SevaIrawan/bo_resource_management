@@ -39,9 +39,10 @@ export async function completeSyncAfterLiveSession(input: {
   account: AccountBrandRow;
   dbAccountId: string;
   brandStandardHint?: number;
-  assumeSessionValid?: boolean;
   /** Sudah persist dari modal login — jangan skip export string Telethon. */
   skipPersist?: boolean;
+  /** Sudah di-probe di Sync manual (badge VALID) — satu kali hitung grup, tanpa validate ulang. */
+  assumeSessionValid?: boolean;
 }): Promise<SyncSuccessPayload> {
   if (!input.skipPersist) {
     const hasSession = await hasActivePlatformSession(input.dbAccountId);
@@ -53,7 +54,7 @@ export async function completeSyncAfterLiveSession(input: {
   }
 
   const supabase = getSupabase();
-  let brandStandard = input.brandStandardHint ?? input.account.groupsTotal;
+  let brandStandard = input.brandStandardHint ?? 0;
 
   if (supabase) {
     const { data: accRow } = await supabase
@@ -81,28 +82,12 @@ export async function completeSyncAfterLiveSession(input: {
 
   let result = metrics.result;
 
-  // Step 3: akun baru — belum ada data grup di device/DB → tampilkan standar brand (X) di kolom grup.
-  if (
-    !metrics.hasDailyToday &&
-    brandStandard > 0 &&
-    metrics.device.totalGroups === 0 &&
-    metrics.device.valid
-  ) {
-    result = {
-      ...result,
-      groupsCurrent: brandStandard,
-      groupsTotal: brandStandard,
-      sessionStatus: 'valid',
-      adminCurrent: metrics.result.adminCurrent,
-      adminTotal: brandStandard,
-    };
-  }
-
   if (!metrics.device.valid) {
     result = {
       ...result,
       sessionStatus: 'invalid',
       groupsCurrent: 0,
+      adminCurrent: 0,
     };
   }
 

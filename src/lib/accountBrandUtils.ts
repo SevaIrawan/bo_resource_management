@@ -2,14 +2,6 @@ import { isMisalignedFromSyncResult } from '@/lib/accountDisplayMetrics';
 import { buildStandardCountByPlatformFromRows } from '@/lib/brandStandardCount';
 import type { AccountBrandGroup, AddAccountInput } from '@/types/accountMonitoringUi';
 import type { SessionUiStatus } from '@/types/accountMonitoringUi';
-import type { Platform } from '@/types/database';
-
-function platformStandardX(group: AccountBrandGroup, platform: Platform): number {
-  const fromMap = group.standardGroupCountByPlatform?.[platform];
-  if (fromMap != null && fromMap > 0) return fromMap;
-  const fromRow = group.accounts.find((a) => a.platform === platform)?.groupsTotal;
-  return fromRow ?? 0;
-}
 
 export const DEFAULT_EMPTY_SLOT_COUNT = 3;
 
@@ -142,20 +134,12 @@ export function applySyncResultToGroup(
   group: AccountBrandGroup,
   accountId: string,
   result: AccountSyncResult,
-  options?: { masterTotal?: number },
+  _options?: { masterTotal?: number },
 ): AccountBrandGroup {
-  const targetAccount = group.accounts.find((a) => a.id === accountId);
-  const brandStandard = targetAccount
-    ? platformStandardX(group, targetAccount.platform)
-    : 0;
   const accounts = group.accounts.map((account) => {
     if (account.id !== accountId) return account;
 
-    const isMisaligned = isMisalignedFromSyncResult(
-      result,
-      options?.masterTotal ?? 0,
-      brandStandard,
-    );
+    const isMisaligned = isMisalignedFromSyncResult(result);
 
     return {
       ...account,

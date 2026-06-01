@@ -6,11 +6,8 @@ import {
   loadTelegramPlatformSession,
 } from '@/lib/platformSessions';
 import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
-import { withTimeout } from '@/lib/withTimeout';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
-
-const DISK_RESTORE_CHECK_MS = 35_000;
 
 /** Session aktif di `platform_sessions` (bukan `messaging_accounts.is_active`). */
 export async function hasStoredPlatformSession(
@@ -56,19 +53,7 @@ export async function hasUsableLoginSession(input: {
     if (linked) return true;
   }
 
-  if (!window.electronAPI?.platformLogin?.tryRestore) {
-    return false;
-  }
-
-  try {
-    return await withTimeout(
-      tryWarmPlatformSession(input),
-      DISK_RESTORE_CHECK_MS,
-      'Restore device session',
-    );
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 export async function backfillPlatformSessionIfNeeded(input: {

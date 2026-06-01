@@ -16,12 +16,7 @@ export async function upsertAccountSnapshot(input: {
   const supabase = getSupabase();
   if (!supabase) return;
 
-  const brandStandard = input.brandStandard ?? input.account.groupsTotal;
-  const isMisaligned = isMisalignedFromSyncResult(
-    input.result,
-    input.masterTotal ?? input.result.adminCurrent,
-    brandStandard,
-  );
+  const isMisaligned = isMisalignedFromSyncResult(input.result);
 
   const row = {
     account_id: input.account.id,

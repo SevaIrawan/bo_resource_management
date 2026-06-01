@@ -24,7 +24,7 @@ interface StartPayload {
   platform: Platform;
   mode?: LoginMode;
   phone?: string;
-  /** true = langsung QR baru (sync relogin), jangan hang di restore disk */
+  /** true = paksa QR baru (logout di HP), jangan restore disk/string DB */
   skipDiskRestore?: boolean;
 }
 
@@ -100,11 +100,18 @@ export function registerPlatformLoginIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle('platform-login:cancel', async (_event, sessionId: string) => {
-    await stopWhatsAppLogin(sessionId);
-    await stopTelegramLogin(sessionId);
-    return { ok: true };
-  });
+  ipcMain.handle(
+    'platform-login:cancel',
+    async (_event, sessionId: string, platform?: Platform) => {
+      if (!platform || platform === 'whatsapp') {
+        await stopWhatsAppLogin(sessionId);
+      }
+      if (!platform || platform === 'telegram') {
+        await stopTelegramLogin(sessionId);
+      }
+      return { ok: true };
+    },
+  );
 
   ipcMain.handle(
     'platform-login:release',

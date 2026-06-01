@@ -41,8 +41,14 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     if (sync.processingAccountId) {
       ids.add(sync.processingAccountId);
     }
+    if (sync.processingDbAccountId && sync.processingAccountId) {
+      ids.add(sync.processingDbAccountId);
+    }
     if (sync.step === 'platform-login' && sync.target?.account.id) {
       ids.add(sync.target.account.id);
+    }
+    if (sync.target?.dbAccountId) {
+      ids.add(sync.target.dbAccountId);
     }
     if (sync.postLoginGraceAccountId) {
       ids.add(sync.postLoginGraceAccountId);
@@ -51,8 +57,10 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
   }, [
     sync.postLoginGraceAccountId,
     sync.processingAccountId,
+    sync.processingDbAccountId,
     sync.step,
     sync.target?.account.id,
+    sync.target?.dbAccountId,
   ]);
 
   useEffect(() => {

@@ -1,27 +1,24 @@
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import type { MasterGroupStats } from '@/lib/accountSyncData';
 import type { DeviceGroupCountResult } from '@/lib/runAccountCount';
+import { isRowMisaligned } from '@/lib/accountSyncUiFlow';
 
 /**
- * UI Groups: Y/X — Y = device, X = standar brand (master count).
+ * UI Groups: Y/X — Y = device, X = master brand (card).
  * UI Admin: admin di grup master / X.
  */
 export function computeIsMisaligned(input: {
-  brandStandard: number;
-  deviceTotal: number;
+  groupsCurrent: number;
+  groupsTotal: number;
+  adminCurrent: number;
+  adminTotal: number;
   sessionValid: boolean;
-  masterTotal: number;
 }): boolean {
-  const { brandStandard, deviceTotal, sessionValid, masterTotal } = input;
-
-  if (brandStandard > 0) {
-    if (!sessionValid) return true;
-    return deviceTotal !== brandStandard;
-  }
-
-  if (!sessionValid) return masterTotal > 0;
-  if (masterTotal <= 0) return false;
-  return deviceTotal !== masterTotal;
+  if (!input.sessionValid) return true;
+  return (
+    input.groupsCurrent !== input.groupsTotal ||
+    input.adminCurrent !== input.adminTotal
+  );
 }
 
 export function buildAccountSyncResult(input: {
@@ -30,9 +27,8 @@ export function buildAccountSyncResult(input: {
   brandStandard: number;
 }): AccountSyncResult {
   const { master, device, brandStandard } = input;
+  const brandX = Math.max(0, brandStandard);
   const sessionValid = device.valid;
-  const brandX =
-    brandStandard > 0 ? brandStandard : master.brandMasterTotal;
 
   if (!sessionValid) {
     return {
@@ -44,24 +40,20 @@ export function buildAccountSyncResult(input: {
     };
   }
 
+  const adminY =
+    typeof device.adminGroups === 'number' && device.adminGroups >= 0
+      ? device.adminGroups
+      : 0;
+
   return {
     groupsCurrent: device.totalGroups,
     groupsTotal: brandX,
-    adminCurrent: master.adminInMaster,
+    adminCurrent: adminY,
     adminTotal: brandX,
     sessionStatus: 'valid',
   };
 }
 
-export function isMisalignedFromSyncResult(
-  result: AccountSyncResult,
-  masterTotal: number,
-  brandStandard: number,
-): boolean {
-  return computeIsMisaligned({
-    brandStandard,
-    deviceTotal: result.sessionStatus === 'valid' ? result.groupsCurrent : 0,
-    sessionValid: result.sessionStatus === 'valid',
-    masterTotal,
-  });
+export function isMisalignedFromSyncResult(result: AccountSyncResult): boolean {
+  return isRowMisaligned(result);
 }

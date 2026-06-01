@@ -38,8 +38,8 @@ export function Sidebar() {
         collapsed ? 'w-(--sidebar-collapsed-width)' : 'w-(--sidebar-expanded-width)',
       )}
     >
-      <div className="flex h-(--header-height) shrink-0 items-center border-b border-border-subtle px-3">
-        <BrandLogo collapsed={collapsed} />
+      <div className="flex h-(--header-height) shrink-0 items-center border-b border-border-subtle px-3 py-0">
+        <BrandLogo collapsed={collapsed} className="w-full" />
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 p-2 pt-3">

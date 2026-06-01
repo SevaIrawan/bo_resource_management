@@ -4,6 +4,7 @@ import path from 'path';
 import { app } from 'electron';
 import QRCode from 'qrcode';
 import pkg from 'whatsapp-web.js';
+import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
 
 const { Client, LocalAuth } = pkg;
 
@@ -440,6 +441,7 @@ async function ensureWhatsAppClientInner(
       const state = await existing.client.getState();
       if (state === 'CONNECTED') {
         existing.loggedIn = true;
+        await waitForWhatsAppStoreReady(existing.client);
         return existing.client;
       }
       if (existing.loggedIn) {
@@ -467,18 +469,21 @@ async function ensureWhatsAppClientInner(
     const state = await client.getState();
     if (state === 'CONNECTED') {
       sessions.set(sessionId, { client, mode: 'qr', loggedIn: true });
+      await waitForWhatsAppStoreReady(client);
       return client;
     }
   } catch {
     // wait for ready event
   }
 
-  return readyPromise;
+  const readyClient = await readyPromise;
+  await waitForWhatsAppStoreReady(readyClient);
+  return readyClient;
 }
 
 /**
- * Jalankan operasi WA dengan lock per session + antrian global.
- * Lock tetap aktif sampai scrape/count selesai — hindari client undefined saat getChats().
+ * Jalankan operasi WA dengan lock per session.
+ * Lock tetap aktif sampai scrape/count selesai — hindari client hilang saat getChatById().
  */
 export async function withWhatsAppClient<T>(
   sessionId: string,
@@ -486,6 +491,9 @@ export async function withWhatsAppClient<T>(
 ): Promise<T> {
   return withWaSessionLock(sessionId, async () => {
     const client = await ensureWhatsAppClientInner(sessionId);
+    if (!client) {
+      throw new Error('WA_CLIENT_NOT_READY: WhatsApp client could not be opened. Log in again.');
+    }
     return fn(client);
   });
 }

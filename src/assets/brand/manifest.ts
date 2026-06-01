@@ -3,7 +3,7 @@
  * Support: .svg .png .jpg .jpeg .webp .gif .avif .ico .bmp
  */
 export const BRAND_FILES = {
-  logo: 'logo-icon.svg',
+  logo: 'logo-icon.jpg',
   logoFull: 'logo-full.svg',
   telegram: 'telegram.svg',
   whatsapp: 'whatsapp.svg',

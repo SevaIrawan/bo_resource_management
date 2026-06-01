@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
-import { BrandImage } from './BrandImage';
+import { BrandLogoMark } from './BrandLogoMark';
 import { SidebarLabel } from '@/components/layout/SidebarLabel';
 
 interface BrandLogoProps {
@@ -12,19 +12,11 @@ export function BrandLogo({ collapsed = false, className }: BrandLogoProps) {
   const { t } = useLanguage();
 
   return (
-    <div className={cn('flex min-w-0 items-center', className)}>
-      <BrandImage
-        asset="logo"
-        alt={t('brand.name')}
-        className="h-9 w-9 shrink-0 rounded-[10px] object-contain"
-      />
-      <SidebarLabel collapsed={collapsed} className="sidebar-brand-label leading-tight">
-        <span className="block truncate text-sm font-semibold tracking-wide text-text-primary">
-          {t('brand.name')}
-        </span>
-        <span className="mt-0.5 block truncate text-[11px] font-medium text-text-muted">
-          {t('brand.tagline')}
-        </span>
+    <div className={cn('sidebar-brand-block', className)}>
+      <BrandLogoMark alt={t('brand.name')} size="md" />
+      <SidebarLabel collapsed={collapsed} className="sidebar-brand-label min-w-0 leading-tight">
+        <span className="sidebar-brand-title">{t('brand.name')}</span>
+        <span className="sidebar-brand-tagline">{t('brand.tagline')}</span>
       </SidebarLabel>
     </div>
   );

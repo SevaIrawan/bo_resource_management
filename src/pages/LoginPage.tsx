@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Eye, EyeOff, Lock, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { BrandImage } from '@/components/brand/BrandImage';
+import { BrandLogoMark } from '@/components/brand/BrandLogoMark';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -47,10 +47,8 @@ export function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <header className="login-card-header">
-          <div className="login-card-logo">
-            <BrandImage asset="logo" alt={t('brand.name')} />
-          </div>
-          <div className="min-w-0">
+          <BrandLogoMark alt={t('brand.name')} size="lg" />
+          <div className="min-w-0 flex-1">
             <h1 className="login-card-title">{t('brand.name')}</h1>
             <p className="login-card-subtitle">{t('brand.tagline')}</p>
           </div>

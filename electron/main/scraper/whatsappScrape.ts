@@ -6,6 +6,11 @@ import {
 } from './whatsappParticipants';
 import type { ScrapedGroupRow } from './index';
 import { isWhatsAppGroupChat } from './whatsappGroupFilter';
+import {
+  assertWhatsAppScrapeClient,
+  listWhatsAppGroupIds,
+  waitForWhatsAppStoreReady,
+} from './whatsappGroupDiscovery';
 import { emitScrapeProgress } from './scrapeProgress';
 
 const { Client } = pkg;
@@ -36,9 +41,7 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
 
   try {
     return await withWhatsAppClient(sessionId, async (client) => {
-      if (!client || typeof client.getChats !== 'function') {
-        throw new Error('WA_CLIENT_NOT_READY: WhatsApp client lost during scrape. Try again.');
-      }
+      assertWhatsAppScrapeClient(client);
 
       emitScrapeProgress({ sessionId, phase: 'connect', label: 'Checking WhatsApp connection' });
 
@@ -52,10 +55,16 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
         );
       }
 
-      emitScrapeProgress({ sessionId, phase: 'discover', label: 'Reading chat list from device' });
-      const chats = await client.getChats();
-      const groups = chats.filter((chat) => isWhatsAppGroupChat(chat));
-      const total = groups.length;
+      emitScrapeProgress({
+        sessionId,
+        phase: 'connect',
+        label: 'Waiting for WhatsApp Web to finish syncing…',
+      });
+      await waitForWhatsAppStoreReady(client);
+
+      emitScrapeProgress({ sessionId, phase: 'discover', label: 'Discovering groups on device' });
+      const groupIds = await listWhatsAppGroupIds(client);
+      const total = groupIds.length;
 
       emitScrapeProgress({
         sessionId,
@@ -68,8 +77,11 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
       const rows: ScrapedGroupRow[] = [];
       const meId = client.info?.wid?._serialized;
 
-      for (let i = 0; i < groups.length; i += 1) {
-        const chat = groups[i];
+      for (let i = 0; i < groupIds.length; i += 1) {
+        const groupId = groupIds[i];
+        const chat = await client.getChatById(groupId);
+        if (!chat || !isWhatsAppGroupChat(chat)) continue;
+
         const groupName = chat.name ?? chat.id._serialized;
         emitScrapeProgress({
           sessionId,

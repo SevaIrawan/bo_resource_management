@@ -11,7 +11,7 @@ from telethon.tl.types import (
     ChatParticipantCreator,
 )
 
-from telegram_login import SESSIONS, restore_telegram_session
+from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 
 
 def _admin_label(is_admin: bool) -> str:
@@ -95,6 +95,11 @@ async def _count_admin_roles(client, entity) -> tuple[int, int]:
 
 
 async def _collect_groups(session_id: str) -> dict:
+    async with tg_session_lock(session_id):
+        return await _collect_groups_locked(session_id)
+
+
+async def _collect_groups_locked(session_id: str) -> dict:
     session = SESSIONS.get(session_id)
     if not session:
         return {"status": "error", "message": "Login session not found. Log in first."}

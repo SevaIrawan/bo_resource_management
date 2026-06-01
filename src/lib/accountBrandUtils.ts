@@ -134,12 +134,14 @@ export function applySyncResultToGroup(
   group: AccountBrandGroup,
   accountId: string,
   result: AccountSyncResult,
-  _options?: { masterTotal?: number },
+  options?: { masterTotal?: number; lastSyncAt?: string | null },
 ): AccountBrandGroup {
   const accounts = group.accounts.map((account) => {
     if (account.id !== accountId) return account;
 
     const isMisaligned = isMisalignedFromSyncResult(result);
+    const lastSyncAt =
+      options?.lastSyncAt !== undefined ? options.lastSyncAt : account.lastSyncAt;
 
     return {
       ...account,
@@ -152,7 +154,7 @@ export function applySyncResultToGroup(
       actionProcess: null,
       syncState: 'synced' as const,
       isMisaligned,
-      lastSyncAt: new Date().toISOString(),
+      lastSyncAt,
     };
   });
 

@@ -1,5 +1,5 @@
 import { isProbeSkipMessage } from '@/lib/persistLoginSession';
-import { isDeviceBusyMessage } from '@/lib/scrapeErrorUi';
+import { isDeviceBusyMessage, isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
 import { hasStoredPlatformSession } from '@/lib/sessionAvailability';
 import { probePlatformSession } from '@/lib/sessionProbe';
 import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
@@ -71,7 +71,7 @@ function needLoginResult(
   };
 }
 
-/** Probe dulu (client login mungkin sudah hidup) — baru warm, hindari Puppeteer ganda. */
+/** Probe → warm → probe lagi. Warm saja tidak pernah dianggap valid tanpa getState(). */
 async function probeThenWarm(input: {
   sessionId: string;
   platform: Platform;
@@ -80,10 +80,16 @@ async function probeThenWarm(input: {
   let probe = await probeDeviceStrict(input);
   if (probe.valid) return probe;
 
-  if (await warmDevice(input)) {
-    return { valid: true, message: undefined };
+  if (isDeviceSessionDeadMessage(probe.message)) {
+    return probe;
   }
 
+  if (isDeviceBusyMessage(probe.message)) {
+    await warmDevice(input);
+    return probeDeviceStrict(input);
+  }
+
+  await warmDevice(input);
   probe = await probeDeviceStrict(input);
   return probe;
 }
@@ -112,16 +118,16 @@ async function gateUserActionSession(
   }
 
   const msg = probe.message ?? 'device_not_connected';
-  const isTimeout = msg.toLowerCase().includes('timed out');
 
-  if (
-    isDeviceBusyMessage(msg) ||
-    (hasStored && (isTimeout || isProbeSkipMessage(msg)))
-  ) {
-    return { ok: false, kind: 'warm_pending' };
+  if (isDeviceSessionDeadMessage(msg)) {
+    return needLoginResult(msg, true);
   }
 
-  return needLoginResult(msg, !isTimeout && !isProbeSkipMessage(msg) && hasStored);
+  if (isDeviceBusyMessage(msg) || isProbeSkipMessage(msg)) {
+    return needLoginResult(msg, hasStored);
+  }
+
+  return needLoginResult(msg, hasStored);
 }
 
 /** @deprecated Pakai gateUserActionSession — tetap diekspos untuk kompat. */

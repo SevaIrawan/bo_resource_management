@@ -9,7 +9,7 @@ import { withTimeout } from '@/lib/withTimeout';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 
 const DELAY_BETWEEN_ACCOUNTS_MS = 4_000;
-const INITIAL_DELAY_MS = 30_000;
+const INITIAL_DELAY_MS = 8_000;
 const AUTO_SYNC_ACCOUNT_TIMEOUT_MS = 120_000;
 
 interface UseAutoAccountSyncOptions {

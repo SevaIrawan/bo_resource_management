@@ -16,10 +16,10 @@ import {
 } from '@/lib/accountSnapshots';
 import { MESSAGING_ACCOUNT_SELECT } from '@/config/dbColumns';
 import { readPhoneFromAccount } from '@/lib/accountPhone';
-import { assertRmSchema } from '@/lib/assertRmSchema';
 import { loadUserBrands } from '@/lib/brands';
 import { TABLES } from '@/config/tables';
-import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
+import { fetchLastActivityAtByAccount } from '@/lib/lastAccountUpdate';
+import { fetchActiveSessionAccountIdSet } from '@/lib/platformSessions';
 import { getSupabase } from '@/lib/supabase';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { AccountSnapshot, MessagingAccount, Platform } from '@/types/database';
@@ -34,7 +34,7 @@ function accountRowFromDb(
   hasSession: boolean,
   snap?: AccountSnapshot,
 ): AccountBrandRow {
-  // Badge session = baris platform_sessions terbaru di DB (bukan snapshot history).
+  // Badge session = platform_sessions aktif; akun baru tanpa baris aktif → default INVALID.
   const sessionStatus = hasSession ? 'valid' : 'invalid';
   const status = sessionStatus === 'valid' ? 'active' : 'logout';
 
@@ -70,8 +70,6 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  await assertRmSchema();
-
   const [brands, accounts, snapshots] = await Promise.all([
     loadUserBrands(userId),
     supabase
@@ -106,6 +104,12 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
       };
     }),
   );
+
+  const accountIds = accounts.map((a) => a.id);
+  const [activeSessionIds, lastActivityAtByAccount] = await Promise.all([
+    fetchActiveSessionAccountIdSet(accountIds),
+    fetchLastActivityAtByAccount(accountIds),
+  ]);
   const platformsByBrand = new Map<string, Platform[]>();
   for (const account of accounts) {
     const list = platformsByBrand.get(account.brand_id) ?? [];
@@ -130,7 +134,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
       if (brandX > 0) standardByPlatform[account.platform] = brandX;
 
       const snap = snapshots.get(account.id);
-      const hasSession = (await readLatestSessionUiStatus(account.id)) === 'valid';
+      const hasSession = activeSessionIds.has(account.id);
       let row = accountRowFromDb(account, brand.name, hasSession, snap);
       const master = masterByAccount.get(account.id);
 
@@ -141,6 +145,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
         brandStandard: brandX > 0 ? brandX : undefined,
         sessionValid: hasSession,
       });
+      const lastActivityAt = lastActivityAtByAccount.get(account.id);
       row = {
         ...row,
         groupsCurrent: result.groupsCurrent,
@@ -148,8 +153,8 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
         adminCurrent: result.adminCurrent,
         adminTotal: result.adminTotal,
         isMisaligned: isMisalignedFromSyncResult(result),
-        syncState: result.groupsCurrent > 0 || snap ? 'synced' : row.syncState,
-        lastSyncAt: snap?.last_sync_at ?? row.lastSyncAt,
+        syncState: lastActivityAt || result.groupsCurrent > 0 || snap ? 'synced' : row.syncState,
+        lastSyncAt: lastActivityAt ?? null,
       };
 
       if (master && !hasSession) {
@@ -216,7 +221,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
     const groupId = brandIdFromName(name);
     const rows: AccountBrandRow[] = [];
     for (const account of orphanAccounts) {
-      const hasSession = (await readLatestSessionUiStatus(account.id)) === 'valid';
+      const hasSession = activeSessionIds.has(account.id);
       let row = accountRowFromDb(account, name, hasSession, snapshots.get(account.id));
       const master = masterByAccount.get(account.id);
       const { result } = await buildMetricsFromScrapeDaily({
@@ -225,6 +230,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
         platform: account.platform,
         sessionValid: hasSession,
       });
+      const lastActivityAt = lastActivityAtByAccount.get(account.id);
       row = {
         ...row,
         groupsCurrent: result.groupsCurrent,
@@ -232,6 +238,8 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
         adminCurrent: result.adminCurrent,
         adminTotal: result.adminTotal,
         isMisaligned: isMisalignedFromSyncResult(result),
+        syncState: lastActivityAt ? 'synced' : row.syncState,
+        lastSyncAt: lastActivityAt ?? null,
       };
       if (master) row = applyMasterStatsToAccountRow(row, master);
       rows.push(row);

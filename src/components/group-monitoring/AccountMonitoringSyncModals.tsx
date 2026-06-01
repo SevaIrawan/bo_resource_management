@@ -130,7 +130,7 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
         dbAccountId={target?.dbAccountId}
         phoneNumber={target?.account.phoneNumber ?? ''}
         loginHint={resolveSyncFlowMessage(syncMessage, activePlatform, t)}
-        attemptRestore={syncMessage !== 'SESSION_INVALID_FORCE_SCRAPER'}
+        attemptRestore={false}
         onClose={closeFlow}
         onLoginSuccess={handleLoginSuccess}
       />

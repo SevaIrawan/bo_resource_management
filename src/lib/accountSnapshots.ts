@@ -13,6 +13,8 @@ export async function upsertAccountSnapshot(input: {
   result: AccountSyncResult;
   brandStandard?: number;
   masterTotal?: number;
+  /** Waktu aktivitas nyata; jangan tulis ulang timestamp palsu untuk semua akun. */
+  lastSyncAt?: string | null;
 }): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
@@ -33,7 +35,10 @@ export async function upsertAccountSnapshot(input: {
     admin_current: input.result.adminCurrent,
     admin_total: input.result.adminTotal,
     is_misaligned: isMisaligned,
-    last_sync_at: new Date().toISOString(),
+    last_sync_at:
+      input.lastSyncAt ??
+      input.account.lastSyncAt ??
+      new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 

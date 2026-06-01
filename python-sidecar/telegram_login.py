@@ -37,6 +37,17 @@ class TgLoginSession:
 
 SESSIONS: dict[str, TgLoginSession] = {}
 
+_tg_session_locks: dict[str, asyncio.Lock] = {}
+
+
+def tg_session_lock(session_id: str) -> asyncio.Lock:
+    """Satu operasi Telethon aktif per session_id (multi-akun paralel, tidak tabrakan per akun)."""
+    lock = _tg_session_locks.get(session_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _tg_session_locks[session_id] = lock
+    return lock
+
 def _qr_data_url(url: str) -> str:
     qr = qrcode.QRCode(box_size=4, border=2)
     qr.add_data(url)
@@ -341,6 +352,11 @@ async def export_telegram_session(session_id: str) -> dict:
     }
 
 async def restore_telegram_session(session_id: str, session_string: str) -> dict:
+    async with tg_session_lock(session_id):
+        return await _restore_telegram_session_locked(session_id, session_string)
+
+
+async def _restore_telegram_session_locked(session_id: str, session_string: str) -> dict:
     await cancel_telegram(session_id)
 
     if not session_string.strip():

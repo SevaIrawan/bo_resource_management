@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { applySyncResultToGroup } from '@/lib/accountBrandUtils';
-import { findAccountInGroups, patchAccountSessionInGroups } from '@/lib/accountSessionPatch';
+import { findAccountInGroups } from '@/lib/accountSessionPatch';
 import { invalidSessionMetricsFromDaily } from '@/lib/accountSessionUi';
 import { upsertAccountSnapshot } from '@/lib/accountSnapshots';
 import {
@@ -8,7 +8,6 @@ import {
   resolveAccountIdFromDeviceSession,
 } from '@/lib/platformSessionSync';
 import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
-import { hasActivePlatformSession } from '@/lib/platformSessions';
 import { isAccountInSessionGrace } from '@/lib/sessionRealtimePolicy';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
@@ -31,8 +30,8 @@ function isProtected(accountId: string, suspended: Set<string>): boolean {
 }
 
 /**
- * Session badge UI = mirror realtime `platform_sessions.is_active`.
- * Event device hanya update DB; UI mengikuti postgres_changes, bukan disconnect Puppeteer.
+ * Realtime session: UI hanya ikut DB saat **logout/invalid** (`is_active` false).
+ * Jangan set VALID dari DB saja — badge valid hanya dari probe device / Sync / login sukses.
  */
 export function useRealtimeAccountSessions({
   groups,
@@ -63,38 +62,32 @@ export function useRealtimeAccountSessions({
       const status = await readLatestSessionUiStatus(accountId);
       const found = findAccountInGroups(groupsRef.current, accountId);
 
-      if (status === 'invalid' && (await hasActivePlatformSession(accountId))) {
-        onGroupsChange((prev) => patchAccountSessionInGroups(prev, accountId, 'valid'));
+      if (status !== 'invalid' || !found) {
         return;
       }
 
-      if (status === 'invalid' && found) {
-        const result = await invalidSessionMetricsFromDaily({
-          accountId: found.account.id,
-          brand: found.account.brandName,
-          platform: found.account.platform,
-          brandStandard:
-            found.group.standardGroupCountByPlatform?.[found.account.platform] ||
-            found.account.groupsTotal,
+      const result = await invalidSessionMetricsFromDaily({
+        accountId: found.account.id,
+        brand: found.account.brandName,
+        platform: found.account.platform,
+        brandStandard:
+          found.group.standardGroupCountByPlatform?.[found.account.platform] ||
+          found.account.groupsTotal,
+      });
+      onGroupsChange((prev) =>
+        prev.map((group) =>
+          group.id === found.group.id
+            ? applySyncResultToGroup(group, accountId, result)
+            : group,
+        ),
+      );
+      if (found.group.dbBrandId) {
+        void upsertAccountSnapshot({
+          account: { ...found.account, ...result, status: 'logout', sessionStatus: 'invalid' },
+          brandId: found.group.dbBrandId,
+          result,
         });
-        onGroupsChange((prev) =>
-          prev.map((group) =>
-            group.id === found.group.id
-              ? applySyncResultToGroup(group, accountId, result)
-              : group,
-          ),
-        );
-        if (found.group.dbBrandId) {
-          void upsertAccountSnapshot({
-            account: { ...found.account, ...result, status: 'logout', sessionStatus: 'invalid' },
-            brandId: found.group.dbBrandId,
-            result,
-          });
-        }
-        return;
       }
-
-      onGroupsChange((prev) => patchAccountSessionInGroups(prev, accountId, status));
     },
     [onGroupsChange],
   );
@@ -131,8 +124,6 @@ export function useRealtimeAccountSessions({
           (await resolveAccountIdFromDeviceSession(payload.sessionId, payload.platform)) ??
           payload.sessionId;
         if (isProtected(accountId, new Set(suspendedRef.current))) return;
-
-        if (await hasActivePlatformSession(accountId)) return;
 
         await handleDeviceSessionInvalid(payload);
       })();

@@ -13,9 +13,10 @@ import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
 import { ensurePlatformSessionInDatabase } from '@/lib/ensureWaSessionInDb';
 import {
   fetchActivePlatformSessions,
-  hasActivePlatformSession,
+  markPlatformSessionInvalid,
   markPlatformSessionSynced,
 } from '@/lib/platformSessions';
+import { isDeviceBusyMessage, isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
 import { recordSessionActivityStatus } from '@/lib/recordSessionActivity';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
 import { probePlatformSession } from '@/lib/sessionProbe';
@@ -59,9 +60,7 @@ export async function runAccountSyncCheck(
 
   const { accountId: dbAccountId } = await resolveDbAccountForRow({ userId, account });
 
-  if ((await readLatestSessionUiStatus(dbAccountId)) === 'invalid') {
-    return null;
-  }
+  const dbSaysValid = (await readLatestSessionUiStatus(dbAccountId)) === 'valid';
 
   if (account.platform === 'whatsapp') {
     await ensurePlatformSessionInDatabase({
@@ -115,7 +114,7 @@ export async function runAccountSyncCheck(
     accountName: account.accountName,
   });
 
-  if (!hasSession) {
+  if (!hasSession && !dbSaysValid) {
     const result = await invalidSessionMetricsFromDaily({
       accountId: dbAccountId,
       brand: account.brandName,
@@ -150,29 +149,36 @@ export async function runAccountSyncCheck(
   ]);
 
   if (!probe.valid) {
-    await recordSessionActivityStatus({
-      accountId: dbAccountId,
-      platform: account.platform,
-      sessionStatus: 'logout',
-      message: probe.message ?? `${syncSource}: device not connected`,
-    });
-    const metrics = await refreshAccountMetrics({
-      account,
-      dbAccountId,
-      brandStandard,
-    });
-    const daily = await invalidSessionMetricsFromDaily({
-      accountId: dbAccountId,
-      brand: account.brandName,
-      platform: account.platform,
-      brandStandard,
-    });
-    const dbStillValid = await hasActivePlatformSession(dbAccountId);
-    const result: AccountSyncResult = dbStillValid
-      ? { ...daily, sessionStatus: 'valid' }
-      : daily;
-    await logActivity(result, probe.message);
-    return { dbAccountId, result, masterJoined: metrics.master.joinedInMaster };
+    const probeMessage = probe.message ?? `${syncSource}: device not connected`;
+
+    if (isDeviceSessionDeadMessage(probeMessage)) {
+      await markPlatformSessionInvalid(dbAccountId, probeMessage, account.platform);
+      await recordSessionActivityStatus({
+        accountId: dbAccountId,
+        platform: account.platform,
+        sessionStatus: 'logout',
+        message: probeMessage,
+      });
+      const metrics = await refreshAccountMetrics({
+        account,
+        dbAccountId,
+        brandStandard,
+      });
+      const result = await invalidSessionMetricsFromDaily({
+        accountId: dbAccountId,
+        brand: account.brandName,
+        platform: account.platform,
+        brandStandard,
+      });
+      await logActivity(result, probeMessage);
+      return { dbAccountId, result, masterJoined: metrics.master.joinedInMaster };
+    }
+
+    if (isDeviceBusyMessage(probeMessage)) {
+      return null;
+    }
+
+    return null;
   }
 
   await markPlatformSessionSynced(dbAccountId);
@@ -213,9 +219,11 @@ export function applySyncCheckToGroup(
   group: AccountBrandGroup,
   accountId: string,
   output: RunAccountSyncCheckOutput,
+  lastSyncAt?: string,
 ): AccountBrandGroup {
   const next = applySyncResultToGroup(group, accountId, output.result, {
     masterTotal: output.masterJoined,
+    lastSyncAt: lastSyncAt ?? new Date().toISOString(),
   });
   return rebuildGroupMetrics(next);
 }

@@ -10,6 +10,7 @@ import {
 import { tryRestorePlatformSession } from './restore';
 import {
   clearWhatsAppLocalAuth,
+  forceReleaseWhatsAppForLogin,
   hasWhatsAppDiskAuth,
   startWhatsAppQrLogin,
   startWhatsAppPhoneLogin,
@@ -116,8 +117,8 @@ export function registerPlatformLoginIpc() {
   ipcMain.handle(
     'platform-login:release',
     async (_event, sessionId: string, options?: { purgeWaDisk?: boolean }) => {
-      await stopWhatsAppLogin(sessionId, {
-        clearDiskAuth: Boolean(options?.purgeWaDisk),
+      await forceReleaseWhatsAppForLogin(sessionId, {
+        purgeDisk: Boolean(options?.purgeWaDisk),
       });
       await stopTelegramLogin(sessionId);
       return { ok: true };

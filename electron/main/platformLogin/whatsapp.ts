@@ -5,6 +5,7 @@ import { app } from 'electron';
 import QRCode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
+import { withWaBrowserSlot } from './waBrowserPool';
 
 const { Client, LocalAuth } = pkg;
 
@@ -23,8 +24,13 @@ const sessions = new Map<string, WaSession>();
 const sessionLocks = new Map<string, Promise<unknown>>();
 /** Lock per sessionId — multi-akun WA boleh paralel (folder LocalAuth terpisah). */
 const WA_INIT_TIMEOUT_MS = 120_000;
+/** QR wajib tampil di UI dalam batas ini (login modal). */
+const WA_QR_APPEAR_DEADLINE_MS = 10_000;
 const WA_DESTROY_SETTLE_MS = 900;
+const WA_LOGIN_PREPARE_SETTLE_MS = 1_500;
+const WA_LOCK_WAIT_MS = 4_000;
 
+const qrAppearTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function waSessionsRoot() {
   return path.join(app.getPath('userData'), 'wa-sessions');
 }
@@ -237,6 +243,7 @@ function formatWhatsAppDisconnectMessage(reason: string): string {
 }
 
 function createClient(sessionId: string, mode: WaMode, phone?: string) {
+  /** LocalAuth → folder `wa-sessions/session-{sessionId}` per akun (clientId unik). */
   const options: ConstructorParameters<typeof Client>[0] = {
     authStrategy: new LocalAuth({
       clientId: sessionId,
@@ -244,7 +251,12 @@ function createClient(sessionId: string, mode: WaMode, phone?: string) {
     }),
     puppeteer: {
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
     },
   };
 
@@ -303,30 +315,103 @@ function waitForClientReady(
   });
 }
 
+function clearQrAppearDeadline(sessionId: string) {
+  const timer = qrAppearTimers.get(sessionId);
+  if (timer) {
+    clearTimeout(timer);
+    qrAppearTimers.delete(sessionId);
+  }
+}
+
+function armQrAppearDeadline(
+  sessionId: string,
+  client: InstanceType<typeof Client>,
+  win: BrowserWindow,
+) {
+  clearQrAppearDeadline(sessionId);
+  const timer = setTimeout(() => {
+    qrAppearTimers.delete(sessionId);
+    const session = sessions.get(sessionId);
+    if (session?.loggedIn) return;
+
+    void (async () => {
+      await destroyWhatsAppSession(sessionId);
+      if (!win.isDestroyed()) {
+        win.webContents.send('platform-login:error', {
+          sessionId,
+          platform: 'whatsapp',
+          message:
+            'QR code did not appear within 10 seconds. Close this window, wait a few seconds, then tap Sync again.',
+        });
+      }
+    })();
+  }, WA_QR_APPEAR_DEADLINE_MS);
+
+  qrAppearTimers.set(sessionId, timer);
+  client.once('qr', () => clearQrAppearDeadline(sessionId));
+  client.once('ready', () => clearQrAppearDeadline(sessionId));
+}
+
+async function waitForWaLockOrTimeout(sessionId: string): Promise<void> {
+  const prev = sessionLocks.get(sessionId);
+  if (!prev) return;
+  await Promise.race([prev.catch(() => undefined), delayMs(WA_LOCK_WAIT_MS)]);
+}
+
+/** Lepas client scrape/probe + lock supaya login QR tidak macet "browser already running". */
+export async function forceReleaseWhatsAppForLogin(
+  sessionId: string,
+  options?: { purgeDisk?: boolean },
+): Promise<void> {
+  clearQrAppearDeadline(sessionId);
+
+  /** Tunggu operasi lain pada akun yang sama selesai — jangan cabut lock (bisa double Chrome). */
+  await waitForWaLockOrTimeout(sessionId);
+
+  const session = sessions.get(sessionId);
+  if (session) {
+    sessions.delete(sessionId);
+    try {
+      await session.client.destroy();
+    } catch {
+      // already destroyed
+    }
+    await delayMs(WA_DESTROY_SETTLE_MS);
+  }
+
+  if (options?.purgeDisk) {
+    clearWhatsAppLocalAuth(sessionId);
+  }
+  await delayMs(WA_LOGIN_PREPARE_SETTLE_MS);
+}
+
 async function initializeClientWithRetry(
   sessionId: string,
   client: InstanceType<typeof Client>,
 ): Promise<void> {
-  const maxAttempts = 3;
+  const maxAttempts = 5;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      await client.initialize();
-      return;
-    } catch (error) {
-      if (!isBrowserAlreadyRunningError(error) || attempt >= maxAttempts - 1) {
-        throw error;
+  await withWaBrowserSlot(async () => {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        await client.initialize();
+        return;
+      } catch (error) {
+        if (!isBrowserAlreadyRunningError(error) || attempt >= maxAttempts - 1) {
+          throw error;
+        }
+        await destroyWhatsAppSession(sessionId);
+        await delayMs(WA_DESTROY_SETTLE_MS + 800 * (attempt + 1));
       }
-      await destroyWhatsAppSession(sessionId);
-      await delayMs(WA_DESTROY_SETTLE_MS * (attempt + 1));
     }
-  }
+  });
 }
 
 async function destroyWhatsAppSession(
   sessionId: string,
   options?: { clearDiskAuth?: boolean },
 ): Promise<void> {
+  clearQrAppearDeadline(sessionId);
   const session = sessions.get(sessionId);
   if (session) {
     sessions.delete(sessionId);
@@ -553,34 +638,34 @@ export async function startWhatsAppQrLogin(
   options?: { skipDiskRestore?: boolean },
 ) {
   return runWhatsAppLoginOperation(sessionId, async () => {
+    await forceReleaseWhatsAppForLogin(sessionId, {
+      purgeDisk: Boolean(options?.skipDiskRestore),
+    });
+
     if (await reuseConnectedWhatsAppSession(sessionId, win)) {
       return;
-    }
-
-    const existing = sessions.get(sessionId);
-    if (existing) {
-      await destroyWhatsAppSession(sessionId);
     }
 
     if (!options?.skipDiskRestore) {
       if (await restoreWhatsAppFromDisk(sessionId, win)) {
         return;
       }
-    } else {
-      clearWhatsAppLocalAuth(sessionId);
+      await forceReleaseWhatsAppForLogin(sessionId);
     }
-
-    await destroyWhatsAppSession(sessionId);
 
     const client = createClient(sessionId, 'qr');
     attachCommonHandlers(sessionId, client, win);
     armWhatsAppLoginTimeout(sessionId, client, win);
+    armQrAppearDeadline(sessionId, client, win);
     sessions.set(sessionId, { client, mode: 'qr', forwardQrToUi: true, qrGeneration: 0 });
 
-    void initializeClientWithRetry(sessionId, client).catch(async (error) => {
+    try {
+      await initializeClientWithRetry(sessionId, client);
+    } catch (error) {
+      clearQrAppearDeadline(sessionId);
       await destroyWhatsAppSession(sessionId);
       sendWhatsAppLoginError(sessionId, win, error);
-    });
+    }
   });
 }
 
@@ -599,15 +684,22 @@ export async function startWhatsAppPhoneLogin(
     armWhatsAppLoginTimeout(sessionId, client, win);
     sessions.set(sessionId, { client, mode: 'phone' });
 
-    void initializeClientWithRetry(sessionId, client).catch(async (error) => {
+    try {
+      await initializeClientWithRetry(sessionId, client);
+    } catch (error) {
       await destroyWhatsAppSession(sessionId);
       sendWhatsAppLoginError(sessionId, win, error);
-    });
+    }
   });
 }
 
 export function getWhatsAppSessionClient(sessionId: string) {
   return sessions.get(sessionId)?.client ?? null;
+}
+
+/** Debug / audit: akun WA yang sedang punya client di memori (satu client per sessionId). */
+export function listActiveWhatsAppSessionIds(): string[] {
+  return [...sessions.keys()];
 }
 
 export function restoreWhatsAppFromDiskForLogin(

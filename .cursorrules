@@ -62,3 +62,11 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     - Group name duplicate.
     Implementasi ticket: `reconcileTickets.ts` + tipe di `TicketType`. Jangan tambah dokumen audit terpisah; ubah kode sesuai kontrak ini setelah konfirmasi user.
     UI Ticket (sudah ada di kode): satu kartu = satu topik issue per akun (`account` + `brand` + `ticketType` → `TicketSummaryGroup.key`); banyak baris DB digabung di `groupOpenTickets`; double-click kartu → `TicketIssueDetailModal` (detail per grup/barisan); Export issue / Export all → Excel acuan perbaikan.
+
+12. MULTI-AKUN (100+ WA & Telegram per platform)
+    Produk ini multi-akun: setiap baris `messaging_accounts` = satu sesi terpisah.
+    - Device key: selalu `resolveDeviceSessionId()` (WA: LocalAuth `clientId` / UUID DB; TG: UUID akun).
+    - WA: satu folder profil per akun (`wa-sessions/session-{sessionId}`), lock per `sessionId`, pool global max ~4 Chrome bersamaan (`waBrowserPool.ts`, env `RM_WA_MAX_CONCURRENT_BROWSERS`).
+    - Jangan buka dua Puppeteer untuk akun yang sama (lock sampai `initialize()` selesai; jangan cabut lock di `forceRelease`).
+    - TG: sidecar `SESSIONS[session_id]` — kunci = UUID akun; auto-sync berurutan antar akun.
+    - Issue/KPI hanya dari grup/admin, bukan login/logout session.

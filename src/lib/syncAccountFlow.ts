@@ -1,11 +1,13 @@
-import { buildMetricsFromScrapeDaily } from '@/lib/accountSyncData';
 import { refreshAccountMetrics, type RefreshAccountMetricsResult } from '@/lib/accountMonitoringEngine';
 import { resolveBrandStandardTotal } from '@/lib/brandStandardCount';
 import { persistLoginSessionAfterSuccess } from '@/lib/persistLoginSession';
 import { recordSessionActivityStatus } from '@/lib/recordSessionActivity';
+import { invalidSessionMetricsFromDaily } from '@/lib/accountSessionUi';
+import { isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
 import {
   fetchActivePlatformSessions,
   hasActivePlatformSession,
+  markPlatformSessionInvalid,
   markPlatformSessionSynced,
 } from '@/lib/platformSessions';
 import { getSupabase } from '@/lib/supabase';
@@ -83,25 +85,21 @@ export async function completeSyncAfterLiveSession(input: {
 
   let result = metrics.result;
 
-  if (!metrics.device.valid) {
-    const dbValid = await hasActivePlatformSession(input.dbAccountId);
-    if (dbValid) {
-      const { result: fromDaily } = await buildMetricsFromScrapeDaily({
-        accountId: input.dbAccountId,
-        brand: input.account.brandName,
-        platform: input.account.platform,
-        brandStandard,
-        sessionValid: true,
-      });
-      result = fromDaily;
-    } else {
-      result = {
-        ...result,
-        sessionStatus: 'invalid',
-        groupsCurrent: 0,
-        adminCurrent: 0,
-      };
-    }
+  if (!metrics.device.valid && isDeviceSessionDeadMessage(metrics.device.message)) {
+    const deviceMsg = metrics.device.message ?? 'device_not_connected';
+    await markPlatformSessionInvalid(input.dbAccountId, deviceMsg, input.account.platform);
+    await recordSessionActivityStatus({
+      accountId: input.dbAccountId,
+      platform: input.account.platform,
+      sessionStatus: 'logout',
+      message: deviceMsg,
+    });
+    result = await invalidSessionMetricsFromDaily({
+      accountId: input.dbAccountId,
+      brand: input.account.brandName,
+      platform: input.account.platform,
+      brandStandard,
+    });
   }
 
   const activeRows = await fetchActivePlatformSessions(input.dbAccountId);

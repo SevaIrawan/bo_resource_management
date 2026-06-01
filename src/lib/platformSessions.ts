@@ -116,6 +116,32 @@ export async function fetchActivePlatformSessions(
   return (data as ActivePlatformSessionRow[] | null) ?? [];
 }
 
+/** Satu query untuk semua akun — hindari N× readLatestSessionUiStatus saat load grid. */
+export async function fetchActiveSessionAccountIdSet(
+  accountIds: string[],
+): Promise<Set<string>> {
+  const supabase = getSupabase();
+  if (!supabase || accountIds.length === 0) return new Set();
+
+  const unique = [...new Set(accountIds)];
+  const { data, error } = await supabase
+    .from(TABLES.platformSessions)
+    .select('account_id')
+    .in('account_id', unique)
+    .eq('is_active', true);
+
+  if (error) {
+    if (isRlsError(error.code, error.message)) {
+      console.error('[platformSessions]', PLATFORM_SESSION_RLS_HINT, error);
+    }
+    return new Set();
+  }
+
+  return new Set(
+    ((data as { account_id: string }[] | null) ?? []).map((row) => row.account_id),
+  );
+}
+
 async function resolvePlatformForAccount(accountId: string): Promise<Platform> {
   const supabase = getSupabase();
   if (!supabase) return 'whatsapp';

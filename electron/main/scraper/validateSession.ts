@@ -4,6 +4,17 @@ import {
   hasWhatsAppDiskAuth,
   withWhatsAppClient,
 } from '../platformLogin/whatsapp';
+import {
+  classifyWaSocketState,
+  waLinkProbeMessage,
+  type WaLinkStatus,
+} from './whatsappLinkState';
+
+function probeResultFromWaState(state: string | null): { valid: boolean; message: string } {
+  const link: WaLinkStatus = classifyWaSocketState(state);
+  const message = waLinkProbeMessage(link, state);
+  return { valid: link === 'linked', message };
+}
 
 export async function validateTelegramSession(
   sessionId: string,
@@ -44,33 +55,24 @@ export async function validateWhatsAppSession(
   const strict = options?.strict === true;
 
   try {
-    const live = getWhatsAppSessionClient(sessionId);
-    if (live) {
-      const state = await live.getState();
-      if (state === 'CONNECTED') {
-        return { valid: true };
+    if (!strict) {
+      const live = getWhatsAppSessionClient(sessionId);
+      if (live) {
+        const state = await live.getState();
+        return probeResultFromWaState(state);
       }
-      if (strict) {
+
+      if (hasWhatsAppDiskAuth(sessionId)) {
         return {
-          valid: false,
-          message: `WhatsApp not connected (${state ?? 'disconnected'}). Linked device was logged out.`,
+          valid: true,
+          message: 'WA_LINKED',
         };
       }
     }
 
-    if (!strict && hasWhatsAppDiskAuth(sessionId)) {
-      return {
-        valid: true,
-        message: 'LocalAuth on disk (live check deferred)',
-      };
-    }
-
     return await withWhatsAppClient(sessionId, async (client) => {
       const state = await client.getState();
-      if (state !== 'CONNECTED') {
-        return { valid: false, message: `WhatsApp state: ${state ?? 'disconnected'}` };
-      }
-      return { valid: true };
+      return probeResultFromWaState(state);
     });
   } catch (error) {
     return {

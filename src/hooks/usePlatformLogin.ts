@@ -2,12 +2,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { loginQrTimeoutMessage } from '@/lib/platformSyncCopy';
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
+import { isWhatsAppBrowserBusyMessage } from '@/lib/waLoginErrors';
 import { withTimeout } from '@/lib/withTimeout';
 import type { Platform } from '@/types/database';
 
-const TG_LOGIN_RESTORE_TIMEOUT_MS = 15_000;
-const WA_QR_TIMEOUT_MS = 180_000;
+const TG_LOGIN_RESTORE_TIMEOUT_MS = 8_000;
+const WA_QR_SCAN_TIMEOUT_MS = 180_000;
 const TG_QR_TIMEOUT_MS = 120_000;
+/** QR harus tampil di modal dalam 10 detik (sinkron dengan main process). */
+const WA_QR_MUST_APPEAR_MS = 10_000;
+const WA_PREPARE_SETTLE_MS = 2_000;
+
+type PlatformLoginApi = NonNullable<NonNullable<Window['electronAPI']>['platformLogin']>;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 export type LoginView = 'qr' | 'phone' | 'code' | '2fa';
 export type LoginStatus =
@@ -59,6 +69,7 @@ export function usePlatformLogin(
   const lastQrGenerationRef = useRef(0);
   const prevOpenRef = useRef(false);
   const loginSucceededRef = useRef(false);
+  const qrAppearDeadlineRef = useRef<number | undefined>(undefined);
 
   const clearQrTimeout = useCallback(() => {
     if (qrTimeoutIdRef.current !== undefined) {
@@ -67,10 +78,37 @@ export function usePlatformLogin(
     }
   }, []);
 
+  const clearQrAppearDeadline = useCallback(() => {
+    if (qrAppearDeadlineRef.current !== undefined) {
+      window.clearTimeout(qrAppearDeadlineRef.current);
+      qrAppearDeadlineRef.current = undefined;
+    }
+  }, []);
+
+  const armQrAppearDeadline = useCallback(
+    (plat: Platform) => {
+      clearQrAppearDeadline();
+      if (plat !== 'whatsapp') return;
+
+      qrAppearDeadlineRef.current = window.setTimeout(() => {
+        qrAppearDeadlineRef.current = undefined;
+        if (lastQrGenerationRef.current > 0 || sessionReadyRef.current) return;
+
+        clearQrTimeout();
+        setStatus('error');
+        setError(
+          t('groupMonitoring.sync.qrAppearTimeout') ??
+            'QR code did not appear within 10 seconds. Close this window, wait a few seconds, then tap Sync again.',
+        );
+      }, WA_QR_MUST_APPEAR_MS);
+    },
+    [clearQrAppearDeadline, clearQrTimeout, t],
+  );
+
   const armQrTimeout = useCallback(
     (plat: Platform) => {
       clearQrTimeout();
-      const ms = plat === 'whatsapp' ? WA_QR_TIMEOUT_MS : TG_QR_TIMEOUT_MS;
+      const ms = plat === 'whatsapp' ? WA_QR_SCAN_TIMEOUT_MS : TG_QR_TIMEOUT_MS;
       qrTimeoutIdRef.current = window.setTimeout(() => {
         setStatus((current) => {
           if (
@@ -130,6 +168,7 @@ export function usePlatformLogin(
       if (gen <= lastQrGenerationRef.current) return;
       lastQrGenerationRef.current = gen;
 
+      clearQrAppearDeadline();
       clearQrTimeout();
       setQrGeneration(gen);
       setQrDataUrl(payload.dataUrl);
@@ -181,6 +220,7 @@ export function usePlatformLogin(
 
     const offError = api.onError((payload) => {
       if (!matchesSession(payload)) return;
+      clearQrAppearDeadline();
       clearQrTimeout();
       setQrDataUrl(null);
       setStatus('error');
@@ -194,7 +234,7 @@ export function usePlatformLogin(
       offReady();
       offError();
     };
-  }, [armQrTimeout, clearQrTimeout, dbAccountId, platform, sessionId]);
+  }, [armQrTimeout, clearQrAppearDeadline, clearQrTimeout, dbAccountId, platform, sessionId]);
 
   // Stuck di "Confirm on phone" tanpa ready — beri jalan keluar.
   useEffect(() => {
@@ -241,7 +281,46 @@ export function usePlatformLogin(
       sessionReadyRef.current = false;
     }
     clearQrTimeout();
-  }, [clearQrTimeout, open, platform]);
+    clearQrAppearDeadline();
+  }, [clearQrAppearDeadline, clearQrTimeout, open, platform]);
+
+  const prepareWhatsAppForQr = useCallback(
+    async (deviceSessionId: string, purgeDisk: boolean) => {
+      const api = window.electronAPI?.platformLogin;
+      if (!api) return;
+
+      await api.cancel(deviceSessionId, 'whatsapp').catch(() => undefined);
+      await api.release(deviceSessionId, { purgeWaDisk: purgeDisk }).catch(() => undefined);
+      await sleep(WA_PREPARE_SETTLE_MS);
+    },
+    [],
+  );
+
+  const startWhatsAppQr = useCallback(
+    async (
+      deviceSessionId: string,
+      api: PlatformLoginApi,
+      purgeDisk: boolean,
+      retryCount: number,
+    ): Promise<void> => {
+      try {
+        await api.start({
+          sessionId: deviceSessionId,
+          platform: 'whatsapp',
+          mode: 'qr',
+          skipDiskRestore: purgeDisk,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (retryCount < 1 && isWhatsAppBrowserBusyMessage(message)) {
+          await prepareWhatsAppForQr(deviceSessionId, purgeDisk);
+          return startWhatsAppQr(deviceSessionId, api, purgeDisk, retryCount + 1);
+        }
+        throw error;
+      }
+    },
+    [prepareWhatsAppForQr],
+  );
 
   // Start login (tanpa cancel saat StrictMode remount)
   useEffect(() => {
@@ -282,6 +361,19 @@ export function usePlatformLogin(
       const startQrLogin = () => {
         if (isStale()) return;
         armQrTimeout(platform);
+        armQrAppearDeadline(platform);
+
+        if (platform === 'whatsapp') {
+          void startWhatsAppQr(deviceSessionId, api, skipDiskRestore, 0).catch((err: unknown) => {
+            if (isStale()) return;
+            clearQrAppearDeadline();
+            clearQrTimeout();
+            setStatus('error');
+            setError(err instanceof Error ? err.message : 'Failed to start login');
+          });
+          return;
+        }
+
         void api
           .start({
             sessionId: deviceSessionId,
@@ -291,24 +383,51 @@ export function usePlatformLogin(
           })
           .catch((err: unknown) => {
             if (isStale()) return;
+            clearQrAppearDeadline();
             clearQrTimeout();
             setStatus('error');
             setError(err instanceof Error ? err.message : 'Failed to start login');
           });
       };
 
-      if (platform === 'whatsapp' && skipDiskRestore) {
-        try {
-          await api.release(deviceSessionId, { purgeWaDisk: true });
-        } catch {
-          // ignore
-        }
+      if (platform === 'whatsapp') {
+        await prepareWhatsAppForQr(deviceSessionId, skipDiskRestore);
         if (isStale()) return;
+
+        if (!skipDiskRestore && attemptRestore) {
+          setStatus('restoring');
+          acceptQrRef.current = false;
+          try {
+            const warmed = await withTimeout(
+              tryWarmPlatformSession({
+                sessionId,
+                platform,
+                accountId: dbAccountId,
+              }),
+              TG_LOGIN_RESTORE_TIMEOUT_MS,
+              'Restore session',
+            );
+            if (isStale()) return;
+            if (warmed) {
+              sessionReadyRef.current = true;
+              loginSucceededRef.current = true;
+              clearQrAppearDeadline();
+              setStatus('ready');
+              return;
+            }
+          } catch {
+            if (isStale()) return;
+          }
+          acceptQrRef.current = true;
+          await prepareWhatsAppForQr(deviceSessionId, false);
+          if (isStale()) return;
+        }
+
+        setStatus('starting-qr');
         startQrLogin();
         return;
       }
 
-      // Restore dulu — jangan start QR paralel (dua Puppeteer = macet di "Confirm on phone").
       if (attemptRestore) {
         setStatus('restoring');
         acceptQrRef.current = false;
@@ -346,16 +465,21 @@ export function usePlatformLogin(
 
     return () => {
       clearQrTimeout();
+      clearQrAppearDeadline();
     };
   }, [
+    armQrAppearDeadline,
     armQrTimeout,
     attemptRestore,
+    clearQrAppearDeadline,
     clearQrTimeout,
     dbAccountId,
     open,
     platform,
+    prepareWhatsAppForQr,
     sessionId,
     skipDiskRestore,
+    startWhatsAppQr,
   ]);
 
   const switchToPhoneForm = useCallback(async () => {
@@ -401,28 +525,29 @@ export function usePlatformLogin(
       });
       electronSessionIdRef.current = deviceSessionId;
       if (platform === 'whatsapp') {
-        try {
-          await api.release(deviceSessionId, { purgeWaDisk: true });
-        } catch {
-          // ignore
-        }
+        await prepareWhatsAppForQr(deviceSessionId, true);
       }
       setStatus('starting-qr');
       armQrTimeout(platform);
+      armQrAppearDeadline(platform);
       loginStartedRef.current = true;
-      void api.start({
-        sessionId: deviceSessionId,
-        platform,
-        mode: 'qr',
-        skipDiskRestore: platform === 'whatsapp',
-      });
+      if (platform === 'whatsapp') {
+        void startWhatsAppQr(deviceSessionId, api, true, 0);
+      } else {
+        void api.start({
+          sessionId: deviceSessionId,
+          platform,
+          mode: 'qr',
+          skipDiskRestore: false,
+        });
+      }
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to switch to QR login');
     } finally {
       setSubmitting(false);
     }
-  }, [armQrTimeout, dbAccountId, platform, sessionId]);
+  }, [armQrAppearDeadline, armQrTimeout, dbAccountId, platform, prepareWhatsAppForQr, sessionId, startWhatsAppQr]);
 
   const startPhoneLogin = useCallback(
     async (phone: string) => {

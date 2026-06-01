@@ -1,14 +1,28 @@
-/** Client WA/Puppeteer masih dipakai operasi lain — bukan logout. */
+import {
+  isWaLinkLoadingProbeMessage,
+  isWaUnlinkedProbeMessage,
+} from '@/lib/waLinkStatus';
+
+/** Client WA masih nyala / sync / timeout — bukan unlink di HP. */
 export function isDeviceBusyMessage(message: string | undefined): boolean {
   if (!message) return false;
+  if (isWaLinkLoadingProbeMessage(message)) return true;
   const lower = message.toLowerCase();
   return (
     lower.includes('browser is already running') ||
     lower.includes('still starting from a previous attempt') ||
     lower.includes('session_warm_pending') ||
+    lower.includes('wa_store_not_ready') ||
     lower.includes('session check timed out') ||
     (lower.includes('timed out') && lower.includes('restore device session'))
   );
+}
+
+/** Unlink di HP (UNPAIRED / logout) — DB + UI invalid. */
+export function isDeviceSessionDeadMessage(message: string | undefined): boolean {
+  if (!message || isDeviceBusyMessage(message)) return false;
+  if (isWaUnlinkedProbeMessage(message)) return true;
+  return scrapeFailureNeedsLoginModal(message);
 }
 
 /** Apakah gagal scrape harus buka modal login (session benar-benar mati). */

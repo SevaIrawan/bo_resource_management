@@ -10,7 +10,6 @@ import { assertRmSchema } from '@/lib/assertRmSchema';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { loadAccountMonitoringGroups } from '@/lib/loadAccountMonitoring';
 import { loadOpenTicketsForUser } from '@/lib/loadTickets';
-import { reconcileTicketsForAccount } from '@/lib/reconcileTickets';
 import {
   ACCOUNT_FILTER_DEFAULT,
   filterAccountGroups,
@@ -90,25 +89,15 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     setError(null);
     try {
       await assertRmSchema();
-      const loadedGroups = await loadAccountMonitoringGroups(user.id);
-      await Promise.all(
-        loadedGroups.flatMap((group) =>
-          group.dbBrandId
-            ? group.accounts.map((acc) =>
-                reconcileTicketsForAccount({
-                  accountId: acc.id,
-                  brandId: group.dbBrandId!,
-                  brandName: group.brandName,
-                  platform: acc.platform,
-                }),
-              )
-            : [],
-        ),
-      );
-      const loadedTickets = await loadOpenTicketsForUser(user.id);
+      const [loadedGroups, loadedTickets] = await Promise.all([
+        loadAccountMonitoringGroups(user.id),
+        loadOpenTicketsForUser(user.id),
+      ]);
       setGroups(loadedGroups);
       setTickets(loadedTickets);
-      await reloadTicketHandles(loadedTickets);
+      void reloadTicketHandles(loadedTickets).catch(() => {
+        hydrateTicketProcessCache({});
+      });
     } catch (e) {
       setError(getErrorMessage(e, t('groupMonitoring.loadAccountsFailed')));
       setGroups([]);

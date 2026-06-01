@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { GroupLinksModal } from '@/components/group-monitoring/GroupLinksModal';
+import { accountNeedsRelogin } from '@/lib/platformSyncCopy';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
@@ -96,7 +97,7 @@ function ScraperColumnCell({
   const canShowLastUpdate =
     !isRunning && row.syncState === 'synced' && Boolean(row.lastSyncAt);
 
-  if (row.sessionStatus === 'invalid') {
+  if (accountNeedsRelogin(row)) {
     return (
       <span className="brand-account-slot-muted text-xs">
         {t('groupMonitoring.accountCard.useSyncToLogin')}

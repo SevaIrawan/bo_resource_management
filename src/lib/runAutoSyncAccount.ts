@@ -3,18 +3,17 @@ import {
   rebuildGroupMetrics,
   type AccountSyncResult,
 } from '@/lib/accountBrandUtils';
-import { syncResultForInvalidSession } from '@/lib/accountSessionUi';
+import { invalidSessionMetricsFromDaily } from '@/lib/accountSessionUi';
 import { refreshAccountMetrics } from '@/lib/accountMonitoringEngine';
 import { resolveBrandStandardTotal } from '@/lib/brandStandardCount';
 import { hasValidAccountPhone } from '@/lib/accountPhone';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
-import {
-  backfillPlatformSessionIfNeeded,
-  hasUsableLoginSession,
-} from '@/lib/sessionAvailability';
+import { backfillPlatformSessionIfNeeded, hasUsableLoginSession } from '@/lib/sessionAvailability';
+import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
 import { ensurePlatformSessionInDatabase } from '@/lib/ensureWaSessionInDb';
 import {
   fetchActivePlatformSessions,
+  hasActivePlatformSession,
   markPlatformSessionSynced,
 } from '@/lib/platformSessions';
 import { recordSessionActivityStatus } from '@/lib/recordSessionActivity';
@@ -57,11 +56,12 @@ export async function runAccountSyncCheck(
 
   if (!window.electronAPI?.isElectron) return null;
   if (!hasValidAccountPhone(account.phoneNumber)) return null;
-  if (account.status === 'logout' || account.sessionStatus === 'invalid') {
-    return null;
-  }
 
   const { accountId: dbAccountId } = await resolveDbAccountForRow({ userId, account });
+
+  if ((await readLatestSessionUiStatus(dbAccountId)) === 'invalid') {
+    return null;
+  }
 
   if (account.platform === 'whatsapp') {
     await ensurePlatformSessionInDatabase({
@@ -116,7 +116,12 @@ export async function runAccountSyncCheck(
   });
 
   if (!hasSession) {
-    const result = syncResultForInvalidSession(brandStandard, 0);
+    const result = await invalidSessionMetricsFromDaily({
+      accountId: dbAccountId,
+      brand: account.brandName,
+      platform: account.platform,
+      brandStandard,
+    });
     await recordSessionActivityStatus({
       accountId: dbAccountId,
       platform: account.platform,
@@ -156,10 +161,16 @@ export async function runAccountSyncCheck(
       dbAccountId,
       brandStandard,
     });
-    const result: AccountSyncResult = {
-      ...syncResultForInvalidSession(brandStandard, metrics.master.adminInMaster),
-      sessionStatus: 'invalid',
-    };
+    const daily = await invalidSessionMetricsFromDaily({
+      accountId: dbAccountId,
+      brand: account.brandName,
+      platform: account.platform,
+      brandStandard,
+    });
+    const dbStillValid = await hasActivePlatformSession(dbAccountId);
+    const result: AccountSyncResult = dbStillValid
+      ? { ...daily, sessionStatus: 'valid' }
+      : daily;
     await logActivity(result, probe.message);
     return { dbAccountId, result, masterJoined: metrics.master.joinedInMaster };
   }

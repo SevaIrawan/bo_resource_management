@@ -15,6 +15,52 @@ export type ActivePlatformSessionRow = {
   updated_at?: string;
 };
 
+/** Satu baris terbaru per akun (tracking history) — UI badge mengikuti ini. */
+export type LatestPlatformSessionRow = {
+  id: string;
+  is_active: boolean;
+  updated_at: string | null;
+  connected_at: string | null;
+  disconnected_at: string | null;
+};
+
+/**
+ * Session terbaru di DB untuk akun (ORDER BY updated_at DESC LIMIT 1).
+ * Banyak baris history — jangan pakai baris lama atau maybeSingle sembarang.
+ */
+export async function fetchLatestPlatformSession(
+  accountId: string,
+): Promise<LatestPlatformSessionRow | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from(TABLES.platformSessions)
+    .select('id, is_active, updated_at, connected_at, disconnected_at')
+    .eq('account_id', accountId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    if (isRlsError(error.code, error.message)) {
+      console.error('[platformSessions]', PLATFORM_SESSION_RLS_HINT, error);
+    }
+    return null;
+  }
+
+  if (!data) return null;
+  return data as LatestPlatformSessionRow;
+}
+
+/** VALID bila masih ada baris `is_active = true` (bukan baris history terakhir by updated_at). */
+export async function resolveLatestSessionUiStatus(
+  accountId: string,
+): Promise<'valid' | 'invalid'> {
+  const active = await fetchActivePlatformSessions(accountId);
+  return active.length > 0 ? 'valid' : 'invalid';
+}
+
 function isRlsError(code: string | undefined, message: string | undefined): boolean {
   if (code === '42501') return true;
   const lower = (message ?? '').toLowerCase();
@@ -136,8 +182,7 @@ export async function loadTelegramPlatformSession(accountId: string): Promise<st
 }
 
 export async function hasActivePlatformSession(accountId: string): Promise<boolean> {
-  const rows = await fetchActivePlatformSessions(accountId);
-  return rows.length > 0;
+  return (await resolveLatestSessionUiStatus(accountId)) === 'valid';
 }
 
 /** Cari account_id dari session_data (LocalAuth id / acc-xxx) bila UUID UI tidak cocok. */
@@ -277,14 +322,16 @@ export async function markPlatformSessionSynced(accountId: string): Promise<void
   const supabase = getSupabase();
   if (!supabase) return;
 
+  const latest = await fetchLatestPlatformSession(accountId);
+  if (!latest?.is_active) return;
+
   const { error } = await supabase
     .from(TABLES.platformSessions)
     .update({
       last_sync_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq('account_id', accountId)
-    .eq('is_active', true);
+    .eq('id', latest.id);
 
   if (error && isRlsError(error.code, error.message)) {
     throw new Error(PLATFORM_SESSION_RLS_HINT);

@@ -1,6 +1,7 @@
 import type { TicketDetailLine, TicketSummaryGroup } from '@/lib/ticketGroups';
 
 export interface TicketExportRow {
+  'Issue ID': string;
   '#': number;
   Account: string;
   Brand: string;
@@ -29,6 +30,7 @@ export function ticketGroupToExportRows(
   formatNote?: (line: TicketDetailLine) => string,
 ): TicketExportRow[] {
   return group.lines.map((line, index) => ({
+    'Issue ID': group.issueId,
     '#': index + 1,
     Account: group.accountName,
     Brand: group.brandName,
@@ -43,6 +45,7 @@ export function ticketGroupToExportRows(
 }
 
 export const TICKET_EXPORT_COLUMNS: (keyof TicketExportRow)[] = [
+  'Issue ID',
   '#',
   'Account',
   'Brand',

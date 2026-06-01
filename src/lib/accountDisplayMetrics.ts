@@ -7,14 +7,13 @@ import { isRowMisaligned } from '@/lib/accountSyncUiFlow';
  * UI Groups: Y/X — Y = device, X = master brand (card).
  * UI Admin: admin di grup master / X.
  */
+/** Issue / aligned — hanya metrik grup & admin; bukan session. */
 export function computeIsMisaligned(input: {
   groupsCurrent: number;
   groupsTotal: number;
   adminCurrent: number;
   adminTotal: number;
-  sessionValid: boolean;
 }): boolean {
-  if (!input.sessionValid) return true;
   return (
     input.groupsCurrent !== input.groupsTotal ||
     input.adminCurrent !== input.adminTotal

@@ -152,9 +152,7 @@ export async function buildMetricsFromScrapeDaily(input: {
   const adminY =
     input.deviceAdminCount != null && input.deviceAdminCount >= 0
       ? input.deviceAdminCount
-      : dailyCount > 0
-        ? 0
-        : 0;
+      : master.adminInMaster;
 
   return {
     master,
@@ -188,36 +186,47 @@ export async function fetchMasterGroupStatsBatch(
   return map;
 }
 
+/** Hanya update X/total & misaligned — jangan sentuh session / Y device (realtime master). */
+export function patchMasterTotalsOnRow(
+  row: AccountBrandRow,
+  master: MasterGroupStats,
+  brandStandard?: number,
+): AccountBrandRow {
+  const brandX = Math.max(0, brandStandard ?? master.brandMasterTotal);
+  return {
+    ...row,
+    groupsTotal: brandX,
+    adminTotal: brandX,
+    isMisaligned: computeIsMisaligned({
+      groupsCurrent: row.groupsCurrent,
+      groupsTotal: brandX,
+      adminCurrent: row.adminCurrent,
+      adminTotal: brandX,
+    }),
+  };
+}
+
 export function applyMasterStatsToAccountRow(
   row: AccountBrandRow,
   master: MasterGroupStats,
   options?: { deviceConnected?: boolean; brandStandard?: number },
 ): AccountBrandRow {
   const brandX = Math.max(0, options?.brandStandard ?? master.brandMasterTotal);
-  const deviceConnected = options?.deviceConnected ?? row.sessionStatus === 'valid';
-  const deviceY = deviceConnected ? row.groupsCurrent : 0;
-  const adminY = deviceConnected ? row.adminCurrent : master.adminInMaster;
-
-  const draft = {
-    groupsCurrent: deviceY,
-    groupsTotal: brandX,
-    adminCurrent: adminY,
-    adminTotal: brandX,
-    sessionStatus: deviceConnected ? ('valid' as const) : ('invalid' as const),
-  };
-
+  const groupsCurrent = row.groupsCurrent;
+  const adminCurrent =
+    row.adminCurrent > 0 ? row.adminCurrent : master.adminInMaster;
   return {
     ...row,
-    ...draft,
-    groupsCurrent: deviceConnected ? deviceY : 0,
-    adminCurrent: deviceConnected ? adminY : master.adminInMaster,
+    groupsCurrent,
+    groupsTotal: brandX,
+    adminCurrent,
+    adminTotal: brandX,
     syncState: row.syncState === 'pending' ? 'synced' : row.syncState,
     isMisaligned: computeIsMisaligned({
-      groupsCurrent: draft.groupsCurrent,
-      groupsTotal: draft.groupsTotal,
-      adminCurrent: draft.adminCurrent,
-      adminTotal: draft.adminTotal,
-      sessionValid: deviceConnected,
+      groupsCurrent,
+      groupsTotal: brandX,
+      adminCurrent,
+      adminTotal: brandX,
     }),
   };
 }

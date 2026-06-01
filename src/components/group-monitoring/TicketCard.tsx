@@ -90,6 +90,9 @@ export function TicketSummaryCard({
 
       <div className="ticket-card-body">
         <div className="ticket-card-title-row">
+          <span className="ticket-issue-id" title={group.issueId}>
+            {group.issueId}
+          </span>
           <h3 className="ticket-card-title">{group.accountName}</h3>
           <TicketTypeBadge group={group} />
           <PlatformTag platform={group.platform} />

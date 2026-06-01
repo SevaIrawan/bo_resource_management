@@ -6,16 +6,20 @@ import {
 } from '@/lib/brandStandardCount';
 import {
   applyMasterStatsToAccountRow,
+  buildMetricsFromScrapeDaily,
   fetchMasterGroupStatsBatch,
 } from '@/lib/accountSyncData';
-import { buildAccountSyncResult } from '@/lib/accountDisplayMetrics';
-import { loadAccountSnapshotsForUser, snapshotToSyncFields, upsertAccountSnapshot } from '@/lib/accountSnapshots';
+import { isMisalignedFromSyncResult } from '@/lib/accountDisplayMetrics';
+import {
+  loadAccountSnapshotsForUser,
+  upsertAccountSnapshot,
+} from '@/lib/accountSnapshots';
 import { MESSAGING_ACCOUNT_SELECT } from '@/config/dbColumns';
 import { readPhoneFromAccount } from '@/lib/accountPhone';
 import { assertRmSchema } from '@/lib/assertRmSchema';
 import { loadUserBrands } from '@/lib/brands';
 import { TABLES } from '@/config/tables';
-import { hasActivePlatformSession } from '@/lib/platformSessions';
+import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
 import { getSupabase } from '@/lib/supabase';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { AccountSnapshot, MessagingAccount, Platform } from '@/types/database';
@@ -30,19 +34,22 @@ function accountRowFromDb(
   hasSession: boolean,
   snap?: AccountSnapshot,
 ): AccountBrandRow {
+  // Badge session = baris platform_sessions terbaru di DB (bukan snapshot history).
+  const sessionStatus = hasSession ? 'valid' : 'invalid';
+  const status = sessionStatus === 'valid' ? 'active' : 'logout';
+
   const base: AccountBrandRow = {
     id: account.id,
     platform: account.platform,
     accountName: account.label,
     phoneNumber: readPhoneFromAccount(account),
     brandName,
-    status: 'logout',
+    status,
     groupsCurrent: 0,
     groupsTotal: 0,
     adminCurrent: 0,
     adminTotal: 0,
-    // VALID hanya bila snapshot terakhir dari operasi live; baris DB saja ≠ device CONNECTED.
-    sessionStatus: hasSession && snap?.session_status === 'valid' ? 'valid' : 'invalid',
+    sessionStatus,
     actionProcess: null,
     syncState: 'pending',
     isMisaligned: false,
@@ -51,13 +58,11 @@ function accountRowFromDb(
   if (!snap) return base;
   return {
     ...base,
-    ...snapshotToSyncFields(
-      snap,
-      account.platform,
-      brandName,
-      account.label,
-      readPhoneFromAccount(account),
-    ),
+    syncState: snap.sync_state === 'synced' ? 'synced' : base.syncState,
+    lastSyncAt: snap.last_sync_at ?? base.lastSyncAt,
+    isMisaligned: false,
+    sessionStatus,
+    status,
   };
 }
 
@@ -125,33 +130,49 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
       if (brandX > 0) standardByPlatform[account.platform] = brandX;
 
       const snap = snapshots.get(account.id);
-      const hasSession = await hasActivePlatformSession(account.id);
+      const hasSession = (await readLatestSessionUiStatus(account.id)) === 'valid';
       let row = accountRowFromDb(account, brand.name, hasSession, snap);
       const master = masterByAccount.get(account.id);
-      if (master) {
-        row = applyMasterStatsToAccountRow(row, master, {
-          deviceConnected: row.sessionStatus === 'valid',
-          brandStandard: brandX,
-        });
+
+      const { result } = await buildMetricsFromScrapeDaily({
+        accountId: account.id,
+        brand: brand.name,
+        platform: account.platform,
+        brandStandard: brandX > 0 ? brandX : undefined,
+        sessionValid: hasSession,
+      });
+      row = {
+        ...row,
+        groupsCurrent: result.groupsCurrent,
+        groupsTotal: result.groupsTotal,
+        adminCurrent: result.adminCurrent,
+        adminTotal: result.adminTotal,
+        isMisaligned: isMisalignedFromSyncResult(result),
+        syncState: result.groupsCurrent > 0 || snap ? 'synced' : row.syncState,
+        lastSyncAt: snap?.last_sync_at ?? row.lastSyncAt,
+      };
+
+      if (master && !hasSession) {
+        row = applyMasterStatsToAccountRow(row, master, { brandStandard: brandX });
+      }
+
+      if (master && hasSession) {
         if (
-          snap &&
-          (snap.admin_current !== master.adminInMaster ||
-            snap.groups_current !== row.groupsCurrent ||
-            snap.groups_total !== brandX)
+          !snap ||
+          snap.groups_current !== row.groupsCurrent ||
+          snap.admin_current !== row.adminCurrent ||
+          snap.groups_total !== row.groupsTotal
         ) {
-          const result = buildAccountSyncResult({
-            master,
-            device: {
-              valid: snap.session_status === 'valid',
-              totalGroups: snap.session_status === 'valid' ? snap.groups_current : 0,
-              adminGroups: 0,
-            },
-            brandStandard: brandX,
-          });
           void upsertAccountSnapshot({
             account: row,
             brandId: brand.id,
-            result,
+            result: {
+              groupsCurrent: row.groupsCurrent,
+              groupsTotal: row.groupsTotal,
+              adminCurrent: row.adminCurrent,
+              adminTotal: row.adminTotal,
+              sessionStatus: 'valid',
+            },
             brandStandard: brandX,
             masterTotal: master.joinedInMaster,
           });
@@ -195,10 +216,24 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
     const groupId = brandIdFromName(name);
     const rows: AccountBrandRow[] = [];
     for (const account of orphanAccounts) {
-      const hasSession = await hasActivePlatformSession(account.id);
+      const hasSession = (await readLatestSessionUiStatus(account.id)) === 'valid';
       let row = accountRowFromDb(account, name, hasSession, snapshots.get(account.id));
       const master = masterByAccount.get(account.id);
-      if (master) row = applyMasterStatsToAccountRow(row, master, { deviceConnected: hasSession });
+      const { result } = await buildMetricsFromScrapeDaily({
+        accountId: account.id,
+        brand: name,
+        platform: account.platform,
+        sessionValid: hasSession,
+      });
+      row = {
+        ...row,
+        groupsCurrent: result.groupsCurrent,
+        groupsTotal: result.groupsTotal,
+        adminCurrent: result.adminCurrent,
+        adminTotal: result.adminTotal,
+        isMisaligned: isMisalignedFromSyncResult(result),
+      };
+      if (master) row = applyMasterStatsToAccountRow(row, master);
       rows.push(row);
     }
     groups.push(

@@ -1,3 +1,4 @@
+import { buildMetricsFromScrapeDaily } from '@/lib/accountSyncData';
 import { refreshAccountMetrics, type RefreshAccountMetricsResult } from '@/lib/accountMonitoringEngine';
 import { resolveBrandStandardTotal } from '@/lib/brandStandardCount';
 import { persistLoginSessionAfterSuccess } from '@/lib/persistLoginSession';
@@ -83,12 +84,24 @@ export async function completeSyncAfterLiveSession(input: {
   let result = metrics.result;
 
   if (!metrics.device.valid) {
-    result = {
-      ...result,
-      sessionStatus: 'invalid',
-      groupsCurrent: 0,
-      adminCurrent: 0,
-    };
+    const dbValid = await hasActivePlatformSession(input.dbAccountId);
+    if (dbValid) {
+      const { result: fromDaily } = await buildMetricsFromScrapeDaily({
+        accountId: input.dbAccountId,
+        brand: input.account.brandName,
+        platform: input.account.platform,
+        brandStandard,
+        sessionValid: true,
+      });
+      result = fromDaily;
+    } else {
+      result = {
+        ...result,
+        sessionStatus: 'invalid',
+        groupsCurrent: 0,
+        adminCurrent: 0,
+      };
+    }
   }
 
   const activeRows = await fetchActivePlatformSessions(input.dbAccountId);

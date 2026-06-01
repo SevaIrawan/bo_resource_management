@@ -12,7 +12,6 @@
     "build:web": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "audit:accounts": "node scripts/audit-all-accounts.mjs",
     "diagnose:session": "node scripts/diagnose-session.mjs",
     "repair:wa-session": "node scripts/repair-wa-session.mjs",
     "setup": "powershell -ExecutionPolicy Bypass -File scripts/setup.ps1",

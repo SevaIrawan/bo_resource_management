@@ -1,8 +1,6 @@
 import { rebuildGroupMetrics } from '@/lib/accountBrandUtils';
-import { snapshotToSyncFields } from '@/lib/accountSnapshots';
 import { accountRowAfterSessionInvalid } from '@/lib/accountSessionUi';
-import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
-import type { SessionUiStatus } from '@/types/accountMonitoringUi';
+import type { AccountBrandGroup, AccountBrandRow, SessionUiStatus } from '@/types/accountMonitoringUi';
 import type { AccountSnapshot } from '@/types/database';
 
 export function patchAccountSessionInGroups(
@@ -26,6 +24,18 @@ export function patchAccountSessionInGroups(
   });
 }
 
+function isStaleSnapshot(account: AccountBrandRow, snap: AccountSnapshot): boolean {
+  if (!snap.last_sync_at || !account.lastSyncAt) return false;
+  const snapMs = Date.parse(snap.last_sync_at);
+  const rowMs = Date.parse(account.lastSyncAt);
+  if (Number.isNaN(snapMs) || Number.isNaN(rowMs)) return false;
+  return snapMs < rowMs;
+}
+
+/**
+ * Realtime snapshot — hanya sync_state / last_sync / misaligned.
+ * Groups Y/X & Admin = `group_scrape_daily` (bukan snap.groups_current yang sering 0 saat logout).
+ */
 export function patchAccountSnapshotInGroups(
   groups: AccountBrandGroup[],
   snap: AccountSnapshot,
@@ -33,24 +43,11 @@ export function patchAccountSnapshotInGroups(
   return groups.map((group) => {
     const accounts = group.accounts.map((account) => {
       if (account.id !== snap.account_id) return account;
-      const fields = snapshotToSyncFields(
-        snap,
-        account.platform,
-        account.brandName,
-        account.accountName,
-        account.phoneNumber,
-      );
+      if (isStaleSnapshot(account, snap)) return account;
       return {
         ...account,
-        status: fields.status ?? account.status,
-        sessionStatus: fields.sessionStatus ?? account.sessionStatus,
-        syncState: fields.syncState ?? account.syncState,
-        groupsCurrent: fields.groupsCurrent ?? account.groupsCurrent,
-        groupsTotal: fields.groupsTotal ?? account.groupsTotal,
-        adminCurrent: fields.adminCurrent ?? account.adminCurrent,
-        adminTotal: fields.adminTotal ?? account.adminTotal,
-        isMisaligned: fields.isMisaligned ?? account.isMisaligned,
-        lastSyncAt: fields.lastSyncAt ?? account.lastSyncAt,
+        syncState: snap.sync_state === 'synced' ? 'synced' : account.syncState,
+        lastSyncAt: snap.last_sync_at ?? account.lastSyncAt,
       };
     });
     return rebuildGroupMetrics({ ...group, accounts });

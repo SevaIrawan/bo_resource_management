@@ -1,5 +1,6 @@
 import { ACCOUNT_SNAPSHOT_SELECT } from '@/config/dbColumns';
 import { TABLES } from '@/config/tables';
+import { resolveLatestSessionUiStatus } from '@/lib/platformSessions';
 import { getSupabase } from '@/lib/supabase';
 import { isMisalignedFromSyncResult } from '@/lib/accountDisplayMetrics';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
@@ -16,14 +17,16 @@ export async function upsertAccountSnapshot(input: {
   const supabase = getSupabase();
   if (!supabase) return;
 
+  const dbSession = await resolveLatestSessionUiStatus(input.account.id);
+  const effectiveSession = dbSession === 'valid' ? 'valid' : 'invalid';
   const isMisaligned = isMisalignedFromSyncResult(input.result);
 
   const row = {
     account_id: input.account.id,
     brand_id: input.brandId,
     platform: input.account.platform,
-    status: input.result.sessionStatus === 'valid' ? 'active' : 'logout',
-    session_status: input.result.sessionStatus,
+    status: effectiveSession === 'valid' ? 'active' : 'logout',
+    session_status: effectiveSession,
     sync_state: 'synced' as const,
     groups_current: input.result.groupsCurrent,
     groups_total: input.result.groupsTotal,
@@ -71,18 +74,19 @@ export async function loadAccountSnapshotsForUser(
   return map;
 }
 
-export function snapshotToSyncFields(
-  snap: {
-    status: string;
-    session_status: string;
-    sync_state: string;
-    groups_current: number;
-    groups_total: number;
-    admin_current: number;
-    admin_total: number;
-    is_misaligned: boolean;
-    last_sync_at?: string | null;
-  },
+type SnapshotMetricsSource = {
+  sync_state: string;
+  groups_current: number;
+  groups_total: number;
+  admin_current: number;
+  admin_total: number;
+  is_misaligned: boolean;
+  last_sync_at?: string | null;
+};
+
+/** Metrik kartu saja — session/status diatur oleh platform_sessions (realtime). */
+export function snapshotMetricsToRowFields(
+  snap: SnapshotMetricsSource,
   platform: Platform,
   brandName: string,
   label: string,
@@ -93,8 +97,6 @@ export function snapshotToSyncFields(
     brandName,
     accountName: label,
     phoneNumber: phone,
-    status: snap.status === 'active' ? 'active' : 'logout',
-    sessionStatus: snap.session_status === 'valid' ? 'valid' : 'invalid',
     syncState: snap.sync_state === 'synced' ? 'synced' : 'pending',
     groupsCurrent: snap.groups_current,
     groupsTotal: snap.groups_total,
@@ -102,5 +104,20 @@ export function snapshotToSyncFields(
     adminTotal: snap.admin_total,
     isMisaligned: snap.is_misaligned,
     lastSyncAt: snap.last_sync_at ?? null,
+  };
+}
+
+/** @deprecated Pakai snapshotMetricsToRowFields + session dari platform_sessions. */
+export function snapshotToSyncFields(
+  snap: SnapshotMetricsSource & { status: string; session_status: string },
+  platform: Platform,
+  brandName: string,
+  label: string,
+  phone: string,
+): Partial<AccountBrandRow> {
+  return {
+    ...snapshotMetricsToRowFields(snap, platform, brandName, label, phone),
+    status: snap.status === 'active' ? 'active' : 'logout',
+    sessionStatus: snap.session_status === 'valid' ? 'valid' : 'invalid',
   };
 }

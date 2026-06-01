@@ -196,6 +196,19 @@ export function usePlatformLogin(
     };
   }, [armQrTimeout, clearQrTimeout, dbAccountId, platform, sessionId]);
 
+  // Stuck di "Confirm on phone" tanpa ready — beri jalan keluar.
+  useEffect(() => {
+    if (!open || status !== 'confirming') return;
+    const timeoutId = window.setTimeout(() => {
+      setStatus('error');
+      setError(
+        t?.('groupMonitoring.sync.loginConfirmingTimeout') ??
+          'WhatsApp is taking too long to connect. Close this window, wait a few seconds, then tap Sync again.',
+      );
+    }, 90_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [open, status, t]);
+
   // Buka modal baru → reset state (hindari status `ready` lama memicu persist ulang)
   useEffect(() => {
     const justOpened = open && !prevOpenRef.current;
@@ -295,11 +308,10 @@ export function usePlatformLogin(
         return;
       }
 
-      // QR segera; restore (jika ada) paralel — tidak blok tampilan QR.
-      startQrLogin();
-
-      if (attemptRestore && platform === 'telegram') {
-        setStatus((current) => (current === 'starting-qr' ? 'restoring' : current));
+      // Restore dulu — jangan start QR paralel (dua Puppeteer = macet di "Confirm on phone").
+      if (attemptRestore) {
+        setStatus('restoring');
+        acceptQrRef.current = false;
         try {
           const warmed = await withTimeout(
             tryWarmPlatformSession({
@@ -312,21 +324,19 @@ export function usePlatformLogin(
           );
           if (isStale()) return;
           if (warmed) {
-            try {
-              await api.cancel(deviceSessionId, platform);
-            } catch {
-              // ignore
-            }
             sessionReadyRef.current = true;
+            loginSucceededRef.current = true;
             setStatus('ready');
+            return;
           }
         } catch {
           if (isStale()) return;
-          setStatus((current) =>
-            current === 'ready' || current === 'qr' ? current : 'starting-qr',
-          );
         }
+        acceptQrRef.current = true;
+        setStatus('starting-qr');
       }
+
+      startQrLogin();
     })().catch((err: unknown) => {
       if (loginRunIdRef.current !== runId) return;
       clearQrTimeout();

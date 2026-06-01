@@ -50,3 +50,15 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     Do not over-explain things the user clearly already knows.
     Adapt the depth of your response to match the user's level of knowledge based on how they communicate.
     Treat the user as an intelligent adult.
+
+11. ISSUE / TICKET — KONTRAK BISNIS (Resource Management)
+    Session login/logout TIDAK masuk Issue, KPI Issue, atau ticket.
+    Semua ticket per akun (`account_id` = satu baris messaging account); daily dibaca per akun; master brand dipakai sebagai standar X untuk brand itu.
+    Yang masuk Issue hanya:
+    - Data group tidak match (jumlah grup device/daily vs standar brand X; termasuk grup master yang belum ada di daily).
+    - Data admin dalam group tidak match dengan total group brand X (jumlah admin vs X; plus per-grup bukan admin di master).
+    - Group sampah: banned, not used, no invite link, not admin, unidentify — perbandingan daily vs master brand.
+    - Group ID duplicate.
+    - Group name duplicate.
+    Implementasi ticket: `reconcileTickets.ts` + tipe di `TicketType`. Jangan tambah dokumen audit terpisah; ubah kode sesuai kontrak ini setelah konfirmasi user.
+    UI Ticket (sudah ada di kode): satu kartu = satu topik issue per akun (`account` + `brand` + `ticketType` → `TicketSummaryGroup.key`); banyak baris DB digabung di `groupOpenTickets`; double-click kartu → `TicketIssueDetailModal` (detail per grup/barisan); Export issue / Export all → Excel acuan perbaikan.

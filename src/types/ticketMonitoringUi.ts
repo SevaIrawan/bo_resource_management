@@ -12,7 +12,9 @@ export type TicketAccent = 'danger' | 'warning';
 
 /** Satu baris detail di DB (open ticket). */
 export interface TicketItem {
+  /** UUID baris `resource_management_tickets`. */
   id: string;
+  accountId: string;
   ticketType: TicketType;
   accent: TicketAccent;
   accountName: string;

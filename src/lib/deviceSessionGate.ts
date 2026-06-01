@@ -1,4 +1,5 @@
 import { isProbeSkipMessage } from '@/lib/persistLoginSession';
+import { isDeviceBusyMessage } from '@/lib/scrapeErrorUi';
 import { hasStoredPlatformSession } from '@/lib/sessionAvailability';
 import { probePlatformSession } from '@/lib/sessionProbe';
 import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
@@ -87,7 +88,43 @@ async function probeThenWarm(input: {
   return probe;
 }
 
-/** Sync: gagal = login ulang (tanpa warm_pending). */
+/**
+ * Sync / Run (user action): DB valid tetap wajib cek device (probe → warm → probe).
+ * skipWarmProbe hanya untuk internal tepat setelah login berhasil.
+ */
+async function gateUserActionSession(
+  input: {
+    sessionId: string;
+    platform: Platform;
+    accountId: string;
+    skipWarmProbe?: boolean;
+  },
+  hasStored: boolean,
+  _mode: DeviceSessionGateMode,
+): Promise<DeviceSessionGateResult> {
+  if (input.skipWarmProbe) {
+    return { ok: true };
+  }
+
+  const probe = await probeThenWarm(input);
+  if (probe.valid) {
+    return { ok: true };
+  }
+
+  const msg = probe.message ?? 'device_not_connected';
+  const isTimeout = msg.toLowerCase().includes('timed out');
+
+  if (
+    isDeviceBusyMessage(msg) ||
+    (hasStored && (isTimeout || isProbeSkipMessage(msg)))
+  ) {
+    return { ok: false, kind: 'warm_pending' };
+  }
+
+  return needLoginResult(msg, !isTimeout && !isProbeSkipMessage(msg) && hasStored);
+}
+
+/** @deprecated Pakai gateUserActionSession — tetap diekspos untuk kompat. */
 async function gateSyncSession(
   input: {
     sessionId: string;
@@ -98,32 +135,10 @@ async function gateSyncSession(
   },
   hasStored: boolean,
 ): Promise<DeviceSessionGateResult> {
-  if (input.skipWarmProbe) {
-    return { ok: true };
-  }
-
-  // UI VALID + session di DB — probe saja; warm memutus client TG/WA aktif (sync lama / hang).
-  if (input.uiSessionStatus === 'valid' && hasStored) {
-    const probe = await probeDeviceStrict(input);
-    if (probe.valid) {
-      return { ok: true };
-    }
-    const msg = probe.message ?? 'device_not_connected';
-    const isTimeout = msg.toLowerCase().includes('timed out');
-    return needLoginResult(msg, !isTimeout && !isProbeSkipMessage(msg) && hasStored);
-  }
-
-  const probe = await probeThenWarm(input);
-  if (probe.valid) {
-    return { ok: true };
-  }
-
-  const msg = probe.message ?? 'device_not_connected';
-  const isTimeout = msg.toLowerCase().includes('timed out');
-  return needLoginResult(msg, !isTimeout && !isProbeSkipMessage(msg) && hasStored);
+  void input.uiSessionStatus;
+  return gateUserActionSession(input, hasStored, 'sync');
 }
 
-/** Scrape / RUN: UI valid + skipWarmProbe = lolos; else probe→warm. */
 async function gateScrapeSession(
   input: {
     sessionId: string;
@@ -134,25 +149,8 @@ async function gateScrapeSession(
   },
   hasStored: boolean,
 ): Promise<DeviceSessionGateResult> {
-  const uiStillValid = input.uiSessionStatus === 'valid';
-
-  if (input.skipWarmProbe && uiStillValid) {
-    return { ok: true };
-  }
-
-  const probe = await probeThenWarm(input);
-  if (probe.valid) {
-    return { ok: true };
-  }
-
-  const msg = probe.message ?? 'device_not_connected';
-  const isTimeout = msg.toLowerCase().includes('timed out');
-
-  if (uiStillValid && hasStored && (isTimeout || isProbeSkipMessage(msg))) {
-    return { ok: false, kind: 'warm_pending' };
-  }
-
-  return needLoginResult(msg, !isTimeout && !isProbeSkipMessage(msg));
+  void input.uiSessionStatus;
+  return gateUserActionSession(input, hasStored, 'scrape');
 }
 
 export async function gateDeviceSession(

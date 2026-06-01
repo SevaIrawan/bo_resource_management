@@ -10,6 +10,7 @@ import { assertRmSchema } from '@/lib/assertRmSchema';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { loadAccountMonitoringGroups } from '@/lib/loadAccountMonitoring';
 import { loadOpenTicketsForUser } from '@/lib/loadTickets';
+import { reconcileTicketsForAccount } from '@/lib/reconcileTickets';
 import {
   ACCOUNT_FILTER_DEFAULT,
   filterAccountGroups,
@@ -39,6 +40,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const [probeSuspendAccountIds, setProbeSuspendAccountIds] = useState<string[]>([]);
   const [accountFilters, setAccountFilters] = useState(ACCOUNT_FILTER_DEFAULT);
   const [ticketFilters, setTicketFilters] = useState(TICKET_FILTER_DEFAULT);
+  const [dismissedBrandGroupIds, setDismissedBrandGroupIds] = useState<string[]>([]);
 
   const reportError = useCallback((message: string) => {
     setError(message);
@@ -65,10 +67,22 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     setError(null);
     try {
       await assertRmSchema();
-      const [loadedGroups, loadedTickets] = await Promise.all([
-        loadAccountMonitoringGroups(user.id),
-        loadOpenTicketsForUser(user.id),
-      ]);
+      const loadedGroups = await loadAccountMonitoringGroups(user.id);
+      await Promise.all(
+        loadedGroups.flatMap((group) =>
+          group.dbBrandId
+            ? group.accounts.map((acc) =>
+                reconcileTicketsForAccount({
+                  accountId: acc.id,
+                  brandId: group.dbBrandId!,
+                  brandName: group.brandName,
+                  platform: acc.platform,
+                }),
+              )
+            : [],
+        ),
+      );
+      const loadedTickets = await loadOpenTicketsForUser(user.id);
       setGroups(loadedGroups);
       setTickets(loadedTickets);
     } catch (e) {
@@ -86,9 +100,16 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   const ticketSummaries = useMemo(() => groupOpenTickets(tickets), [tickets]);
 
+  const dismissBrandGroup = useCallback((groupId: string) => {
+    setDismissedBrandGroupIds((prev) => (prev.includes(groupId) ? prev : [...prev, groupId]));
+  }, []);
+
+  const dismissedBrandSet = useMemo(() => new Set(dismissedBrandGroupIds), [dismissedBrandGroupIds]);
+
   const filteredGroups = useMemo(
-    () => filterAccountGroups(groups, accountFilters),
-    [groups, accountFilters],
+    () =>
+      filterAccountGroups(groups, accountFilters).filter((g) => !dismissedBrandSet.has(g.id)),
+    [groups, accountFilters, dismissedBrandSet],
   );
 
   const filteredTicketSummaries = useMemo(
@@ -164,6 +185,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       loading,
       reportError,
       setProbeSuspendAccountIds,
+      dismissBrandGroup,
     }),
     [
       groups,
@@ -172,6 +194,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       tickets,
       ticketSummaries,
       filteredTicketSummaries,
+      dismissBrandGroup,
       ticketFilters,
       accountKpis,
       ticketKpis,

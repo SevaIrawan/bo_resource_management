@@ -1,6 +1,6 @@
 import { rebuildGroupMetrics } from '@/lib/accountBrandUtils';
 import { countBrandMasterGroups } from '@/lib/brandStandardCount';
-import { applyMasterStatsToAccountRow, fetchMasterGroupStatsForAccount } from '@/lib/accountSyncData';
+import { fetchMasterGroupStatsForAccount, patchMasterTotalsOnRow } from '@/lib/accountSyncData';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
@@ -31,10 +31,7 @@ export async function patchBrandPlatformMasterInGroups(
             brand: brandKey,
             platform,
           });
-          return applyMasterStatsToAccountRow(account, master, {
-            deviceConnected: account.sessionStatus === 'valid',
-            brandStandard: brandX,
-          });
+          return patchMasterTotalsOnRow(account, master, brandX);
         }),
       );
 

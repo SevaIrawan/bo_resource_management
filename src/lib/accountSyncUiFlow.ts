@@ -1,8 +1,10 @@
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 
-/** Y = X dan admin match — kolom Scraper tampil last update saja. */
+/**
+ * Not aligned / Issue KPI / ticket reconcile — hanya Groups Y/X dan Admin.
+ * Session (valid/logout) TIDAK masuk sini; badge session terpisah (`platform_sessions`).
+ */
 export function isRowMisaligned(result: AccountSyncResult): boolean {
-  if (result.sessionStatus !== 'valid') return true;
   return (
     result.groupsCurrent !== result.groupsTotal ||
     result.adminCurrent !== result.adminTotal

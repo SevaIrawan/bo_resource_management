@@ -41,6 +41,7 @@ function toTicketItem(row: TicketRow): TicketItem | null {
 
   return {
     id: row.id,
+    accountId: row.account_id,
     ticketType: row.ticket_type,
     accent: ticketAccent(row.ticket_type),
     accountName: account.label,

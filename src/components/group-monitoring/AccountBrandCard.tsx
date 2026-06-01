@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { AddAccountHeaderMenu } from '@/components/group-monitoring/AddAccountHeaderMenu';
+import { CardDismissButton } from '@/components/group-monitoring/CardDismissButton';
 import {
   AddAccountModal,
   type AddAccountFormValues,
@@ -26,6 +27,7 @@ interface AccountBrandCardProps {
   scraperAccountId?: string | null;
   getScrapeProgress?: (accountId: string) => UiScrapeProgress | null;
   defaultExpanded?: boolean;
+  onDismiss?: () => void;
 }
 
 export function AccountBrandCard({
@@ -38,6 +40,7 @@ export function AccountBrandCard({
   scraperAccountId = null,
   getScrapeProgress,
   defaultExpanded = true,
+  onDismiss,
 }: AccountBrandCardProps) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -152,6 +155,13 @@ export function AccountBrandCard({
             </span>
             <AddAccountHeaderMenu onSelectPlatform={(platform) => openAddFlow(platform)} />
           </div>
+
+          {onDismiss ? (
+            <CardDismissButton
+              onDismiss={onDismiss}
+              className="card-header-dismiss-btn brand-card-header-dismiss"
+            />
+          ) : null}
         </div>
 
         {expanded ? (

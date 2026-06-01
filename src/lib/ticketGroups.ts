@@ -1,3 +1,4 @@
+import { buildTicketIssueId } from '@/lib/ticketIssueId';
 import type { Platform } from '@/types/database';
 import type { TicketAccent, TicketItem, TicketType } from '@/types/ticketMonitoringUi';
 
@@ -10,7 +11,10 @@ export interface TicketDetailLine {
 }
 
 export interface TicketSummaryGroup {
+  /** Kunci internal grouping (accountId|brand|platform|type). */
   key: string;
+  /** ID topik issue di UI — satu per kartu summary. */
+  issueId: string;
   ticketType: TicketType;
   accent: TicketAccent;
   accountName: string;
@@ -21,13 +25,10 @@ export interface TicketSummaryGroup {
   lines: TicketDetailLine[];
 }
 
-export function ticketGroupKey(ticket: Pick<TicketItem, 'accountName' | 'brandName' | 'platform' | 'ticketType'>): string {
-  return [
-    ticket.accountName.trim(),
-    ticket.brandName.trim(),
-    ticket.platform,
-    ticket.ticketType,
-  ].join('|');
+export function ticketGroupKey(
+  ticket: Pick<TicketItem, 'accountId' | 'brandName' | 'platform' | 'ticketType'>,
+): string {
+  return [ticket.accountId, ticket.brandName.trim(), ticket.platform, ticket.ticketType].join('|');
 }
 
 export function groupOpenTickets(tickets: TicketItem[]): TicketSummaryGroup[] {
@@ -40,6 +41,12 @@ export function groupOpenTickets(tickets: TicketItem[]): TicketSummaryGroup[] {
     if (!group) {
       group = {
         key,
+        issueId: buildTicketIssueId({
+          accountId: ticket.accountId,
+          brandName: ticket.brandName,
+          platform: ticket.platform,
+          ticketType: ticket.ticketType,
+        }),
         ticketType: ticket.ticketType,
         accent: ticket.accent,
         accountName: ticket.accountName,

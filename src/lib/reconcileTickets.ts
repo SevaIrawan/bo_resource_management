@@ -316,12 +316,16 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
 
   if (snapError) throw snapError;
 
+  /** Y untuk count mismatch = daily akun (sudah di-load), bukan snapshot 0 saat logout. */
+  const dailyY = dailyRows.length;
   const deviceY =
-    input.deviceY !== undefined
+    input.deviceY !== undefined && input.deviceY >= 0
       ? input.deviceY
-      : snap?.session_status === 'valid'
-        ? Number(snap?.groups_current ?? 0)
-        : 0;
+      : dailyY > 0
+        ? dailyY
+        : snap?.session_status === 'valid'
+          ? Number(snap?.groups_current ?? 0)
+          : 0;
   const brandX = await resolveBrandStandardTotal(
     input.brandId,
     input.platform,
@@ -329,10 +333,7 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
     brand,
   );
 
-  const sessionOk =
-    input.deviceY !== undefined || snap?.session_status === 'valid';
-
-  if (brandX > 0 && sessionOk && deviceY !== brandX) {
+  if (brandX > 0 && deviceY !== brandX) {
     await upsertOpenTicket({
       accountId: input.accountId,
       brandId: input.brandId,

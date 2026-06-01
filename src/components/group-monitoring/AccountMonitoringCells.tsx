@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { AccountBrandEmptySlot, AccountBrandRow } from '@/types/accountMonitoringUi';
+import { ScraperStatusMarquee } from '@/components/group-monitoring/ScraperStatusMarquee';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 export function PlatformBadge({ platform }: { platform: AccountBrandRow['platform'] }) {
@@ -134,11 +135,7 @@ function ScraperColumnCell({
     }
 
     const statusLabel = scrapeProgress?.label ?? t('groupMonitoring.accountCard.scraperRunning');
-    return (
-      <span className="brand-scraper-status-text" role="status" aria-busy="true">
-        {statusLabel}
-      </span>
-    );
+    return <ScraperStatusMarquee label={statusLabel} />;
   }
 
   if (row.syncState === 'synced' && row.isMisaligned && onRunScraper) {

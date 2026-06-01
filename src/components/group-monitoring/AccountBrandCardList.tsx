@@ -3,6 +3,7 @@ import { AccountBrandCard } from '@/components/group-monitoring/AccountBrandCard
 import { AddBrandCard } from '@/components/group-monitoring/AddBrandCard';
 import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
 import { useAuth } from '@/hooks/useAuth';
+import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import { addAccountToGroup, createEmptyBrandGroup } from '@/lib/accountBrandUtils';
 import { ensureBrand } from '@/lib/brands';
@@ -24,6 +25,7 @@ export function AccountBrandCardList({
   onRemoveFromSlot,
 }: AccountBrandCardListProps) {
   const { user } = useAuth();
+  const { dismissBrandGroup } = useGroupMonitoring();
   const [modalOpen, setModalOpen] = useState(false);
 
   const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, getScrapeProgress } =
@@ -91,6 +93,7 @@ export function AccountBrandCardList({
               processingAction === 'scraper' ? processingAccountId : null
             }
             getScrapeProgress={getScrapeProgress}
+            onDismiss={() => dismissBrandGroup(group.id)}
           />
         ))}
         <AddBrandCard onClick={() => setModalOpen(true)} />

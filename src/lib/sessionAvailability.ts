@@ -4,6 +4,7 @@ import { persistLoginSessionAfterSuccess } from '@/lib/persistLoginSession';
 import {
   hasActivePlatformSession,
   loadTelegramPlatformSession,
+  resolveLatestSessionUiStatus,
 } from '@/lib/platformSessions';
 import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
@@ -32,6 +33,10 @@ export async function hasUsableLoginSession(input: {
   accountId: string;
   accountName?: string;
 }): Promise<boolean> {
+  if ((await resolveLatestSessionUiStatus(input.accountId)) === 'valid') {
+    return true;
+  }
+
   if (input.accountName?.trim()) {
     const byLabel = await findMessagingAccountWithActiveSession(
       input.accountName,

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { TABLES } from '@/config/tables';
+import { patchGroupsFromDailyInState } from '@/lib/hydrateAccountMetricsFromDaily';
 import { patchAccountSnapshotInGroups } from '@/lib/accountSessionPatch';
 import { patchBrandPlatformMasterInGroups } from '@/lib/patchAccountMasterInGroups';
 import { getSupabase } from '@/lib/supabase';
@@ -19,6 +20,12 @@ interface UseRealtimeMonitoringOptions {
 }
 
 type GroupsMasterRow = {
+  brand?: string;
+  platform?: Platform;
+};
+
+type DailyRow = {
+  account_id?: string;
   brand?: string;
   platform?: Platform;
 };
@@ -59,21 +66,30 @@ export function useRealtimeMonitoring({
       pendingBrandPlatform.clear();
       if (!keys.length) return;
 
-      onGroupsChangeRef.current((prev) => {
+      onGroupsChangeRef.current((latest) => {
         void (async () => {
-          let next = prev;
+          let patched = latest;
           for (const key of keys) {
             const sep = key.indexOf('|');
             if (sep < 0) continue;
             const brand = key.slice(0, sep);
             const platform = key.slice(sep + 1) as Platform;
             if (platform !== 'whatsapp' && platform !== 'telegram') continue;
-            next = await patchBrandPlatformMasterInGroups(next, brand, platform);
+            const hasSuspended = patched.some((g) =>
+              g.brandName.trim() === brand.trim()
+                ? g.accounts.some(
+                    (a) =>
+                      a.platform === platform && suspendedRef.current.includes(a.id),
+                  )
+                : false,
+            );
+            if (hasSuspended) continue;
+            patched = await patchBrandPlatformMasterInGroups(patched, brand, platform);
           }
-          onGroupsChangeRef.current(() => next);
+          onGroupsChangeRef.current(() => patched);
           onTicketsChangeRef.current();
         })();
-        return prev;
+        return latest;
       });
     };
 
@@ -104,6 +120,7 @@ export function useRealtimeMonitoring({
           const row = (payload.new ?? payload.old) as AccountSnapshot | undefined;
           if (!row?.account_id) return;
           if (suspendedRef.current.includes(row.account_id)) return;
+
           onGroupsChangeRef.current((prev) => patchAccountSnapshotInGroups(prev, row));
         },
       )
@@ -146,10 +163,16 @@ export function useRealtimeMonitoring({
         'postgres_changes',
         { event: '*', schema: 'public', table: TABLES.groupScrapeDaily },
         (payload) => {
-          const row = (payload.new ?? payload.old) as
-            | { brand?: string; platform?: Platform }
-            | undefined;
+          const row = (payload.new ?? payload.old) as DailyRow | undefined;
           handleMasterChange(row);
+          const accountId = row?.account_id;
+          if (!accountId || suspendedRef.current.includes(accountId)) return;
+          onGroupsChangeRef.current((prev) => {
+            void patchGroupsFromDailyInState(prev, accountId).then((next) => {
+              onGroupsChangeRef.current(() => next);
+            });
+            return prev;
+          });
         },
       )
       .subscribe();

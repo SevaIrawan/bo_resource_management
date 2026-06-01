@@ -106,18 +106,17 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
             onRemoveFromSlot={removeSlot.openRemoveModal}
           />
         )
+      ) : !hasAnyAccounts ? (
+        <AccountBrandCardList
+          groups={groups}
+          onGroupsChange={onGroupsChange}
+          sync={sync}
+          onRemoveFromSlot={removeSlot.openRemoveModal}
+        />
       ) : (
         <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
-          <p className="ticket-empty-title">
-            {hasAnyAccounts
-              ? t('groupMonitoring.noFilterMatch')
-              : t('groupMonitoring.noAccounts')}
-          </p>
-          <p className="ticket-empty-desc">
-            {hasAnyAccounts
-              ? t('groupMonitoring.noFilterMatchDesc')
-              : t('groupMonitoring.noAccountsDesc')}
-          </p>
+          <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
+          <p className="ticket-empty-desc">{t('groupMonitoring.noFilterMatchDesc')}</p>
         </div>
       )}
     </>

@@ -14,6 +14,8 @@
     "typecheck": "tsc --noEmit",
     "validate:session-flow": "node scripts/validate-session-column-flow.mjs",
     "validate:multi-account-wa": "node scripts/validate-multi-account-wa.mjs",
+    "validate:telegram-login": "node scripts/validate-telegram-login-flow.mjs",
+    "validate:desktop": "npm run validate:session-flow && npm run validate:multi-account-wa && npm run validate:telegram-login",
     "audit:reload": "node scripts/audit-reload-all-flow.mjs",
     "diagnose:session": "node scripts/diagnose-session.mjs",
     "repair:wa-session": "node scripts/repair-wa-session.mjs",

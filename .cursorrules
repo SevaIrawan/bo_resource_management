@@ -70,3 +70,12 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     - Jangan buka dua Puppeteer untuk akun yang sama (lock sampai `initialize()` selesai; jangan cabut lock di `forceRelease`).
     - TG: sidecar `SESSIONS[session_id]` — kunci = UUID akun; auto-sync berurutan antar akun.
     - Issue/KPI hanya dari grup/admin, bukan login/logout session.
+
+13. TELEGRAM QR LOGIN (jangan regresi)
+    - Scan sukses di HP → UI wajib `ready`, bukan error 500 / JSON parse.
+    - `_finalize_qr_login_if_live`: jangan `wait_task.cancel()`; deteksi `is_user_authorized` + `_verify_client_live`.
+    - `get_telegram_status`: poll ringan tanpa lock; session belum ada → `pending` (bukan error fatal).
+    - Electron: `parseSidecarJson`, poll retry (`POLL_ERROR_MAX_STREAK`), jangan stop poll pada error sementara.
+    - UI: `onError` abaikan jika sudah `ready` / pesan sidecar sementara saat QR.
+    - Sidecar version 3; exception handler FastAPI selalu JSON.
+    - Sebelum merge: `npm run validate:telegram-login` (atau `validate:desktop`).

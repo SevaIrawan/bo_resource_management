@@ -126,7 +126,15 @@ async def _clear_stale_local_auth(client: TelegramClient) -> None:
 
 
 async def start_telegram_qr(session_id: str) -> dict:
-    await cancel_telegram(session_id)
+    async with tg_session_lock(session_id):
+        return await _start_telegram_qr_locked(session_id)
+
+
+async def _start_telegram_qr_locked(session_id: str) -> dict:
+    try:
+        await cancel_telegram(session_id)
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "message": str(exc) or "Could not reset previous Telegram login"}
 
     try:
         client = await _create_client()
@@ -164,18 +172,18 @@ async def start_telegram_qr(session_id: str) -> dict:
         return {"status": "error", "message": str(exc)}
 
 async def _finalize_qr_login_if_live(session: TgLoginSession) -> None:
-    """Setelah scan: jika session sudah live di server TG, langsung ready (jangan hang di wait())."""
+    """Setelah scan di HP: deteksi authorized + live — jangan cancel wait_task (bisa putus login)."""
     if session.status not in ("pending", "confirming"):
+        return
+
+    try:
+        if not await session.client.is_user_authorized():
+            return
+    except Exception:  # noqa: BLE001
         return
 
     ok, err = await _verify_client_live(session.client)
     if ok:
-        if session.wait_task and not session.wait_task.done():
-            session.wait_task.cancel()
-            try:
-                await session.wait_task
-            except asyncio.CancelledError:
-                pass
         session.qr_login = None
         await _apply_login_ready(session)
         return
@@ -189,15 +197,26 @@ async def _maybe_rotate_telegram_qr(session: TgLoginSession) -> str | None:
     if session.status != "pending" or not session.qr_login:
         return None
 
+    try:
+        qr_url = getattr(session.qr_login, "url", None)
+        if not qr_url:
+            return None
+    except Exception:  # noqa: BLE001
+        return None
+
     age = time.time() - session.qr_created_at
     if age < 25:
-        return _qr_data_url(session.qr_login.url)
+        try:
+            return _qr_data_url(qr_url)
+        except Exception:  # noqa: BLE001
+            return None
 
     try:
         session.qr_login = await session.qr_login.recreate()
         session.qr_created_at = time.time()
         session.qr_generation += 1
-        return _qr_data_url(session.qr_login.url)
+        new_url = getattr(session.qr_login, "url", None)
+        return _qr_data_url(new_url) if new_url else None
     except Exception:  # noqa: BLE001
         return None
 
@@ -229,6 +248,19 @@ async def _wait_for_qr_scan(session_id: str) -> None:
     except Exception as exc:  # noqa: BLE001
         if session.status == "ready":
             return
+        try:
+            if await session.client.is_user_authorized():
+                ok, err = await _verify_client_live(session.client)
+                if ok:
+                    session.qr_login = None
+                    await _apply_login_ready(session)
+                    return
+                if err == "2FA":
+                    session.status = "need_2fa"
+                    session.error = None
+                    return
+        except Exception:  # noqa: BLE001
+            pass
         session.status = "error"
         session.error = str(exc)
 
@@ -317,17 +349,41 @@ async def submit_telegram_2fa(session_id: str, password: str) -> dict:
     return _session_payload(session)
 
 async def get_telegram_status(session_id: str) -> dict:
+    """Poll ringan — tanpa lock penuh agar wait_task QR tidak bentrok dengan scrape/login lain."""
+    try:
+        return await _get_telegram_status_locked(session_id)
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "message": str(exc) or "Telegram status check failed"}
+
+
+async def _get_telegram_status_locked(session_id: str) -> dict:
     session = SESSIONS.get(session_id)
     if not session:
-        return {"status": "error", "message": "Session not found"}
+        return {"status": "pending", "mode": "qr", "message": None}
 
-    if session.mode == "qr" and session.status in ("pending", "confirming"):
-        await _refresh_qr_login_status(session)
-        qr_url = await _maybe_rotate_telegram_qr(session)
-        if qr_url:
-            return _session_payload(session, qr_url)
+    try:
+        if session.mode == "qr" and session.status in ("pending", "confirming"):
+            await _refresh_qr_login_status(session)
+            if session.status == "ready":
+                return _session_payload(session)
+            qr_url = await _maybe_rotate_telegram_qr(session)
+            if qr_url:
+                return _session_payload(session, qr_url)
 
-    return _session_payload(session)
+        return _session_payload(session)
+    except Exception as exc:  # noqa: BLE001
+        if session.status == "ready":
+            return _session_payload(session)
+        try:
+            if await session.client.is_user_authorized():
+                ok, _err = await _verify_client_live(session.client)
+                if ok:
+                    session.qr_login = None
+                    await _apply_login_ready(session)
+                    return _session_payload(session)
+        except Exception:  # noqa: BLE001
+            pass
+        return {"status": "error", "message": str(exc)}
 
 async def export_telegram_session(session_id: str) -> dict:
     session = SESSIONS.get(session_id)
@@ -394,5 +450,10 @@ async def cancel_telegram(session_id: str) -> None:
             await session.wait_task
         except asyncio.CancelledError:
             pass
+        except Exception:  # noqa: BLE001
+            pass
 
-    await session.client.disconnect()
+    try:
+        await session.client.disconnect()
+    except Exception:  # noqa: BLE001
+        pass

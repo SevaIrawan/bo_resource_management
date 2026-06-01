@@ -5,8 +5,9 @@ from pathlib import Path
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from telegram_login import (
@@ -25,6 +26,16 @@ ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
 app = FastAPI(title="RM Telegram Sidecar")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=200,
+        content={"status": "error", "message": str(exc) or "Telegram sidecar internal error"},
+    )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -60,7 +71,7 @@ class ScrapeBody(BaseModel):
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "version": 2, "features": ["login", "scrape", "count", "validate"]}
+    return {"ok": True, "version": 3, "features": ["login", "scrape", "count", "validate"]}
 
 @app.post("/telegram/login/qr/start")
 async def telegram_qr_start(body: SessionBody) -> dict:
@@ -87,7 +98,10 @@ async def telegram_submit_2fa(body: TwoFaBody) -> dict:
 
 @app.get("/telegram/login/status/{session_id}")
 async def telegram_login_status(session_id: str) -> dict:
-    return await get_telegram_status(session_id)
+    try:
+        return await get_telegram_status(session_id)
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "message": str(exc) or "Telegram status failed"}
 
 @app.post("/telegram/login/cancel/{session_id}")
 async def telegram_login_cancel(session_id: str) -> dict:

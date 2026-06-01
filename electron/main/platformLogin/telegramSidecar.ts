@@ -2,12 +2,15 @@ import type { BrowserWindow } from 'electron';
 import { spawn, exec, type ChildProcessWithoutNullSignals } from 'child_process';
 import path from 'path';
 import { app } from 'electron';
+import dotenv from 'dotenv';
 
 const SIDECAR_URL = 'http://127.0.0.1:8765';
 export { SIDECAR_URL };
 const SIDECAR_PORT = 8765;
-const SIDECAR_VERSION = 2;
+const SIDECAR_VERSION = 3;
 const pollTimers = new Map<string, ReturnType<typeof setInterval>>();
+const pollErrorStreak = new Map<string, number>();
+const POLL_ERROR_MAX_STREAK = 8;
 
 export type LoginMode = 'qr' | 'phone';
 export type LoginPhase = 'pending' | 'need_code' | 'need_2fa' | 'ready' | 'error';
@@ -24,6 +27,27 @@ let sidecarStarting: Promise<void> | null = null;
 
 function projectRoot() {
   return app.isPackaged ? app.getAppPath() : process.cwd();
+}
+
+function sidecarEnv(): NodeJS.ProcessEnv {
+  const root = projectRoot();
+  const parsed = dotenv.config({ path: path.join(root, '.env') }).parsed ?? {};
+  return { ...process.env, ...parsed };
+}
+
+async function parseSidecarJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text.trim()) {
+    throw new Error(`Telegram sidecar ${res.status}: empty response`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const snippet = text.trim().slice(0, 160);
+    throw new Error(
+      `Telegram sidecar ${res.status}: ${snippet || res.statusText}. Restart the app and check TELEGRAM_API_ID / TELEGRAM_API_HASH in .env`,
+    );
+  }
 }
 
 async function waitForHealth(timeoutMs = 15000) {
@@ -46,7 +70,7 @@ async function readSidecarVersion(): Promise<number | null> {
   try {
     const res = await fetch(`${SIDECAR_URL}/health`, { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return null;
-    const json = (await res.json()) as { version?: number };
+    const json = await parseSidecarJson<{ version?: number }>(res);
     return typeof json.version === 'number' ? json.version : null;
   } catch {
     return null;
@@ -91,7 +115,7 @@ export async function ensureSidecarRunning() {
       const [pythonBin, pythonArgs] = getPythonCommand();
       sidecarProcess = spawn(pythonBin, [...pythonArgs, script], {
         cwd: root,
-        env: { ...process.env },
+        env: sidecarEnv(),
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
       });
@@ -128,6 +152,20 @@ function stopPolling(sessionId: string) {
     clearInterval(timer);
     pollTimers.delete(sessionId);
   }
+  pollErrorStreak.delete(sessionId);
+}
+
+function isRetryableTelegramPollError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('internal server error') ||
+    lower.includes('session not found') ||
+    lower.includes('empty response') ||
+    lower.includes('invalid json') ||
+    lower.includes('econnrefused') ||
+    lower.includes('fetch failed') ||
+    lower.includes('timed out')
+  );
 }
 
 function emitTelegramResult(
@@ -143,6 +181,7 @@ function emitTelegramResult(
 ) {
   if (json.status === 'ready') {
     stopPolling(sessionId);
+    pollErrorStreak.delete(sessionId);
     win.webContents.send('platform-login:ready', { sessionId, platform: 'telegram' });
     return;
   }
@@ -169,11 +208,15 @@ function emitTelegramResult(
   }
 
   if (json.status === 'error') {
+    const message = json.message ?? 'Telegram login failed';
+    if (isRetryableTelegramPollError(message)) {
+      return;
+    }
     stopPolling(sessionId);
     win.webContents.send('platform-login:error', {
       sessionId,
       platform: 'telegram',
-      message: json.message ?? 'Telegram login failed',
+      message,
     });
     return;
   }
@@ -189,22 +232,43 @@ function emitTelegramResult(
 }
 
 async function fetchTelegramLoginStatus(sessionId: string) {
-  const res = await fetch(`${SIDECAR_URL}/telegram/login/status/${encodeURIComponent(sessionId)}`);
-  return (await res.json()) as {
+  await ensureSidecarRunning();
+  const res = await fetch(
+    `${SIDECAR_URL}/telegram/login/status/${encodeURIComponent(sessionId)}`,
+    { signal: AbortSignal.timeout(30_000) },
+  );
+  const json = await parseSidecarJson<{
     status: string;
     message?: string;
     hint?: string;
     qrDataUrl?: string;
-  };
+    qrGeneration?: number;
+  }>(res);
+
+  if (!res.ok) {
+    const detail = json.message ?? res.statusText;
+    throw new Error(`Telegram sidecar ${res.status}: ${detail}`);
+  }
+
+  if (json.status === 'error') {
+    const message = json.message ?? 'Telegram status failed';
+    if (!isRetryableTelegramPollError(message)) {
+      throw new Error(message);
+    }
+  }
+
+  return json;
 }
 
 function pollTelegramStatus(sessionId: string, win: BrowserWindow) {
   stopPolling(sessionId);
+  pollErrorStreak.set(sessionId, 0);
 
   const tick = () => {
     void (async () => {
       try {
         const json = await fetchTelegramLoginStatus(sessionId);
+        pollErrorStreak.set(sessionId, 0);
 
         if (win.isDestroyed()) {
           stopPolling(sessionId);
@@ -213,12 +277,20 @@ function pollTelegramStatus(sessionId: string, win: BrowserWindow) {
 
         emitTelegramResult(win, sessionId, json);
       } catch (error) {
+        const message = error instanceof Error ? error.message : 'Telegram sidecar error';
+        const streak = (pollErrorStreak.get(sessionId) ?? 0) + 1;
+        pollErrorStreak.set(sessionId, streak);
+
+        if (streak < POLL_ERROR_MAX_STREAK && isRetryableTelegramPollError(message)) {
+          return;
+        }
+
         stopPolling(sessionId);
         if (!win.isDestroyed()) {
           win.webContents.send('platform-login:error', {
             sessionId,
             platform: 'telegram',
-            message: error instanceof Error ? error.message : 'Telegram sidecar error',
+            message,
           });
         }
       }
@@ -226,7 +298,7 @@ function pollTelegramStatus(sessionId: string, win: BrowserWindow) {
   };
 
   tick();
-  const timer = setInterval(tick, 600);
+  const timer = setInterval(tick, 500);
   pollTimers.set(sessionId, timer);
 }
 
@@ -239,11 +311,17 @@ async function postJson<T>(route: string, body: unknown): Promise<T> {
     signal: AbortSignal.timeout(45000),
   });
 
-  const json = (await res.json()) as T & { detail?: string; status?: string; message?: string };
+  const json = await parseSidecarJson<T & { detail?: string; status?: string; message?: string }>(
+    res,
+  );
 
   if (!res.ok) {
     const detail = json.detail ?? json.message ?? res.statusText;
     throw new Error(`Telegram sidecar ${res.status}: ${detail}`);
+  }
+
+  if (json.status === 'error') {
+    throw new Error(json.message ?? 'Telegram login failed');
   }
 
   return json;

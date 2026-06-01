@@ -69,7 +69,12 @@ export function usePlatformLogin(
   const lastQrGenerationRef = useRef(0);
   const prevOpenRef = useRef(false);
   const loginSucceededRef = useRef(false);
+  const loginStatusRef = useRef<LoginStatus>('loading');
   const qrAppearDeadlineRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    loginStatusRef.current = status;
+  }, [status]);
 
   const clearQrTimeout = useCallback(() => {
     if (qrTimeoutIdRef.current !== undefined) {
@@ -220,11 +225,27 @@ export function usePlatformLogin(
 
     const offError = api.onError((payload) => {
       if (!matchesSession(payload)) return;
+      if (sessionReadyRef.current || loginSucceededRef.current) return;
+
+      const message = payload.message ?? '';
+      if (platform === 'telegram') {
+        const transient =
+          /internal server error|session not found|sidecar|invalid json|empty response/i.test(
+            message,
+          );
+        const duringQr =
+          loginStatusRef.current === 'qr' ||
+          loginStatusRef.current === 'confirming' ||
+          loginStatusRef.current === 'starting-qr' ||
+          loginStatusRef.current === 'loading';
+        if (transient && duringQr) return;
+      }
+
       clearQrAppearDeadline();
       clearQrTimeout();
       setQrDataUrl(null);
       setStatus('error');
-      setError(payload.message ?? 'Login failed');
+      setError(message || 'Login failed');
     });
 
     return () => {

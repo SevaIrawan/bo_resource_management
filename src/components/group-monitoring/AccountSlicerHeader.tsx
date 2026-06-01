@@ -1,4 +1,4 @@
-import { ChevronDown, Download, Search } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import { useMemo } from 'react';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -8,6 +8,7 @@ import {
   uniqueAccountPlatforms,
   uniqueAccountStatuses,
 } from '@/lib/filterAccountGroups';
+import { DarkSelect } from '@/components/ui/DarkSelect';
 import { cn } from '@/lib/utils';
 import type { AccountConnectionStatus, AccountViewMode } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
@@ -28,20 +29,13 @@ interface FilterSelectProps {
 
 function SlicerSelect({ value, onChange, options, className }: FilterSelectProps) {
   return (
-    <div className={cn('account-slicer-select-wrap', className)}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="account-slicer-select"
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="account-slicer-select-icon" aria-hidden />
-    </div>
+    <DarkSelect
+      value={value}
+      onChange={onChange}
+      options={options}
+      className={className}
+      triggerClassName="account-slicer-select"
+    />
   );
 }
 

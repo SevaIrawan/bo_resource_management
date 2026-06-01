@@ -1,6 +1,8 @@
 import { resolveBrandStandardTotal } from '@/lib/brandStandardCount';
+import { dedupeDailyRowsByGroupId, dedupeScrapeDailyRowsForAccount } from '@/lib/dedupeScrapeDaily';
 import { TABLES } from '@/config/tables';
 import { ticketDescriptionEn } from '@/lib/ticketNote';
+import { openTicketDedupeKey } from '@/lib/ticketDedupe';
 import { getSupabase } from '@/lib/supabase';
 import type { GroupsMaster, Platform, TicketType } from '@/types/database';
 
@@ -18,6 +20,38 @@ interface DailyRow {
   group_name: string | null;
   invite_link: string | null;
   is_admin: string;
+}
+
+/** Satu baris open per (account, type, group_id) — bersihkan duplikat historis. */
+async function dedupeOpenTicketsForAccount(accountId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const { data: openRows, error } = await supabase
+    .from(TABLES.tickets)
+    .select('id, ticket_type, group_id, created_at')
+    .eq('account_id', accountId)
+    .eq('status', 'open')
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  if (!openRows?.length) return;
+
+  const now = new Date().toISOString();
+  const seenKeys = new Set<string>();
+
+  for (const row of openRows) {
+    const id = row.id as string;
+    const key = openTicketDedupeKey(row.ticket_type as TicketType, row.group_id as string | null);
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      continue;
+    }
+    await supabase
+      .from(TABLES.tickets)
+      .update({ status: 'resolved', resolved_at: now })
+      .eq('id', id);
+  }
 }
 
 async function upsertOpenTicket(input: {
@@ -38,7 +72,8 @@ async function upsertOpenTicket(input: {
     .select('id')
     .eq('account_id', input.accountId)
     .eq('ticket_type', input.ticketType)
-    .eq('status', 'open');
+    .eq('status', 'open')
+    .limit(1);
 
   if (input.groupId) {
     query = query.eq('group_id', input.groupId);
@@ -46,8 +81,9 @@ async function upsertOpenTicket(input: {
     query = query.eq('group_name', input.groupName);
   }
 
-  const { data: existing } = await query.maybeSingle();
-  if (existing?.id) return;
+  const { data: existingRows, error: findError } = await query;
+  if (findError) throw findError;
+  if (existingRows?.length) return;
 
   const { error } = await supabase.from(TABLES.tickets).insert({
     account_id: input.accountId,
@@ -61,7 +97,10 @@ async function upsertOpenTicket(input: {
     group_name: input.groupName ?? null,
   });
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505') return;
+    throw error;
+  }
 }
 
 async function resolveTickets(input: {
@@ -118,7 +157,7 @@ async function detectFraudTickets(input: ReconcileInput): Promise<void> {
   ]);
 
   const masterRows = (master ?? []) as Pick<GroupsMaster, 'group_id' | 'group_name' | 'invite_link'>[];
-  const dailyRows = (daily ?? []) as DailyRow[];
+  const dailyRows = dedupeDailyRowsByGroupId((daily ?? []) as DailyRow[]);
 
   const masterByGid = new Map(
     masterRows.map((m) => [String(m.group_id).trim(), m]),
@@ -202,6 +241,9 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
   const supabase = getSupabase();
   if (!supabase) return;
 
+  await dedupeOpenTicketsForAccount(input.accountId);
+  await dedupeScrapeDailyRowsForAccount(input.accountId);
+
   const brand = input.brandName.trim();
 
   const [{ data: master }, { data: daily }] = await Promise.all([
@@ -217,7 +259,7 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
   ]);
 
   const masterRows = (master ?? []) as Pick<GroupsMaster, 'group_id' | 'group_name' | 'invite_link'>[];
-  const dailyRows = (daily ?? []) as DailyRow[];
+  const dailyRows = dedupeDailyRowsByGroupId((daily ?? []) as DailyRow[]);
   const dailyByGid = new Map(dailyRows.map((d) => [String(d.group_id).trim(), d]));
 
   const masterGids = new Set(

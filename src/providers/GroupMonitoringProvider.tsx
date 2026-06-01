@@ -19,6 +19,14 @@ import {
   filterTicketSummaries,
   TICKET_FILTER_DEFAULT,
 } from '@/lib/filterTicketSummaries';
+import {
+  loadIssueHandlesForAccounts,
+  resetReopenedCompletedHandles,
+} from '@/lib/ticketWorkflowDb';
+import {
+  hydrateTicketProcessCache,
+  TICKET_WORKFLOW_CHANGED_EVENT,
+} from '@/lib/ticketWorkflowLocal';
 import { groupOpenTickets } from '@/lib/ticketGroups';
 import { computeAccountKpis, computeTicketKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -41,19 +49,34 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const [accountFilters, setAccountFilters] = useState(ACCOUNT_FILTER_DEFAULT);
   const [ticketFilters, setTicketFilters] = useState(TICKET_FILTER_DEFAULT);
   const [dismissedBrandGroupIds, setDismissedBrandGroupIds] = useState<string[]>([]);
+  const [workflowTick, setWorkflowTick] = useState(0);
 
   const reportError = useCallback((message: string) => {
     setError(message);
   }, []);
 
+  const reloadTicketHandles = useCallback(async (loaded: TicketItem[]) => {
+    const accountIds = [...new Set(loaded.map((ticket) => ticket.accountId))];
+    try {
+      const handles = await loadIssueHandlesForAccounts(accountIds);
+      const summaries = groupOpenTickets(loaded);
+      const synced = await resetReopenedCompletedHandles(summaries, handles);
+      hydrateTicketProcessCache(synced);
+    } catch {
+      hydrateTicketProcessCache({});
+    }
+  }, []);
+
   const reloadTickets = useCallback(async () => {
     if (!user?.id) {
       setTickets([]);
+      hydrateTicketProcessCache({});
       return;
     }
     const loaded = await loadOpenTicketsForUser(user.id);
     setTickets(loaded);
-  }, [user?.id]);
+    await reloadTicketHandles(loaded);
+  }, [user?.id, reloadTicketHandles]);
 
   const reloadAll = useCallback(async () => {
     if (!user?.id) {
@@ -85,14 +108,16 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       const loadedTickets = await loadOpenTicketsForUser(user.id);
       setGroups(loadedGroups);
       setTickets(loadedTickets);
+      await reloadTicketHandles(loadedTickets);
     } catch (e) {
       setError(getErrorMessage(e, t('groupMonitoring.loadAccountsFailed')));
       setGroups([]);
       setTickets([]);
+      hydrateTicketProcessCache({});
     } finally {
       setLoading(false);
     }
-  }, [user?.id, t]);
+  }, [user?.id, t, reloadTicketHandles]);
 
   useEffect(() => {
     void reloadAll();
@@ -114,8 +139,14 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   const filteredTicketSummaries = useMemo(
     () => filterTicketSummaries(ticketSummaries, ticketFilters),
-    [ticketSummaries, ticketFilters],
+    [ticketSummaries, ticketFilters, workflowTick],
   );
+
+  useEffect(() => {
+    const bump = () => setWorkflowTick((n) => n + 1);
+    window.addEventListener(TICKET_WORKFLOW_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(TICKET_WORKFLOW_CHANGED_EVENT, bump);
+  }, []);
 
   useEffect(() => {
     setTicketCount(ticketSummaries.length);

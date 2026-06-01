@@ -14,20 +14,14 @@ import {
   findAccountIdBySessionData,
   hasActivePlatformSession,
 } from '@/lib/platformSessions';
+import { dedupeScrapedGroupsByGroupId } from '@/lib/dedupeScrapedGroups';
+import type { ScrapedGroupPayload } from '@/lib/dedupeScrapedGroups';
 import { rebuildBrandGroupsMaster } from '@/lib/syncMasterAfterScrape';
 import { getSupabase } from '@/lib/supabase';
 import type { Platform } from '@/types/database';
 import type { MessagingAccount } from '@/types/database';
 
-export interface ScrapedGroupPayload {
-  group_id: string;
-  group_name: string;
-  invite_link: string | null;
-  is_admin: 'yes' | 'no';
-  member_count: number;
-  admin_count: number;
-  owner_count: number;
-}
+export type { ScrapedGroupPayload } from '@/lib/dedupeScrapedGroups';
 
 export async function resolveMessagingAccountId(input: {
   userId: string;
@@ -222,7 +216,8 @@ export async function writeScrapeDailyRows(input: {
   const supabase = getSupabase();
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED');
 
-  if (!input.groups.length) {
+  const uniqueGroups = dedupeScrapedGroupsByGroupId(input.groups);
+  if (!uniqueGroups.length) {
     throw new Error('SCRAPER_NO_GROUPS');
   }
 
@@ -250,7 +245,7 @@ export async function writeScrapeDailyRows(input: {
     phoneNumber: phone,
     scrapeDate,
     scrapedAt,
-    groups: input.groups,
+    groups: uniqueGroups,
   });
 
   const { error: insertError } = await supabase.from(SCRAPER_WRITE_TABLE).insert(rows);

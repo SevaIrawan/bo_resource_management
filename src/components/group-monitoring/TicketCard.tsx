@@ -1,11 +1,72 @@
-import { Download, ShieldBan } from 'lucide-react';
+import { ShieldBan } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { TicketProcessModal } from '@/components/group-monitoring/TicketProcessModal';
 import { BrandImage } from '@/components/brand/BrandImage';
-import { exportTicketGroupExcel } from '@/lib/exportExcel';
-import { ticketNoteForDisplay } from '@/lib/ticketNote';
 import type { TicketSummaryGroup } from '@/lib/ticketGroups';
 import { ticketTypeLabel } from '@/lib/ticketTypeLabel';
+import {
+  getTicketProcess,
+  TICKET_WORKFLOW_CHANGED_EVENT,
+  taskStatusI18nKey,
+} from '@/lib/ticketWorkflowLocal';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
+
+const PROCESS_CAPTION_INTERVAL_MS = 3000;
+
+function TicketProcessNewCaption({
+  issueId,
+  onOpen,
+}: {
+  issueId: string;
+  onOpen: () => void;
+}) {
+  const { t } = useLanguage();
+  const [showProcess, setShowProcess] = useState(true);
+  const [taskStatus, setTaskStatus] = useState(() => getTicketProcess(issueId).taskStatus);
+
+  useEffect(() => {
+    const sync = () => setTaskStatus(getTicketProcess(issueId).taskStatus);
+    window.addEventListener(TICKET_WORKFLOW_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(TICKET_WORKFLOW_CHANGED_EVENT, sync);
+  }, [issueId]);
+
+  useEffect(() => {
+    if (taskStatus !== 'todo') return;
+    const timer = window.setInterval(() => {
+      setShowProcess((prev) => !prev);
+    }, PROCESS_CAPTION_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [taskStatus]);
+
+  const isTodo = taskStatus === 'todo';
+  const isNew = isTodo && !showProcess;
+  const label = isTodo
+    ? showProcess
+      ? t('groupMonitoring.ticketPanel.process')
+      : t('groupMonitoring.ticketPanel.captionNew')
+    : t(taskStatusI18nKey(taskStatus));
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        'ticket-process-caption',
+        isNew && 'ticket-process-caption--new',
+        taskStatus === 'complete' && 'ticket-process-caption--complete',
+        taskStatus === 'interrupted' && 'ticket-process-caption--interrupted',
+      )}
+      aria-live={isTodo ? 'polite' : 'off'}
+      aria-label={label}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen();
+      }}
+    >
+      {label}
+    </button>
+  );
+}
 
 function TicketTypeBadge({ group }: { group: TicketSummaryGroup }) {
   const { t } = useLanguage();
@@ -71,6 +132,7 @@ export function TicketSummaryCard({
   onOpenDetail?: (group: TicketSummaryGroup) => void;
 }) {
   const { t } = useLanguage();
+  const [processModalOpen, setProcessModalOpen] = useState(false);
 
   return (
     <article
@@ -90,9 +152,6 @@ export function TicketSummaryCard({
 
       <div className="ticket-card-body">
         <div className="ticket-card-title-row">
-          <span className="ticket-issue-id" title={group.issueId}>
-            {group.issueId}
-          </span>
           <h3 className="ticket-card-title">{group.accountName}</h3>
           <TicketTypeBadge group={group} />
           <PlatformTag platform={group.platform} />
@@ -108,22 +167,17 @@ export function TicketSummaryCard({
       </div>
 
       <div className="ticket-card-actions">
-        <button
-          type="button"
-          className="ticket-process-btn"
-          onClick={(event) => {
-            event.stopPropagation();
-            exportTicketGroupExcel(
-              group,
-              ticketTypeLabel(t, group.ticketType, 'export'),
-              (line) => ticketNoteForDisplay(t, group.ticketType, line.description, line),
-            );
-          }}
-        >
-          <Download className="h-3.5 w-3.5" strokeWidth={2} />
-          {t('groupMonitoring.ticketPanel.exportIssue')}
-        </button>
+        <TicketProcessNewCaption
+          issueId={group.issueId}
+          onOpen={() => setProcessModalOpen(true)}
+        />
       </div>
+
+      <TicketProcessModal
+        group={group}
+        open={processModalOpen}
+        onClose={() => setProcessModalOpen(false)}
+      />
     </article>
   );
 }

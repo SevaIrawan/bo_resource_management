@@ -50,7 +50,6 @@ export function TicketIssueDetailModal({ group, onClose }: TicketIssueDetailModa
         <header className="brand-modal-header ticket-detail-modal-header">
           <div>
             <h2 id="ticket-detail-title" className="ticket-detail-modal-title">
-              <span className="ticket-issue-id ticket-issue-id--detail">{group.issueId}</span>
               {group.accountName} · {typeLabel}
             </h2>
             <p className="ticket-detail-modal-meta">

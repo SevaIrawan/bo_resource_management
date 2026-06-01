@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
+import { DarkSelect } from '@/components/ui/DarkSelect';
 import {
   GROUP_LINKS_PAGE_SIZE,
   GROUP_LINKS_VISIBLE_ROWS,
@@ -35,21 +36,14 @@ function AdminFilterSlicer({
   return (
     <div className="group-links-admin-slicer">
       <span className="group-links-admin-slicer-label">{label}</span>
-      <div className="account-slicer-select-wrap group-links-admin-slicer-select">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value as AdminFilter)}
-          className="account-slicer-select"
-          aria-label={label}
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="account-slicer-select-icon" aria-hidden />
-      </div>
+      <DarkSelect
+        value={value}
+        onChange={(next) => onChange(next as AdminFilter)}
+        options={options}
+        ariaLabel={label}
+        className="group-links-admin-slicer-select"
+        triggerClassName="account-slicer-select"
+      />
     </div>
   );
 }

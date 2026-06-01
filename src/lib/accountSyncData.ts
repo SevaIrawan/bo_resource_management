@@ -1,6 +1,7 @@
 import { DAILY_PHONE_SELECT } from '@/config/dbColumns';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import { computeIsMisaligned } from '@/lib/accountDisplayMetrics';
+import { dedupeDailyRowsByGroupId } from '@/lib/dedupeScrapeDaily';
 import { fetchDailyGroupCount } from '@/lib/accountScrapeData';
 import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
 import { hasValidAccountPhone } from '@/lib/accountPhone';
@@ -109,7 +110,7 @@ export async function fetchMasterGroupStatsForAccount(input: {
 
   let joinedInMaster = 0;
   let adminInMaster = 0;
-  for (const row of dailyRows ?? []) {
+  for (const row of dedupeDailyRowsByGroupId(dailyRows ?? [])) {
     const gid = String(row.group_id ?? '').trim();
     if (!masterGids.has(gid)) continue;
     joinedInMaster += 1;
@@ -142,8 +143,11 @@ export async function buildMetricsFromScrapeDaily(input: {
 
   const dbId = normalizeDbAccountId(input.accountId);
   const dailyCount =
-    input.deviceGroupCount ??
-    (dbId ? await fetchDailyGroupCount(input.brand, '', '', dbId) : 0);
+    input.deviceGroupCount != null && input.deviceGroupCount >= 0
+      ? input.deviceGroupCount
+      : dbId
+        ? await fetchDailyGroupCount(input.brand, '', '', dbId)
+        : 0;
 
   const brandX =
     input.brandStandard != null ? Math.max(0, input.brandStandard) : master.brandMasterTotal;

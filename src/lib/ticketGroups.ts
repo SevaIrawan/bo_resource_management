@@ -13,6 +13,7 @@ export interface TicketDetailLine {
 export interface TicketSummaryGroup {
   /** Kunci internal grouping (accountId|brand|platform|type). */
   key: string;
+  accountId: string;
   /** ID topik issue di UI — satu per kartu summary. */
   issueId: string;
   ticketType: TicketType;
@@ -41,6 +42,7 @@ export function groupOpenTickets(tickets: TicketItem[]): TicketSummaryGroup[] {
     if (!group) {
       group = {
         key,
+        accountId: ticket.accountId,
         issueId: buildTicketIssueId({
           accountId: ticket.accountId,
           brandName: ticket.brandName,
@@ -59,13 +61,28 @@ export function groupOpenTickets(tickets: TicketItem[]): TicketSummaryGroup[] {
       map.set(key, group);
     }
 
-    group.lines.push({
-      id: ticket.id,
-      groupId: ticket.groupId ?? null,
-      groupName: ticket.groupName ?? null,
-      groupLink: ticket.groupLink ?? null,
-      description: ticket.description,
-    });
+    const lineKey = [
+      ticket.groupId?.trim() || '',
+      ticket.groupName?.trim().toLowerCase() || '',
+      ticket.description,
+    ].join('|');
+    const alreadyListed = group.lines.some(
+      (line) =>
+        [
+          line.groupId?.trim() || '',
+          line.groupName?.trim().toLowerCase() || '',
+          line.description,
+        ].join('|') === lineKey,
+    );
+    if (!alreadyListed) {
+      group.lines.push({
+        id: ticket.id,
+        groupId: ticket.groupId ?? null,
+        groupName: ticket.groupName ?? null,
+        groupLink: ticket.groupLink ?? null,
+        description: ticket.description,
+      });
+    }
     group.itemCount = group.lines.length;
   }
 

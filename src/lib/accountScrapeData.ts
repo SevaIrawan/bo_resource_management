@@ -1,3 +1,4 @@
+import { countDistinctDailyGroupsForAccount } from '@/lib/dedupeScrapeDaily';
 import { countBrandMasterGroups } from '@/lib/brandStandardCount';
 import { TABLES } from '@/config/tables';
 import { hasValidAccountPhone } from '@/lib/accountPhone';
@@ -49,12 +50,7 @@ export async function fetchDailyGroupCount(
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED');
 
   if (accountId) {
-    const { count, error } = await supabase
-      .from(TABLES.groupScrapeDaily)
-      .select('id', { count: 'exact', head: true })
-      .eq('account_id', accountId);
-    if (error) throw error;
-    return count ?? 0;
+    return countDistinctDailyGroupsForAccount(accountId);
   }
 
   let latestQuery = supabase

@@ -1,5 +1,6 @@
 import { TICKET_SELECT } from '@/config/dbColumns';
 import { TABLES } from '@/config/tables';
+import { dedupeOpenTicketItems } from '@/lib/ticketDedupe';
 import { getSupabase } from '@/lib/supabase';
 import type { Ticket } from '@/types/database';
 import type { TicketAccent, TicketItem } from '@/types/ticketMonitoringUi';
@@ -79,5 +80,9 @@ export async function loadOpenTicketsForUser(userId: string): Promise<TicketItem
 
   if (error) throw error;
 
-  return ((data ?? []) as TicketRow[]).map(toTicketItem).filter((t): t is TicketItem => t !== null);
+  const items = ((data ?? []) as TicketRow[])
+    .map(toTicketItem)
+    .filter((t): t is TicketItem => t !== null);
+
+  return dedupeOpenTicketItems(items);
 }

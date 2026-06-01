@@ -13,6 +13,7 @@ export const TABLES = {
   groupsMaster: 'resource_management_groups_master',
   accountSnapshots: 'resource_management_account_snapshots',
   tickets: 'resource_management_tickets',
+  ticketIssueHandles: 'resource_management_ticket_issue_handles',
 } as const;
 
 /** Tabel RM + Realtime publication (017). */
@@ -22,6 +23,7 @@ export const RM_REALTIME_TABLES = [
   TABLES.accountSnapshots,
   TABLES.scrapeRuns,
   TABLES.tickets,
+  TABLES.ticketIssueHandles,
   TABLES.messagingAccounts,
   TABLES.brands,
   TABLES.groupsMaster,
@@ -39,6 +41,7 @@ export const RM_ACTIVE_TABLES = [
   TABLES.groupsMaster,
   TABLES.accountSnapshots,
   TABLES.tickets,
+  TABLES.ticketIssueHandles,
 ] as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

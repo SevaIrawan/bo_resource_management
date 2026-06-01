@@ -1,4 +1,8 @@
 import type { TicketSummaryGroup } from '@/lib/ticketGroups';
+import {
+  ticketMatchesWorkflowBookmark,
+  type TicketWorkflowBookmark,
+} from '@/lib/ticketWorkflowLocal';
 import type { Platform } from '@/types/database';
 import type { TicketType } from '@/types/ticketMonitoringUi';
 
@@ -7,6 +11,8 @@ export interface TicketSlicerFilters {
   platform: string;
   ticketType: string;
   search: string;
+  /** Bookmark kanan: In Progress | Completed (sama pola Card view | Table view). */
+  workflowBookmark: TicketWorkflowBookmark;
 }
 
 export const TICKET_FILTER_DEFAULT: TicketSlicerFilters = {
@@ -14,6 +20,7 @@ export const TICKET_FILTER_DEFAULT: TicketSlicerFilters = {
   platform: 'all',
   ticketType: 'all',
   search: '',
+  workflowBookmark: 'in_progress',
 };
 
 export function filterTicketSummaries(
@@ -23,6 +30,10 @@ export function filterTicketSummaries(
   const q = filters.search.trim().toLowerCase();
 
   return summaries.filter((group) => {
+    if (!ticketMatchesWorkflowBookmark(group.issueId, filters.workflowBookmark)) {
+      return false;
+    }
+
     if (filters.brand !== 'all' && group.brandName !== filters.brand) return false;
     if (filters.platform !== 'all' && group.platform !== filters.platform) return false;
     if (filters.ticketType !== 'all' && group.ticketType !== (filters.ticketType as TicketType)) {

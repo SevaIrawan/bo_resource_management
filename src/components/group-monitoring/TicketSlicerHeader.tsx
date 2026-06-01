@@ -1,8 +1,14 @@
-import { ChevronDown, Search } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import { useMemo } from 'react';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
+import { exportAllTicketGroupsExcel } from '@/lib/exportExcel';
+import { DarkSelect } from '@/components/ui/DarkSelect';
 import { uniqueTicketBrands, uniqueTicketPlatforms } from '@/lib/filterTicketSummaries';
+import { ticketNoteForDisplay } from '@/lib/ticketNote';
+import { ticketTypeLabel } from '@/lib/ticketTypeLabel';
+import type { TicketWorkflowBookmark } from '@/lib/ticketWorkflowLocal';
+import { cn } from '@/lib/utils';
 import type { TicketType } from '@/types/ticketMonitoringUi';
 
 interface FilterSelectProps {
@@ -13,20 +19,12 @@ interface FilterSelectProps {
 
 function SlicerSelect({ value, onChange, options }: FilterSelectProps) {
   return (
-    <div className="account-slicer-select-wrap">
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="account-slicer-select"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="account-slicer-select-icon" aria-hidden />
-    </div>
+    <DarkSelect
+      value={value}
+      onChange={onChange}
+      options={options}
+      triggerClassName="account-slicer-select"
+    />
   );
 }
 
@@ -41,7 +39,8 @@ const TICKET_TYPE_OPTIONS: TicketType[] = [
 
 export function TicketSlicerHeader() {
   const { t } = useLanguage();
-  const { ticketSummaries, ticketFilters, setTicketFilters } = useGroupMonitoring();
+  const { ticketSummaries, ticketFilters, setTicketFilters, filteredTicketSummaries } =
+    useGroupMonitoring();
 
   const patchFilters = (partial: Partial<typeof ticketFilters>) => {
     setTicketFilters((prev) => ({ ...prev, ...partial }));
@@ -79,6 +78,19 @@ export function TicketSlicerHeader() {
       })),
     ];
   }, [ticketSummaries, t]);
+
+  const workflowBookmark = ticketFilters.workflowBookmark;
+
+  const workflowModes: TicketWorkflowBookmark[] = ['in_progress', 'completed'];
+
+  const handleExportFiltered = () => {
+    exportAllTicketGroupsExcel(
+      filteredTicketSummaries,
+      (group) => ticketTypeLabel(t, group.ticketType, 'export'),
+      (group, line) =>
+        ticketNoteForDisplay(t, group.ticketType, line.description, line),
+    );
+  };
 
   return (
     <div className="account-slicer-row">
@@ -120,6 +132,39 @@ export function TicketSlicerHeader() {
             options={typeOptions}
           />
         </div>
+
+        <div
+          className="account-slicer-view-toggle"
+          role="group"
+          aria-label={t('groupMonitoring.ticketPanel.bookmarksLabel')}
+        >
+          {workflowModes.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => patchFilters({ workflowBookmark: mode })}
+              className={cn(
+                'account-slicer-view-btn',
+                workflowBookmark === mode && 'account-slicer-view-btn--active',
+              )}
+            >
+              {mode === 'in_progress'
+                ? t('groupMonitoring.ticketPanel.bookmarkInProgress')
+                : t('groupMonitoring.ticketPanel.bookmarkCompleted')}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="account-slicer-export-btn"
+          disabled={filteredTicketSummaries.length === 0}
+          onClick={handleExportFiltered}
+          title={t('groupMonitoring.ticketPanel.exportAll')}
+          aria-label={t('groupMonitoring.ticketPanel.exportAll')}
+        >
+          <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </button>
       </div>
     </div>
   );

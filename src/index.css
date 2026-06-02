@@ -1031,6 +1031,49 @@
     cursor: wait;
   }
 
+  .permission-locked-btn {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 0.375rem;
+    background: rgba(107, 103, 136, 0.2);
+    padding: 0.3125rem;
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+    opacity: 0.85;
+  }
+
+  .permission-locked-btn--text {
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .permission-locked-btn--run {
+    color: var(--color-text-muted);
+  }
+
+  .brand-add-card--locked {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .brand-add-account-btn--locked {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: not-allowed;
+    opacity: 0.75;
+  }
+
+  .card-header-dismiss-btn--locked {
+    cursor: not-allowed;
+    opacity: 0.75;
+  }
+
   .brand-account-sync-btn--spin {
     animation: brand-sync-spin 0.85s linear infinite;
   }

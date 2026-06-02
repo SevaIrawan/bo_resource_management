@@ -3,6 +3,7 @@ import { Power } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/hooks/useSidebar';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useLanguage } from '@/hooks/useLanguage';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { SidebarLabel } from '@/components/layout/SidebarLabel';
@@ -23,7 +24,10 @@ export function Sidebar() {
   const { collapsed } = useSidebar();
   const { t } = useLanguage();
   const { logout } = useAuth();
+  const { isAdmin } = usePermissions();
   const navigate = useNavigate();
+
+  const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.id !== 'admin');
 
   function handleLogout() {
     logout();
@@ -43,7 +47,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 p-2 pt-3">
-        {NAV_ITEMS.map(({ id, path, icon, end }) => {
+        {navItems.map(({ id, path, icon, end }) => {
           const Icon = ICONS[icon];
           const label = t(NAV_LABEL_KEYS[id]);
           return (

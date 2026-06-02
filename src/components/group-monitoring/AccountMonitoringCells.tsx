@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
+import { PermissionLockedButton } from '@/components/ui/PermissionLockedButton';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { GroupLinksModal } from '@/components/group-monitoring/GroupLinksModal';
 import { accountNeedsRelogin } from '@/lib/platformSyncCopy';
@@ -85,11 +86,13 @@ function ScraperColumnCell({
   scraperLoading,
   scrapeProgress,
   onRunScraper,
+  operateLocked = false,
 }: {
   row: AccountBrandRow;
   scraperLoading: boolean;
   scrapeProgress?: UiScrapeProgress | null;
   onRunScraper?: () => void;
+  operateLocked?: boolean;
 }) {
   const { t, locale } = useLanguage();
   const dateLocale = locale === 'zh' ? 'zh-CN' : 'en-GB';
@@ -139,18 +142,27 @@ function ScraperColumnCell({
     return <ScraperStatusMarquee label={statusLabel} />;
   }
 
-  if (row.syncState === 'synced' && row.isMisaligned && onRunScraper) {
+  if (row.syncState === 'synced' && row.isMisaligned && (onRunScraper || operateLocked)) {
     return (
       <div className="brand-scraper-cell-stack">
-        <button
-          type="button"
-          className="brand-scraper-run-link"
-          disabled={scraperLoading}
-          onClick={() => onRunScraper()}
-          aria-label={t('groupMonitoring.accountCard.runScraper')}
-        >
-          {t('groupMonitoring.accountCard.run')}
-        </button>
+        {operateLocked ? (
+          <PermissionLockedButton
+            variant="text"
+            className="brand-scraper-run-link permission-locked-btn--run"
+          >
+            {t('groupMonitoring.accountCard.run')}
+          </PermissionLockedButton>
+        ) : (
+          <button
+            type="button"
+            className="brand-scraper-run-link"
+            disabled={scraperLoading}
+            onClick={() => onRunScraper?.()}
+            aria-label={t('groupMonitoring.accountCard.runScraper')}
+          >
+            {t('groupMonitoring.accountCard.run')}
+          </button>
+        )}
         {canShowLastUpdate ? (
           <time className="brand-scraper-last-update-time" dateTime={row.lastSyncAt ?? undefined}>
             {formatLastSyncAt(row.lastSyncAt, dateLocale)}
@@ -176,11 +188,22 @@ function ScraperColumnCell({
 function AccountSyncIcon({
   onSync,
   loading = false,
+  operateLocked = false,
 }: {
   onSync?: () => void;
   loading?: boolean;
+  operateLocked?: boolean;
 }) {
   const { t } = useLanguage();
+
+  if (operateLocked) {
+    return (
+      <PermissionLockedButton
+        className="brand-account-sync-btn"
+        title={t('groupMonitoring.accountCard.syncAccountTooltip')}
+      />
+    );
+  }
 
   return (
     <button
@@ -199,8 +222,25 @@ function AccountSyncIcon({
   );
 }
 
-function AccountRemoveSlotIcon({ onRemove }: { onRemove: () => void }) {
+function AccountRemoveSlotIcon({
+  onRemove,
+  structureLocked = false,
+}: {
+  onRemove?: () => void;
+  structureLocked?: boolean;
+}) {
   const { t } = useLanguage();
+
+  if (structureLocked) {
+    return (
+      <PermissionLockedButton
+        className="brand-account-remove-btn permission-locked-btn--remove"
+        title={t('groupMonitoring.accountCard.removeFromSlotAria')}
+      />
+    );
+  }
+
+  if (!onRemove) return null;
 
   return (
     <button
@@ -234,6 +274,8 @@ export function AccountTableRow({
   onSync,
   onRunScraper,
   onRemoveFromSlot,
+  canOperatePlatform = true,
+  canManageStructure = true,
   syncLoading = false,
   scraperLoading = false,
   scrapeProgress = null,
@@ -243,6 +285,8 @@ export function AccountTableRow({
   onSync?: () => void;
   onRunScraper?: () => void;
   onRemoveFromSlot?: () => void;
+  canOperatePlatform?: boolean;
+  canManageStructure?: boolean;
   syncLoading?: boolean;
   scraperLoading?: boolean;
   scrapeProgress?: UiScrapeProgress | null;
@@ -252,8 +296,10 @@ export function AccountTableRow({
   const isPending = row.syncState === 'pending';
   const isProcessing = row.actionProcess !== null;
 
+  const operateLocked = !canOperatePlatform;
+  const structureLocked = !canManageStructure;
   const showRemoveHover =
-    Boolean(onRemoveFromSlot) && !isPending && !isProcessing;
+    (Boolean(onRemoveFromSlot) || structureLocked) && !isPending && !isProcessing;
 
   return (
     <>
@@ -271,8 +317,17 @@ export function AccountTableRow({
                 )}
               </p>
             </div>
-            {showRemoveHover ? <AccountRemoveSlotIcon onRemove={onRemoveFromSlot!} /> : null}
-            <AccountSyncIcon onSync={onSync} loading={syncLoading} />
+            {showRemoveHover ? (
+              <AccountRemoveSlotIcon
+                onRemove={onRemoveFromSlot}
+                structureLocked={structureLocked}
+              />
+            ) : null}
+            <AccountSyncIcon
+              onSync={onSync}
+              loading={syncLoading}
+              operateLocked={operateLocked}
+            />
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--brand">
@@ -321,6 +376,7 @@ export function AccountTableRow({
               scraperLoading={scraperLoading}
               scrapeProgress={scrapeProgress}
               onRunScraper={onRunScraper}
+              operateLocked={operateLocked}
             />
           </div>
         </td>
@@ -359,9 +415,11 @@ export function AccountTableRow({
 export function AccountEmptySlotRow({
   slot,
   onAdd,
+  structureLocked = false,
 }: {
   slot: AccountBrandEmptySlot;
-  onAdd: () => void;
+  onAdd?: () => void;
+  structureLocked?: boolean;
 }) {
   const { t } = useLanguage();
 
@@ -411,13 +469,22 @@ export function AccountEmptySlotRow({
       </td>
       <td className="brand-col-cell brand-col-cell--action">
         <div className="brand-col-cell-inner">
-          <button
-            type="button"
-            className="brand-card-action-btn brand-card-action-btn--slot brand-card-action-btn--nowrap"
-            onClick={onAdd}
-          >
-            {t('groupMonitoring.accountCard.addAccountSlot')}
-          </button>
+          {structureLocked ? (
+            <PermissionLockedButton
+              variant="text"
+              className="brand-card-action-btn brand-card-action-btn--slot brand-card-action-btn--nowrap"
+            >
+              {t('groupMonitoring.accountCard.addAccountSlot')}
+            </PermissionLockedButton>
+          ) : (
+            <button
+              type="button"
+              className="brand-card-action-btn brand-card-action-btn--slot brand-card-action-btn--nowrap"
+              onClick={onAdd}
+            >
+              {t('groupMonitoring.accountCard.addAccountSlot')}
+            </button>
+          )}
         </div>
       </td>
     </tr>

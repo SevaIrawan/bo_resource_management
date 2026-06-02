@@ -19,6 +19,8 @@ import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 interface AccountBrandCardProps {
   group: AccountBrandGroup;
+  canManageStructure?: boolean;
+  canOperatePlatform?: boolean;
   onAddAccount: (input: AddAccountInput) => Promise<void>;
   onSyncAccount?: (accountId: string) => void;
   onRemoveFromSlot?: (account: import('@/types/accountMonitoringUi').AccountBrandRow) => void;
@@ -32,6 +34,8 @@ interface AccountBrandCardProps {
 
 export function AccountBrandCard({
   group,
+  canManageStructure = true,
+  canOperatePlatform = true,
   onAddAccount,
   onSyncAccount,
   onRemoveFromSlot,
@@ -53,6 +57,7 @@ export function AccountBrandCard({
   const allAligned = group.misalignedCount === 0;
 
   function openAddFlow(platform: Platform, slotId?: string) {
+    if (!canManageStructure) return;
     setAddSlotId(slotId);
     setAddPlatform(platform);
     setSaveError(null);
@@ -60,6 +65,7 @@ export function AccountBrandCard({
   }
 
   function openAddFromSlot(slotId: string) {
+    if (!canManageStructure) return;
     setAddSlotId(slotId);
     setAddPlatform(null);
     setSaveError(null);
@@ -153,15 +159,17 @@ export function AccountBrandCard({
                 ? t('groupMonitoring.accountCard.allAligned')
                 : t('groupMonitoring.accountCard.misaligned', { count: group.misalignedCount })}
             </span>
-            <AddAccountHeaderMenu onSelectPlatform={(platform) => openAddFlow(platform)} />
+            <AddAccountHeaderMenu
+              locked={!canManageStructure}
+              onSelectPlatform={(platform) => openAddFlow(platform)}
+            />
           </div>
 
-          {onDismiss ? (
-            <CardDismissButton
-              onDismiss={onDismiss}
-              className="card-header-dismiss-btn brand-card-header-dismiss"
-            />
-          ) : null}
+          <CardDismissButton
+            locked={!canManageStructure}
+            onDismiss={onDismiss}
+            className="card-header-dismiss-btn brand-card-header-dismiss"
+          />
         </div>
 
         {expanded ? (
@@ -174,6 +182,8 @@ export function AccountBrandCard({
                     <AccountTableRow
                       key={row.id}
                       row={row}
+                      canOperatePlatform={canOperatePlatform}
+                      canManageStructure={canManageStructure}
                       syncLoading={checkingAccountId === row.id}
                       scraperLoading={scraperAccountId === row.id}
                       scrapeProgress={getScrapeProgress?.(row.id) ?? null}
@@ -188,6 +198,7 @@ export function AccountBrandCard({
                     <AccountEmptySlotRow
                       key={slot.id}
                       slot={slot}
+                      structureLocked={!canManageStructure}
                       onAdd={() => openAddFromSlot(slot.id)}
                     />
                   ))}

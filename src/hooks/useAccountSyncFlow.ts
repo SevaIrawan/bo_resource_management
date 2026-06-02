@@ -76,6 +76,8 @@ interface UseAccountSyncFlowOptions {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   userId?: string | null;
   onTicketsReload?: () => void;
+  /** false untuk non-admin — blok Sync/Run/login platform. */
+  canOperatePlatform?: boolean;
 }
 
 function patchGroup(
@@ -115,6 +117,7 @@ export function useAccountSyncFlow({
   onGroupsChange,
   userId,
   onTicketsReload,
+  canOperatePlatform = true,
 }: UseAccountSyncFlowOptions) {
   const [processingAccountId, setProcessingAccountId] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<'sync' | 'scraper' | null>(null);
@@ -334,6 +337,8 @@ export function useAccountSyncFlow({
 
   const runSyncCheck = useCallback(
     async (groupId: string, account: AccountBrandRow) => {
+      if (!canOperatePlatform) return;
+
       if (!userId) {
         showSyncError('AUTH_REQUIRED', groupId, account);
         return;
@@ -530,6 +535,7 @@ export function useAccountSyncFlow({
     },
     [
       applyResult,
+      canOperatePlatform,
       clearRowProcessing,
       setRowProcessing,
       showLoginModal,
@@ -760,6 +766,8 @@ export function useAccountSyncFlow({
 
   const handleRunScraper = useCallback(
     async (groupId: string, account: AccountBrandRow) => {
+      if (!canOperatePlatform) return;
+
       setTarget({ groupId, account });
       setCheckError(null);
 
@@ -850,6 +858,7 @@ export function useAccountSyncFlow({
     },
     [
       applyResult,
+      canOperatePlatform,
       clearRowProcessing,
       runScrapeInBackground,
       setRowProcessing,

@@ -6,6 +6,7 @@ import {
 } from '@/components/group-monitoring/AccountMonitoringTableParts';
 import { flattenBrandAccounts } from '@/lib/accountBrandUtils';
 import { useLanguage } from '@/hooks/useLanguage';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 
@@ -19,11 +20,13 @@ interface AccountBrandTableViewProps {
 
 export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: AccountBrandTableViewProps) {
   const { t } = useLanguage();
+  const { canManageStructure, canOperatePlatform } = usePermissions();
   const rows = flattenBrandAccounts(groups);
   const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, getScrapeProgress } =
     sync;
 
   function handleSyncRow(accountId: string) {
+    if (!canOperatePlatform) return;
     const group = groups.find((item) => item.accounts.some((row) => row.id === accountId));
     const account = group?.accounts.find((row) => row.id === accountId);
     if (!group || !account) return;
@@ -31,6 +34,7 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
   }
 
   function handleScraperRow(accountId: string) {
+    if (!canOperatePlatform) return;
     const group = groups.find((item) => item.accounts.some((row) => row.id === accountId));
     const account = group?.accounts.find((row) => row.id === accountId);
     if (!group || !account) return;
@@ -38,6 +42,7 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
   }
 
   function handleRemoveRow(accountId: string) {
+    if (!canManageStructure) return;
     const group = groups.find((item) => item.accounts.some((row) => row.id === accountId));
     const account = group?.accounts.find((row) => row.id === accountId);
     if (!group || !account) return;
@@ -56,6 +61,8 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
                 <AccountTableRow
                   key={row.id}
                   row={row}
+                  canOperatePlatform={canOperatePlatform}
+                  canManageStructure={canManageStructure}
                   onSync={() => handleSyncRow(row.id)}
                   onRunScraper={() => handleScraperRow(row.id)}
                   syncLoading={

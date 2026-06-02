@@ -4,6 +4,7 @@ import { AccountBrandTableView } from '@/components/group-monitoring/AccountBran
 import { AccountMonitoringSyncModals } from '@/components/group-monitoring/AccountMonitoringSyncModals';
 import { RemoveAccountModal } from '@/components/group-monitoring/RemoveAccountModal';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import { useRemoveAccountFromSlot } from '@/hooks/useRemoveAccountFromSlot';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
@@ -17,6 +18,7 @@ interface AccountMonitoringBodyProps {
 export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { canManageStructure, canOperatePlatform } = usePermissions();
   const {
     groups,
     filteredGroups,
@@ -29,12 +31,18 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
   const sync = useAccountSyncFlow({
     onGroupsChange,
     userId: user?.id ?? null,
+    canOperatePlatform,
     onTicketsReload: () => {
       void reloadTickets();
     },
   });
 
-  const removeSlot = useRemoveAccountFromSlot(groups, onGroupsChange, user?.id);
+  const removeSlot = useRemoveAccountFromSlot(
+    groups,
+    onGroupsChange,
+    user?.id,
+    canManageStructure,
+  );
 
   const probeSuspendIds = useMemo(() => {
     const ids = new Set<string>();

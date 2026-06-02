@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Lock } from 'lucide-react';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -6,9 +7,13 @@ import type { Platform } from '@/types/database';
 
 interface AddAccountHeaderMenuProps {
   onSelectPlatform: (platform: Platform) => void;
+  locked?: boolean;
 }
 
-export function AddAccountHeaderMenu({ onSelectPlatform }: AddAccountHeaderMenuProps) {
+export function AddAccountHeaderMenu({
+  onSelectPlatform,
+  locked = false,
+}: AddAccountHeaderMenuProps) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -29,6 +34,22 @@ export function AddAccountHeaderMenu({ onSelectPlatform }: AddAccountHeaderMenuP
   function pick(platform: Platform) {
     onSelectPlatform(platform);
     setOpen(false);
+  }
+
+  if (locked) {
+    return (
+      <div className="brand-add-account-menu">
+        <button
+          type="button"
+          className="brand-add-account-btn brand-add-account-btn--locked"
+          disabled
+          title={t('permissions.adminOnlyAction')}
+        >
+          <Lock className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
+          {t('groupMonitoring.accountCard.addAccount')}
+        </button>
+      </div>
+    );
   }
 
   return (

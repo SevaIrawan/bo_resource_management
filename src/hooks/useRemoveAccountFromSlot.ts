@@ -14,16 +14,21 @@ export function useRemoveAccountFromSlot(
   groups: AccountBrandGroup[],
   onGroupsChange: (groups: AccountBrandGroup[]) => void,
   userId: string | null | undefined,
+  canManageStructure = true,
 ) {
   const { t } = useLanguage();
   const [removeTarget, setRemoveTarget] = useState<RemoveTarget | null>(null);
   const [removeSaving, setRemoveSaving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
-  const openRemoveModal = useCallback((groupId: string, account: AccountBrandRow) => {
-    setRemoveError(null);
-    setRemoveTarget({ groupId, account });
-  }, []);
+  const openRemoveModal = useCallback(
+    (groupId: string, account: AccountBrandRow) => {
+      if (!canManageStructure) return;
+      setRemoveError(null);
+      setRemoveTarget({ groupId, account });
+    },
+    [canManageStructure],
+  );
 
   const closeRemoveModal = useCallback(() => {
     if (removeSaving) return;
@@ -32,7 +37,7 @@ export function useRemoveAccountFromSlot(
   }, [removeSaving]);
 
   const commitRemoveFromSlot = useCallback(async () => {
-    if (!removeTarget) return;
+    if (!canManageStructure || !removeTarget) return;
 
     const { groupId, account } = removeTarget;
     setRemoveSaving(true);
@@ -57,7 +62,7 @@ export function useRemoveAccountFromSlot(
     } finally {
       setRemoveSaving(false);
     }
-  }, [groups, onGroupsChange, removeTarget, userId, t]);
+  }, [canManageStructure, groups, onGroupsChange, removeTarget, userId, t]);
 
   return {
     removeTarget,

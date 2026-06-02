@@ -377,6 +377,9 @@ export const zh: Messages = {
     showPassword: '显示密码',
     hidePassword: '隐藏密码',
   },
+  permissions: {
+    adminOnlyAction: '此操作需要管理员账号。',
+  },
   admin: {
     title: '管理',
     openConfigFolder: '打开配置文件夹（.env）',

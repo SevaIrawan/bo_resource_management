@@ -3,6 +3,7 @@ import { AccountBrandCard } from '@/components/group-monitoring/AccountBrandCard
 import { AddBrandCard } from '@/components/group-monitoring/AddBrandCard';
 import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import { addAccountToGroup, createEmptyBrandGroup } from '@/lib/accountBrandUtils';
@@ -25,6 +26,7 @@ export function AccountBrandCardList({
   onRemoveFromSlot,
 }: AccountBrandCardListProps) {
   const { user } = useAuth();
+  const { canManageStructure, canOperatePlatform } = usePermissions();
   const { dismissBrandGroup } = useGroupMonitoring();
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -32,6 +34,7 @@ export function AccountBrandCardList({
     sync;
 
   async function handleAddBrand(brandName: string) {
+    if (!canManageStructure) return;
     let dbBrandId: string | undefined;
     if (user?.id) {
       const brand = await ensureBrand({ userId: user.id, brandName });
@@ -42,6 +45,7 @@ export function AccountBrandCardList({
   }
 
   async function handleAddAccount(groupId: string, input: AddAccountInput) {
+    if (!canManageStructure) return;
     const group = groups.find((item) => item.id === groupId);
     if (!group) return;
 
@@ -65,6 +69,7 @@ export function AccountBrandCardList({
   }
 
   function handleSyncByAccountId(groupId: string, accountId: string) {
+    if (!canOperatePlatform) return;
     const group = groups.find((item) => item.id === groupId);
     const account = group?.accounts.find((row) => row.id === accountId);
     if (!account) return;
@@ -80,9 +85,12 @@ export function AccountBrandCardList({
             key={group.id}
             group={group}
             onAddAccount={(input) => handleAddAccount(group.id, input)}
+            canManageStructure={canManageStructure}
+            canOperatePlatform={canOperatePlatform}
             onSyncAccount={(accountId) => handleSyncByAccountId(group.id, accountId)}
             onRemoveFromSlot={(account) => onRemoveFromSlot(group.id, account)}
             onRunScraper={(accountId) => {
+              if (!canOperatePlatform) return;
               const account = group.accounts.find((row) => row.id === accountId);
               if (account) void handleRunScraper(group.id, account);
             }}
@@ -96,11 +104,17 @@ export function AccountBrandCardList({
             onDismiss={() => dismissBrandGroup(group.id)}
           />
         ))}
-        <AddBrandCard onClick={() => setModalOpen(true)} />
+        <AddBrandCard
+          locked={!canManageStructure}
+          onClick={() => {
+            if (!canManageStructure) return;
+            setModalOpen(true);
+          }}
+        />
       </div>
 
       <AddBrandModal
-        open={modalOpen}
+        open={modalOpen && canManageStructure}
         onClose={() => setModalOpen(false)}
         onSubmit={handleAddBrand}
       />

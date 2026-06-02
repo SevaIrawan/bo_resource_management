@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GroupMonitoringContext } from '@/contexts/group-monitoring-context';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useAutoAccountSync } from '@/hooks/useAutoAccountSync';
 import { useRealtimeAccountSessions } from '@/hooks/useRealtimeAccountSessions';
 import { useRealtimeMonitoring } from '@/hooks/useRealtimeMonitoring';
@@ -10,6 +11,7 @@ import { assertRmSchema } from '@/lib/assertRmSchema';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { loadAccountMonitoringGroups } from '@/lib/loadAccountMonitoring';
 import { loadOpenTicketsForUser } from '@/lib/loadTickets';
+import { resolveMonitoringUserId } from '@/lib/monitoringDataUser';
 import {
   ACCOUNT_FILTER_DEFAULT,
   filterAccountGroups,
@@ -38,6 +40,7 @@ interface GroupMonitoringProviderProps {
 
 export function GroupMonitoringProvider({ children }: GroupMonitoringProviderProps) {
   const { user } = useAuth();
+  const { canAutoSync, canManageStructure } = usePermissions();
   const { t } = useLanguage();
   const { setTicketCount } = useMonitoringTab();
   const [groups, setGroups] = useState<AccountBrandGroup[]>([]);
@@ -72,10 +75,11 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       hydrateTicketProcessCache({});
       return;
     }
-    const loaded = await loadOpenTicketsForUser(user.id);
+    const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+    const loaded = await loadOpenTicketsForUser(dataUserId);
     setTickets(loaded);
     await reloadTicketHandles(loaded);
-  }, [user?.id, reloadTicketHandles]);
+  }, [user?.id, user?.userName, reloadTicketHandles]);
 
   const reloadAll = useCallback(async () => {
     if (!user?.id) {
@@ -89,9 +93,10 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     setError(null);
     try {
       await assertRmSchema();
+      const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
       const [loadedGroups, loadedTickets] = await Promise.all([
-        loadAccountMonitoringGroups(user.id),
-        loadOpenTicketsForUser(user.id),
+        loadAccountMonitoringGroups(dataUserId),
+        loadOpenTicketsForUser(dataUserId),
       ]);
       setGroups(loadedGroups);
       setTickets(loadedTickets);
@@ -106,7 +111,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     } finally {
       setLoading(false);
     }
-  }, [user?.id, t, reloadTicketHandles]);
+  }, [user?.id, user?.userName, t, reloadTicketHandles]);
 
   useEffect(() => {
     void reloadAll();
@@ -114,9 +119,13 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   const ticketSummaries = useMemo(() => groupOpenTickets(tickets), [tickets]);
 
-  const dismissBrandGroup = useCallback((groupId: string) => {
-    setDismissedBrandGroupIds((prev) => (prev.includes(groupId) ? prev : [...prev, groupId]));
-  }, []);
+  const dismissBrandGroup = useCallback(
+    (groupId: string) => {
+      if (!canManageStructure) return;
+      setDismissedBrandGroupIds((prev) => (prev.includes(groupId) ? prev : [...prev, groupId]));
+    },
+    [canManageStructure],
+  );
 
   const dismissedBrandSet = useMemo(() => new Set(dismissedBrandGroupIds), [dismissedBrandGroupIds]);
 
@@ -153,7 +162,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     userId: user?.id,
     groups,
     onGroupsChange: setGroups,
-    enabled: Boolean(user?.id),
+    enabled: Boolean(user?.id) && canAutoSync,
     loading,
     suspendAccountIds: probeSuspendAccountIds,
   });
@@ -172,9 +181,25 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     suspendProbeAccountIds: realtimeSuspendIds,
   });
 
+  const [monitoringUserId, setMonitoringUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setMonitoringUserId(null);
+      return;
+    }
+    let cancelled = false;
+    void resolveMonitoringUserId(user.id, user.userName).then((id) => {
+      if (!cancelled) setMonitoringUserId(id);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.userName]);
+
   useRealtimeMonitoring({
-    userId: user?.id ?? null,
-    enabled: Boolean(user?.id) && !loading,
+    userId: monitoringUserId,
+    enabled: Boolean(monitoringUserId) && !loading,
     suspendAccountIds: probeSuspendAccountIds,
     onGroupsChange: setGroups,
     onTicketsChange: handleTicketsRealtime,

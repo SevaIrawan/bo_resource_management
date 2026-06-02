@@ -385,6 +385,9 @@ export const en = {
     showPassword: 'Show password',
     hidePassword: 'Hide password',
   },
+  permissions: {
+    adminOnlyAction: 'This action requires an admin account.',
+  },
   admin: {
     title: 'Admin',
     openConfigFolder: 'Open configuration folder (.env)',

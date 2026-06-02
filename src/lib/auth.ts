@@ -19,10 +19,13 @@ export function getStoredAuth(): AuthUser | null {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as AuthUser;
+    const parsed = JSON.parse(raw) as Partial<AuthUser>;
     if (!parsed?.id || !parsed?.userName) return null;
 
-    return parsed;
+    return {
+      id: String(parsed.id),
+      userName: String(parsed.userName),
+    };
   } catch {
     return null;
   }

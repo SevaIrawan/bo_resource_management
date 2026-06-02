@@ -2,14 +2,19 @@ import './env';
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 import dotenv from 'dotenv';
+import { loadAppEnv } from './appEnv';
+import { registerAppIpc } from './registerAppIpc';
 import {
   cleanupPlatformLogin,
   registerPlatformLoginIpc,
   setPlatformLoginWindow,
 } from './platformLogin';
 import { registerScraperIpc } from './scraper';
+import { disposeAutoUpdate, setupAutoUpdate } from './autoUpdate';
 
-dotenv.config({ path: path.join(process.cwd(), '.env') });
+if (!app.isPackaged) {
+  dotenv.config({ path: path.join(process.cwd(), '.env') });
+}
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
@@ -19,7 +24,7 @@ function devServerUrl(): string {
   return `${base}/#/`;
 }
 
-function createWindow() {
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -68,15 +73,23 @@ function createWindow() {
   }
 
   setPlatformLoginWindow(mainWindow);
+  mainWindowRef = mainWindow;
+  return mainWindow;
 }
 
+let mainWindowRef: BrowserWindow | null = null;
+
 app.whenReady().then(() => {
+  loadAppEnv();
+  registerAppIpc();
   registerPlatformLoginIpc();
   registerScraperIpc();
   createWindow();
+  setupAutoUpdate(() => mainWindowRef);
 });
 
 app.on('before-quit', () => {
+  disposeAutoUpdate();
   cleanupPlatformLogin();
 });
 

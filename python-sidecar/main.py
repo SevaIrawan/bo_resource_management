@@ -22,8 +22,16 @@ from telegram_login import (
 )
 from telegram_scraper import count_telegram_groups, scrape_telegram_groups, validate_telegram_session
 
-ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env")
+def _load_env() -> None:
+    env_file = os.environ.get("RM_ENV_FILE", "").strip()
+    if env_file and Path(env_file).is_file():
+        load_dotenv(env_file)
+        return
+    root = Path(__file__).resolve().parent.parent
+    load_dotenv(root / ".env")
+
+
+_load_env()
 
 app = FastAPI(title="RM Telegram Sidecar")
 

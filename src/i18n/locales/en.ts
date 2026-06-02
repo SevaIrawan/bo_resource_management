@@ -378,12 +378,20 @@ export const en = {
     loading: 'Signing in…',
     invalidCredentials: 'Invalid username or password',
     supabaseNotConfigured: 'Database is not configured. Check your .env file.',
+    configRequired:
+      'App configuration is incomplete. Contact IT — reinstall the latest installer built with organization settings.',
+    openConfigFolder: 'Open configuration folder',
     loginFailed: 'Login failed. Please try again.',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
   },
   admin: {
     title: 'Admin',
+    openConfigFolder: 'Open configuration folder (.env)',
+    configFolderHint: 'Supabase + Telegram API keys · restart app after editing',
+    checkForUpdates: 'Check for app updates',
+    autoUpdateHint:
+      'Updates download automatically from GitHub. Restart when prompted — no reinstall.',
     subtitle: 'System status and application preferences',
     systemSection: 'System status',
     preferencesSection: 'Preferences',

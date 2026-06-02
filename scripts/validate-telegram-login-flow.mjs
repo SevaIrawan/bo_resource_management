@@ -16,6 +16,9 @@ function read(rel) {
 const tgPy = read('python-sidecar/telegram_login.py');
 const mainPy = read('python-sidecar/main.py');
 const sidecarTs = read('electron/main/platformLogin/telegramSidecar.ts');
+const appEnvTs = read('electron/main/appEnv.ts');
+const autoUpdateTs = read('electron/main/autoUpdate.ts');
+const indexTs = read('electron/main/index.ts');
 const loginTs = read('src/hooks/usePlatformLogin.ts');
 
 function fnBlock(source, name) {
@@ -66,8 +69,30 @@ const checks = [
       loginTs.includes('internal server error'),
   },
   {
-    name: 'Sidecar spawn memuat .env (TELEGRAM_API_ID/HASH)',
-    ok: sidecarTs.includes('sidecarEnv') && sidecarTs.includes('dotenv'),
+    name: 'Sidecar spawn memuat .env via loadAppEnv + RM_ENV_FILE',
+    ok:
+      sidecarTs.includes('sidecarEnv') &&
+      sidecarTs.includes('loadAppEnv') &&
+      sidecarTs.includes('RM_ENV_FILE') &&
+      appEnvTs.includes('TELEGRAM_API_ID') &&
+      appEnvTs.includes('dotenv'),
+  },
+  {
+    name: 'Python sidecar baca RM_ENV_FILE',
+    ok: mainPy.includes('RM_ENV_FILE') && mainPy.includes('load_dotenv'),
+  },
+  {
+    name: 'Installer: bundled sidecar exe path (packaged)',
+    ok:
+      sidecarTs.includes('rm-telegram-sidecar.exe') &&
+      sidecarTs.includes('process.resourcesPath'),
+  },
+  {
+    name: 'Auto-update GitHub (electron-updater)',
+    ok:
+      autoUpdateTs.includes('autoUpdater') &&
+      autoUpdateTs.includes('update-downloaded') &&
+      indexTs.includes('setupAutoUpdate'),
   },
 ];
 

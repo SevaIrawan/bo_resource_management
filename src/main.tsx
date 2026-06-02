@@ -5,16 +5,21 @@ import App from './App';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { initSupabaseConfig } from '@/lib/supabase';
 import './index.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <LanguageProvider>
-      <AuthProvider>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-      </AuthProvider>
-    </LanguageProvider>
-  </StrictMode>,
-);
+const rootEl = document.getElementById('root')!;
+
+void initSupabaseConfig().then(() => {
+  createRoot(rootEl).render(
+    <StrictMode>
+      <LanguageProvider>
+        <AuthProvider>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </AuthProvider>
+      </LanguageProvider>
+    </StrictMode>,
+  );
+});

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Database, KeyRound, Server, Shield } from 'lucide-react';
 import { AdminExpandCard } from '@/components/admin/AdminExpandCard';
 import { AutoSyncSettingsSection } from '@/components/settings/AutoSyncSettingsSection';
@@ -11,6 +12,7 @@ export function AdminPage() {
   const { locale, setLocale, t } = useLanguage();
   const supabaseReady = isSupabaseConfigured();
   const { enabled, intervalMinutes } = useAutoSyncSettings();
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
 
   const items = [
     {
@@ -85,6 +87,41 @@ export function AdminPage() {
             ))}
           </div>
         </section>
+
+        {window.electronAPI?.app?.openConfigFolder ? (
+          <section className="space-y-3">
+            <div>
+              <button
+                type="button"
+                className="rounded-lg border border-border-subtle bg-bg-shell px-4 py-2 text-xs font-medium text-text-primary hover:bg-bg-active"
+                onClick={() => void window.electronAPI?.app?.openConfigFolder()}
+              >
+                {t('admin.openConfigFolder')}
+              </button>
+              <p className="mt-2 text-xs text-text-muted">{t('admin.configFolderHint')}</p>
+            </div>
+            {window.electronAPI.app.checkForUpdates ? (
+              <div>
+                <button
+                  type="button"
+                  className="rounded-lg border border-border-subtle bg-bg-shell px-4 py-2 text-xs font-medium text-text-primary hover:bg-bg-active"
+                  onClick={() => {
+                    setUpdateMsg(null);
+                    void window.electronAPI?.app?.checkForUpdates?.().then((r) => {
+                      setUpdateMsg(r.message ?? r.status);
+                    });
+                  }}
+                >
+                  {t('admin.checkForUpdates')}
+                </button>
+                <p className="mt-2 text-xs text-text-muted">{t('admin.autoUpdateHint')}</p>
+                {updateMsg ? (
+                  <p className="mt-1 text-xs text-text-secondary">{updateMsg}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         <section className="border-t border-border-subtle pt-8">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">

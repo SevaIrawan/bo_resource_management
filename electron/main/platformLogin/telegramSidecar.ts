@@ -1,8 +1,9 @@
 import type { BrowserWindow } from 'electron';
 import { spawn, exec, type ChildProcessWithoutNullSignals } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
-import dotenv from 'dotenv';
+import { getEnvFilePath, loadAppEnv } from '../appEnv';
 
 const SIDECAR_URL = 'http://127.0.0.1:8765';
 export { SIDECAR_URL };
@@ -29,10 +30,33 @@ function projectRoot() {
   return app.isPackaged ? app.getAppPath() : process.cwd();
 }
 
-function sidecarEnv(): NodeJS.ProcessEnv {
+function bundledSidecarExe(): string {
+  return path.join(process.resourcesPath, 'sidecar', 'rm-telegram-sidecar.exe');
+}
+
+function resolveSidecarLaunch(): { command: string; args: string[]; cwd: string } {
+  if (app.isPackaged) {
+    const exe = bundledSidecarExe();
+    if (!fs.existsSync(exe)) {
+      throw new Error(
+        'Komponen Telegram tidak ditemukan di instalasi. Install ulang Resource Management.',
+      );
+    }
+    return { command: exe, args: [], cwd: path.dirname(exe) };
+  }
+
   const root = projectRoot();
-  const parsed = dotenv.config({ path: path.join(root, '.env') }).parsed ?? {};
-  return { ...process.env, ...parsed };
+  const script = path.join(root, 'python-sidecar', 'main.py');
+  const [pythonBin, pythonArgs] = getPythonCommand();
+  return { command: pythonBin, args: [...pythonArgs, script], cwd: root };
+}
+
+function sidecarEnv(): NodeJS.ProcessEnv {
+  loadAppEnv();
+  return {
+    ...process.env,
+    RM_ENV_FILE: getEnvFilePath(),
+  };
 }
 
 async function parseSidecarJson<T>(res: Response): Promise<T> {
@@ -110,11 +134,9 @@ export async function ensureSidecarRunning() {
         // not running yet
       }
 
-      const root = projectRoot();
-      const script = path.join(root, 'python-sidecar', 'main.py');
-      const [pythonBin, pythonArgs] = getPythonCommand();
-      sidecarProcess = spawn(pythonBin, [...pythonArgs, script], {
-        cwd: root,
+      const launch = resolveSidecarLaunch();
+      sidecarProcess = spawn(launch.command, launch.args, {
+        cwd: launch.cwd,
         env: sidecarEnv(),
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,

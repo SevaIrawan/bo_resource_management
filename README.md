@@ -2,6 +2,10 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
+**Dokumen resmi (kondisi proyek terkini):** **[PROJECT.md](./PROJECT.md)** — arsitektur, installer, auto-update, Supabase realtime, kontrak internal.
+
+**Panduan user (PDF / Word, bukan Markdown):** [docs/guides/documents/](./docs/guides/documents/) · rebuild: `npm run build:handbook-docs`
+
 ## Stack
 
 - **Electron** — desktop app (Windows)
@@ -36,7 +40,8 @@ Isi `.env`:
 | Variable | Untuk apa | Dari mana |
 |----------|-----------|-----------|
 | `VITE_SUPABASE_URL` | Supabase project URL | Supabase Dashboard → Settings → API |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key (client) | Supabase Dashboard → Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Kunci app desktop (internal) | Supabase → service_role |
+| `VITE_SUPABASE_ANON_KEY` | Opsional (dev) | Supabase → anon |
 | `TELEGRAM_API_ID` | Telethon login | [my.telegram.org](https://my.telegram.org) → API Development tools |
 | `TELEGRAM_API_HASH` | Telethon login (**rahasia**) | Sama — jangan expose ke UI |
 
@@ -49,13 +54,17 @@ Isi `.env`:
 npm run dev
 ```
 
-## Build Desktop (Windows)
+## Build Desktop (Windows) — installer untuk PC lain
 
-```bash
-npm run electron:build
+```powershell
+npm run build:installer
 ```
 
-Output: `release/` folder
+Output: `release\Resource Management Setup ….exe`
+
+Panduan: **[INSTALL-WINDOWS.md](./INSTALL-WINDOWS.md)** · Rilis/update: `npm run publish:github`
+
+Ringkas: tim internal install `.exe` sekali → login → SYNC WA/TG. Config terbundel; update kode via auto-update (Restart).
 
 ## Export (Excel)
 
@@ -70,8 +79,8 @@ Output: `release/` folder
 **Urutan SQL wajib (jangan tebak-tebak):** lihat **[SUPABASE_RUNBOOK.md](./SUPABASE_RUNBOOK.md)** di root project.
 
 Ringkas:
-- **DB baru:** `003` → `017` → `020` → `023`
-- **DB sudah jalan:** `018` (sekali) → `019` (opsional) → `020` → `023`
+- **DB baru:** `003` → `017` → `020` → `023` → `024` → `025` → `026`
+- **DB sudah jalan:** `018` (sekali) → `019` (opsional) → `020` → `023` → `024`–`026`
 - Error console `404 sync_activity_logs` / `400 session_status` = belum jalankan **`023`**
 
 **Prinsip:** Semua data bisnis di Supabase; session WA/TG tersimpan + Realtime; metrik sync di `account_snapshots`; audit di `platform_session_logs` & `scrape_runs`.

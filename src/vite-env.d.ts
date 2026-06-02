@@ -32,6 +32,31 @@ declare global {
     electronAPI?: {
       platform: string;
       isElectron: boolean;
+      app?: {
+        getConfig: () => Promise<{
+          supabaseUrl: string;
+          /** Service role jika ada di .env bawaan IT; fallback anon (dev). */
+          supabaseKey: string;
+          supabaseAnonKey: string;
+          hasTelegramApi: boolean;
+          envPath: string;
+          configured: boolean;
+          missing: string[];
+        }>;
+        getConfigStatus: () => Promise<{
+          envPath: string;
+          configured: boolean;
+          missing: string[];
+          supabaseUrl: string | null;
+          hasTelegramApi: boolean;
+          bundledOrgConfig: boolean;
+        }>;
+        openConfigFolder: () => Promise<{ ok: boolean }>;
+        checkForUpdates: () => Promise<{
+          status: 'dev' | 'checking' | 'error';
+          message?: string;
+        }>;
+      };
       platformLogin?: {
         start: (payload: {
           sessionId: string;

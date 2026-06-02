@@ -17,6 +17,12 @@ interface PlatformLoginEvent {
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   isElectron: true,
+  app: {
+    getConfig: () => ipcRenderer.invoke('app:get-config'),
+    getConfigStatus: () => ipcRenderer.invoke('app:get-config-status'),
+    openConfigFolder: () => ipcRenderer.invoke('app:open-config-folder'),
+    checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
+  },
   platformLogin: {
     start: (payload: {
       sessionId: string;

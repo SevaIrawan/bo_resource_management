@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Resource Management — Official User Guide</title>
+  <link rel="stylesheet" href="../../confluence.css" />
+</head>
+<body class="confluence-document">
+  <header class="doc-cover">
+    <p class="doc-cover-logo">Backend Operation</p>
+    <h1>Resource Management</h1>
+    <p class="doc-cover-subtitle">Official User Guide</p>
+    <table class="doc-meta-table"></table>
+  </header>
+  
+<section class="doc-toc">
+  <p class="doc-toc-title">Table of contents</p>
+  <ol><li><a href="#table-of-contents">Table of contents</a></li>
+<li><a href="#1-overview">1. Overview</a></li>
+<li><a href="#2-getting-started">2. Getting started</a></li>
+<li><a href="#3-navigation-and-layout">3. Navigation and layout</a></li>
+<li><a href="#4-account-tab-account-monitoring">4. Account tab — account monitoring</a></li>
+<li><a href="#5-ticket-tab-issues-and-remediation">5. Ticket tab — issues and remediation</a></li>
+<li><a href="#6-admin-page">6. Admin page</a></li>
+<li><a href="#7-data-synchronization-realtime">7. Data synchronization (realtime)</a></li>
+<li><a href="#8-recommended-daily-workflows">8. Recommended daily workflows</a></li>
+<li><a href="#9-glossary">9. Glossary</a></li>
+<li><a href="#10-faq">10. FAQ</a></li>
+<li><a href="#appendix-quick-feature-map">Appendix — Quick feature map</a></li></ol>
+</section>
+  <main class="doc-body">
+    <h1 id="resource-management-official-user-guide-english">Resource Management — Official User Guide (English)</h1>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Product</strong></td>
+<td>Backend Operation — Resource Management</td>
+</tr>
+<tr>
+<td><strong>App version</strong></td>
+<td>0.1.1</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Internal operations team (marketing / monitoring of WhatsApp &amp; Telegram groups)</td>
+</tr>
+<tr>
+<td><strong>Platform</strong></td>
+<td>Windows desktop (<code>.exe</code>)</td>
+</tr>
+<tr>
+<td><strong>UI languages</strong></td>
+<td>English / 中文 (Admin → Language)</td>
+</tr>
+</tbody></table>
+<p>This document is the <strong>official guide to every feature</strong> in the current application. For architecture and IT release notes, see <a href="../../PROJECT.md">PROJECT.md</a>.</p>
+<hr>
+<h2 id="table-of-contents">Table of contents</h2>
+<ol>
+<li><a href="#1-overview">Overview</a></li>
+<li><a href="#2-getting-started">Getting started</a></li>
+<li><a href="#3-navigation-and-layout">Navigation and layout</a></li>
+<li><a href="#4-account-tab--account-monitoring">Account tab — account monitoring</a></li>
+<li><a href="#5-ticket-tab--issues-and-remediation">Ticket tab — issues and remediation</a></li>
+<li><a href="#6-admin-page">Admin page</a></li>
+<li><a href="#7-data-synchronization-realtime">Data synchronization (realtime)</a></li>
+<li><a href="#8-recommended-daily-workflows">Recommended daily workflows</a></li>
+<li><a href="#9-glossary">Glossary</a></li>
+<li><a href="#10-faq">FAQ</a></li>
+<li><a href="#appendix--quick-feature-map">Appendix — Quick feature map</a></li>
+</ol>
+<hr>
+<h2 id="1-overview">1. Overview</h2>
+<h3 id="1-1-what-does-this-application-do">1.1 What does this application do?</h3>
+<p>Resource Management helps your team:</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Multi-account registry</td>
+<td>Register many <strong>WhatsApp</strong> and <strong>Telegram</strong> accounts per <strong>brand</strong> (e.g. SBMY)</td>
+</tr>
+<tr>
+<td>Session health</td>
+<td>Check whether accounts are still <strong>logged in</strong> on phone/PC (session)</td>
+</tr>
+<tr>
+<td>Group alignment</td>
+<td>Compare <strong>groups on device</strong> vs <strong>brand standard</strong> (master list)</td>
+</tr>
+<tr>
+<td>Scraper</td>
+<td>Run a full read of groups from the device and save to the database</td>
+</tr>
+<tr>
+<td>Tickets / issues</td>
+<td>See remediation tasks (missing groups, not admin, duplicates, junk groups, etc.)</td>
+</tr>
+<tr>
+<td>Export</td>
+<td>Export filtered data to <strong>Excel</strong> for field operations</td>
+</tr>
+</tbody></table>
+<h3 id="1-2-two-types-of-login">1.2 Two types of “login”</h3>
+<p>Do not confuse these — they serve different purposes.</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Purpose</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Dashboard login</strong></td>
+<td>Access the application</td>
+<td><strong>Username</strong> + <strong>Password</strong> (from IT, <code>users</code> table)</td>
+</tr>
+<tr>
+<td><strong>Platform login</strong></td>
+<td>Link WA/TG to a marketing account</td>
+<td><strong>Sync (↻)</strong> → QR or phone-number modal</td>
+</tr>
+</tbody></table>
+<p>The dashboard password is <strong>not</strong> your Telegram or WhatsApp password.</p>
+<h3 id="1-3-what-is-not-a-ticket">1.3 What is **not** a ticket?</h3>
+<p>Changes to <strong>session login/logout</strong> in the <strong>Session</strong> column do <strong>not</strong> create tickets. Tickets only cover <strong>group and admin</strong> problems relative to the brand standard.</p>
+<h3 id="1-4-who-should-read-which-sections">1.4 Who should read which sections?</h3>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Primary sections</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Field / marketing ops</td>
+<td>§2–§5, §8</td>
+</tr>
+<tr>
+<td>Team lead</td>
+<td>§4–§5 KPIs, bookmarks, export</td>
+</tr>
+<tr>
+<td>IT / support</td>
+<td>§6, §7, §10 FAQ</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="2-getting-started">2. Getting started</h2>
+<h3 id="2-1-install-once-per-pc">2.1 Install (once per PC)</h3>
+<ol>
+<li>Run <strong><code>Resource Management Setup x.x.x.exe</code></strong> provided by IT.</li>
+<li>Complete the installer wizard → <strong>Install</strong>.</li>
+<li>Open the app from the <strong>desktop shortcut</strong>.</li>
+<li><strong>No manual <code>.env</code> setup</strong> is required — organization settings are bundled in the installer.</li>
+</ol>
+<p>For detailed Windows steps, see <a href="../../INSTALL-WINDOWS.md">INSTALL-WINDOWS.md</a>.</p>
+<h3 id="2-2-dashboard-login">2.2 Dashboard login</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Enter <strong>Username</strong> and <strong>Password</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Click <strong>Login</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>On failure</td>
+</tr>
+</tbody></table>
+<p><strong>Login screen labels (UI):</strong> Username, Password, <strong>Login</strong>, tagline <em>Telegram &amp; WhatsApp Operations</em>.</p>
+<p><strong>Common errors:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Meaning</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Invalid username or password</td>
+<td>Wrong credentials</td>
+<td>Verify with IT</td>
+</tr>
+<tr>
+<td>Database is not configured</td>
+<td>Supabase missing on this PC</td>
+<td>IT: reinstall or open configuration folder</td>
+</tr>
+<tr>
+<td>App configuration is incomplete</td>
+<td>Org env not baked into installer</td>
+<td>IT: rebuild installer with org settings</td>
+</tr>
+</tbody></table>
+<h3 id="2-3-after-login">2.3 After login</h3>
+<p>You land on <strong>Group Monitoring</strong> (main workspace) with the <strong>Account</strong> tab selected by default.</p>
+<hr>
+<h2 id="3-navigation-and-layout">3. Navigation and layout</h2>
+<h3 id="3-1-sidebar-left">3.1 Sidebar (left)</h3>
+<table>
+<thead>
+<tr>
+<th>Icon / menu</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Logo</strong></td>
+<td><strong>Backend Operation</strong> — <strong>Resource Management</strong></td>
+</tr>
+<tr>
+<td><strong>Group Monitoring</strong></td>
+<td>Main page — accounts &amp; tickets</td>
+</tr>
+<tr>
+<td><strong>Admin</strong></td>
+<td>System status &amp; preferences</td>
+</tr>
+<tr>
+<td><strong>Logout (power)</strong></td>
+<td>Exit dashboard only — does <strong>not</strong> auto-logout WA/TG on phone</td>
+</tr>
+</tbody></table>
+<p><strong>Tip:</strong> Collapse the sidebar to icon-only mode — use <strong>Toggle sidebar</strong> in the header.</p>
+<h3 id="3-2-header-top">3.2 Header (top)</h3>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Page title</td>
+<td>Active module (e.g. Group Monitoring, Admin)</td>
+</tr>
+<tr>
+<td><strong>Welcome</strong> + user name</td>
+<td>Currently signed-in user</td>
+</tr>
+<tr>
+<td><strong>Logout</strong></td>
+<td>Exit dashboard</td>
+</tr>
+</tbody></table>
+<h3 id="3-3-sub-header-group-monitoring-only">3.3 Sub-header (Group Monitoring only)</h3>
+<table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Account</strong></td>
+<td>Brand cards &amp; WA/TG account rows</td>
+</tr>
+<tr>
+<td><strong>Ticket</strong></td>
+<td>Open issues to remediate (badge = open issue count)</td>
+</tr>
+</tbody></table>
+<p>Switching tabs updates KPI cards and the filter toolbar below.</p>
+<h3 id="3-4-kpi-cards-summary-numbers">3.4 KPI cards (summary numbers)</h3>
+<p>Numbers refresh when you change tab or when data updates from the database.</p>
+<h4 id="account-tab-kpis">Account tab KPIs</h4>
+<table>
+<thead>
+<tr>
+<th>KPI</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Brands</strong></td>
+<td>Number of brand cards visible</td>
+</tr>
+<tr>
+<td><strong>Accounts</strong></td>
+<td>Filled account rows</td>
+</tr>
+<tr>
+<td><strong>Online</strong></td>
+<td>Accounts with <strong>Active</strong> status (session valid)</td>
+</tr>
+<tr>
+<td><strong>Aligned</strong></td>
+<td>Accounts matching brand standard for their platform</td>
+</tr>
+<tr>
+<td><strong>Issue</strong></td>
+<td>Accounts <strong>not aligned</strong></td>
+</tr>
+<tr>
+<td><strong>Open issues</strong></td>
+<td>Count of open ticket issues (rollup)</td>
+</tr>
+</tbody></table>
+<h4 id="ticket-tab-kpis">Ticket tab KPIs</h4>
+<table>
+<thead>
+<tr>
+<th>KPI</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Open issues</strong></td>
+<td>Issue cards shown</td>
+</tr>
+<tr>
+<td><strong>Missing groups</strong></td>
+<td>Issues of type <em>Missing group</em></td>
+</tr>
+<tr>
+<td><strong>Not admin</strong></td>
+<td>Issues of type <em>Not admin</em></td>
+</tr>
+<tr>
+<td><strong>Groups to handle</strong></td>
+<td>Total group rows across all issues</td>
+</tr>
+<tr>
+<td><strong>Accounts involved</strong></td>
+<td>Distinct accounts in filtered issues</td>
+</tr>
+<tr>
+<td><strong>Brands involved</strong></td>
+<td>Distinct brands in filtered issues</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="4-account-tab-account-monitoring">4. Account tab — account monitoring</h2>
+<h3 id="4-1-toolbar-filters-and-tools-slicer-bar">4.1 Toolbar — filters and tools (slicer bar)</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Location</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Search box</strong></td>
+<td>Left</td>
+<td>Search account name or phone number</td>
+</tr>
+<tr>
+<td><strong>Search</strong> button</td>
+<td>Beside box</td>
+<td>Run search (Enter key also works)</td>
+</tr>
+<tr>
+<td><strong>Filter Brand</strong></td>
+<td>Right</td>
+<td>One brand or <strong>All brands</strong></td>
+</tr>
+<tr>
+<td><strong>Filter Platform</strong></td>
+<td>Right</td>
+<td>WhatsApp / Telegram / All</td>
+</tr>
+<tr>
+<td><strong>Filter Status</strong></td>
+<td>Right</td>
+<td>Active / Logout / All</td>
+</tr>
+<tr>
+<td><strong>Card view / Table view</strong></td>
+<td>Right</td>
+<td>Per-brand cards vs single combined table</td>
+</tr>
+<tr>
+<td><strong>Export</strong> (download icon)</td>
+<td>Right</td>
+<td>Excel export of accounts <strong>matching current filters</strong></td>
+</tr>
+</tbody></table>
+<p>Placeholder text: <em>Search account name / phone number…</em></p>
+<h3 id="4-2-brand-card-card-view">4.2 Brand card (Card view)</h3>
+<p>Each brand (e.g. <strong>Brand : SBMY</strong>) has one card.</p>
+<h4 id="brand-header">Brand header</h4>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Arrow</strong></td>
+<td>Collapse / expand account table</td>
+</tr>
+<tr>
+<td><strong>Brand title</strong></td>
+<td>Brand name</td>
+</tr>
+<tr>
+<td><strong>Account count badge</strong></td>
+<td>e.g. <em>12 accounts</em></td>
+</tr>
+<tr>
+<td><strong>WA x std / TG x std</strong></td>
+<td>Standard (master) group count per platform</td>
+</tr>
+<tr>
+<td><strong>All aligned</strong> / <strong>N accounts not aligned</strong></td>
+<td>Health summary for this brand</td>
+</tr>
+<tr>
+<td><strong>+Add</strong></td>
+<td>Add new account (choose WA or TG)</td>
+</tr>
+<tr>
+<td><strong>X (Dismiss)</strong></td>
+<td>Hide card for <strong>this session only</strong> — does not delete database data</td>
+</tr>
+</tbody></table>
+<h4 id="add-account-add">Add account (+Add)</h4>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Click <strong>+Add</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Select <strong>WhatsApp</strong> or <strong>Telegram</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Enter <strong>Account name</strong> (team label, e.g. marketing name)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Enter <strong>Account phone number</strong> (recommended; <code>@username</code> allowed for TG)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Click <strong>Save</strong></td>
+</tr>
+</tbody></table>
+<p><strong>Empty account slot:</strong> Row labeled <em>Empty account slot</em> → <strong>Add account</strong> fills the slot without adding extra rows outside defined slots.</p>
+<h3 id="4-3-account-table-columns">4.3 Account table columns</h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+<th>How to read</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Account</strong></td>
+<td>Platform + name + phone</td>
+<td>WA/TG icon, name, number below</td>
+</tr>
+<tr>
+<td><strong>Brand</strong></td>
+<td>Brand name</td>
+<td>Same for all rows in the card</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td><strong>Active</strong> = valid session; <strong>Logout</strong> = invalid</td>
+<td>Green / red indicator</td>
+</tr>
+<tr>
+<td><strong>Session</strong></td>
+<td><strong>Valid</strong> / <strong>Invalid</strong></td>
+<td>Invalid → platform login required first</td>
+</tr>
+<tr>
+<td><strong>Groups</strong></td>
+<td><code>Y/X</code></td>
+<td>Y = groups on device today; X = brand standard for same platform</td>
+</tr>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Bar + <code>a/X</code></td>
+<td>How many groups you are admin of vs standard</td>
+</tr>
+<tr>
+<td><strong>Scraper</strong></td>
+<td><strong>Run</strong> + time / progress</td>
+<td>Full group read into database</td>
+</tr>
+<tr>
+<td><strong>Action</strong></td>
+<td><strong>Group link</strong></td>
+<td>Open group list + invite links</td>
+</tr>
+</tbody></table>
+<p><strong>Important:</strong> WhatsApp and Telegram totals are <strong>separate</strong> — do not compare <code>Y/X</code> across platforms on one row.</p>
+<h3 id="4-4-row-controls">4.4 Row controls</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>↻ (Sync)</strong></td>
+<td>Primary flow: platform login or live session check + count update</td>
+</tr>
+<tr>
+<td><strong>X (hover, right of name)</strong></td>
+<td><strong>Remove from slot</strong> — detach account from slot (confirmation modal)</td>
+</tr>
+<tr>
+<td><strong>Group link</strong></td>
+<td>Modal: group name, ID, invite link, admin flag — needs scrape data</td>
+</tr>
+</tbody></table>
+<p>Tooltip: <strong>Sync account</strong>.</p>
+<h3 id="4-5-sync-flow-critical">4.5 Sync (↻) flow — critical</h3>
+<p>Sync behavior depends on <strong>Session</strong> column value.</p>
+<h4 id="session-invalid">Session = **Invalid**</h4>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Click <strong>↻</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Platform login modal opens (QR default, or phone login)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Scan QR on marketing phone (WA: Linked devices; TG: Link Desktop Device)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>On success: session saved, group counts refresh</td>
+</tr>
+<tr>
+<td>5</td>
+<td>App may prompt <strong>Run scraper</strong> to save full group list to DB</td>
+</tr>
+</tbody></table>
+<h4 id="session-valid">Session = **Valid**</h4>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Click <strong>↻</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>App checks WA/TG still active on <strong>this PC</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>If OK: <strong>Groups</strong> / <strong>Admin</strong> numbers update</td>
+</tr>
+<tr>
+<td>4</td>
+<td>If failed: prompted to log in again</td>
+</tr>
+</tbody></table>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Platform login runs only in the <strong>desktop app</strong> (not browser-only).</li>
+<li>If QR does not appear within ~10 seconds: close modal, wait a few seconds, <strong>Sync</strong> again.</li>
+<li>Long sync (&gt;3 min) on Telegram with many groups: retry or restart app.</li>
+</ul>
+<h3 id="4-6-scraper-column-run-button">4.6 Scraper column — **Run** button</h3>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Display</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Session invalid</td>
+<td><em>Use Sync (↻) to log in first</em></td>
+<td>Sync first</td>
+</tr>
+<tr>
+<td>Already aligned</td>
+<td><strong>Last update</strong> time only</td>
+<td>Run usually not needed</td>
+</tr>
+<tr>
+<td><strong>Not aligned</strong></td>
+<td><strong>Run</strong> + timestamp</td>
+<td>Click <strong>Run</strong> → read all groups from phone → save DB → tickets refresh</td>
+</tr>
+<tr>
+<td>Running</td>
+<td><em>Reading groups…</em> / progress</td>
+<td>Wait (can take minutes for large group lists)</td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Run</strong></td>
+<td>Full scrape — all groups written to database</td>
+</tr>
+<tr>
+<td><strong>Sync</strong></td>
+<td>Session check + summary counts — not always a full scrape</td>
+</tr>
+</tbody></table>
+<p>After login, you may see: <em>Login OK. Device group &amp; admin counts are updated. Save the full group list to the database now?</em> → choose <strong>Run scraper</strong> or <strong>Later</strong>.</p>
+<h3 id="4-7-group-link-modal">4.7 Group link modal</h3>
+<p>Open via <strong>Action → Group link</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Table</td>
+<td>Group name, Group ID, Invite link, Admin (Yes/No)</td>
+</tr>
+<tr>
+<td>Admin filter</td>
+<td>All / admin only / non-admin</td>
+</tr>
+<tr>
+<td>Pagination</td>
+<td>Previous / Next when many groups</td>
+</tr>
+<tr>
+<td>Scroll</td>
+<td>Scroll inside table (viewport hint for large pages)</td>
+</tr>
+</tbody></table>
+<p>Empty list? Run <strong>Run</strong> scraper first. Message: <em>No links. Run scraper first.</em></p>
+<h3 id="4-8-remove-account-from-slot">4.8 Remove account from slot</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Hover account row → <strong>X</strong> icon</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Confirm <strong>Remove from slot?</strong> → <strong>Remove</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Effect</td>
+</tr>
+</tbody></table>
+<p>Use before swapping test accounts for production marketing accounts — or let IT delete from database (see §7).</p>
+<h3 id="4-9-add-brand-card">4.9 Add brand card</h3>
+<p>At end of card list: <strong>Add Card View</strong> → enter brand name → <strong>Create card</strong>.</p>
+<h3 id="4-10-table-view">4.10 Table view</h3>
+<p>All brands in <strong>one table</strong> with the same columns. Filters and export in the toolbar still apply.</p>
+<h3 id="4-11-platform-login-modal-reference">4.11 Platform login modal (reference)</h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>WhatsApp</th>
+<th>Telegram</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>QR</td>
+<td>Linked devices → Link a device</td>
+<td>Settings → Devices → Link Desktop Device</td>
+</tr>
+<tr>
+<td>Phone</td>
+<td>Pairing code on phone</td>
+<td>SMS code / 2FA password</td>
+</tr>
+</tbody></table>
+<p>Modal actions: close, switch QR ↔ phone, verify code/password, <strong>OK</strong> when connected.</p>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>UI hint</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>QR timeout (10s)</td>
+<td><em>QR code did not appear within 10 seconds…</em></td>
+<td>Close, wait, Sync again</td>
+</tr>
+<tr>
+<td>Telegram QR timeout</td>
+<td><em>Telegram QR timed out…</em></td>
+<td>Restart app; IT checks API keys in <code>.env</code></td>
+</tr>
+<tr>
+<td>WhatsApp QR timeout</td>
+<td><em>WhatsApp QR timed out…</em></td>
+<td>Restart; ensure WhatsApp Web reachable on PC</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="5-ticket-tab-issues-and-remediation">5. Ticket tab — issues and remediation</h2>
+<h3 id="5-1-when-do-tickets-appear">5.1 When do tickets appear?</h3>
+<p>After an account has scrape/sync data, the system compares <strong>device groups (daily snapshot)</strong> vs <strong>brand master</strong>. Mismatches create tickets automatically.</p>
+<h3 id="5-2-issue-types-filter-all-ticket-types">5.2 Issue types (filter: All ticket types)</h3>
+<table>
+<thead>
+<tr>
+<th>Type (UI)</th>
+<th>Short meaning</th>
+<th>Typical field action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Missing group</strong></td>
+<td>In brand master but not on this account</td>
+<td>Join group (use export invite links)</td>
+</tr>
+<tr>
+<td><strong>Not admin</strong></td>
+<td>In group but not admin</td>
+<td>Request admin rights</td>
+</tr>
+<tr>
+<td><strong>Group count mismatch</strong></td>
+<td>Device count ≠ brand standard</td>
+<td>Audit and align</td>
+</tr>
+<tr>
+<td><strong>Duplicate group ID</strong></td>
+<td>Same ID, conflicting names</td>
+<td>Audit master data</td>
+</tr>
+<tr>
+<td><strong>Duplicate group name</strong></td>
+<td>Same name, different IDs in master</td>
+<td>Audit master data</td>
+</tr>
+<tr>
+<td><strong>Device junk group</strong></td>
+<td>On phone but not in master</td>
+<td>Leave/clean junk groups on phone</td>
+</tr>
+</tbody></table>
+<p>Session login/logout does <strong>not</strong> create tickets.</p>
+<h3 id="5-3-ticket-toolbar">5.3 Ticket toolbar</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Search</td>
+<td><em>Search account / group…</em></td>
+</tr>
+<tr>
+<td>Filter Brand / Platform / Type</td>
+<td>Narrow issue list</td>
+</tr>
+<tr>
+<td><strong>Bookmark: In Progress</strong></td>
+<td>Issues marked <em>In Progress</em></td>
+</tr>
+<tr>
+<td><strong>Bookmark: Completed</strong></td>
+<td>Issues marked <em>Complete</em></td>
+</tr>
+<tr>
+<td><strong>Export</strong></td>
+<td>Excel for all issues <strong>matching filters</strong></td>
+</tr>
+</tbody></table>
+<p><strong>Issue workflow views:</strong> In Progress · Completed</p>
+<h3 id="5-4-issue-card">5.4 Issue card</h3>
+<p>Each card = <strong>one issue</strong> per: account + brand + issue type.</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Title</td>
+<td>Account name</td>
+</tr>
+<tr>
+<td>Badge</td>
+<td>Issue type (color-coded)</td>
+</tr>
+<tr>
+<td>Platform</td>
+<td>WA / TG</td>
+</tr>
+<tr>
+<td>Meta</td>
+<td>Phone · brand</td>
+</tr>
+<tr>
+<td>Description</td>
+<td>Summary (group counts, headlines)</td>
+</tr>
+<tr>
+<td><strong>Process</strong> / <strong>New</strong> / status caption</td>
+<td>Workflow — <strong>click</strong> to open handle form</td>
+</tr>
+<tr>
+<td><strong>Double-click card</strong></td>
+<td>Full <strong>detail</strong> table (all group rows)</td>
+</tr>
+</tbody></table>
+<p>Hint on card: <em>Double-click for full detail table</em></p>
+<h3 id="5-5-process-modal-workflow">5.5 Process modal (workflow)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Task status</strong></td>
+<td>To Do → In Progress → Complete / Interrupted</td>
+</tr>
+<tr>
+<td>Due dates / remarks</td>
+<td>Stored in database (<code>ticket_issue_handles</code>)</td>
+</tr>
+<tr>
+<td><strong>Save</strong></td>
+<td>Persist and close</td>
+</tr>
+<tr>
+<td><strong>Export</strong></td>
+<td>Excel for this issue only</td>
+</tr>
+</tbody></table>
+<p>Bookmarks <strong>In Progress</strong> / <strong>Completed</strong> follow the saved task status.</p>
+<h3 id="5-6-detail-modal-double-click">5.6 Detail modal (double-click)</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Full table</td>
+<td>All groups involved in the issue</td>
+</tr>
+<tr>
+<td><strong>Export</strong></td>
+<td>Field remediation reference for this issue</td>
+</tr>
+<tr>
+<td>Close</td>
+<td><strong>Esc</strong> or click outside — <strong>Close</strong> button</td>
+</tr>
+</tbody></table>
+<h3 id="5-7-ticket-account-relationship">5.7 Ticket ↔ Account relationship</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Fix groups on phone (join, admin, remove junk)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>On affected account: <strong>Sync</strong> or <strong>Run</strong> again</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Tickets close or shrink when data aligns (realtime after DB update)</td>
+</tr>
+</tbody></table>
+<p>If tickets remain after phone fix: <strong>Run</strong> scraper to push latest device data.</p>
+<hr>
+<h2 id="6-admin-page">6. Admin page</h2>
+<p>Open from sidebar: <strong>Admin</strong>.</p>
+<p>Subtitle: <em>System status and application preferences</em></p>
+<h3 id="6-1-system-status">6.1 System status</h3>
+<table>
+<thead>
+<tr>
+<th>Card</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Supabase</strong></td>
+<td><strong>Connected</strong> = database reachable</td>
+</tr>
+<tr>
+<td><strong>Active sessions</strong></td>
+<td>Placeholder (not a live session count)</td>
+</tr>
+<tr>
+<td><strong>Platform</strong></td>
+<td>Desktop / Web</td>
+</tr>
+<tr>
+<td><strong>Session tables</strong></td>
+<td>Count of active RM session tables</td>
+</tr>
+</tbody></table>
+<h3 id="6-2-it-tools-desktop-only">6.2 IT tools (desktop only)</h3>
+<table>
+<thead>
+<tr>
+<th>Button</th>
+<th>Function</th>
+<th>Typical user</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Open configuration folder (.env)</strong></td>
+<td>AppData folder (<code>.env</code>, wa-sessions)</td>
+<td>IT</td>
+</tr>
+<tr>
+<td><strong>Check for app updates</strong></td>
+<td>Manual GitHub update check</td>
+<td>IT / power users</td>
+</tr>
+</tbody></table>
+<p>Operational users normally <strong>do not</strong> need the config folder if IT installed the correct build.</p>
+<p><strong>Auto-update:</strong> Updates download from GitHub automatically. <strong>Restart</strong> when prompted — no reinstall.</p>
+<h3 id="6-3-preferences">6.3 Preferences</h3>
+<h4 id="automatic-account-sync">Automatic account sync</h4>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Enabled</strong></td>
+<td>Background checks while app is open (same logic as per-account <strong>Sync</strong>)</td>
+</tr>
+<tr>
+<td><strong>Interval (minutes)</strong></td>
+<td>How often to run (default often 60 minutes)</td>
+</tr>
+</tbody></table>
+<p>Logs activity to the database with timestamps. Does <strong>not</strong> replace a full <strong>Run</strong> scrape when no scrape data exists yet.</p>
+<p>Summary on Admin card: <em>On · N min</em> or <em>Off</em>.</p>
+<h4 id="language">Language</h4>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>English</strong></td>
+<td>UI labels, modals, KPIs in English</td>
+</tr>
+<tr>
+<td><strong>中文</strong></td>
+<td>UI in Simplified Chinese</td>
+</tr>
+</tbody></table>
+<p>Change applies immediately across dashboard captions.</p>
+<hr>
+<h2 id="7-data-synchronization-realtime">7. Data synchronization (realtime)</h2>
+<h3 id="7-1-database-changes-open-apps">7.1 Database changes → open apps</h3>
+<p>When IT or automation changes <strong>Supabase</strong> (accounts, tickets, master groups, session flags):</p>
+<table>
+<thead>
+<tr>
+<th>Behavior</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Live refresh</td>
+<td>Open apps update within seconds to minutes</td>
+</tr>
+<tr>
+<td>No reinstall</td>
+<td>Data-only changes need no new installer</td>
+</tr>
+</tbody></table>
+<p>Example: IT deletes a test account → row disappears on every user’s dashboard.</p>
+<h3 id="7-2-code-ui-changes-app-update">7.2 Code / UI changes → app update</h3>
+<p>Requires a <strong>new app version</strong> (auto-update + <strong>Restart</strong>). See <a href="../../PROJECT.md">PROJECT.md §4.4</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Change type</th>
+<th>Delivery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Data in Supabase</td>
+<td>Realtime</td>
+</tr>
+<tr>
+<td>New buttons, layout, logic</td>
+<td>New <code>.exe</code> version</td>
+</tr>
+</tbody></table>
+<h3 id="7-3-pc-vs-cloud-storage">7.3 PC vs cloud storage</h3>
+<table>
+<thead>
+<tr>
+<th>Location</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Cloud (Supabase)</strong></td>
+<td>Brands, accounts, groups, tickets, session flags</td>
+</tr>
+<tr>
+<td><strong>PC (AppData)</strong></td>
+<td>WhatsApp auth per account, auto-sync preference, language</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="8-recommended-daily-workflows">8. Recommended daily workflows</h2>
+<h3 id="8-1-onboard-a-new-marketing-account-after-test-data-cleanup">8.1 Onboard a new marketing account (after test data cleanup)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Dashboard <strong>Login</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Open target brand (or <strong>Add Card View</strong>)</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>+Add</strong> → WA or TG → name + phone → <strong>Save</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>↻ Sync</strong> → scan QR on marketing phone</td>
+</tr>
+<tr>
+<td>5</td>
+<td>If prompted → <strong>Run</strong> scraper</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Ticket</strong> tab → handle issues → <strong>Export</strong> if needed</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Repeat per account</td>
+</tr>
+</tbody></table>
+<h3 id="8-2-routine-health-check">8.2 Routine health check</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>Account</strong> tab — set brand/platform filters</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Review <strong>N accounts not aligned</strong> on brand headers</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Sync</strong> rows with <strong>Invalid</strong> session</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Run</strong> where counts are stale or not aligned</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Ticket</strong> tab — bookmark <strong>In Progress</strong> → remediate → mark <strong>Complete</strong></td>
+</tr>
+</tbody></table>
+<h3 id="8-3-replace-test-accounts-with-production-accounts">8.3 Replace test accounts with production accounts</h3>
+<p><strong>Option A (recommended):</strong> <strong>Remove from slot</strong> for each test account in app → IT cleans database  </p>
+<p><strong>Option B:</strong> IT deletes rows in Supabase → dashboard clears in realtime → team <strong>+Add</strong> and platform login for new accounts</p>
+<h3 id="8-4-end-of-shift">8.4 End of shift</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Leave sessions linked</td>
+<td>OK — dashboard logout does not unlink phone</td>
+</tr>
+<tr>
+<td>Hand off open tickets</td>
+<td>Set <strong>In Progress</strong> + remarks in <strong>Process</strong> modal</td>
+</tr>
+<tr>
+<td>Export for next shift</td>
+<td>Ticket or Account <strong>Export</strong> with filters applied</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="9-glossary">9. Glossary</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Brand</strong></td>
+<td>Operations unit (e.g. SBMY) with a master group list per WA/TG</td>
+</tr>
+<tr>
+<td><strong>Account / slot</strong></td>
+<td>One WA or TG row under a brand</td>
+</tr>
+<tr>
+<td><strong>Master / std</strong></td>
+<td>Brand standard group list (<code>groups_master</code>)</td>
+</tr>
+<tr>
+<td><strong>Daily</strong></td>
+<td>Today’s device group snapshot</td>
+</tr>
+<tr>
+<td><strong>Aligned</strong></td>
+<td>Device groups match brand standard for that platform</td>
+</tr>
+<tr>
+<td><strong>Session Valid</strong></td>
+<td>Active session record in DB (may still need device check today)</td>
+</tr>
+<tr>
+<td><strong>Sync</strong></td>
+<td>↻ button — login or live device verification</td>
+</tr>
+<tr>
+<td><strong>Run / Scraper</strong></td>
+<td>Full read of groups from phone → database</td>
+</tr>
+<tr>
+<td><strong>Ticket / Issue</strong></td>
+<td>Remediation task for group data</td>
+</tr>
+<tr>
+<td><strong>Bookmark</strong></td>
+<td>Ticket filters: In Progress / Completed</td>
+</tr>
+<tr>
+<td><strong>Slicer</strong></td>
+<td>Filter &amp; tool bar above cards/table</td>
+</tr>
+<tr>
+<td><strong>Group Monitoring</strong></td>
+<td>Main module for accounts and tickets</td>
+</tr>
+<tr>
+<td><strong>Backend Operation</strong></td>
+<td>Product family name shown in sidebar</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="10-faq">10. FAQ</h2>
+<p><strong>Do I need to reinstall when the app updates?</strong><br>No. <strong>Restart</strong> after the update notification (if IT published to GitHub).</p>
+<p><strong>Does deleting data in Supabase remove the installer?</strong><br>No. Only dashboard data changes.</p>
+<p><strong>Why is Session Valid but Run still asks for login?</strong><br>This PC may have lost the device session — click <strong>Sync</strong> to verify.</p>
+<p><strong>What does Groups <code>12/21</code> mean?</strong><br>12 groups detected on device; 21 = brand standard for that platform (WA and TG counted separately).</p>
+<p><strong>Can one PC host many WhatsApp accounts?</strong><br>Yes — hundreds are supported, but each account needs its own QR scan; Chrome processes are limited (~4 concurrent).</p>
+<p><strong>Tickets remain after I fixed groups on the phone?</strong><br>Click <strong>Run</strong> or <strong>Sync</strong> so fresh device data reaches the database.</p>
+<p><strong>Dashboard login fails?</strong><br>Contact IT — account required in <code>users</code> table.</p>
+<p><strong>Telegram QR or login errors?</strong><br>Contact IT — verify Telegram API credentials and database migration <code>023</code>.</p>
+<p><strong>What is the difference between Card view and Table view?</strong><br>Same data; Card view groups by brand, Table view is one flat list.</p>
+<p><strong>Does Dismiss (X on brand card) delete the brand?</strong><br>No — it only hides the card until you reload or refilter.</p>
+<p><strong>Where is UI language changed?</strong><br><strong>Admin</strong> → <strong>Preferences</strong> → <strong>Language</strong> → English or 中文.</p>
+<hr>
+<h2 id="appendix-quick-feature-map">Appendix — Quick feature map</h2>
+<pre><code>Login (Username / Password)
+  └─ Group Monitoring
+        ├─ [Tab Account]
+        │     ├─ KPI: Brands, Accounts, Online, Aligned, Issue, Open issues
+        │     ├─ Slicer: Search, Brand, Platform, Status, Card|Table, Export
+        │     └─ Per Brand Card
+        │           ├─ +Add account (WhatsApp / Telegram)
+        │           ├─ Row: Sync ↻ | Remove X | Group link
+        │           └─ Scraper: Run
+        └─ [Tab Ticket]
+              ├─ KPI: Open, Missing, Not admin, Groups to handle, …
+              ├─ Slicer: Search, filters, In Progress | Completed, Export
+              ├─ 6 issue types
+              └─ Issue card → Process modal | Double-click Detail
+  └─ Admin
+        ├─ System status (Supabase, Platform, …)
+        ├─ Open configuration folder / Check for app updates (IT)
+        └─ Automatic account sync + Language (EN / 中文)
+</code></pre>
+<h3 id="appendix-b-issue-type-export-columns-detail-export">Appendix B — Issue type → export columns (detail export)</h3>
+<p>Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type, Group name, Group ID, Invite link, Note.</p>
+<h3 id="appendix-c-related-documents">Appendix C — Related documents</h3>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="../../PROJECT.md">PROJECT.md</a></td>
+<td>Architecture, releases, IT</td>
+</tr>
+<tr>
+<td><a href="../../INSTALL-WINDOWS.md">INSTALL-WINDOWS.md</a></td>
+<td>Windows install steps</td>
+</tr>
+<tr>
+<td><a href="../HANDBOOK.md">HANDBOOK.md</a></td>
+<td>Bahasa Indonesia edition (same structure)</td>
+</tr>
+<tr>
+<td><a href="./HANDBOOK-zh.md">HANDBOOK-zh.md</a></td>
+<td>简体中文用户手册</td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>This guide matches application version <strong>0.1.1</strong>. Update this document when new features ship.</em></p>
+
+  </main>
+  <footer class="doc-footer">
+    <p>Internal use only — Resource Management v0.1.1</p>
+  </footer>
+</body>
+</html>

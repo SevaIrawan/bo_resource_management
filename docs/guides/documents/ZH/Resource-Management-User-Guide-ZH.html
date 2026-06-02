@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>资源管理 — 官方用户手册</title>
+  <link rel="stylesheet" href="../../confluence.css" />
+</head>
+<body class="confluence-document">
+  <header class="doc-cover">
+    <p class="doc-cover-logo">Backend Operation</p>
+    <h1>资源管理</h1>
+    <p class="doc-cover-subtitle">官方用户手册</p>
+    <table class="doc-meta-table"></table>
+  </header>
+  
+<section class="doc-toc">
+  <p class="doc-toc-title">目录</p>
+  <ol><li><a href="#目录">目录</a></li>
+<li><a href="#1-概述">1. 概述</a></li>
+<li><a href="#2-启动应用">2. 启动应用</a></li>
+<li><a href="#3-导航与布局">3. 导航与布局</a></li>
+<li><a href="#4-账号-标签-账号监控">4. 「账号」标签 — 账号监控</a></li>
+<li><a href="#5-工单-标签-问题与修复">5. 「工单」标签 — 问题与修复</a></li>
+<li><a href="#6-管理-页面">6. 「管理」页面</a></li>
+<li><a href="#7-数据同步-实时">7. 数据同步（实时）</a></li>
+<li><a href="#8-推荐日常工作流">8. 推荐日常工作流</a></li>
+<li><a href="#9-术语表">9. 术语表</a></li>
+<li><a href="#10-常见问题">10. 常见问题</a></li>
+<li><a href="#附录-功能速览图">附录 — 功能速览图</a></li></ol>
+</section>
+  <main class="doc-body">
+    <h1 id="资源管理-官方用户手册-中文">资源管理 — 官方用户手册（中文）</h1>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>产品</strong></td>
+<td>后端运营 — 资源管理（Backend Operation — Resource Management）</td>
+</tr>
+<tr>
+<td><strong>应用版本</strong></td>
+<td>0.1.1</td>
+</tr>
+<tr>
+<td><strong>适用对象</strong></td>
+<td>内部运营团队（营销 / WhatsApp 与 Telegram 群组监控）</td>
+</tr>
+<tr>
+<td><strong>平台</strong></td>
+<td>Windows 桌面端（<code>.exe</code>）</td>
+</tr>
+<tr>
+<td><strong>界面语言</strong></td>
+<td>English / 中文（<strong>管理</strong> → <strong>语言</strong>）</td>
+</tr>
+</tbody></table>
+<p>本文档为当前应用中<strong>全部功能的官方使用说明</strong>。架构与 IT 发布说明请参阅 <a href="../../PROJECT.md">PROJECT.md</a>。</p>
+<hr>
+<h2 id="目录">目录</h2>
+<ol>
+<li><a href="#1-%E6%A6%82%E8%BF%B0">概述</a></li>
+<li><a href="#2-%E5%90%AF%E5%8A%A8%E5%BA%94%E7%94%A8">启动应用</a></li>
+<li><a href="#3-%E5%AF%BC%E8%88%AA%E4%B8%8E%E5%B8%83%E5%B1%80">导航与布局</a></li>
+<li><a href="#4-%E8%B4%A6%E5%8F%B7%E6%A0%87%E7%AD%BE--%E8%B4%A6%E5%8F%B7%E7%9B%91%E6%8E%A7">「账号」标签 — 账号监控</a></li>
+<li><a href="#5-%E5%B7%A5%E5%8D%95%E6%A0%87%E7%AD%BE--%E9%97%AE%E9%A2%98%E4%B8%8E%E4%BF%AE%E5%A4%8D">「工单」标签 — 问题与修复</a></li>
+<li><a href="#6-%E7%AE%A1%E7%90%86%E9%A1%B5%E9%9D%A2">「管理」页面</a></li>
+<li><a href="#7-%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E5%AE%9E%E6%97%B6">数据同步（实时）</a></li>
+<li><a href="#8-%E6%8E%A8%E8%8D%90%E6%97%A5%E5%B8%B8%E5%B7%A5%E4%BD%9C%E6%B5%81">推荐日常工作流</a></li>
+<li><a href="#9-%E6%9C%AF%E8%AF%AD%E8%A1%A8">术语表</a></li>
+<li><a href="#10-%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98">常见问题</a></li>
+<li><a href="#%E9%99%84%E5%BD%95--%E5%8A%9F%E8%83%BD%E9%80%9F%E8%A7%88%E5%9B%BE">附录 — 功能速览图</a></li>
+</ol>
+<hr>
+<h2 id="1-概述">1. 概述</h2>
+<h3 id="1-1-本应用做什么">1.1 本应用做什么？</h3>
+<p>资源管理帮助团队完成以下工作：</p>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>多账号登记</td>
+<td>按<strong>品牌</strong>（如 SBMY）登记多个 <strong>WhatsApp</strong> 与 <strong>Telegram</strong> 账号</td>
+</tr>
+<tr>
+<td>会话健康</td>
+<td>检查账号在手机/本机是否仍<strong>在线</strong>（会话）</td>
+</tr>
+<tr>
+<td>群组对齐</td>
+<td>对比<strong>设备上的群</strong>与<strong>品牌标准群清单</strong>（主表）</td>
+</tr>
+<tr>
+<td>抓取</td>
+<td>从设备完整读取群组并写入数据库</td>
+</tr>
+<tr>
+<td>工单 / 问题</td>
+<td>查看需修复项（缺标准群、非管理员、重复、设备多余群等）</td>
+</tr>
+<tr>
+<td>导出</td>
+<td>将筛选结果导出为 <strong>Excel</strong>，供现场作业使用</td>
+</tr>
+</tbody></table>
+<h3 id="1-2-两种-登录">1.2 两种「登录」</h3>
+<p>请勿混淆 — 用途完全不同。</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>用途</th>
+<th>操作方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>仪表板登录</strong></td>
+<td>进入应用</td>
+<td><strong>用户名</strong> + <strong>密码</strong>（由 IT 提供，对应 <code>users</code> 表）</td>
+</tr>
+<tr>
+<td><strong>平台登录</strong></td>
+<td>将 WA/TG 关联到营销账号</td>
+<td>点击 <strong>同步 (↻)</strong> → 二维码或手机号登录弹窗</td>
+</tr>
+</tbody></table>
+<p>仪表板密码<strong>不是</strong> Telegram 或 WhatsApp 的密码。</p>
+<h3 id="1-3-什么-不会-生成工单">1.3 什么**不会**生成工单？</h3>
+<p><strong>会话</strong>列中的登录/登出变化<strong>不会</strong>产生工单。工单仅针对相对品牌标准的<strong>群组与管理员</strong>问题。</p>
+<h3 id="1-4-阅读指引-按角色">1.4 阅读指引（按角色）</h3>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>建议章节</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>现场 / 营销运营</td>
+<td>§2–§5、§8</td>
+</tr>
+<tr>
+<td>组长</td>
+<td>§4–§5 KPI、书签、导出</td>
+</tr>
+<tr>
+<td>IT / 支持</td>
+<td>§6、§7、§10 常见问题</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="2-启动应用">2. 启动应用</h2>
+<h3 id="2-1-安装-每台-pc-一次">2.1 安装（每台 PC 一次）</h3>
+<ol>
+<li>运行 IT 提供的 <strong><code>Resource Management Setup x.x.x.exe</code></strong>。</li>
+<li>按安装向导完成 <strong>安装</strong>。</li>
+<li>从<strong>桌面快捷方式</strong>打开应用。</li>
+<li><strong>无需</strong>手动填写 <code>.env</code> — 组织配置已包含在安装包中。</li>
+</ol>
+<p>详细 Windows 步骤见 <a href="../../INSTALL-WINDOWS.md">INSTALL-WINDOWS.md</a>。</p>
+<h3 id="2-2-仪表板登录">2.2 仪表板登录</h3>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>输入 <strong>用户名</strong> 与 <strong>密码</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>点击 <strong>登录</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>若失败</td>
+</tr>
+</tbody></table>
+<p><strong>登录页界面文案：</strong> 用户名、密码、<strong>登录</strong>，副标题 <em>Telegram 与 WhatsApp 运营</em>。</p>
+<p><strong>常见提示：</strong></p>
+<table>
+<thead>
+<tr>
+<th>提示</th>
+<th>含义</th>
+<th>处理</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>用户名或密码错误</td>
+<td>凭据不正确</td>
+<td>向 IT 核实</td>
+</tr>
+<tr>
+<td>数据库未配置，请检查 .env 文件</td>
+<td>本机 Supabase 未配置</td>
+<td>IT：重装或打开配置文件夹</td>
+</tr>
+<tr>
+<td>应用配置不完整。请联系 IT…</td>
+<td>安装包未包含组织配置</td>
+<td>IT：使用含组织配置的最新安装包重装</td>
+</tr>
+</tbody></table>
+<h3 id="2-3-登录之后">2.3 登录之后</h3>
+<p>进入 <strong>群组监控</strong> 主界面，默认显示 <strong>账号</strong> 标签。</p>
+<hr>
+<h2 id="3-导航与布局">3. 导航与布局</h2>
+<h3 id="3-1-侧边栏-左侧">3.1 侧边栏（左侧）</h3>
+<table>
+<thead>
+<tr>
+<th>图标 / 菜单</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Logo</strong></td>
+<td><strong>后端运营</strong> — <strong>资源管理</strong></td>
+</tr>
+<tr>
+<td><strong>群组监控</strong></td>
+<td>主页面 — 账号与工单</td>
+</tr>
+<tr>
+<td><strong>管理</strong></td>
+<td>系统状态与偏好设置</td>
+</tr>
+<tr>
+<td><strong>退出（电源）</strong></td>
+<td>仅退出仪表板 — <strong>不会</strong>自动登出手机上的 WA/TG</td>
+</tr>
+</tbody></table>
+<p><strong>提示：</strong> 可收起侧边栏仅显示图标 — 使用顶栏 <strong>切换侧边栏</strong>。</p>
+<h3 id="3-2-顶栏">3.2 顶栏</h3>
+<table>
+<thead>
+<tr>
+<th>元素</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>页面标题</td>
+<td>当前模块（如 群组监控、管理）</td>
+</tr>
+<tr>
+<td><strong>欢迎</strong> + 用户名</td>
+<td>当前登录用户</td>
+</tr>
+<tr>
+<td><strong>退出</strong></td>
+<td>退出仪表板</td>
+</tr>
+</tbody></table>
+<h3 id="3-3-子标题栏-仅群组监控">3.3 子标题栏（仅群组监控）</h3>
+<table>
+<thead>
+<tr>
+<th>标签</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>账号</strong></td>
+<td>品牌卡片与 WA/TG 账号行</td>
+</tr>
+<tr>
+<td><strong>工单</strong></td>
+<td>待处理问题（数字为待处理工单数）</td>
+</tr>
+</tbody></table>
+<p>切换标签会更新 KPI 卡片与下方筛选工具栏。</p>
+<h3 id="3-4-kpi-卡片-汇总数字">3.4 KPI 卡片（汇总数字）</h3>
+<p>切换标签或数据库更新时，数字会刷新。</p>
+<h4 id="账号-标签-kpi">「账号」标签 KPI</h4>
+<table>
+<thead>
+<tr>
+<th>KPI</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>品牌</strong></td>
+<td>可见品牌卡片数量</td>
+</tr>
+<tr>
+<td><strong>账号总数</strong></td>
+<td>已填写的账号行数</td>
+</tr>
+<tr>
+<td><strong>在线</strong></td>
+<td>状态为<strong>在线</strong>的账号（会话有效）</td>
+</tr>
+<tr>
+<td><strong>已对齐</strong></td>
+<td>与该品牌标准一致的账号</td>
+</tr>
+<tr>
+<td><strong>需处理</strong></td>
+<td><strong>未对齐</strong>的账号</td>
+</tr>
+<tr>
+<td><strong>待处理工单</strong></td>
+<td>开放工单数量（汇总）</td>
+</tr>
+</tbody></table>
+<h4 id="工单-标签-kpi">「工单」标签 KPI</h4>
+<table>
+<thead>
+<tr>
+<th>KPI</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>待处理工单</strong></td>
+<td>当前显示的工单卡片数</td>
+</tr>
+<tr>
+<td><strong>缺标准群</strong></td>
+<td>类型为「缺标准群」的工单</td>
+</tr>
+<tr>
+<td><strong>非管理员</strong></td>
+<td>类型为「非管理员」的工单</td>
+</tr>
+<tr>
+<td><strong>待处理群组数</strong></td>
+<td>所有工单涉及的群组行总数</td>
+</tr>
+<tr>
+<td><strong>涉及账号</strong></td>
+<td>筛选结果中的账号数</td>
+</tr>
+<tr>
+<td><strong>涉及品牌</strong></td>
+<td>筛选结果中的品牌数</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="4-账号-标签-账号监控">4. 「账号」标签 — 账号监控</h2>
+<h3 id="4-1-工具栏-筛选与工具-切片栏">4.1 工具栏 — 筛选与工具（切片栏）</h3>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>位置</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>搜索框</strong></td>
+<td>左侧</td>
+<td>搜索账号名或电话号码</td>
+</tr>
+<tr>
+<td><strong>搜索</strong> 按钮</td>
+<td>搜索框旁</td>
+<td>执行搜索（也可按 Enter）</td>
+</tr>
+<tr>
+<td><strong>品牌筛选</strong></td>
+<td>右侧</td>
+<td>单一品牌或 <strong>全部品牌</strong></td>
+</tr>
+<tr>
+<td><strong>平台筛选</strong></td>
+<td>右侧</td>
+<td>WhatsApp / Telegram / 全部</td>
+</tr>
+<tr>
+<td><strong>状态筛选</strong></td>
+<td>右侧</td>
+<td>在线 / 已登出 / 全部</td>
+</tr>
+<tr>
+<td><strong>卡片视图 / 表格视图</strong></td>
+<td>右侧</td>
+<td>按品牌卡片 或 合并单表</td>
+</tr>
+<tr>
+<td><strong>导出</strong>（下载图标）</td>
+<td>右侧</td>
+<td>导出<strong>当前筛选条件下</strong>的账号 Excel</td>
+</tr>
+</tbody></table>
+<p>占位符：<em>搜索账号名 / 电话号码…</em></p>
+<h3 id="4-2-品牌卡片-卡片视图">4.2 品牌卡片（卡片视图）</h3>
+<p>每个品牌（如 <strong>品牌：SBMY</strong>）对应一张卡片。</p>
+<h4 id="品牌标题区">品牌标题区</h4>
+<table>
+<thead>
+<tr>
+<th>元素</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>箭头</strong></td>
+<td>折叠 / 展开账号表</td>
+</tr>
+<tr>
+<td><strong>品牌标题</strong></td>
+<td>品牌名称</td>
+</tr>
+<tr>
+<td><strong>账号数量</strong></td>
+<td>如 <em>12 个账号</em></td>
+</tr>
+<tr>
+<td><strong>WhatsApp 标准 x / Telegram 标准 x</strong></td>
+<td>各平台标准（主表）群数量</td>
+</tr>
+<tr>
+<td><strong>全部已对齐</strong> / <strong>x 个账号未对齐</strong></td>
+<td>该品牌数据健康摘要</td>
+</tr>
+<tr>
+<td><strong>+ 添加</strong></td>
+<td>添加新账号（选择 WA 或 TG）</td>
+</tr>
+<tr>
+<td><strong>X（从列表移除此卡片）</strong></td>
+<td>仅<strong>本次会话</strong>隐藏卡片 — 不删除数据库</td>
+</tr>
+</tbody></table>
+<h4 id="添加账号-添加">添加账号（+ 添加）</h4>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>点击 <strong>+ 添加</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>选择 <strong>WhatsApp</strong> 或 <strong>Telegram</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>填写 <strong>账号名称</strong>（团队标签，如营销姓名）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>填写 <strong>账号电话号码</strong>（建议填写；TG 可用 @username）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>点击 <strong>保存</strong></td>
+</tr>
+</tbody></table>
+<p><strong>空账号槽位：</strong> 显示 <em>空账号槽位</em> 的行 → 点击 <strong>添加账号</strong> 填充槽位，不会在槽位外额外增行。</p>
+<h3 id="4-3-账号表列说明">4.3 账号表列说明</h3>
+<table>
+<thead>
+<tr>
+<th>列名</th>
+<th>含义</th>
+<th>如何理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>账号</strong></td>
+<td>平台 + 名称 + 电话</td>
+<td>WA/TG 图标、名称、下方号码</td>
+</tr>
+<tr>
+<td><strong>品牌</strong></td>
+<td>品牌名</td>
+<td>本卡片内各行相同</td>
+</tr>
+<tr>
+<td><strong>状态</strong></td>
+<td><strong>在线</strong> = 会话有效；<strong>已登出</strong> = 无效</td>
+<td>绿 / 红指示</td>
+</tr>
+<tr>
+<td><strong>会话</strong></td>
+<td><strong>有效</strong> / <strong>无效</strong></td>
+<td>无效时需先完成平台登录</td>
+</tr>
+<tr>
+<td><strong>群组</strong></td>
+<td><code>Y/X</code></td>
+<td>Y = 当日设备群数；X = 该平台品牌标准群数</td>
+</tr>
+<tr>
+<td><strong>管理员</strong></td>
+<td>进度条 + <code>a/X</code></td>
+<td>您为管理员的群数 vs 标准</td>
+</tr>
+<tr>
+<td><strong>抓取</strong></td>
+<td><strong>运行</strong> + 时间 / 进度</td>
+<td>完整读取群组并写入数据库</td>
+</tr>
+<tr>
+<td><strong>操作</strong></td>
+<td><strong>群链接</strong></td>
+<td>打开群列表与邀请链接</td>
+</tr>
+</tbody></table>
+<p><strong>重要：</strong> WhatsApp 与 Telegram 的数量<strong>分开统计</strong>，不可在同一行跨平台比较 <code>Y/X</code>。</p>
+<h3 id="4-4-行内控件">4.4 行内控件</h3>
+<table>
+<thead>
+<tr>
+<th>控件</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>↻（同步）</strong></td>
+<td>主流程：平台登录或检查本机会话并更新计数</td>
+</tr>
+<tr>
+<td><strong>X（悬停于名称右侧）</strong></td>
+<td><strong>移出槽位</strong> — 从槽位移除账号（确认弹窗）</td>
+</tr>
+<tr>
+<td><strong>群链接</strong></td>
+<td>弹窗：群名称、群 ID、邀请链接、是否管理员 — 需先有抓取数据</td>
+</tr>
+</tbody></table>
+<p>提示文字：<strong>同步账号</strong>。</p>
+<h3 id="4-5-同步-流程-必读">4.5 **同步 (↻)** 流程 — 必读</h3>
+<p>行为取决于 <strong>会话</strong> 列取值。</p>
+<h4 id="会话-无效">会话 = **无效**</h4>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>点击 <strong>↻</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>打开平台登录弹窗（默认二维码，或手机号登录）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>在营销手机上扫码（WA：已关联的设备；TG：设置 → 设备 → 链接桌面设备）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>成功后：会话保存，群组数字更新</td>
+</tr>
+<tr>
+<td>5</td>
+<td>可能提示 <strong>抓取</strong> — 将完整群列表写入数据库</td>
+</tr>
+</tbody></table>
+<h4 id="会话-有效">会话 = **有效**</h4>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>点击 <strong>↻</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>应用检查本 PC 上 WA/TG 是否仍活跃</td>
+</tr>
+<tr>
+<td>3</td>
+<td>正常：更新 <strong>群组</strong> / <strong>管理员</strong> 数字</td>
+</tr>
+<tr>
+<td>4</td>
+<td>失败：提示重新登录</td>
+</tr>
+</tbody></table>
+<p><strong>说明：</strong></p>
+<ul>
+<li>平台登录仅在<strong>桌面客户端</strong>内完成（不能仅靠浏览器）。</li>
+<li>若约 10 秒内未显示二维码：关闭窗口，等待数秒后再次 <strong>同步</strong>。</li>
+<li>Telegram 群很多时同步超过 3 分钟：重试或重启应用。</li>
+</ul>
+<h3 id="4-6-抓取-列-运行-按钮">4.6 **抓取** 列 — **运行** 按钮</h3>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>显示</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>会话无效</td>
+<td><em>请先点击同步 (↻) 登录</em></td>
+<td>先同步</td>
+</tr>
+<tr>
+<td>已对齐</td>
+<td>仅显示 <strong>最后更新</strong> 时间</td>
+<td>通常无需运行</td>
+</tr>
+<tr>
+<td><strong>未对齐</strong></td>
+<td><strong>运行</strong> + 时间戳</td>
+<td>点击 <strong>运行</strong> → 从手机读取全部群 → 写入 DB → 工单刷新</td>
+</tr>
+<tr>
+<td>运行中</td>
+<td><em>读取群组中…</em> / 进度</td>
+<td>等待（群多时可需数分钟）</td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>术语</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>运行 / 运行抓取</strong></td>
+<td>完整抓取 — 全部群写入数据库</td>
+</tr>
+<tr>
+<td><strong>同步</strong></td>
+<td>检查会话 + 汇总计数 — 不一定是完整抓取</td>
+</tr>
+</tbody></table>
+<p>登录成功后可能提示：<em>登录成功，设备群组与管理员数已更新。是否立即抓取并写入数据库？</em> → 选 <strong>抓取</strong> 或 <strong>稍后</strong>。</p>
+<h3 id="4-7-群链接-弹窗">4.7 **群链接** 弹窗</h3>
+<p>通过 <strong>操作 → 群链接</strong> 打开。</p>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>表格</td>
+<td>群名称、群 ID、邀请链接、管理员（是/否）</td>
+</tr>
+<tr>
+<td>管理员筛选</td>
+<td>全部 / 仅管理员 / 非管理员</td>
+</tr>
+<tr>
+<td>分页</td>
+<td>群多时 <strong>上一页</strong> / <strong>下一页</strong></td>
+</tr>
+<tr>
+<td>滚动</td>
+<td>表格内滚动（大量行时有视口提示）</td>
+</tr>
+</tbody></table>
+<p>列表为空？先 <strong>运行抓取</strong>。提示：<em>无链接，请先抓取。</em></p>
+<h3 id="4-8-从槽位移除账号">4.8 从槽位移除账号</h3>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>悬停账号行 → <strong>X</strong> 图标</td>
+</tr>
+<tr>
+<td>2</td>
+<td>确认 <em>移出此槽位？</em> → <strong>移除</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>效果</td>
+</tr>
+</tbody></table>
+<p>在将测试账号换为正式营销账号前使用 — 或由 IT 在数据库中删除（见 §7）。</p>
+<h3 id="4-9-添加品牌卡片">4.9 添加品牌卡片</h3>
+<p>卡片列表末尾：<strong>添加卡片</strong> → 输入品牌名称 → <strong>创建卡片</strong>。</p>
+<h3 id="4-10-表格视图">4.10 表格视图</h3>
+<p>所有品牌合并为<strong>一张表</strong>，列与卡片视图相同。工具栏筛选与导出仍然生效。</p>
+<h3 id="4-11-平台登录弹窗-参考">4.11 平台登录弹窗（参考）</h3>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>WhatsApp</th>
+<th>Telegram</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>二维码</td>
+<td>已关联的设备 → 关联新设备</td>
+<td>设置 → 设备 → 链接桌面设备</td>
+</tr>
+<tr>
+<td>手机号</td>
+<td>在手机上输入配对码</td>
+<td>短信验证码 / 两步验证密码</td>
+</tr>
+</tbody></table>
+<p>弹窗操作：关闭、二维码 ↔ 手机号切换、验证、连接成功后 <strong>确定</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>界面提示</th>
+<th>处理</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10 秒无二维码</td>
+<td><em>10 秒内未显示二维码。请关闭窗口…</em></td>
+<td>关闭等待后再次同步</td>
+</tr>
+<tr>
+<td>Telegram 二维码超时</td>
+<td><em>Telegram 二维码超时…</em></td>
+<td>重启应用；IT 检查 <code>.env</code> 中 API 配置</td>
+</tr>
+<tr>
+<td>WhatsApp 二维码超时</td>
+<td><em>WhatsApp 二维码超时…</em></td>
+<td>重启；确保本机可连接 WhatsApp Web</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="5-工单-标签-问题与修复">5. 「工单」标签 — 问题与修复</h2>
+<h3 id="5-1-何时出现工单">5.1 何时出现工单？</h3>
+<p>账号完成抓取/同步后，系统比对<strong>设备群（每日快照）<strong>与</strong>品牌主表</strong>。存在差异则自动生成工单。</p>
+<h3 id="5-2-工单类型-筛选-全部工单类型">5.2 工单类型（筛选：**全部工单类型**）</h3>
+<table>
+<thead>
+<tr>
+<th>类型（界面）</th>
+<th>简要含义</th>
+<th>常见现场操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>缺标准群</strong></td>
+<td>品牌主表有、本账号无</td>
+<td>入群（用导出邀请链接）</td>
+</tr>
+<tr>
+<td><strong>非管理员</strong></td>
+<td>已在群但非 Admin</td>
+<td>申请管理员</td>
+</tr>
+<tr>
+<td><strong>群数不一致</strong></td>
+<td>设备群数 ≠ 品牌标准</td>
+<td>核对并对齐</td>
+</tr>
+<tr>
+<td><strong>群 ID 重复</strong></td>
+<td>相同 ID、名称冲突</td>
+<td>核对主表数据</td>
+</tr>
+<tr>
+<td><strong>群名重复</strong></td>
+<td>同名不同 ID（主表）</td>
+<td>核对主表数据</td>
+</tr>
+<tr>
+<td><strong>设备多余群</strong></td>
+<td>手机有、主表无</td>
+<td>在手机上清理/退群</td>
+</tr>
+</tbody></table>
+<p>会话登录/登出<strong>不会</strong>生成工单。</p>
+<h3 id="5-3-工单工具栏">5.3 工单工具栏</h3>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>搜索</td>
+<td><em>搜索账号 / 群组…</em></td>
+</tr>
+<tr>
+<td>品牌 / 平台 / 类型筛选</td>
+<td>缩小工单列表</td>
+</tr>
+<tr>
+<td><strong>书签：进行中</strong></td>
+<td>任务状态为「进行中」的工单</td>
+</tr>
+<tr>
+<td><strong>书签：已完成</strong></td>
+<td>任务状态为「完成」的工单</td>
+</tr>
+<tr>
+<td><strong>导出</strong></td>
+<td>导出<strong>当前筛选条件下</strong>的全部工单 Excel</td>
+</tr>
+</tbody></table>
+<p><strong>工单进度视图：</strong> 进行中 · 已完成</p>
+<h3 id="5-4-工单卡片">5.4 工单卡片</h3>
+<p>每张卡片 = 一个账号 + 品牌 + 工单类型的<strong>一个问题</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>区域</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>标题</td>
+<td>账号名称</td>
+</tr>
+<tr>
+<td>徽章</td>
+<td>工单类型（颜色区分）</td>
+</tr>
+<tr>
+<td>平台</td>
+<td>WA / TG</td>
+</tr>
+<tr>
+<td>元信息</td>
+<td>电话 · 品牌</td>
+</tr>
+<tr>
+<td>描述</td>
+<td>摘要（群数量、标题说明）</td>
+</tr>
+<tr>
+<td><strong>处理</strong> / <strong>新</strong> / 状态说明</td>
+<td>工作流 — <strong>单击</strong> 打开处理表单</td>
+</tr>
+<tr>
+<td><strong>双击卡片</strong></td>
+<td>完整<strong>明细</strong>表（全部群组行）</td>
+</tr>
+</tbody></table>
+<p>卡片提示：<em>双击查看完整明细表</em></p>
+<h3 id="5-5-处理工单-弹窗-工作流">5.5 **处理工单** 弹窗（工作流）</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>任务状态</strong></td>
+<td>待办 → 进行中 → 完成 / 中断</td>
+</tr>
+<tr>
+<td>任务截止日期 / 备注</td>
+<td>写入数据库（<code>ticket_issue_handles</code>）</td>
+</tr>
+<tr>
+<td><strong>保存</strong></td>
+<td>保存并关闭</td>
+</tr>
+<tr>
+<td><strong>导出</strong></td>
+<td>仅导出本工单 Excel</td>
+</tr>
+</tbody></table>
+<p>书签 <strong>进行中</strong> / <strong>已完成</strong> 与保存的任务状态一致。</p>
+<h3 id="5-6-明细弹窗-双击">5.6 明细弹窗（双击）</h3>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>完整表格</td>
+<td>本工单涉及的全部群</td>
+</tr>
+<tr>
+<td><strong>导出</strong></td>
+<td>现场修复参考</td>
+</tr>
+<tr>
+<td>关闭</td>
+<td><strong>Esc</strong> 或点击外部 — <strong>关闭</strong></td>
+</tr>
+</tbody></table>
+<h3 id="5-7-工单-账号-关系">5.7 工单 ↔ 账号 关系</h3>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>在手机上修复群（入群、管理员、清理多余群）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>在对应账号上 <strong>同步</strong> 或 <strong>运行抓取</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>数据对齐后工单减少或关闭（数据库更新后实时反映）</td>
+</tr>
+</tbody></table>
+<p>手机上已修复但工单仍在：<strong>运行抓取</strong> 以推送最新设备数据。</p>
+<hr>
+<h2 id="6-管理-页面">6. 「管理」页面</h2>
+<p>从侧边栏打开：<strong>管理</strong>。</p>
+<p>副标题：<em>系统状态与应用偏好设置</em></p>
+<h3 id="6-1-系统状态">6.1 系统状态</h3>
+<table>
+<thead>
+<tr>
+<th>卡片</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Supabase</strong></td>
+<td><strong>已连接</strong> = 数据库可用</td>
+</tr>
+<tr>
+<td><strong>活跃会话</strong></td>
+<td>占位项（非实时会话计数）</td>
+</tr>
+<tr>
+<td><strong>平台</strong></td>
+<td>桌面端 / 网页端</td>
+</tr>
+<tr>
+<td><strong>会话表</strong></td>
+<td>活跃 RM 会话表数量</td>
+</tr>
+</tbody></table>
+<h3 id="6-2-it-工具-仅桌面端">6.2 IT 工具（仅桌面端）</h3>
+<table>
+<thead>
+<tr>
+<th>按钮</th>
+<th>功能</th>
+<th>常用人员</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>打开配置文件夹（.env）</strong></td>
+<td>AppData（<code>.env</code>、wa-sessions）</td>
+<td>IT</td>
+</tr>
+<tr>
+<td><strong>检查应用更新</strong></td>
+<td>手动检查 GitHub 更新</td>
+<td>IT / 高级用户</td>
+</tr>
+</tbody></table>
+<p>若 IT 安装包正确，运营人员通常<strong>不需要</strong>打开配置文件夹。</p>
+<p><strong>自动更新：</strong> 从 GitHub 自动下载。提示后<strong>重启</strong>即可，无需重新安装。</p>
+<h3 id="6-3-偏好设置">6.3 偏好设置</h3>
+<h4 id="账号自动同步">账号自动同步</h4>
+<table>
+<thead>
+<tr>
+<th>选项</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>启用</strong></td>
+<td>应用打开时在后台执行（与每账号 <strong>同步</strong> 相同逻辑）</td>
+</tr>
+<tr>
+<td><strong>间隔（分钟）</strong></td>
+<td>执行频率（默认常为 60 分钟）</td>
+</tr>
+</tbody></table>
+<p>带时间戳写入数据库。在尚无抓取数据时，<strong>不能</strong>替代完整的 <strong>运行抓取</strong>。</p>
+<p>管理页摘要显示：<em>开 · N 分钟</em> 或 <em>关</em>。</p>
+<h4 id="语言">语言</h4>
+<table>
+<thead>
+<tr>
+<th>选择</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>English</strong></td>
+<td>界面为英文</td>
+</tr>
+<tr>
+<td><strong>中文</strong></td>
+<td>界面为简体中文（与本文术语一致）</td>
+</tr>
+</tbody></table>
+<p>更改后立即作用于仪表板文案。</p>
+<hr>
+<h2 id="7-数据同步-实时">7. 数据同步（实时）</h2>
+<h3 id="7-1-数据库变更-已打开的应用">7.1 数据库变更 → 已打开的应用</h3>
+<p>当 IT 或系统在 <strong>Supabase</strong> 中修改数据（账号、工单、主表群、会话标记）时：</p>
+<table>
+<thead>
+<tr>
+<th>行为</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>实时刷新</td>
+<td>已打开的应用在数秒至数分钟内更新</td>
+</tr>
+<tr>
+<td>无需重装</td>
+<td>仅数据变更不需要新安装包</td>
+</tr>
+</tbody></table>
+<p>示例：IT 删除测试账号 → 所有用户仪表板上该行消失。</p>
+<h3 id="7-2-代码-界面变更-应用更新">7.2 代码 / 界面变更 → 应用更新</h3>
+<p>需通过<strong>新版本</strong>（自动更新 + <strong>重启</strong>）。见 <a href="../../PROJECT.md">PROJECT.md §4.4</a>。</p>
+<table>
+<thead>
+<tr>
+<th>变更类型</th>
+<th>交付方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Supabase 数据</td>
+<td>实时</td>
+</tr>
+<tr>
+<td>新按钮、布局、逻辑</td>
+<td>新版 <code>.exe</code></td>
+</tr>
+</tbody></table>
+<h3 id="7-3-本机与云端存储">7.3 本机与云端存储</h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>云端（Supabase）</strong></td>
+<td>品牌、账号、群、工单、会话标记</td>
+</tr>
+<tr>
+<td><strong>本机（AppData）</strong></td>
+<td>每账号 WhatsApp 认证、自动同步偏好、语言</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="8-推荐日常工作流">8. 推荐日常工作流</h2>
+<h3 id="8-1-新营销账号上线-测试数据清理后">8.1 新营销账号上线（测试数据清理后）</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>步骤</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>仪表板 <strong>登录</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>打开目标品牌（或 <strong>添加卡片</strong>）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>+ 添加</strong> → 选 WA/TG → 名称 + 电话 → <strong>保存</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>↻ 同步</strong> → 在营销手机上扫码</td>
+</tr>
+<tr>
+<td>5</td>
+<td>若提示 → <strong>运行抓取</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>工单</strong> 标签 → 处理问题 → 需要时 <strong>导出</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td>对每个账号重复</td>
+</tr>
+</tbody></table>
+<h3 id="8-2-例行检查">8.2 例行检查</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>步骤</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>账号</strong> 标签 — 设置品牌/平台筛选</td>
+</tr>
+<tr>
+<td>2</td>
+<td>查看品牌标题上的 <strong>x 个账号未对齐</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>对 <strong>无效</strong> 会话执行 <strong>同步</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>计数陈旧或未对齐时 <strong>运行抓取</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>工单</strong> 标签 — 书签 <strong>进行中</strong> → 现场修复 → 标记 <strong>完成</strong></td>
+</tr>
+</tbody></table>
+<h3 id="8-3-测试账号换正式账号">8.3 测试账号换正式账号</h3>
+<p><strong>方案 A（推荐）：</strong> 在应用中对每个测试账号 <strong>移出槽位</strong> → IT 清理数据库  </p>
+<p><strong>方案 B：</strong> IT 在 Supabase 直接删除 → 仪表板实时清空 → 团队 <strong>+ 添加</strong> 并重新平台登录</p>
+<h3 id="8-4-交班">8.4 交班</h3>
+<table>
+<thead>
+<tr>
+<th>事项</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>保持手机关联</td>
+<td>可以 — 仪表板 <strong>退出</strong> 不会断开手机端</td>
+</tr>
+<tr>
+<td>交接未完成工单</td>
+<td>在 <strong>处理工单</strong> 中设为 <strong>进行中</strong> 并填写 <strong>备注</strong></td>
+</tr>
+<tr>
+<td>导出给下一班</td>
+<td>在工单或账号页按筛选条件 <strong>导出</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="9-术语表">9. 术语表</h2>
+<table>
+<thead>
+<tr>
+<th>术语</th>
+<th>定义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>品牌</strong></td>
+<td>运营单元（如 SBMY），含各 WA/TG 标准群主表</td>
+</tr>
+<tr>
+<td><strong>账号 / 槽位</strong></td>
+<td>品牌下的一行 WA 或 TG 账号</td>
+</tr>
+<tr>
+<td><strong>主表 / 标准</strong></td>
+<td>品牌标准群清单（<code>groups_master</code>）</td>
+</tr>
+<tr>
+<td><strong>每日快照</strong></td>
+<td>当日从设备读取的群列表</td>
+</tr>
+<tr>
+<td><strong>已对齐</strong></td>
+<td>设备群数与该品牌该平台标准一致</td>
+</tr>
+<tr>
+<td><strong>会话有效</strong></td>
+<td>数据库中有活跃会话（当日可能仍需设备检查）</td>
+</tr>
+<tr>
+<td><strong>同步</strong></td>
+<td>↻ 按钮 — 登录或检查本机设备</td>
+</tr>
+<tr>
+<td><strong>运行抓取</strong></td>
+<td>从手机完整读取群 → 数据库</td>
+</tr>
+<tr>
+<td><strong>工单 / 问题</strong></td>
+<td>群组数据修复任务</td>
+</tr>
+<tr>
+<td><strong>书签</strong></td>
+<td>工单筛选：进行中 / 已完成</td>
+</tr>
+<tr>
+<td><strong>切片栏</strong></td>
+<td>卡片/表上方的筛选与工具条</td>
+</tr>
+<tr>
+<td><strong>群组监控</strong></td>
+<td>账号与工单主模块</td>
+</tr>
+<tr>
+<td><strong>后端运营</strong></td>
+<td>侧栏显示的产品系列名称</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="10-常见问题">10. 常见问题</h2>
+<p><strong>应用更新需要重新安装吗？</strong><br>不需要。收到更新提示后<strong>重启</strong>即可（IT 已发布到 GitHub 时）。</p>
+<p><strong>在 Supabase 删除数据会删掉安装程序吗？</strong><br>不会。仅影响仪表板数据。</p>
+<p><strong>会话显示有效，但运行抓取仍要求登录？</strong><br>本机可能已失去设备会话 — 点击 <strong>同步</strong> 重新检查。</p>
+<p><strong>群组显示 <code>12/21</code> 是什么意思？</strong><br>设备检测到 12 个群；21 为该平台的品牌标准群数（WA 与 TG 分开计）。</p>
+<p><strong>一台 PC 可以挂很多 WhatsApp 账号吗？</strong><br>可以，支持大量账号，但每个账号需单独扫码；Chrome 并发进程约限制为 4 个左右。</p>
+<p><strong>手机上已修复，工单还在？</strong><br>点击 <strong>运行抓取</strong> 或 <strong>同步</strong>，让最新设备数据进入数据库。</p>
+<p><strong>仪表板登录失败？</strong><br>联系 IT — 需在 <code>users</code> 表中开通账号。</p>
+<p><strong>Telegram 二维码或登录报错？</strong><br>联系 IT — 检查 Telegram API 配置与数据库迁移 <code>023</code>。</p>
+<p><strong>卡片视图和表格视图有何区别？</strong><br>数据相同；卡片按品牌分组，表格为扁平列表。</p>
+<p><strong>从列表移除此卡片会删除品牌吗？</strong><br>不会 — 仅隐藏至重新加载或调整筛选。</p>
+<p><strong>在哪里改界面语言？</strong><br><strong>管理</strong> → <strong>偏好设置</strong> → <strong>语言</strong> → English 或 <strong>中文</strong>。</p>
+<hr>
+<h2 id="附录-功能速览图">附录 — 功能速览图</h2>
+<pre><code>登录（用户名 / 密码）
+  └─ 群组监控
+        ├─ [标签：账号]
+        │     ├─ KPI：品牌、账号总数、在线、已对齐、需处理、待处理工单
+        │     ├─ 切片栏：搜索、品牌、平台、状态、卡片|表格、导出
+        │     └─ 每张品牌卡片
+        │           ├─ + 添加账号（WhatsApp / Telegram）
+        │           ├─ 行：同步 ↻ | 移除 X | 群链接
+        │           └─ 抓取：运行
+        └─ [标签：工单]
+              ├─ KPI：待处理、缺标准群、非管理员、待处理群组数…
+              ├─ 切片栏：搜索、筛选、进行中 | 已完成、导出
+              ├─ 6 种工单类型
+              └─ 工单卡片 → 处理工单弹窗 | 双击明细
+  └─ 管理
+        ├─ 系统状态（Supabase、平台…）
+        ├─ 打开配置文件夹 / 检查应用更新（IT）
+        └─ 账号自动同步 + 语言（English / 中文）
+</code></pre>
+<h3 id="附录-b-工单类型与导出列-明细导出">附录 B — 工单类型与导出列（明细导出）</h3>
+<p>典型 Excel 列：工单 ID、#、账号、品牌、平台、电话、工单类型、群名称、群 ID、邀请链接、备注。</p>
+<h3 id="附录-c-相关文档">附录 C — 相关文档</h3>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="../../PROJECT.md">PROJECT.md</a></td>
+<td>架构、发布、IT</td>
+</tr>
+<tr>
+<td><a href="../../INSTALL-WINDOWS.md">INSTALL-WINDOWS.md</a></td>
+<td>Windows 安装</td>
+</tr>
+<tr>
+<td><a href="../HANDBOOK.md">HANDBOOK.md</a></td>
+<td>印尼语版（结构相同）</td>
+</tr>
+<tr>
+<td><a href="./HANDBOOK-en.md">HANDBOOK-en.md</a></td>
+<td>English user guide</td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>本手册对应应用版本 <strong>0.1.1</strong>。新功能发布后请同步更新文档。</em></p>
+
+  </main>
+  <footer class="doc-footer">
+    <p>Internal use only — 资源管理 v0.1.1</p>
+  </footer>
+</body>
+</html>

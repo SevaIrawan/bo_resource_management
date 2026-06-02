@@ -1,13 +1,19 @@
 {
   "name": "resource-management",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Resource Management Desktop — Group Monitoring Dashboard",
   "author": "Seva Irawan <tanjungbambangirawan85@gmail.com>",
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder --win",
+    "build:sidecar": "powershell -ExecutionPolicy Bypass -File scripts/build-telegram-sidecar.ps1",
+    "build:app": "vite build && electron-builder --win",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
+    "build:handbook-docs": "node scripts/build-handbook-documents.mjs",
+    "build:handbook-pdf": "npm run build:handbook-docs",
+    "build": "npm run build:installer",
+    "publish:github": "powershell -ExecutionPolicy Bypass -File scripts/publish-release.ps1",
     "build:dir": "vite build && electron-builder --win --dir",
     "build:web": "vite build",
     "preview": "vite preview",
@@ -49,6 +55,9 @@
     "@vitejs/plugin-react": "^4.5.2",
     "electron": "^36.4.0",
     "electron-builder": "^26.0.12",
+    "html-to-docx": "^1.8.0",
+    "marked": "^18.0.4",
+    "md-to-pdf": "^5.2.4",
     "tailwindcss": "^4.1.8",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
@@ -69,8 +78,36 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "package.json"
     ],
+    "asarUnpack": [
+      "**/node_modules/whatsapp-web.js/**",
+      "**/node_modules/puppeteer/**",
+      "**/node_modules/puppeteer-core/**",
+      "**/node_modules/@puppeteer/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/sidecar/rm-telegram-sidecar.exe",
+        "to": "sidecar/rm-telegram-sidecar.exe"
+      },
+      {
+        "from": "resources/env-template.env",
+        "to": "env-template.env"
+      },
+      {
+        "from": "resources/org-default.env",
+        "to": "org-default.env"
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Resource Management",
+      "differentialPackage": true
+    },
     "publish": {
       "provider": "github",
       "owner": "SevaIrawan",

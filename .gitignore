@@ -2,6 +2,11 @@ node_modules
 dist
 dist-electron
 release
+resources/sidecar/*.exe
+resources/org-default.env
+docs/guides/pdf/
+resources/sidecar-dist/
+resources/sidecar-build/
 .env
 .env.local
 *.log

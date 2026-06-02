@@ -65,7 +65,7 @@ export async function diagnoseSessionResolve(input: {
   if (!supabase && isSupabaseConfigured()) {
     supabaseError = 'Supabase client failed to initialize';
   } else if (!isSupabaseConfigured()) {
-    supabaseError = 'VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY missing in .env';
+    supabaseError = 'Supabase URL / SUPABASE_SERVICE_ROLE_KEY missing in .env';
   }
 
   return {

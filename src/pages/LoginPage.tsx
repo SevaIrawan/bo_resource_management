@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Eye, EyeOff, Lock, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BrandLogoMark } from '@/components/brand/BrandLogoMark';
@@ -26,6 +26,16 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [configMissing, setConfigMissing] = useState<string[]>([]);
+
+  useEffect(() => {
+    const api = window.electronAPI?.app?.getConfigStatus;
+    if (!api) return;
+    void api().then((status) => {
+      if (status.bundledOrgConfig || status.configured) return;
+      setConfigMissing(status.missing);
+    });
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -57,6 +67,21 @@ export function LoginPage() {
         <div className="login-divider" aria-hidden />
 
         <form onSubmit={handleSubmit}>
+          {configMissing.length > 0 ? (
+            <div className="login-error mb-3 space-y-2 text-left">
+              <p>{t('login.configRequired')}</p>
+              <p className="text-xs opacity-90">{configMissing.join(', ')}</p>
+              {window.electronAPI?.app?.openConfigFolder ? (
+                <button
+                  type="button"
+                  className="text-xs underline"
+                  onClick={() => void window.electronAPI?.app?.openConfigFolder()}
+                >
+                  {t('login.openConfigFolder')}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {error ? <p className="login-error">{error}</p> : null}
 
           <div className="login-field">

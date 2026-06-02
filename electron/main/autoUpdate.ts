@@ -5,8 +5,24 @@ import { autoUpdater } from 'electron-updater';
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const FIRST_CHECK_DELAY_MS = 12_000;
 
+export type AppUpdateUiStatus = 'idle' | 'available' | 'downloaded';
+
+export interface AppUpdateStatusPayload {
+  status: AppUpdateUiStatus;
+  version?: string;
+}
+
 let checkTimer: ReturnType<typeof setInterval> | null = null;
 let getMainWindow: (() => BrowserWindow | null) | null = null;
+let updateStatus: AppUpdateStatusPayload = { status: 'idle' };
+
+function broadcastUpdateStatus(payload: AppUpdateStatusPayload) {
+  updateStatus = payload;
+  const win = getMainWindow?.();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('app:update-status', payload);
+  }
+}
 
 function showRestartDialog(version: string) {
   const win = getMainWindow?.();
@@ -59,10 +75,12 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
 
   autoUpdater.on('update-available', (info) => {
     console.info('[auto-update] update available:', info.version);
+    broadcastUpdateStatus({ status: 'available', version: info.version });
   });
 
   autoUpdater.on('update-not-available', () => {
     console.info('[auto-update] app is up to date');
+    broadcastUpdateStatus({ status: 'idle' });
   });
 
   autoUpdater.on('error', (err) => {
@@ -78,10 +96,15 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
 
   autoUpdater.on('update-downloaded', (info) => {
     console.info('[auto-update] downloaded:', info.version);
+    broadcastUpdateStatus({ status: 'downloaded', version: info.version });
     showRestartDialog(info.version);
   });
 
   schedulePeriodicChecks();
+}
+
+export function getAppUpdateStatus(): AppUpdateStatusPayload {
+  return updateStatus;
 }
 
 export async function checkForUpdatesNow(): Promise<{
@@ -109,4 +132,5 @@ export function disposeAutoUpdate() {
     checkTimer = null;
   }
   getMainWindow = null;
+  updateStatus = { status: 'idle' };
 }

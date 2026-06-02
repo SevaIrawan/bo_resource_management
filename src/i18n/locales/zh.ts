@@ -37,6 +37,9 @@ export const zh: Messages = {
   tabs: {
     account: '账号',
     ticket: '工单',
+    refreshAccount: '刷新账号',
+    refreshTicket: '刷新工单',
+    updateAvailable: '有应用更新 v{{version}}',
   },
   brand: {
     name: '后端运营',

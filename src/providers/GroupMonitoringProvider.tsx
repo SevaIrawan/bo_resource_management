@@ -41,6 +41,7 @@ interface GroupMonitoringProviderProps {
 export function GroupMonitoringProvider({ children }: GroupMonitoringProviderProps) {
   const { user } = useAuth();
   const { canAutoSync, canManageStructure } = usePermissions();
+  const { registerRefreshHandler } = useMonitoringTab();
   const { t } = useLanguage();
   const { setTicketCount } = useMonitoringTab();
   const [groups, setGroups] = useState<AccountBrandGroup[]>([]);
@@ -116,6 +117,17 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   useEffect(() => {
     void reloadAll();
   }, [reloadAll]);
+
+  useEffect(() => {
+    registerRefreshHandler(async (activeTab) => {
+      if (activeTab === 'ticket') {
+        await reloadTickets();
+      } else {
+        await reloadAll();
+      }
+    });
+    return () => registerRefreshHandler(null);
+  }, [registerRefreshHandler, reloadAll, reloadTickets]);
 
   const ticketSummaries = useMemo(() => groupOpenTickets(tickets), [tickets]);
 

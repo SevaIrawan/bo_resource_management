@@ -56,6 +56,16 @@ declare global {
           status: 'dev' | 'checking' | 'error';
           message?: string;
         }>;
+        getUpdateStatus: () => Promise<{
+          status: 'idle' | 'available' | 'downloaded';
+          version?: string;
+        }>;
+        onUpdateStatus: (
+          callback: (payload: {
+            status: 'idle' | 'available' | 'downloaded';
+            version?: string;
+          }) => void,
+        ) => () => void;
       };
       platformLogin?: {
         start: (payload: {

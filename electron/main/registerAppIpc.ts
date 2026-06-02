@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { checkForUpdatesNow } from './autoUpdate';
+import { checkForUpdatesNow, getAppUpdateStatus } from './autoUpdate';
 import {
   getSupabaseApiKeyFromProcessEnv,
   loadAppEnv,
@@ -32,4 +32,6 @@ export function registerAppIpc() {
   });
 
   ipcMain.handle('app:check-for-updates', () => checkForUpdatesNow());
+
+  ipcMain.handle('app:get-update-status', () => getAppUpdateStatus());
 }

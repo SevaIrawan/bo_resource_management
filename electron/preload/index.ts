@@ -22,6 +22,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getConfigStatus: () => ipcRenderer.invoke('app:get-config-status'),
     openConfigFolder: () => ipcRenderer.invoke('app:open-config-folder'),
     checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
+    getUpdateStatus: () =>
+      ipcRenderer.invoke('app:get-update-status') as Promise<{
+        status: 'idle' | 'available' | 'downloaded';
+        version?: string;
+      }>,
+    onUpdateStatus: (
+      callback: (payload: { status: 'idle' | 'available' | 'downloaded'; version?: string }) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: { status: 'idle' | 'available' | 'downloaded'; version?: string },
+      ) => {
+        callback(payload);
+      };
+      ipcRenderer.on('app:update-status', listener);
+      return () => ipcRenderer.removeListener('app:update-status', listener);
+    },
   },
   platformLogin: {
     start: (payload: {

@@ -271,6 +271,57 @@
     color: #ff4d4f;
   }
 
+  .monitoring-subheader-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .monitoring-refresh-btn {
+    position: relative;
+    display: inline-flex;
+    height: 2.25rem;
+    width: 2.25rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 0.5rem;
+    background: var(--color-bg-shell);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease,
+      border-color 160ms ease;
+  }
+
+  .monitoring-refresh-btn:hover:not(:disabled) {
+    border-color: var(--color-border);
+    background: var(--color-bg-active);
+    color: var(--color-text-primary);
+  }
+
+  .monitoring-refresh-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+
+  .monitoring-refresh-btn--spin svg {
+    animation: brand-sync-spin 0.85s linear infinite;
+  }
+
+  .monitoring-refresh-update-dot {
+    position: absolute;
+    top: 0.3125rem;
+    right: 0.3125rem;
+    height: 0.4375rem;
+    width: 0.4375rem;
+    border-radius: 9999px;
+    background: #ff4d4f;
+    box-shadow: 0 0 0 2px var(--color-bg-shell);
+  }
+
   select {
     color-scheme: dark;
   }

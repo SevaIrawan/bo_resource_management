@@ -35,6 +35,9 @@ export const en = {
   tabs: {
     account: 'Account',
     ticket: 'Ticket',
+    refreshAccount: 'Refresh accounts',
+    refreshTicket: 'Refresh tickets',
+    updateAvailable: 'App update v{{version}} available',
   },
   brand: {
     name: 'Backend Operation',

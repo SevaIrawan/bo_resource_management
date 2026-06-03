@@ -4,7 +4,7 @@ export {};
 
 type Platform = 'whatsapp' | 'telegram';
 type LoginMode = 'qr' | 'phone';
-type LoginPhase = 'pending' | 'need_code' | 'need_2fa' | 'confirming';
+type LoginPhase = 'pending' | 'need_code' | 'need_2fa' | 'confirming' | 'loading';
 
 /** Output scraper WA/TG — selaras kolom group_scrape_daily / groups_master. */
 interface ScrapedGroupRow {

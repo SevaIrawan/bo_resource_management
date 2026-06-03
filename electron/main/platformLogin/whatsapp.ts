@@ -25,8 +25,8 @@ const sessions = new Map<string, WaSession>();
 const sessionLocks = new Map<string, Promise<unknown>>();
 /** Lock per sessionId — multi-akun WA boleh paralel (folder LocalAuth terpisah). */
 const WA_INIT_TIMEOUT_MS = 120_000;
-/** QR wajib tampil setelah Chrome headless + web.whatsapp.com (bundled Chrome bisa >10s). */
-const WA_QR_APPEAR_DEADLINE_MS = 60_000;
+/** Bundled Chrome + web.whatsapp.com — PC lambat bisa >60s; jangan bunuh client sebelum QR sempat emit. */
+const WA_QR_APPEAR_DEADLINE_MS = 120_000;
 const WA_DESTROY_SETTLE_MS = 900;
 const WA_LOGIN_PREPARE_SETTLE_MS = 1_500;
 const WA_LOCK_WAIT_MS = 4_000;
@@ -337,13 +337,16 @@ function armQrAppearDeadline(
     if (session?.loggedIn) return;
 
     void (async () => {
-      await destroyWhatsAppSession(sessionId);
+      console.warn(
+        `[whatsapp] QR not visible yet for ${sessionId} after ${WA_QR_APPEAR_DEADLINE_MS}ms — keeping browser alive`,
+      );
+
       if (!win.isDestroyed()) {
         win.webContents.send('platform-login:error', {
           sessionId,
           platform: 'whatsapp',
           message:
-            'QR code did not appear within 60 seconds. Close this window, wait a few seconds, then tap Sync again.',
+            'QR is still loading (Chrome may take up to 2 minutes on first login). Wait, or close and tap Sync again.',
         });
       }
     })();
@@ -394,6 +397,16 @@ async function initializeClientWithRetry(
   const maxAttempts = 5;
 
   await withWaBrowserSlot(async () => {
+    const win = getNotifierWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('platform-login:phase', {
+        sessionId,
+        platform: 'whatsapp',
+        phase: 'loading',
+        message: 'Starting Chrome for WhatsApp…',
+      });
+    }
+
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       try {
         await client.initialize();

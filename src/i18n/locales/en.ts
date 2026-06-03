@@ -199,9 +199,9 @@ export const en = {
       whatsappPhoneLogin: 'LOG IN WITH PHONE NUMBER',
       generatingQr: 'Generating QR…',
       restoringSession: 'Restoring linked session (up to ~20s)…',
-      startingWhatsApp: 'Starting WhatsApp… QR may take up to 60 seconds.',
+      startingWhatsApp: 'Starting WhatsApp… QR may take up to 2 minutes on first login.',
       qrAppearTimeout:
-        'QR code did not appear within 60 seconds. Close this window, wait a few seconds, then tap Sync again.',
+        'QR is still loading. Wait up to 2 minutes, or close and tap Sync again.',
       loadingQr: 'Loading QR…',
       scanQr: 'Scan with your phone',
       qrUpdated: 'New QR — scan this code only',

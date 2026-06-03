@@ -9,9 +9,8 @@ import type { Platform } from '@/types/database';
 const TG_LOGIN_RESTORE_TIMEOUT_MS = 8_000;
 const WA_QR_SCAN_TIMEOUT_MS = 180_000;
 const TG_QR_TIMEOUT_MS = 120_000;
-/** QR harus tampil di modal dalam 10 detik (sinkron dengan main process). */
-/** UI guard — sedikit lebih longgar dari main (60s) karena timer mulai saat modal buka. */
-const WA_QR_MUST_APPEAR_MS = 90_000;
+/** UI guard — lebih longgar dari main (120s); timer mulai saat modal buka. */
+const WA_QR_MUST_APPEAR_MS = 150_000;
 const WA_PREPARE_SETTLE_MS = 2_000;
 
 type PlatformLoginApi = NonNullable<NonNullable<Window['electronAPI']>['platformLogin']>;
@@ -211,6 +210,12 @@ export function usePlatformLogin(
         clearQrTimeout();
         setView('qr');
         setStatus('confirming');
+        setError(null);
+      }
+      if (payload.phase === 'loading' && platform === 'whatsapp') {
+        clearQrAppearDeadline();
+        setView('qr');
+        setStatus('starting-qr');
         setError(null);
       }
     });
@@ -413,7 +418,13 @@ export function usePlatformLogin(
       };
 
       if (platform === 'whatsapp') {
-        await prepareWhatsAppForQr(deviceSessionId, skipDiskRestore);
+        const api = window.electronAPI?.platformLogin;
+        await api?.cancel(deviceSessionId, 'whatsapp').catch(() => undefined);
+        if (!skipDiskRestore) {
+          await prepareWhatsAppForQr(deviceSessionId, false);
+        } else {
+          await sleep(400);
+        }
         if (isStale()) return;
 
         if (!skipDiskRestore && attemptRestore) {

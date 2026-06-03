@@ -2,7 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import electron from 'vite-plugin-electron/simple';
+import fs from 'fs';
 import path from 'path';
+
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'),
+) as { version: string };
 
 const PRODUCTION_CSP = [
   "default-src 'self'",
@@ -17,6 +22,9 @@ const PRODUCTION_CSP = [
 ].join('; ');
 
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
+  },
   plugins: [
     react(),
     tailwindcss(),

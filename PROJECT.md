@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-02  
-**Versi aplikasi:** `0.1.1` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.2` (lihat `package.json`)  
 **Status:** Produksi internal — desktop Windows untuk tim operasional perusahaan  
 
 ---
@@ -64,7 +64,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 0.1.1)
+## 4. Konfigurasi & installer (kondisi 1.0.2)
 
 ### 4.1 Variabel lingkungan
 
@@ -85,7 +85,7 @@ cd "C:\Work\Resource Management"
 npm run build:installer
 ```
 
-Output: `release\Resource Management Setup 0.1.1.exe` (~141 MB)
+Output: `release\Resource Management Setup 1.0.2.exe`
 
 **Yang terbundel dalam satu paket:**
 
@@ -266,7 +266,7 @@ release/                Output installer (gitignore)
 |------------|--------|
 | "Hapus di database = uninstall app" | **Salah.** Hanya data cloud; `.exe` tetap di PC |
 | "Push GitHub = tim dapat UI baru" | Perlu **Release** + version naik + app terinstall punya auto-update |
-| "User isi .env tiap PC" | **Tidak** (build 0.1.1+ dengan `.env` IT lengkap saat build) |
+| "User isi .env tiap PC" | **Tidak** (build 1.0.2+ dengan `.env` IT lengkap saat build) |
 | "Service role aman di web publik" | Hanya untuk desktop internal terdistribusi terbatas |
 | "Session invalid = ticket" | **Tidak** — kontrak issue di `.cursorrules` §11 |
 
@@ -295,4 +295,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **0.1.1**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.2**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*

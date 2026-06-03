@@ -7,6 +7,7 @@ import { useAutoAccountSync } from '@/hooks/useAutoAccountSync';
 import { useRealtimeAccountSessions } from '@/hooks/useRealtimeAccountSessions';
 import { useRealtimeMonitoring } from '@/hooks/useRealtimeMonitoring';
 import { useMonitoringTab } from '@/hooks/useMonitoringTab';
+import { useMonitoringPending } from '@/hooks/useMonitoringPending';
 import { assertRmSchema } from '@/lib/assertRmSchema';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { loadAccountMonitoringGroups } from '@/lib/loadAccountMonitoring';
@@ -41,7 +42,8 @@ interface GroupMonitoringProviderProps {
 export function GroupMonitoringProvider({ children }: GroupMonitoringProviderProps) {
   const { user } = useAuth();
   const { canAutoSync, canManageStructure } = usePermissions();
-  const { registerRefreshHandler } = useMonitoringTab();
+  const { registerRefreshHandler, registerFullRefreshHandler } = useMonitoringTab();
+  const { notifyPendingDataUpdate } = useMonitoringPending();
   const { t } = useLanguage();
   const { setTicketCount } = useMonitoringTab();
   const [groups, setGroups] = useState<AccountBrandGroup[]>([]);
@@ -129,6 +131,13 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     return () => registerRefreshHandler(null);
   }, [registerRefreshHandler, reloadAll, reloadTickets]);
 
+  useEffect(() => {
+    registerFullRefreshHandler(async () => {
+      await reloadAll();
+    });
+    return () => registerFullRefreshHandler(null);
+  }, [registerFullRefreshHandler, reloadAll]);
+
   const ticketSummaries = useMemo(() => groupOpenTickets(tickets), [tickets]);
 
   const dismissBrandGroup = useCallback(
@@ -163,12 +172,12 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   }, [ticketSummaries.length, setTicketCount]);
 
   const handleTicketsRealtime = useCallback(() => {
-    void reloadTickets();
-  }, [reloadTickets]);
+    notifyPendingDataUpdate();
+  }, [notifyPendingDataUpdate]);
 
   const handleRegistryRealtime = useCallback(() => {
-    void reloadAll();
-  }, [reloadAll]);
+    notifyPendingDataUpdate();
+  }, [notifyPendingDataUpdate]);
 
   const autoSyncState = useAutoAccountSync({
     userId: user?.id,
@@ -216,6 +225,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     onGroupsChange: setGroups,
     onTicketsChange: handleTicketsRealtime,
     onRegistryChange: handleRegistryRealtime,
+    onDataChangeNotice: notifyPendingDataUpdate,
   });
 
   const accountKpis = useMemo(

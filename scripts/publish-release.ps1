@@ -15,6 +15,10 @@ if (-not $env:GH_TOKEN) {
 }
 
 $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+Write-Host "==> Validasi pre-release v$version" -ForegroundColor Cyan
+npm run validate:pre-release
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "==> Build installer v$version" -ForegroundColor Cyan
 npm run build:installer
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

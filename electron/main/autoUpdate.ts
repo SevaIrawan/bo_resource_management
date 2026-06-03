@@ -20,7 +20,10 @@ function broadcastUpdateStatus(payload: AppUpdateStatusPayload) {
   updateStatus = payload;
   const win = getMainWindow?.();
   if (win && !win.isDestroyed()) {
-    win.webContents.send('app:update-status', payload);
+    win.webContents.send('app:update-status', {
+      ...payload,
+      currentVersion: app.getVersion(),
+    });
   }
 }
 
@@ -103,21 +106,54 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
   schedulePeriodicChecks();
 }
 
-export function getAppUpdateStatus(): AppUpdateStatusPayload {
-  return updateStatus;
+export function getAppUpdateStatus(): AppUpdateStatusPayload & { currentVersion: string } {
+  return {
+    ...updateStatus,
+    currentVersion: app.getVersion(),
+  };
+}
+
+/** Pasang update yang sudah diunduh (dipanggil dari UI Update Now). */
+export function installDownloadedUpdate(): { ok: boolean; message?: string } {
+  if (!app.isPackaged) {
+    return { ok: false, message: 'Auto-update hanya jalan di app terinstall (bukan dev).' };
+  }
+  if (updateStatus.status !== 'downloaded') {
+    return {
+      ok: false,
+      message:
+        updateStatus.status === 'available'
+          ? 'Update masih diunduh. Tunggu sebentar lalu pilih Update Now lagi.'
+          : 'Tidak ada update yang siap dipasang.',
+    };
+  }
+  autoUpdater.quitAndInstall(false, true);
+  return { ok: true };
 }
 
 export async function checkForUpdatesNow(): Promise<{
   status: 'dev' | 'checking' | 'error';
   message?: string;
 }> {
+  const currentVersion = app.getVersion();
   if (!app.isPackaged) {
-    return { status: 'dev', message: 'Auto-update hanya jalan di app terinstall (bukan dev).' };
+    return {
+      status: 'dev',
+      message: `Auto-update hanya jalan di app terinstall. Versi saat ini: v${currentVersion}.`,
+    };
   }
 
   try {
     await autoUpdater.checkForUpdates();
-    return { status: 'checking', message: 'Memeriksa GitHub Releases...' };
+    const latest = updateStatus.version;
+    const extra =
+      updateStatus.status === 'available' || updateStatus.status === 'downloaded'
+        ? ` Pembaruan v${latest ?? '?'} tersedia.`
+        : ' App sudah versi terbaru.';
+    return {
+      status: 'checking',
+      message: `Versi saat ini v${currentVersion}.${extra}`,
+    };
   } catch (err) {
     return {
       status: 'error',

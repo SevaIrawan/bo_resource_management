@@ -1,5 +1,5 @@
 /**
- * Skala ~2000 grup: timeout, quick count, scrape paralel.
+ * Skala hingga ~3000 grup: timeout, quick count, scrape paralel.
  */
 import fs from 'fs';
 import path from 'path';
@@ -17,13 +17,13 @@ const syncFlow = read('src/hooks/useAccountSyncFlow.ts');
 
 const checks = [
   {
-    name: 'Target 2000 grup (electron)',
-    ok: scaleElectron.includes('DEVICE_GROUP_TARGET_MAX = 2000'),
+    name: 'Target 3000 grup (electron)',
+    ok: scaleElectron.includes('DEVICE_GROUP_TARGET_MAX = 3000'),
   },
   {
     name: 'Timeout sync/login scale (renderer)',
     ok:
-      scaleRenderer.includes('DEVICE_GROUP_TARGET_MAX = 2000') &&
+      scaleRenderer.includes('DEVICE_GROUP_TARGET_MAX = 3000') &&
       syncFlow.includes('loginSyncAfterTimeoutMs') &&
       syncFlow.includes('manualSyncTimeoutMs'),
   },
@@ -53,4 +53,4 @@ for (const c of checks) {
   if (!c.ok) failed += 1;
 }
 if (failed) process.exit(1);
-console.log('\nDevice group scale (2000) checks passed.');
+console.log('\nDevice group scale (3000) checks passed.');

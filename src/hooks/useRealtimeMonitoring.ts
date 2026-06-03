@@ -17,6 +17,8 @@ interface UseRealtimeMonitoringOptions {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   onTicketsChange: () => void;
   onRegistryChange: () => void;
+  /** Tandai tombol Refresh (notifikasi) — pembaruan diterapkan lewat Update Now / Refresh. */
+  onDataChangeNotice?: () => void;
 }
 
 type GroupsMasterRow = {
@@ -41,16 +43,23 @@ export function useRealtimeMonitoring({
   onGroupsChange,
   onTicketsChange,
   onRegistryChange,
+  onDataChangeNotice,
 }: UseRealtimeMonitoringOptions) {
   const onGroupsChangeRef = useRef(onGroupsChange);
   const onTicketsChangeRef = useRef(onTicketsChange);
   const onRegistryChangeRef = useRef(onRegistryChange);
+  const onDataChangeNoticeRef = useRef(onDataChangeNotice);
   const suspendedRef = useRef(suspendAccountIds);
 
   onGroupsChangeRef.current = onGroupsChange;
   onTicketsChangeRef.current = onTicketsChange;
   onRegistryChangeRef.current = onRegistryChange;
+  onDataChangeNoticeRef.current = onDataChangeNotice;
   suspendedRef.current = suspendAccountIds;
+
+  const notifyChange = () => {
+    onDataChangeNoticeRef.current?.();
+  };
 
   useEffect(() => {
     if (!enabled || !userId) return;
@@ -88,6 +97,7 @@ export function useRealtimeMonitoring({
           }
           onGroupsChangeRef.current(() => patched);
           onTicketsChangeRef.current();
+          notifyChange();
         })();
         return latest;
       });
@@ -122,6 +132,7 @@ export function useRealtimeMonitoring({
           if (suspendedRef.current.includes(row.account_id)) return;
 
           onGroupsChangeRef.current((prev) => patchAccountSnapshotInGroups(prev, row));
+          notifyChange();
         },
       )
       .on(
@@ -129,6 +140,7 @@ export function useRealtimeMonitoring({
         { event: '*', schema: 'public', table: TABLES.tickets },
         () => {
           onTicketsChangeRef.current();
+          notifyChange();
         },
       )
       .on(
@@ -136,6 +148,7 @@ export function useRealtimeMonitoring({
         { event: '*', schema: 'public', table: TABLES.brands },
         () => {
           onRegistryChangeRef.current();
+          notifyChange();
         },
       )
       .on(
@@ -143,6 +156,7 @@ export function useRealtimeMonitoring({
         { event: '*', schema: 'public', table: TABLES.messagingAccounts },
         () => {
           onRegistryChangeRef.current();
+          notifyChange();
         },
       )
       .on(
@@ -150,6 +164,7 @@ export function useRealtimeMonitoring({
         { event: '*', schema: 'public', table: TABLES.scrapeRuns },
         () => {
           onTicketsChangeRef.current();
+          notifyChange();
         },
       )
       .on(
@@ -170,9 +185,11 @@ export function useRealtimeMonitoring({
           onGroupsChangeRef.current((prev) => {
             void patchGroupsFromDailyInState(prev, accountId).then((next) => {
               onGroupsChangeRef.current(() => next);
+              notifyChange();
             });
             return prev;
           });
+          notifyChange();
         },
       )
       .subscribe();

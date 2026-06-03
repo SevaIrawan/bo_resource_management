@@ -7,7 +7,7 @@ interface KpiGridProps {
 
 export function KpiGrid({ items }: KpiGridProps) {
   return (
-    <div className="grid shrink-0 grid-cols-2 gap-(--layout-gap) md:grid-cols-3 xl:grid-cols-6">
+    <div className="grid shrink-0 grid-cols-2 gap-(--layout-gap) md:grid-cols-3 xl:grid-cols-5">
       {items.map((item) => (
         <KpiCard
           key={item.labelKey}

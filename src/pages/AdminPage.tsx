@@ -5,14 +5,23 @@ import { AutoSyncSettingsSection } from '@/components/settings/AutoSyncSettingsS
 import { LanguageToggle } from '@/components/settings/LanguageToggle';
 import { useAutoSyncSettings } from '@/contexts/AutoSyncSettingsContext';
 import { RM_ACTIVE_TABLES } from '@/config/tables';
+import { useAppUpdateStatus } from '@/hooks/useAppUpdateStatus';
 import { useLanguage } from '@/hooks/useLanguage';
+import { APP_VERSION } from '@/lib/appVersion';
+import { appUpdateStatusLine, hasNewerAppVersion } from '@/lib/appUpdateUi';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
 export function AdminPage() {
   const { locale, setLocale, t } = useLanguage();
   const supabaseReady = isSupabaseConfigured();
   const { enabled, intervalMinutes } = useAutoSyncSettings();
+  const updateStatus = useAppUpdateStatus();
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  const installedVersion = updateStatus.currentVersion || APP_VERSION;
+  const newVersion = updateStatus.version;
+  const updateLine = appUpdateStatusLine(t, updateStatus.status, newVersion);
 
   const items = [
     {
@@ -89,7 +98,7 @@ export function AdminPage() {
         </section>
 
         {window.electronAPI?.app?.openConfigFolder ? (
-          <section className="space-y-3">
+          <section className="space-y-4">
             <div>
               <button
                 type="button"
@@ -101,20 +110,48 @@ export function AdminPage() {
               <p className="mt-2 text-xs text-text-muted">{t('admin.configFolderHint')}</p>
             </div>
             {window.electronAPI.app.checkForUpdates ? (
-              <div>
-                <button
-                  type="button"
-                  className="rounded-lg border border-border-subtle bg-bg-shell px-4 py-2 text-xs font-medium text-text-primary hover:bg-bg-active"
-                  onClick={() => {
-                    setUpdateMsg(null);
-                    void window.electronAPI?.app?.checkForUpdates?.().then((r) => {
-                      setUpdateMsg(r.message ?? r.status);
-                    });
-                  }}
-                >
-                  {t('admin.checkForUpdates')}
-                </button>
-                <p className="mt-2 text-xs text-text-muted">{t('admin.autoUpdateHint')}</p>
+              <div className="rounded-xl border border-border-subtle bg-bg-shell px-4 py-4">
+                <p className="text-sm font-medium text-text-primary">
+                  {t('admin.currentVersion', { version: installedVersion })}
+                </p>
+                {hasNewerAppVersion(updateStatus.status) && newVersion ? (
+                  <p className="mt-1 text-sm font-medium text-wa">
+                    {t('admin.latestVersion', { version: newVersion })}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-text-muted">{t('admin.noUpdateAvailable')}</p>
+                )}
+                {updateLine ? (
+                  <p className="mt-2 text-xs text-text-secondary">{updateLine}</p>
+                ) : null}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-border-subtle bg-bg-active px-4 py-2 text-xs font-medium text-text-primary hover:border-border"
+                    disabled={checkingUpdate}
+                    onClick={() => {
+                      setUpdateMsg(null);
+                      setCheckingUpdate(true);
+                      void window.electronAPI?.app?.checkForUpdates?.().then((r) => {
+                        setUpdateMsg(r.message ?? r.status);
+                      }).finally(() => setCheckingUpdate(false));
+                    }}
+                  >
+                    {checkingUpdate
+                      ? t('admin.checkingUpdates')
+                      : t('admin.checkForUpdates')}
+                  </button>
+                  {updateStatus.status === 'downloaded' && newVersion ? (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-wa/40 bg-wa/10 px-4 py-2 text-xs font-semibold text-wa hover:bg-wa/15"
+                      onClick={() => void window.electronAPI?.app?.installUpdate?.()}
+                    >
+                      {t('admin.installUpdateNow', { version: newVersion })}
+                    </button>
+                  ) : null}
+                </div>
                 {updateMsg ? (
                   <p className="mt-1 text-xs text-text-secondary">{updateMsg}</p>
                 ) : null}

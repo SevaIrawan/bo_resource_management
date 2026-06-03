@@ -27,7 +27,7 @@ const checks = [
     ok: /quickDeviceCount:\s*true/.test(syncFlow),
   },
   {
-    name: 'Timeout sync setelah login skala 2000 grup',
+    name: 'Timeout sync setelah login skala 3000 grup',
     ok: syncFlow.includes('loginSyncAfterTimeoutMs'),
   },
   {

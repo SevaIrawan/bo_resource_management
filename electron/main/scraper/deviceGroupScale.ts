@@ -1,15 +1,15 @@
-/** Target operasional: akun dengan ribuan grup (mis. ~2000). */
-export const DEVICE_GROUP_TARGET_MAX = 2000;
+/** Target operasional: akun dengan ribuan grup (hingga ~3000). */
+export const DEVICE_GROUP_TARGET_MAX = 3000;
 
 /** Batas aman daftar grup dari store WA Web (satu pass di browser). */
-export const WA_STORE_GROUP_LIST_CAP = 5000;
+export const WA_STORE_GROUP_LIST_CAP = 6000;
 
 /** Scrape / admin detail — paralel terbatas agar Chrome tidak jebol. */
 export const WA_GROUP_PROCESS_CONCURRENCY = 12;
 
-const COUNT_BASE_MS = 90_000;
-const COUNT_PER_GROUP_MS = 40;
-const COUNT_MAX_MS = 900_000;
+const COUNT_BASE_MS = 120_000;
+const COUNT_PER_GROUP_MS = 30;
+const COUNT_MAX_MS = 1_200_000;
 
 const SCRAPE_BASE_MS = 120_000;
 const SCRAPE_PER_GROUP_MS = 2_500;

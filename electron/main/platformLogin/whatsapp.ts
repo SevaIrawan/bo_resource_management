@@ -23,9 +23,9 @@ interface WaSession {
 const sessions = new Map<string, WaSession>();
 const sessionLocks = new Map<string, Promise<unknown>>();
 /** Lock per sessionId — multi-akun WA boleh paralel (folder LocalAuth terpisah). */
-const WA_INIT_TIMEOUT_MS = 120_000;
-/** Bundled Chrome + web.whatsapp.com — PC lambat bisa >60s; jangan bunuh client sebelum QR sempat emit. */
-const WA_QR_APPEAR_DEADLINE_MS = 120_000;
+const WA_INIT_TIMEOUT_MS = 180_000;
+/** Bundled Chrome + web.whatsapp.com — PC lambat; jangan bunuh client sebelum QR sempat emit. */
+const WA_QR_APPEAR_DEADLINE_MS = 180_000;
 const WA_DESTROY_SETTLE_MS = 900;
 const WA_LOGIN_PREPARE_SETTLE_MS = 1_500;
 const WA_LOCK_WAIT_MS = 4_000;
@@ -345,7 +345,7 @@ function armQrAppearDeadline(
           sessionId,
           platform: 'whatsapp',
           message:
-            'QR is still loading (Chrome may take up to 2 minutes on first login). Wait, or close and tap Sync again.',
+            'QR is still loading (Chrome may take up to 3 minutes on first login). Wait, or close and tap Sync again.',
         });
       }
     })();

@@ -9,8 +9,8 @@ Write-Host "==> Chrome untuk WhatsApp (Puppeteer)" -ForegroundColor Cyan
 npm run build:chrome
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "==> Validasi desktop" -ForegroundColor Cyan
-npm run validate:desktop
+Write-Host "==> Validasi pre-release (desktop + typecheck)" -ForegroundColor Cyan
+npm run validate:pre-release
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "==> Validasi .env organisasi" -ForegroundColor Cyan

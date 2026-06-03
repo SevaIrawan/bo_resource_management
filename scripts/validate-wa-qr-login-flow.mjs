@@ -19,8 +19,8 @@ const deadlineBlock = waTs.slice(
 
 const checks = [
   {
-    name: 'QR deadline >= 120s (bundled Chrome)',
-    ok: /WA_QR_APPEAR_DEADLINE_MS = 120_000/.test(waTs),
+    name: 'QR deadline >= 180s (bundled Chrome)',
+    ok: /WA_QR_APPEAR_DEADLINE_MS = 180_000/.test(waTs),
   },
   {
     name: 'Timeout tidak destroyWhatsAppSession (biarkan QR sempat emit)',

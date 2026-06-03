@@ -1,5 +1,9 @@
 import { ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  countAccountsByPlatform,
+  masterGroupCountsByPlatform,
+} from '@/lib/brandCardHeaderBadges';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { AddAccountHeaderMenu } from '@/components/group-monitoring/AddAccountHeaderMenu';
@@ -55,6 +59,15 @@ export function AccountBrandCard({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const allAligned = group.misalignedCount === 0;
+
+  const accountsByPlatform = useMemo(
+    () => countAccountsByPlatform(group.accounts),
+    [group.accounts],
+  );
+  const groupsByPlatform = useMemo(
+    () => masterGroupCountsByPlatform(group.standardGroupCountByPlatform),
+    [group.standardGroupCountByPlatform],
+  );
 
   function openAddFlow(platform: Platform, slotId?: string) {
     if (!canManageStructure) return;
@@ -130,25 +143,18 @@ export function AccountBrandCard({
           </button>
 
           <div className="brand-card-header-actions">
-            <span className="brand-card-badge brand-card-badge--neutral">
-              {t('groupMonitoring.accountCard.accountCount', { count: group.accountCount })}
+            <span className="brand-card-badge brand-card-badge--neutral brand-card-badge--split">
+              {t('groupMonitoring.accountCard.platformAccountsBadge', {
+                wa: accountsByPlatform.whatsapp,
+                tg: accountsByPlatform.telegram,
+              })}
             </span>
-            {group.standardGroupCountByPlatform?.whatsapp != null &&
-            group.standardGroupCountByPlatform.whatsapp > 0 ? (
-              <span className="brand-card-badge brand-card-badge--neutral">
-                {t('groupMonitoring.accountCard.standardGroupsWa', {
-                  count: group.standardGroupCountByPlatform.whatsapp,
-                })}
-              </span>
-            ) : null}
-            {group.standardGroupCountByPlatform?.telegram != null &&
-            group.standardGroupCountByPlatform.telegram > 0 ? (
-              <span className="brand-card-badge brand-card-badge--neutral">
-                {t('groupMonitoring.accountCard.standardGroupsTg', {
-                  count: group.standardGroupCountByPlatform.telegram,
-                })}
-              </span>
-            ) : null}
+            <span className="brand-card-badge brand-card-badge--neutral brand-card-badge--split">
+              {t('groupMonitoring.accountCard.platformGroupsBadge', {
+                wa: groupsByPlatform.whatsapp,
+                tg: groupsByPlatform.telegram,
+              })}
+            </span>
             <span
               className={cn(
                 'brand-card-badge',

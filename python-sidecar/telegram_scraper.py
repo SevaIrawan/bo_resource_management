@@ -13,7 +13,7 @@ from telethon.tl.types import (
 
 from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 
-DEVICE_GROUP_TARGET_MAX = 2000
+DEVICE_GROUP_TARGET_MAX = 3000
 
 
 def _admin_label(is_admin: bool) -> str:

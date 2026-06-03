@@ -320,7 +320,7 @@ function pollTelegramStatus(sessionId: string, win: BrowserWindow) {
   };
 
   tick();
-  const timer = setInterval(tick, 500);
+  const timer = setInterval(tick, 300);
   pollTimers.set(sessionId, timer);
 }
 

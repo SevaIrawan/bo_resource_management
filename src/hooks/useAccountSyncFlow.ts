@@ -945,6 +945,26 @@ export function useAccountSyncFlow({
       clearRowProcessing(groupId, account.id);
       setStep('idle');
 
+      const supabaseAfterLogin = getSupabase();
+      const brandIdAfterLogin =
+        (
+          await supabaseAfterLogin
+            ?.from(TABLES.messagingAccounts)
+            .select('brand_id')
+            .eq('id', dbAccountId)
+            .maybeSingle()
+        )?.data?.brand_id as string | undefined;
+      if (brandIdAfterLogin) {
+        await reconcileTicketsForAccount({
+          accountId: dbAccountId,
+          brandId: brandIdAfterLogin,
+          brandName: account.brandName,
+          platform: account.platform,
+          deviceY: syncPayload.result.groupsCurrent,
+        });
+        onTicketsReload?.();
+      }
+
       if (savedIntent === 'scraper') {
         void runScrapeInBackground({ groupId, account: updatedAccount, dbAccountId });
         return;
@@ -998,6 +1018,7 @@ export function useAccountSyncFlow({
     applyResult,
     clearRowProcessing,
     loginIntent,
+    onTicketsReload,
     runScrapeInBackground,
     setRowProcessing,
     showSyncError,

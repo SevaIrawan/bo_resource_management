@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getConfigStatus: () => ipcRenderer.invoke('app:get-config-status'),
     openConfigFolder: () => ipcRenderer.invoke('app:open-config-folder'),
     checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
+    installUpdate: () =>
+      ipcRenderer.invoke('app:install-update') as Promise<{ ok: boolean; message?: string }>,
     getUpdateStatus: () =>
       ipcRenderer.invoke('app:get-update-status') as Promise<{
         status: 'idle' | 'available' | 'downloaded';

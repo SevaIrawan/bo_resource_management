@@ -1,13 +1,27 @@
 import { useEffect, useState } from 'react';
+import { APP_VERSION } from '@/lib/appVersion';
 
 export type AppUpdateUiStatus = 'idle' | 'available' | 'downloaded';
 
 export interface AppUpdateStatus {
   status: AppUpdateUiStatus;
+  /** Versi pembaruan di GitHub (jika ada). */
   version?: string;
+  /** Versi terpasang di PC ini. */
+  currentVersion: string;
 }
 
-const IDLE: AppUpdateStatus = { status: 'idle' };
+function normalizeStatus(
+  payload: Partial<AppUpdateStatus> & { status?: AppUpdateUiStatus },
+): AppUpdateStatus {
+  return {
+    status: payload.status ?? 'idle',
+    version: payload.version,
+    currentVersion: payload.currentVersion?.trim() || APP_VERSION,
+  };
+}
+
+const IDLE: AppUpdateStatus = normalizeStatus({ status: 'idle' });
 
 export function useAppUpdateStatus(): AppUpdateStatus {
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus>(IDLE);
@@ -16,10 +30,13 @@ export function useAppUpdateStatus(): AppUpdateStatus {
     const api = window.electronAPI?.app;
     if (!api?.getUpdateStatus) return;
 
-    void api.getUpdateStatus().then(setUpdateStatus).catch(() => setUpdateStatus(IDLE));
+    void api
+      .getUpdateStatus()
+      .then((payload) => setUpdateStatus(normalizeStatus(payload)))
+      .catch(() => setUpdateStatus(IDLE));
 
     const unsubscribe = api.onUpdateStatus?.((payload) => {
-      setUpdateStatus(payload);
+      setUpdateStatus(normalizeStatus(payload));
     });
 
     return () => {

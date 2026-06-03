@@ -5,7 +5,7 @@ import { app } from 'electron';
 import QRCode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
-import { withWaBrowserPool } from './waBrowserPool';
+import { withWaBrowserSlot } from './waBrowserPool';
 import { resolveWaChromeExecutable } from './waPuppeteerChrome';
 
 const { Client, LocalAuth } = pkg;

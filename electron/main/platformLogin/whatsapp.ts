@@ -5,7 +5,8 @@ import { app } from 'electron';
 import QRCode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
-import { withWaBrowserSlot } from './waBrowserPool';
+import { withWaBrowserPool } from './waBrowserPool';
+import { resolveWaChromeExecutable } from './waPuppeteerChrome';
 
 const { Client, LocalAuth } = pkg;
 
@@ -251,6 +252,7 @@ function createClient(sessionId: string, mode: WaMode, phone?: string) {
     }),
     puppeteer: {
       headless: true,
+      executablePath: resolveWaChromeExecutable(),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

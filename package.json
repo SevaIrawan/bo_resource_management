@@ -1,6 +1,6 @@
 {
   "name": "resource-management",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Resource Management Desktop — Group Monitoring Dashboard",
   "author": "Seva Irawan <tanjungbambangirawan85@gmail.com>",
@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "vite",
     "build:sidecar": "powershell -ExecutionPolicy Bypass -File scripts/build-telegram-sidecar.ps1",
-    "build:app": "vite build && electron-builder --win",
+    "build:chrome": "powershell -ExecutionPolicy Bypass -File scripts/build-puppeteer-chrome.ps1",
+    "build:app": "node scripts/validate-puppeteer-chrome.mjs && vite build && electron-builder --win",
     "build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
     "build:handbook-docs": "node scripts/build-handbook-documents.mjs",
     "build:handbook-pdf": "npm run build:handbook-docs",
@@ -21,7 +22,8 @@
     "validate:session-flow": "node scripts/validate-session-column-flow.mjs",
     "validate:multi-account-wa": "node scripts/validate-multi-account-wa.mjs",
     "validate:telegram-login": "node scripts/validate-telegram-login-flow.mjs",
-    "validate:desktop": "npm run validate:session-flow && npm run validate:multi-account-wa && npm run validate:telegram-login",
+    "validate:puppeteer-chrome": "node scripts/validate-puppeteer-chrome.mjs",
+    "validate:desktop": "npm run validate:session-flow && npm run validate:multi-account-wa && npm run validate:telegram-login && npm run validate:puppeteer-chrome",
     "audit:reload": "node scripts/audit-reload-all-flow.mjs",
     "diagnose:session": "node scripts/diagnose-session.mjs",
     "repair:wa-session": "node scripts/repair-wa-session.mjs",
@@ -43,6 +45,7 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.1",
     "tailwind-merge": "^3.3.0",
+    "puppeteer": "^24.38.0",
     "whatsapp-web.js": "^1.34.7",
     "xlsx": "^0.18.5"
   },
@@ -99,6 +102,10 @@
       {
         "from": "resources/org-default.env",
         "to": "org-default.env"
+      },
+      {
+        "from": "resources/puppeteer-cache/chrome",
+        "to": "puppeteer-chrome/chrome"
       }
     ],
     "nsis": {

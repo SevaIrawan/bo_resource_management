@@ -5,6 +5,10 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
+Write-Host "==> Chrome untuk WhatsApp (Puppeteer)" -ForegroundColor Cyan
+npm run build:chrome
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "==> Validasi desktop" -ForegroundColor Cyan
 npm run validate:desktop
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

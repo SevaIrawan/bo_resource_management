@@ -7,6 +7,7 @@ resources/org-default.env
 docs/guides/pdf/
 resources/sidecar-dist/
 resources/sidecar-build/
+resources/puppeteer-cache/
 .env
 .env.local
 *.log

@@ -41,6 +41,8 @@ export default defineConfig({
                 'electron',
                 'electron-updater',
                 'whatsapp-web.js',
+                'puppeteer',
+                'puppeteer-core',
                 'node-cron',
                 'dotenv',
               ],

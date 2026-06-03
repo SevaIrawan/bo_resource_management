@@ -211,6 +211,9 @@ export const zh: Messages = {
       telegramStep3: '扫描右侧二维码',
       telegramStep4: '若 Telegram 提示，请在手机上点确认',
       loginConfirming: '若手机有提示，请在手机上确认…',
+      loginConfirmingLoading: '扫码成功 — 正在本机加载账号（群组很多时可能需要几分钟）…',
+      loginConfirmingTimeout:
+        '扫码后 {{platform}} 仍在加载。群组很多的账号最多约 10 分钟 — 请继续等待，或关闭后重新点同步。',
       loginSaving: '正在保存会话…',
       whatsappStep1: '在手机上打开 WhatsApp',
       whatsappStep2: '已关联的设备 → 关联新设备',

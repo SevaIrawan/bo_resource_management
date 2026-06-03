@@ -56,8 +56,11 @@ import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
-const LOGIN_PERSIST_TIMEOUT_MS = 90_000;
-const LOGIN_SYNC_AFTER_TIMEOUT_MS = loginSyncAfterTimeoutMs();
+const LOGIN_PERSIST_TIMEOUT_MS = 180_000;
+
+function loginGroupEstimate(account: AccountBrandRow): number {
+  return Math.max(500, account.groupsCurrent ?? 0, account.groupsTotal ?? 0, 2000);
+}
 /** Manual Sync (VALID): gate + hitung grup device (siap ~2000 grup). */
 const MANUAL_SYNC_TIMEOUT_MS = manualSyncTimeoutMs();
 export type SyncFlowStep =
@@ -921,7 +924,7 @@ export function useAccountSyncFlow({
           skipPersist: true,
           quickDeviceCount: true,
         }),
-        LOGIN_SYNC_AFTER_TIMEOUT_MS,
+        loginSyncAfterTimeoutMs(loginGroupEstimate(account)),
         'Sync after login',
       );
 

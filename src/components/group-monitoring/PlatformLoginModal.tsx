@@ -151,7 +151,9 @@ export function PlatformLoginModal({
       : status === 'ready'
       ? t('groupMonitoring.sync.loginReady')
       : status === 'confirming'
-        ? t('groupMonitoring.sync.loginConfirming')
+        ? isTelegram
+          ? t('groupMonitoring.sync.loginConfirming')
+          : t('groupMonitoring.sync.loginConfirmingLoading')
       : status === 'error'
         ? error ?? t('groupMonitoring.sync.loginFailed')
         : status === 'unsupported'

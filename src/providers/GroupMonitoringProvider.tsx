@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GroupMonitoringContext } from '@/contexts/group-monitoring-context';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -30,6 +30,7 @@ import {
   TICKET_WORKFLOW_CHANGED_EVENT,
 } from '@/lib/ticketWorkflowLocal';
 import { groupOpenTickets } from '@/lib/ticketGroups';
+import { reconcileOpenTicketsForUser } from '@/lib/reconcileTickets';
 import { computeAccountKpis, computeTicketKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
@@ -54,6 +55,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const [accountFilters, setAccountFilters] = useState(ACCOUNT_FILTER_DEFAULT);
   const [ticketFilters, setTicketFilters] = useState(TICKET_FILTER_DEFAULT);
   const [workflowTick, setWorkflowTick] = useState(0);
+  const ticketReconcileBusyRef = useRef(false);
+  const ticketReconcileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reportError = useCallback((message: string) => {
     setError(message);
@@ -82,6 +85,30 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     setTickets(loaded);
     await reloadTicketHandles(loaded);
   }, [user?.id, user?.userName, reloadTicketHandles]);
+
+  const runTicketReconcile = useCallback(async () => {
+    if (!user?.id || ticketReconcileBusyRef.current) return;
+    ticketReconcileBusyRef.current = true;
+    try {
+      const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+      await reconcileOpenTicketsForUser(dataUserId, { concurrency: 2 });
+      const loaded = await loadOpenTicketsForUser(dataUserId);
+      setTickets(loaded);
+      await reloadTicketHandles(loaded);
+    } catch {
+      /* background — UI tetap pakai ticket terakhir */
+    } finally {
+      ticketReconcileBusyRef.current = false;
+    }
+  }, [user?.id, user?.userName, reloadTicketHandles]);
+
+  const scheduleTicketReconcile = useCallback(() => {
+    if (ticketReconcileTimerRef.current) clearTimeout(ticketReconcileTimerRef.current);
+    ticketReconcileTimerRef.current = setTimeout(() => {
+      ticketReconcileTimerRef.current = null;
+      void runTicketReconcile();
+    }, 1500);
+  }, [runTicketReconcile]);
 
   const reloadAll = useCallback(async () => {
     if (!user?.id) {
@@ -112,8 +139,9 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       hydrateTicketProcessCache({});
     } finally {
       setLoading(false);
+      scheduleTicketReconcile();
     }
-  }, [user?.id, user?.userName, t, reloadTicketHandles]);
+  }, [user?.id, user?.userName, t, reloadTicketHandles, scheduleTicketReconcile]);
 
   useEffect(() => {
     void reloadAll();
@@ -122,13 +150,13 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   useEffect(() => {
     registerRefreshHandler(async (activeTab) => {
       if (activeTab === 'ticket') {
-        await reloadTickets();
+        await runTicketReconcile();
       } else {
         await reloadAll();
       }
     });
     return () => registerRefreshHandler(null);
-  }, [registerRefreshHandler, reloadAll, reloadTickets]);
+  }, [registerRefreshHandler, reloadAll, runTicketReconcile]);
 
   useEffect(() => {
     registerFullRefreshHandler(async () => {
@@ -161,7 +189,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   const handleTicketsRealtime = useCallback(() => {
     notifyPendingDataUpdate();
-  }, [notifyPendingDataUpdate]);
+    void reloadTickets();
+  }, [notifyPendingDataUpdate, reloadTickets]);
 
   const reloadGroupsOnly = useCallback(async () => {
     if (!user?.id) return;
@@ -224,6 +253,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     suspendAccountIds: probeSuspendAccountIds,
     onGroupsChange: setGroups,
     onTicketsChange: handleTicketsRealtime,
+    onIssueReconcile: scheduleTicketReconcile,
     onRegistryChange: handleRegistryRealtime,
     onDataChangeNotice: notifyPendingDataUpdate,
   });

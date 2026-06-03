@@ -21,6 +21,7 @@ const checks = [
   { name: 'installUpdate IPC', ok: read('electron/preload/index.ts').includes('installUpdate') },
   { name: 'i18n updateNow / dataUpdatesPending', ok: i18n.includes('updateNow') && i18n.includes('dataUpdatesPending') },
   { name: 'Post-login reconcile tickets', ok: read('src/hooks/useAccountSyncFlow.ts').includes('reconcileTicketsForAccount') && read('src/hooks/useAccountSyncFlow.ts').includes('brandIdAfterLogin') },
+  { name: 'Load app: background reconcileOpenTicketsForUser', ok: read('src/providers/GroupMonitoringProvider.tsx').includes('scheduleTicketReconcile') && read('src/providers/GroupMonitoringProvider.tsx').includes('reconcileOpenTicketsForUser') },
 ];
 
 let failed = 0;

@@ -34,10 +34,10 @@ const STEPS = [
   },
   {
     row: 5,
-    where: '~~reconcileTicketsForAccount × N~~',
-    action: 'REMOVED dari load',
+    where: 'scheduleTicketReconcile (background)',
+    action: 'reconcileOpenTicketsForUser → reload tickets (debounce 1.5s)',
     blocksUi: false,
-    note: 'Jalan saat SYNC sukses, bukan saat buka halaman',
+    note: 'Tidak block spinner; missing_group + link master untuk 30/1893',
   },
   {
     row: 6,
@@ -66,6 +66,13 @@ const STEPS = [
     action: 'Background (tidak block)',
     blocksUi: false,
     note: 'OK',
+  },
+  {
+    row: 10,
+    where: 'SYNC / scrape / login',
+    action: 'reconcileTicketsForAccount per akun',
+    blocksUi: false,
+    note: 'Tetap jalan + batch insert ribuan missing_group',
   },
 ];
 

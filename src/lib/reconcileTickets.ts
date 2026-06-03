@@ -54,6 +54,15 @@ async function dedupeOpenTicketsForAccount(accountId: string): Promise<void> {
   }
 }
 
+const TICKET_INSERT_CHUNK = 150;
+
+interface OpenTicketRowInput {
+  description: string;
+  groupLink?: string | null;
+  groupId?: string | null;
+  groupName?: string | null;
+}
+
 async function upsertOpenTicket(input: {
   accountId: string;
   brandId: string;
@@ -64,43 +73,81 @@ async function upsertOpenTicket(input: {
   groupId?: string | null;
   groupName?: string | null;
 }): Promise<void> {
-  const supabase = getSupabase();
-  if (!supabase) return;
+  await batchUpsertOpenTicketsByGroupId({
+    accountId: input.accountId,
+    brandId: input.brandId,
+    platform: input.platform,
+    ticketType: input.ticketType,
+    rows: [
+      {
+        description: input.description,
+        groupLink: input.groupLink,
+        groupId: input.groupId,
+        groupName: input.groupName,
+      },
+    ],
+  });
+}
 
-  let query = supabase
+/** Satu query existing + insert chunk — untuk ribuan missing_group (master >> daily). */
+async function batchUpsertOpenTicketsByGroupId(input: {
+  accountId: string;
+  brandId: string;
+  platform: Platform;
+  ticketType: TicketType;
+  rows: OpenTicketRowInput[];
+}): Promise<Set<string>> {
+  const supabase = getSupabase();
+  const keepIds = new Set<string>();
+  if (!supabase || !input.rows.length) return keepIds;
+
+  const { data: openRows, error: openError } = await supabase
     .from(TABLES.tickets)
-    .select('id')
+    .select('group_id')
     .eq('account_id', input.accountId)
     .eq('ticket_type', input.ticketType)
-    .eq('status', 'open')
-    .limit(1);
+    .eq('status', 'open');
 
-  if (input.groupId) {
-    query = query.eq('group_id', input.groupId);
-  } else if (input.groupName) {
-    query = query.eq('group_name', input.groupName);
+  if (openError) throw openError;
+
+  const existingGids = new Set<string>();
+  for (const row of openRows ?? []) {
+    const gid = String(row.group_id ?? '').trim();
+    if (gid) {
+      existingGids.add(gid);
+      keepIds.add(gid);
+    }
   }
 
-  const { data: existingRows, error: findError } = await query;
-  if (findError) throw findError;
-  if (existingRows?.length) return;
-
-  const { error } = await supabase.from(TABLES.tickets).insert({
-    account_id: input.accountId,
-    brand_id: input.brandId,
-    platform: input.platform,
-    ticket_type: input.ticketType,
-    status: 'open',
-    description: input.description,
-    group_link: input.groupLink ?? null,
-    group_id: input.groupId ?? null,
-    group_name: input.groupName ?? null,
-  });
-
-  if (error) {
-    if (error.code === '23505') return;
-    throw error;
+  const toInsert: Record<string, unknown>[] = [];
+  for (const row of input.rows) {
+    const gid = String(row.groupId ?? '').trim();
+    if (!gid || existingGids.has(gid)) {
+      if (gid) keepIds.add(gid);
+      continue;
+    }
+    existingGids.add(gid);
+    keepIds.add(gid);
+    toInsert.push({
+      account_id: input.accountId,
+      brand_id: input.brandId,
+      platform: input.platform,
+      ticket_type: input.ticketType,
+      status: 'open',
+      description: row.description,
+      group_link: row.groupLink ?? null,
+      group_id: gid,
+      group_name: row.groupName ?? null,
+    });
   }
+
+  for (let i = 0; i < toInsert.length; i += TICKET_INSERT_CHUNK) {
+    const chunk = toInsert.slice(i, i + TICKET_INSERT_CHUNK);
+    const { error } = await supabase.from(TABLES.tickets).insert(chunk);
+    if (error && error.code !== '23505') throw error;
+  }
+
+  return keepIds;
 }
 
 async function resolveTickets(input: {
@@ -266,25 +313,25 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
     masterRows.map((m) => String(m.group_id ?? '').trim()).filter(Boolean),
   );
 
-  const junkKeepIds = new Set<string>();
+  const junkRows: OpenTicketRowInput[] = [];
   for (const d of dailyRows) {
     const gid = String(d.group_id ?? '').trim();
     if (!gid || masterGids.has(gid)) continue;
-
     const label = d.group_name?.trim() || gid;
-    await upsertOpenTicket({
-      accountId: input.accountId,
-      brandId: input.brandId,
-      platform: input.platform,
-      ticketType: 'daily_junk_group',
+    junkRows.push({
       description: ticketDescriptionEn.dailyJunk(label),
       groupLink: d.invite_link,
       groupId: gid,
       groupName: d.group_name,
     });
-    junkKeepIds.add(gid);
   }
-
+  const junkKeepIds = await batchUpsertOpenTicketsByGroupId({
+    accountId: input.accountId,
+    brandId: input.brandId,
+    platform: input.platform,
+    ticketType: 'daily_junk_group',
+    rows: junkRows,
+  });
   await resolveTickets({
     accountId: input.accountId,
     ticketType: 'daily_junk_group',
@@ -292,8 +339,8 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
     keepGroupNames: new Set(),
   });
 
-  const missingKeepIds = new Set<string>();
-  const notAdminKeepIds = new Set<string>();
+  const missingRows: OpenTicketRowInput[] = [];
+  const notAdminRows: OpenTicketRowInput[] = [];
 
   for (const m of masterRows) {
     const gid = String(m.group_id ?? '').trim();
@@ -303,35 +350,32 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
     const label = m.group_name?.trim() || gid;
 
     if (!d) {
-      await upsertOpenTicket({
-        accountId: input.accountId,
-        brandId: input.brandId,
-        platform: input.platform,
-        ticketType: 'missing_group',
+      missingRows.push({
         description: ticketDescriptionEn.missingGroup(label),
         groupLink: m.invite_link,
         groupId: gid,
         groupName: m.group_name,
       });
-      missingKeepIds.add(gid);
       continue;
     }
 
     if (d.is_admin !== 'yes') {
-      await upsertOpenTicket({
-        accountId: input.accountId,
-        brandId: input.brandId,
-        platform: input.platform,
-        ticketType: 'not_admin',
+      notAdminRows.push({
         description: ticketDescriptionEn.notAdmin(label),
         groupLink: m.invite_link ?? d.invite_link,
         groupId: gid,
         groupName: m.group_name ?? d.group_name,
       });
-      notAdminKeepIds.add(gid);
     }
   }
 
+  const missingKeepIds = await batchUpsertOpenTicketsByGroupId({
+    accountId: input.accountId,
+    brandId: input.brandId,
+    platform: input.platform,
+    ticketType: 'missing_group',
+    rows: missingRows,
+  });
   await resolveTickets({
     accountId: input.accountId,
     ticketType: 'missing_group',
@@ -339,6 +383,13 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
     keepGroupNames: new Set(),
   });
 
+  const notAdminKeepIds = await batchUpsertOpenTicketsByGroupId({
+    accountId: input.accountId,
+    brandId: input.brandId,
+    platform: input.platform,
+    ticketType: 'not_admin',
+    rows: notAdminRows,
+  });
   await resolveTickets({
     accountId: input.accountId,
     ticketType: 'not_admin',
@@ -358,16 +409,14 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
 
   if (snapError) throw snapError;
 
-  /** Y untuk count mismatch = daily akun (sudah di-load), bukan snapshot 0 saat logout. */
+  /** Y untuk count mismatch — max(daily, snapshot, input) agar selaras kartu 30/1893. */
   const dailyY = dailyRows.length;
+  const snapY =
+    snap?.session_status === 'valid' ? Math.max(0, Number(snap?.groups_current ?? 0)) : 0;
   const deviceY =
     input.deviceY !== undefined && input.deviceY >= 0
       ? input.deviceY
-      : dailyY > 0
-        ? dailyY
-        : snap?.session_status === 'valid'
-          ? Number(snap?.groups_current ?? 0)
-          : 0;
+      : Math.max(dailyY, snapY);
   const brandX = await resolveBrandStandardTotal(
     input.brandId,
     input.platform,
@@ -432,4 +481,161 @@ export async function reconcileTicketsAfterScrape(input: {
     platform: input.platform,
     deviceY: input.deviceY,
   });
+}
+
+async function mapWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  if (!items.length) return;
+  const limit = Math.max(1, concurrency);
+  for (let i = 0; i < items.length; i += limit) {
+    const chunk = items.slice(i, i + limit);
+    await Promise.all(chunk.map((item) => worker(item)));
+  }
+}
+
+/** Semua akun aktif user — buat/update open ticket dari master vs daily. */
+export async function reconcileOpenTicketsForUser(
+  userId: string,
+  options?: { concurrency?: number },
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const { data: accounts, error } = await supabase
+    .from(TABLES.messagingAccounts)
+    .select('id, brand_id, platform, metadata')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  if (error) throw error;
+  if (!accounts?.length) return;
+
+  const brandIds = [
+    ...new Set(
+      accounts
+        .map((row) => row.brand_id as string | undefined)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const brandNameById = new Map<string, string>();
+  if (brandIds.length) {
+    const { data: brandRows, error: brandError } = await supabase
+      .from(TABLES.brands)
+      .select('id, name')
+      .in('id', brandIds);
+    if (brandError) throw brandError;
+    for (const row of brandRows ?? []) {
+      const name = String(row.name ?? '').trim();
+      if (name) brandNameById.set(row.id as string, name);
+    }
+  }
+
+  const accountIds = accounts.map((row) => row.id as string);
+  const deviceYByAccount = new Map<string, number>();
+  if (accountIds.length) {
+    const { data: snaps, error: snapError } = await supabase
+      .from(TABLES.accountSnapshots)
+      .select('account_id, groups_current, session_status')
+      .in('account_id', accountIds);
+    if (snapError) throw snapError;
+    for (const snap of snaps ?? []) {
+      const id = snap.account_id as string;
+      if (snap.session_status !== 'valid') continue;
+      deviceYByAccount.set(id, Math.max(0, Number(snap.groups_current ?? 0)));
+    }
+  }
+
+  const jobs: ReconcileInput[] = [];
+  for (const row of accounts) {
+    const accountId = row.id as string;
+    const brandId = row.brand_id as string | undefined;
+    if (!brandId) continue;
+
+    const meta = row.metadata as { brand?: string } | null;
+    const brandName = meta?.brand?.trim() || brandNameById.get(brandId) || '';
+    if (!brandName) continue;
+
+    jobs.push({
+      accountId,
+      brandId,
+      brandName,
+      platform: row.platform as Platform,
+      deviceY: deviceYByAccount.get(accountId),
+    });
+  }
+
+  await mapWithConcurrency(jobs, options?.concurrency ?? 3, (job) =>
+    reconcileTicketsForAccount(job),
+  );
+}
+
+/** Setelah master/daily brand+platform berubah — rekonsiliasi semua akun user di brand itu. */
+export async function reconcileTicketsForBrandPlatform(input: {
+  userId: string;
+  brandName: string;
+  platform: Platform;
+  concurrency?: number;
+}): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const brand = input.brandName.trim();
+  if (!brand) return;
+
+  const { data: accounts, error } = await supabase
+    .from(TABLES.messagingAccounts)
+    .select('id, brand_id, platform, metadata')
+    .eq('user_id', input.userId)
+    .eq('is_active', true)
+    .eq('platform', input.platform);
+
+  if (error) throw error;
+  if (!accounts?.length) return;
+
+  const brandIds = [
+    ...new Set(
+      accounts
+        .map((row) => row.brand_id as string | undefined)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const brandNameById = new Map<string, string>();
+  if (brandIds.length) {
+    const { data: brandRows, error: brandError } = await supabase
+      .from(TABLES.brands)
+      .select('id, name')
+      .in('id', brandIds);
+    if (brandError) throw brandError;
+    for (const row of brandRows ?? []) {
+      const name = String(row.name ?? '').trim();
+      if (name) brandNameById.set(row.id as string, name);
+    }
+  }
+
+  const brandKey = brand.toLowerCase();
+  const jobs: ReconcileInput[] = [];
+  for (const row of accounts) {
+    const brandId = row.brand_id as string | undefined;
+    if (!brandId) continue;
+
+    const meta = row.metadata as { brand?: string } | null;
+    const resolvedBrand = meta?.brand?.trim() || brandNameById.get(brandId) || '';
+    if (!resolvedBrand || resolvedBrand.toLowerCase() !== brandKey) continue;
+
+    jobs.push({
+      accountId: row.id as string,
+      brandId,
+      brandName: resolvedBrand,
+      platform: input.platform,
+    });
+  }
+
+  await mapWithConcurrency(jobs, input.concurrency ?? 5, (job) =>
+    reconcileTicketsForAccount(job),
+  );
 }

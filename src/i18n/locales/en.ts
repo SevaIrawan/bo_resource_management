@@ -209,6 +209,10 @@ export const en = {
       telegramStep3: 'Scan the QR code on the right',
       telegramStep4: 'If Telegram asks, tap Confirm on your phone',
       loginConfirming: 'Confirm on phone if asked…',
+      loginConfirmingLoading:
+        'Scan OK — loading account on this PC (large group lists may take several minutes)…',
+      loginConfirmingTimeout:
+        '{{platform}} is still loading after scan. Large accounts can take up to 10 minutes — keep waiting, or close and tap Sync again.',
       loginSaving: 'Saving session…',
       whatsappStep1: 'Open WhatsApp on your phone',
       whatsappStep2: 'Linked devices → Link a device',
@@ -253,7 +257,7 @@ export const en = {
       scrapeProgressHint: 'Scraping in background. Counts update in the table.',
       syncFailed: 'Sync failed. Try again.',
       syncTimedOut:
-        'Sync took too long (over 3 minutes). Telegram may have many groups — try again. If it keeps failing, restart the app.',
+        'Sync took too long. Accounts with many groups need more time — try again or restart the app.',
       scraperFailed: 'Scraper failed. Try again.',
       scraperNoGroups: 'No groups found.',
       scraperDesktopRequired: 'Scraper needs the desktop app.',

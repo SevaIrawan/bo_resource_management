@@ -16,7 +16,10 @@ interface UseRealtimeMonitoringOptions {
   /** Jangan patch UI dari realtime saat sync/scrape berjalan (cegah flash). */
   suspendAccountIds?: string[];
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
+  /** Tabel tickets berubah — muat ulang open ticket saja (tanpa reconcile penuh). */
   onTicketsChange: () => void;
+  /** Master/daily/scrape berubah — jalankan reconcileTickets (buat missing_group + link). */
+  onIssueReconcile?: () => void;
   onRegistryChange: () => void;
   /** Tandai tombol Refresh (notifikasi) — pembaruan diterapkan lewat Update Now / Refresh. */
   onDataChangeNotice?: () => void;
@@ -43,17 +46,20 @@ export function useRealtimeMonitoring({
   suspendAccountIds = [],
   onGroupsChange,
   onTicketsChange,
+  onIssueReconcile,
   onRegistryChange,
   onDataChangeNotice,
 }: UseRealtimeMonitoringOptions) {
   const onGroupsChangeRef = useRef(onGroupsChange);
   const onTicketsChangeRef = useRef(onTicketsChange);
+  const onIssueReconcileRef = useRef(onIssueReconcile);
   const onRegistryChangeRef = useRef(onRegistryChange);
   const onDataChangeNoticeRef = useRef(onDataChangeNotice);
   const suspendedRef = useRef(suspendAccountIds);
 
   onGroupsChangeRef.current = onGroupsChange;
   onTicketsChangeRef.current = onTicketsChange;
+  onIssueReconcileRef.current = onIssueReconcile;
   onRegistryChangeRef.current = onRegistryChange;
   onDataChangeNoticeRef.current = onDataChangeNotice;
   suspendedRef.current = suspendAccountIds;
@@ -98,7 +104,7 @@ export function useRealtimeMonitoring({
           }
           const patched = working;
           onGroupsChangeRef.current((current) => mergeGroupsAccountMetrics(current, patched));
-          onTicketsChangeRef.current();
+          onIssueReconcileRef.current?.();
           notifyChange();
         })();
         return latest;
@@ -141,7 +147,7 @@ export function useRealtimeMonitoring({
         'postgres_changes',
         { event: '*', schema: 'public', table: TABLES.tickets },
         () => {
-          onTicketsChangeRef.current();
+          onIssueReconcileRef.current?.();
           notifyChange();
         },
       )
@@ -189,6 +195,7 @@ export function useRealtimeMonitoring({
               onGroupsChangeRef.current((current) =>
                 mergeGroupsAccountMetrics(current, patched),
               );
+              onIssueReconcileRef.current?.();
               notifyChange();
             });
             return latest;

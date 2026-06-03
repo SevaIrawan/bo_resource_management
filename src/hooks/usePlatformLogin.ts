@@ -12,6 +12,9 @@ const TG_QR_TIMEOUT_MS = 120_000;
 /** UI guard — lebih longgar dari main (120s); timer mulai saat modal buka. */
 const WA_QR_MUST_APPEAR_MS = 150_000;
 const WA_PREPARE_SETTLE_MS = 2_000;
+/** Setelah scan: WA `authenticated` → `ready` bisa lama (~2000 grup). */
+const WA_CONFIRMING_TIMEOUT_MS = 600_000;
+const TG_CONFIRMING_TIMEOUT_MS = 120_000;
 
 type PlatformLoginApi = NonNullable<NonNullable<Window['electronAPI']>['platformLogin']>;
 
@@ -264,18 +267,22 @@ export function usePlatformLogin(
     };
   }, [armQrTimeout, clearQrAppearDeadline, clearQrTimeout, dbAccountId, platform, sessionId]);
 
-  // Stuck di "Confirm on phone" tanpa ready — beri jalan keluar.
+  // Setelah scan: fase confirming sampai event `ready` — jangan timeout terlalu cepat (akun besar).
   useEffect(() => {
-    if (!open || status !== 'confirming') return;
+    if (!open || status !== 'confirming' || !platform) return;
+    const ms = platform === 'whatsapp' ? WA_CONFIRMING_TIMEOUT_MS : TG_CONFIRMING_TIMEOUT_MS;
     const timeoutId = window.setTimeout(() => {
+      if (sessionReadyRef.current || loginSucceededRef.current) return;
       setStatus('error');
       setError(
-        t?.('groupMonitoring.sync.loginConfirmingTimeout') ??
-          'WhatsApp is taking too long to connect. Close this window, wait a few seconds, then tap Sync again.',
+        t('groupMonitoring.sync.loginConfirmingTimeout', {
+          platform: platform === 'whatsapp' ? 'WhatsApp' : 'Telegram',
+        }) ??
+          'Account is still loading after scan. For large group lists this can take several minutes — wait, or close and tap Sync again.',
       );
-    }, 90_000);
+    }, ms);
     return () => window.clearTimeout(timeoutId);
-  }, [open, status, t]);
+  }, [open, platform, status, t]);
 
   // Buka modal baru → reset state (hindari status `ready` lama memicu persist ulang)
   useEffect(() => {

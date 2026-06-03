@@ -1,7 +1,6 @@
-import type { BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { app } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import QRCode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';

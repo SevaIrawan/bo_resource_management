@@ -45,6 +45,13 @@ const checks = [
     ok: waTs.includes('resolveWaChromeExecutable()'),
   },
   {
+    name: 'BrowserWindow runtime import (bukan import type saja)',
+    ok:
+      /import \{[^}]*BrowserWindow[^}]*\} from 'electron'/.test(waTs) &&
+      !waTs.includes("import type { BrowserWindow } from 'electron'") &&
+      waTs.includes('BrowserWindow.getAllWindows'),
+  },
+  {
     name: 'Sync modal skipDiskRestore (AccountMonitoringSyncModals)',
     ok: fs
       .readFileSync(

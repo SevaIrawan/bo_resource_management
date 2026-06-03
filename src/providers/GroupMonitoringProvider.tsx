@@ -41,7 +41,7 @@ interface GroupMonitoringProviderProps {
 
 export function GroupMonitoringProvider({ children }: GroupMonitoringProviderProps) {
   const { user } = useAuth();
-  const { canAutoSync, canManageStructure } = usePermissions();
+  const { canAutoSync } = usePermissions();
   const { registerRefreshHandler, registerFullRefreshHandler } = useMonitoringTab();
   const { notifyPendingDataUpdate } = useMonitoringPending();
   const { t } = useLanguage();
@@ -53,7 +53,6 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const [probeSuspendAccountIds, setProbeSuspendAccountIds] = useState<string[]>([]);
   const [accountFilters, setAccountFilters] = useState(ACCOUNT_FILTER_DEFAULT);
   const [ticketFilters, setTicketFilters] = useState(TICKET_FILTER_DEFAULT);
-  const [dismissedBrandGroupIds, setDismissedBrandGroupIds] = useState<string[]>([]);
   const [workflowTick, setWorkflowTick] = useState(0);
 
   const reportError = useCallback((message: string) => {
@@ -140,20 +139,9 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   const ticketSummaries = useMemo(() => groupOpenTickets(tickets), [tickets]);
 
-  const dismissBrandGroup = useCallback(
-    (groupId: string) => {
-      if (!canManageStructure) return;
-      setDismissedBrandGroupIds((prev) => (prev.includes(groupId) ? prev : [...prev, groupId]));
-    },
-    [canManageStructure],
-  );
-
-  const dismissedBrandSet = useMemo(() => new Set(dismissedBrandGroupIds), [dismissedBrandGroupIds]);
-
   const filteredGroups = useMemo(
-    () =>
-      filterAccountGroups(groups, accountFilters).filter((g) => !dismissedBrandSet.has(g.id)),
-    [groups, accountFilters, dismissedBrandSet],
+    () => filterAccountGroups(groups, accountFilters),
+    [groups, accountFilters],
   );
 
   const filteredTicketSummaries = useMemo(
@@ -175,9 +163,21 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     notifyPendingDataUpdate();
   }, [notifyPendingDataUpdate]);
 
+  const reloadGroupsOnly = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
+      setGroups(loadedGroups);
+    } catch {
+      /* tetap tampilkan data lama */
+    }
+  }, [user?.id, user?.userName]);
+
   const handleRegistryRealtime = useCallback(() => {
+    void reloadGroupsOnly();
     notifyPendingDataUpdate();
-  }, [notifyPendingDataUpdate]);
+  }, [notifyPendingDataUpdate, reloadGroupsOnly]);
 
   const autoSyncState = useAutoAccountSync({
     userId: user?.id,
@@ -252,7 +252,6 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       loading,
       reportError,
       setProbeSuspendAccountIds,
-      dismissBrandGroup,
     }),
     [
       groups,
@@ -261,7 +260,6 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       tickets,
       ticketSummaries,
       filteredTicketSummaries,
-      dismissBrandGroup,
       ticketFilters,
       accountKpis,
       ticketKpis,

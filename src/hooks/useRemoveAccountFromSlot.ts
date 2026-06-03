@@ -3,6 +3,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { removeAccountFromGroup } from '@/lib/accountBrandUtils';
 import { deactivateMessagingAccount } from '@/lib/messagingAccounts';
 import { getErrorMessage } from '@/lib/errorMessage';
+import type { Dispatch, SetStateAction } from 'react';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 
 interface RemoveTarget {
@@ -11,8 +12,7 @@ interface RemoveTarget {
 }
 
 export function useRemoveAccountFromSlot(
-  groups: AccountBrandGroup[],
-  onGroupsChange: (groups: AccountBrandGroup[]) => void,
+  onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>,
   userId: string | null | undefined,
   canManageStructure = true,
 ) {
@@ -48,8 +48,8 @@ export function useRemoveAccountFromSlot(
         await deactivateMessagingAccount(account.id, account.platform);
       }
 
-      onGroupsChange(
-        groups.map((item) =>
+      onGroupsChange((prev) =>
+        prev.map((item) =>
           item.id === groupId ? removeAccountFromGroup(item, account.id) : item,
         ),
       );
@@ -62,7 +62,7 @@ export function useRemoveAccountFromSlot(
     } finally {
       setRemoveSaving(false);
     }
-  }, [canManageStructure, groups, onGroupsChange, removeTarget, userId, t]);
+  }, [canManageStructure, onGroupsChange, removeTarget, userId, t]);
 
   return {
     removeTarget,

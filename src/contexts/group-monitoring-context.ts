@@ -27,8 +27,6 @@ export interface GroupMonitoringContextValue {
   loading: boolean;
   reportError: (message: string) => void;
   setProbeSuspendAccountIds: Dispatch<SetStateAction<string[]>>;
-  /** Sembunyikan kartu brand dari area konten (session UI saja). */
-  dismissBrandGroup: (groupId: string) => void;
 }
 
 export const GroupMonitoringContext = createContext<GroupMonitoringContextValue | null>(null);

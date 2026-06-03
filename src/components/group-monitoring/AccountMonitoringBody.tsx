@@ -20,7 +20,6 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
   const { user } = useAuth();
   const { canManageStructure, canOperatePlatform } = usePermissions();
   const {
-    groups,
     filteredGroups,
     onGroupsChange,
     loading,
@@ -37,12 +36,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     },
   });
 
-  const removeSlot = useRemoveAccountFromSlot(
-    groups,
-    onGroupsChange,
-    user?.id,
-    canManageStructure,
-  );
+  const removeSlot = useRemoveAccountFromSlot(onGroupsChange, user?.id, canManageStructure);
 
   const probeSuspendIds = useMemo(() => {
     const ids = new Set<string>();
@@ -79,8 +73,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     return <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>;
   }
 
-  const hasAnyAccounts = groups.some((g) => g.accounts.length > 0);
-  const hasFiltered = filteredGroups.some((g) => g.accounts.length > 0);
+  const hasFilteredBrands = filteredGroups.length > 0;
 
   return (
     <>
@@ -99,33 +92,26 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
         />
       ) : null}
 
-      {hasFiltered ? (
-        viewMode === 'table' ? (
+      {viewMode === 'table' ? (
+        hasFilteredBrands ? (
           <AccountBrandTableView
             groups={filteredGroups}
             sync={sync}
             onRemoveFromSlot={removeSlot.openRemoveModal}
           />
         ) : (
-          <AccountBrandCardList
-            groups={filteredGroups}
-            onGroupsChange={onGroupsChange}
-            sync={sync}
-            onRemoveFromSlot={removeSlot.openRemoveModal}
-          />
+          <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
+            <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
+            <p className="ticket-empty-desc">{t('groupMonitoring.noFilterMatchDesc')}</p>
+          </div>
         )
-      ) : !hasAnyAccounts ? (
+      ) : (
         <AccountBrandCardList
-          groups={groups}
+          groups={filteredGroups}
           onGroupsChange={onGroupsChange}
           sync={sync}
           onRemoveFromSlot={removeSlot.openRemoveModal}
         />
-      ) : (
-        <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
-          <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
-          <p className="ticket-empty-desc">{t('groupMonitoring.noFilterMatchDesc')}</p>
-        </div>
       )}
     </>
   );

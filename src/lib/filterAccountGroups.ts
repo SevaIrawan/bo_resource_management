@@ -43,6 +43,10 @@ export function uniqueAccountStatuses(groups: AccountBrandGroup[]): AccountConne
   return [...set].sort((a, b) => a.localeCompare(b));
 }
 
+function brandNameMatchesSearch(group: AccountBrandGroup, query: string): boolean {
+  return group.brandName.trim().toLowerCase().includes(query);
+}
+
 function rowMatchesSearch(row: AccountBrandRow, group: AccountBrandGroup, query: string): boolean {
   const haystack = [
     row.accountName,
@@ -63,7 +67,12 @@ export function filterAccountGroups(
   const q = filters.search.trim().toLowerCase();
 
   return groups
-    .filter((group) => filters.brand === 'all' || group.brandName === filters.brand)
+    .filter((group) => {
+      if (filters.brand !== 'all' && group.brandName !== filters.brand) return false;
+      if (!q) return true;
+      if (brandNameMatchesSearch(group, q)) return true;
+      return group.accounts.some((row) => rowMatchesSearch(row, group, q));
+    })
     .map((group) => {
       const accounts = group.accounts.filter((row) => {
         if (filters.platform !== 'all' && row.platform !== filters.platform) return false;
@@ -78,6 +87,5 @@ export function filterAccountGroups(
         accountCount: accounts.length,
         misalignedCount: accounts.filter((a) => a.isMisaligned).length,
       };
-    })
-    .filter((group) => group.accounts.length > 0);
+    });
 }

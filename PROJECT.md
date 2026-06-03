@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-02  
-**Versi aplikasi:** `1.0.2` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.3` (lihat `package.json`)  
 **Status:** Produksi internal — desktop Windows untuk tim operasional perusahaan  
 
 ---
@@ -64,7 +64,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.2)
+## 4. Konfigurasi & installer (kondisi 1.0.3)
 
 ### 4.1 Variabel lingkungan
 
@@ -85,7 +85,7 @@ cd "C:\Work\Resource Management"
 npm run build:installer
 ```
 
-Output: `release\Resource Management Setup 1.0.2.exe`
+Output: `release\Resource Management Setup 1.0.3.exe`
 
 **Yang terbundel dalam satu paket:**
 
@@ -295,4 +295,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.2**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.3**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*

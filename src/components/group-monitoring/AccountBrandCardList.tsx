@@ -1,20 +1,24 @@
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { AccountBrandCard } from '@/components/group-monitoring/AccountBrandCard';
 import { AddBrandCard } from '@/components/group-monitoring/AddBrandCard';
 import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
+import { RemoveBrandModal } from '@/components/group-monitoring/RemoveBrandModal';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import { addAccountToGroup, createEmptyBrandGroup } from '@/lib/accountBrandUtils';
-import { ensureBrand } from '@/lib/brands';
+import { ensureBrand, removeBrandCompletely } from '@/lib/brands';
+import { getErrorMessage } from '@/lib/errorMessage';
 import { createMessagingAccount } from '@/lib/messagingAccounts';
+import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup, AccountBrandRow, AddAccountInput } from '@/types/accountMonitoringUi';
+
 type SyncFlow = ReturnType<typeof useAccountSyncFlow>;
 
 interface AccountBrandCardListProps {
   groups: AccountBrandGroup[];
-  onGroupsChange: (groups: AccountBrandGroup[]) => void;
+  onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   sync: SyncFlow;
   onRemoveFromSlot: (groupId: string, account: AccountBrandRow) => void;
 }
@@ -26,28 +30,44 @@ export function AccountBrandCardList({
   onRemoveFromSlot,
 }: AccountBrandCardListProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { canManageStructure, canOperatePlatform } = usePermissions();
-  const { dismissBrandGroup } = useGroupMonitoring();
+  const { reloadTickets } = useGroupMonitoring();
   const [modalOpen, setModalOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<AccountBrandGroup | null>(null);
+  const [removeSaving, setRemoveSaving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, getScrapeProgress } =
     sync;
 
   async function handleAddBrand(brandName: string) {
     if (!canManageStructure) return;
+    const name = brandName.trim();
+    if (!name) return;
+
     let dbBrandId: string | undefined;
     if (user?.id) {
-      const brand = await ensureBrand({ userId: user.id, brandName });
+      const brand = await ensureBrand({ userId: user.id, brandName: name });
       dbBrandId = brand.id;
     }
-    const nextGroup = { ...createEmptyBrandGroup(brandName), dbBrandId };
-    onGroupsChange([...groups, nextGroup]);
+    const nextGroup = { ...createEmptyBrandGroup(name, dbBrandId), dbBrandId };
+
+    onGroupsChange((prev) => {
+      const exists = prev.some(
+        (g) =>
+          g.brandName.trim().toLowerCase() === name.toLowerCase() ||
+          (dbBrandId && g.dbBrandId === dbBrandId),
+      );
+      if (exists) return prev;
+      return [...prev, nextGroup].sort((a, b) =>
+        a.brandName.localeCompare(b.brandName),
+      );
+    });
   }
 
-  async function handleAddAccount(groupId: string, input: AddAccountInput) {
+  async function handleAddAccount(group: AccountBrandGroup, input: AddAccountInput) {
     if (!canManageStructure) return;
-    const group = groups.find((item) => item.id === groupId);
-    if (!group) return;
 
     let dbAccountId: string | undefined;
     if (user?.id) {
@@ -61,20 +81,54 @@ export function AccountBrandCardList({
       });
     }
 
-    onGroupsChange(
-      groups.map((item) =>
-        item.id === groupId ? addAccountToGroup(item, { ...input, dbAccountId }) : item,
+    onGroupsChange((prev) =>
+      prev.map((item) =>
+        item.id === group.id ? addAccountToGroup(item, { ...input, dbAccountId }) : item,
       ),
     );
   }
 
-  function handleSyncByAccountId(groupId: string, accountId: string) {
+  function handleSyncAccountForGroup(group: AccountBrandGroup, account: AccountBrandRow) {
     if (!canOperatePlatform) return;
-    const group = groups.find((item) => item.id === groupId);
-    const account = group?.accounts.find((row) => row.id === accountId);
-    if (!account) return;
+    handleSyncAccount(group.id, account);
+  }
 
-    handleSyncAccount(groupId, account);
+  function openRemoveBrandModal(group: AccountBrandGroup) {
+    if (!canManageStructure) return;
+    setRemoveError(null);
+    setRemoveTarget(group);
+  }
+
+  function closeRemoveBrandModal() {
+    if (removeSaving) return;
+    setRemoveTarget(null);
+    setRemoveError(null);
+  }
+
+  async function commitRemoveBrand() {
+    if (!canManageStructure || !removeTarget) return;
+
+    const group = removeTarget;
+    setRemoveSaving(true);
+    setRemoveError(null);
+
+    try {
+      if (user?.id && group.dbBrandId) {
+        await removeBrandCompletely({
+          userId: user.id,
+          brandId: group.dbBrandId,
+          brandName: group.brandName,
+        });
+      }
+
+      onGroupsChange((prev) => prev.filter((g) => g.id !== group.id));
+      setRemoveTarget(null);
+      void reloadTickets();
+    } catch (error) {
+      setRemoveError(getErrorMessage(error, t('groupMonitoring.removeBrandFailed')));
+    } finally {
+      setRemoveSaving(false);
+    }
   }
 
   return (
@@ -84,10 +138,13 @@ export function AccountBrandCardList({
           <AccountBrandCard
             key={group.id}
             group={group}
-            onAddAccount={(input) => handleAddAccount(group.id, input)}
+            onAddAccount={(input) => handleAddAccount(group, input)}
             canManageStructure={canManageStructure}
             canOperatePlatform={canOperatePlatform}
-            onSyncAccount={(accountId) => handleSyncByAccountId(group.id, accountId)}
+            onSyncAccount={(accountId) => {
+              const account = group.accounts.find((row) => row.id === accountId);
+              if (account) handleSyncAccountForGroup(group, account);
+            }}
             onRemoveFromSlot={(account) => onRemoveFromSlot(group.id, account)}
             onRunScraper={(accountId) => {
               if (!canOperatePlatform) return;
@@ -101,7 +158,7 @@ export function AccountBrandCardList({
               processingAction === 'scraper' ? processingAccountId : null
             }
             getScrapeProgress={getScrapeProgress}
-            onDismiss={() => dismissBrandGroup(group.id)}
+            onDismiss={() => openRemoveBrandModal(group)}
           />
         ))}
         <AddBrandCard
@@ -118,6 +175,16 @@ export function AccountBrandCardList({
         onClose={() => setModalOpen(false)}
         onSubmit={handleAddBrand}
       />
+
+      {removeTarget ? (
+        <RemoveBrandModal
+          open
+          saving={removeSaving}
+          error={removeError}
+          onClose={closeRemoveBrandModal}
+          onConfirm={() => void commitRemoveBrand()}
+        />
+      ) : null}
     </>
   );
 }

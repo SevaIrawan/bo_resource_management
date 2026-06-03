@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { TABLES } from '@/config/tables';
 import { patchGroupsFromDailyInState } from '@/lib/hydrateAccountMetricsFromDaily';
 import { patchAccountSnapshotInGroups } from '@/lib/accountSessionPatch';
+import { mergeGroupsAccountMetrics } from '@/lib/mergeMonitoringGroups';
 import { patchBrandPlatformMasterInGroups } from '@/lib/patchAccountMasterInGroups';
 import { getSupabase } from '@/lib/supabase';
 import type { AccountSnapshot } from '@/types/database';
@@ -77,14 +78,14 @@ export function useRealtimeMonitoring({
 
       onGroupsChangeRef.current((latest) => {
         void (async () => {
-          let patched = latest;
+          let working = latest;
           for (const key of keys) {
             const sep = key.indexOf('|');
             if (sep < 0) continue;
             const brand = key.slice(0, sep);
             const platform = key.slice(sep + 1) as Platform;
             if (platform !== 'whatsapp' && platform !== 'telegram') continue;
-            const hasSuspended = patched.some((g) =>
+            const hasSuspended = working.some((g) =>
               g.brandName.trim() === brand.trim()
                 ? g.accounts.some(
                     (a) =>
@@ -93,9 +94,10 @@ export function useRealtimeMonitoring({
                 : false,
             );
             if (hasSuspended) continue;
-            patched = await patchBrandPlatformMasterInGroups(patched, brand, platform);
+            working = await patchBrandPlatformMasterInGroups(working, brand, platform);
           }
-          onGroupsChangeRef.current(() => patched);
+          const patched = working;
+          onGroupsChangeRef.current((current) => mergeGroupsAccountMetrics(current, patched));
           onTicketsChangeRef.current();
           notifyChange();
         })();
@@ -182,12 +184,14 @@ export function useRealtimeMonitoring({
           handleMasterChange(row);
           const accountId = row?.account_id;
           if (!accountId || suspendedRef.current.includes(accountId)) return;
-          onGroupsChangeRef.current((prev) => {
-            void patchGroupsFromDailyInState(prev, accountId).then((next) => {
-              onGroupsChangeRef.current(() => next);
+          onGroupsChangeRef.current((latest) => {
+            void patchGroupsFromDailyInState(latest, accountId).then((patched) => {
+              onGroupsChangeRef.current((current) =>
+                mergeGroupsAccountMetrics(current, patched),
+              );
               notifyChange();
             });
-            return prev;
+            return latest;
           });
           notifyChange();
         },

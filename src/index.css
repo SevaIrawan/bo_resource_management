@@ -2571,6 +2571,19 @@
     cursor: wait;
   }
 
+  /** Konfirmasi destruktif: Cancel = aksi default (merah), Delete = sekunder */
+  .brand-modal-btn--danger-muted {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .brand-modal-btn--danger-muted:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-text-primary);
+  }
+
   /* Table view — satu tabel gabungan semua brand */
   .account-table-view {
     display: flex;

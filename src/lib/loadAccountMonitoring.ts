@@ -1,4 +1,9 @@
-import { createEmptyAccountSlots, createEmptyBrandGroup, rebuildGroupMetrics } from '@/lib/accountBrandUtils';
+import {
+  brandGroupId,
+  createEmptyAccountSlots,
+  createEmptyBrandGroup,
+  rebuildGroupMetrics,
+} from '@/lib/accountBrandUtils';
 import {
   brandPlatformCacheKey,
   buildStandardCountByPlatformFromRows,
@@ -23,10 +28,6 @@ import { fetchActiveSessionAccountIdSet } from '@/lib/platformSessions';
 import { getSupabase } from '@/lib/supabase';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { AccountSnapshot, MessagingAccount, Platform } from '@/types/database';
-
-function brandIdFromName(brandName: string) {
-  return `brand-${brandName.trim().toLowerCase().replace(/\s+/g, '-')}`;
-}
 
 function accountRowFromDb(
   account: MessagingAccount,
@@ -125,71 +126,72 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
 
   for (const brand of brands) {
     const brandAccounts = accountsByBrand.get(brand.id) ?? [];
-    const rows: AccountBrandRow[] = [];
     const standardByPlatform: Partial<Record<Platform, number>> = {};
 
-    for (const account of brandAccounts) {
-      const brandX =
-        brandStandardByPlatform.get(brandPlatformCacheKey(brand.id, account.platform)) ?? 0;
-      if (brandX > 0) standardByPlatform[account.platform] = brandX;
+    const rows = await Promise.all(
+      brandAccounts.map(async (account) => {
+        const brandX =
+          brandStandardByPlatform.get(brandPlatformCacheKey(brand.id, account.platform)) ?? 0;
+        if (brandX > 0) standardByPlatform[account.platform] = brandX;
 
-      const snap = snapshots.get(account.id);
-      const hasSession = activeSessionIds.has(account.id);
-      let row = accountRowFromDb(account, brand.name, hasSession, snap);
-      const master = masterByAccount.get(account.id);
+        const snap = snapshots.get(account.id);
+        const hasSession = activeSessionIds.has(account.id);
+        let row = accountRowFromDb(account, brand.name, hasSession, snap);
+        const master = masterByAccount.get(account.id);
 
-      const { result } = await buildMetricsFromScrapeDaily({
-        accountId: account.id,
-        brand: brand.name,
-        platform: account.platform,
-        brandStandard: brandX > 0 ? brandX : undefined,
-        sessionValid: hasSession,
-      });
-      const lastActivityAt = lastActivityAtByAccount.get(account.id);
-      row = {
-        ...row,
-        groupsCurrent: result.groupsCurrent,
-        groupsTotal: result.groupsTotal,
-        adminCurrent: result.adminCurrent,
-        adminTotal: result.adminTotal,
-        isMisaligned: isMisalignedFromSyncResult(result),
-        syncState: lastActivityAt || result.groupsCurrent > 0 || snap ? 'synced' : row.syncState,
-        lastSyncAt: lastActivityAt ?? null,
-      };
+        const { result } = await buildMetricsFromScrapeDaily({
+          accountId: account.id,
+          brand: brand.name,
+          platform: account.platform,
+          brandStandard: brandX > 0 ? brandX : undefined,
+          sessionValid: hasSession,
+        });
+        const lastActivityAt = lastActivityAtByAccount.get(account.id);
+        row = {
+          ...row,
+          groupsCurrent: result.groupsCurrent,
+          groupsTotal: result.groupsTotal,
+          adminCurrent: result.adminCurrent,
+          adminTotal: result.adminTotal,
+          isMisaligned: isMisalignedFromSyncResult(result),
+          syncState: lastActivityAt || result.groupsCurrent > 0 || snap ? 'synced' : row.syncState,
+          lastSyncAt: lastActivityAt ?? null,
+        };
 
-      if (master && !hasSession) {
-        row = applyMasterStatsToAccountRow(row, master, { brandStandard: brandX });
-      }
-
-      if (master && hasSession) {
-        if (
-          !snap ||
-          snap.groups_current !== row.groupsCurrent ||
-          snap.admin_current !== row.adminCurrent ||
-          snap.groups_total !== row.groupsTotal
-        ) {
-          void upsertAccountSnapshot({
-            account: row,
-            brandId: brand.id,
-            result: {
-              groupsCurrent: row.groupsCurrent,
-              groupsTotal: row.groupsTotal,
-              adminCurrent: row.adminCurrent,
-              adminTotal: row.adminTotal,
-              sessionStatus: 'valid',
-            },
-            brandStandard: brandX,
-            masterTotal: master.joinedInMaster,
-          });
+        if (master && !hasSession) {
+          row = applyMasterStatsToAccountRow(row, master, { brandStandard: brandX });
         }
-      } else if (brandX > 0 && row.groupsTotal !== brandX) {
-        row = { ...row, groupsTotal: brandX, adminTotal: brandX };
-      }
-      rows.push(row);
-    }
 
-    const groupId = brandIdFromName(brand.name);
-    const base = createEmptyBrandGroup(brand.name);
+        if (master && hasSession) {
+          if (
+            !snap ||
+            snap.groups_current !== row.groupsCurrent ||
+            snap.admin_current !== row.adminCurrent ||
+            snap.groups_total !== row.groupsTotal
+          ) {
+            void upsertAccountSnapshot({
+              account: row,
+              brandId: brand.id,
+              result: {
+                groupsCurrent: row.groupsCurrent,
+                groupsTotal: result.groupsTotal,
+                adminCurrent: row.adminCurrent,
+                adminTotal: row.adminTotal,
+                sessionStatus: 'valid',
+              },
+              brandStandard: brandX,
+              masterTotal: master.joinedInMaster,
+            });
+          }
+        } else if (brandX > 0 && row.groupsTotal !== brandX) {
+          row = { ...row, groupsTotal: brandX, adminTotal: brandX };
+        }
+        return row;
+      }),
+    );
+
+    const groupId = brandGroupId(brand.name, brand.id);
+    const base = createEmptyBrandGroup(brand.name, brand.id);
     const withMetrics = rebuildGroupMetrics({
       ...base,
       id: groupId,
@@ -218,7 +220,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
     const orphanAccounts = accountsByBrand.get(orphanId) ?? [];
     const name =
       String((orphanAccounts[0]?.metadata as { brand?: string })?.brand ?? 'Unknown').trim() || 'Unknown';
-    const groupId = brandIdFromName(name);
+    const groupId = brandGroupId(name, orphanId);
     const rows: AccountBrandRow[] = [];
     for (const account of orphanAccounts) {
       const hasSession = activeSessionIds.has(account.id);
@@ -246,14 +248,34 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
     }
     groups.push(
       rebuildGroupMetrics({
-        ...createEmptyBrandGroup(name),
+        ...createEmptyBrandGroup(name, orphanId),
         id: groupId,
         brandName: name,
+        dbBrandId: orphanId,
         accounts: rows,
         emptySlots: createEmptyAccountSlots(name, groupId, Math.max(0, 3 - rows.length)),
       }),
     );
   }
 
-  return groups.sort((a, b) => a.brandName.localeCompare(b.brandName));
+  const byId = new Map<string, AccountBrandGroup>();
+  for (const group of groups) {
+    const existing = byId.get(group.id);
+    if (!existing) {
+      byId.set(group.id, group);
+      continue;
+    }
+    byId.set(group.id, {
+      ...existing,
+      accounts: [...existing.accounts, ...group.accounts],
+      emptySlots: existing.emptySlots.length >= group.emptySlots.length
+        ? existing.emptySlots
+        : group.emptySlots,
+      dbBrandId: existing.dbBrandId ?? group.dbBrandId,
+    });
+  }
+
+  return [...byId.values()]
+    .map((g) => rebuildGroupMetrics(g))
+    .sort((a, b) => a.brandName.localeCompare(b.brandName));
 }

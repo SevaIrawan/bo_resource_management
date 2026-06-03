@@ -2,30 +2,22 @@ import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { useLanguage } from '@/hooks/useLanguage';
-import { accountPlatformSubtitle } from '@/lib/platformSyncCopy';
-import type { Platform } from '@/types/database';
 
-interface RemoveAccountModalProps {
+interface RemoveBrandModalProps {
   open: boolean;
-  accountName: string;
-  platform: Platform;
-  brandName: string;
   saving?: boolean;
   error?: string | null;
   onClose: () => void;
   onConfirm: () => void;
 }
 
-export function RemoveAccountModal({
+export function RemoveBrandModal({
   open,
-  accountName,
-  platform,
-  brandName,
   saving = false,
   error = null,
   onClose,
   onConfirm,
-}: RemoveAccountModalProps) {
+}: RemoveBrandModalProps) {
   const { t } = useLanguage();
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -46,20 +38,18 @@ export function RemoveAccountModal({
 
   if (!open) return null;
 
-  const accountLine = `${accountPlatformSubtitle(accountName, platform)} · ${brandName}`;
-
   return (
     <BrandModalRoot onBackdropClick={saving ? undefined : onClose}>
       <div
         className="brand-modal-panel"
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="remove-account-line"
+        aria-labelledby="remove-brand-title"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="brand-modal-header">
-          <h2 id="remove-account-line" className="brand-modal-title">
-            {accountLine}
+          <h2 id="remove-brand-title" className="brand-modal-title">
+            {t('groupMonitoring.removeBrandTitle')}
           </h2>
           <button
             type="button"
@@ -73,7 +63,7 @@ export function RemoveAccountModal({
         </header>
 
         <div className="brand-modal-form">
-          <p className="sync-modal-message">{t('groupMonitoring.accountCard.removeFromSlotBody')}</p>
+          <p className="sync-modal-message">{t('groupMonitoring.removeBrandBody')}</p>
 
           {error ? (
             <p className="sync-modal-message sync-modal-message--error" role="alert">
@@ -97,9 +87,7 @@ export function RemoveAccountModal({
               disabled={saving}
               onClick={onConfirm}
             >
-              {saving
-                ? t('groupMonitoring.accountCard.removingAccount')
-                : t('groupMonitoring.accountCard.removeFromSlotConfirm')}
+              {saving ? t('groupMonitoring.removingBrand') : t('groupMonitoring.removeBrandConfirm')}
             </button>
           </div>
         </div>

@@ -13,10 +13,20 @@ export interface AccountSyncResult {
   sessionStatus: SessionUiStatus;
 }
 
-function createBrandId() {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? `brand-${crypto.randomUUID()}`
-    : `brand-${Date.now()}`;
+/** ID kartu brand stabil; pakai UUID brand DB bila ada (unik, tidak tabrakan nama). */
+export function brandGroupId(brandName: string, dbBrandId?: string): string {
+  if (dbBrandId) return `brand-${dbBrandId}`;
+  const slug = brandName
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+  return `brand-${slug || 'unknown'}`;
+}
+
+/** @deprecated gunakan brandGroupId — tetap untuk kompatibilitas validator */
+export function brandGroupIdFromName(brandName: string): string {
+  return brandGroupId(brandName);
 }
 
 export function createEmptyAccountSlots(
@@ -30,9 +40,12 @@ export function createEmptyAccountSlots(
   }));
 }
 
-export function createEmptyBrandGroup(brandName: string): AccountBrandGroup {
+export function createEmptyBrandGroup(
+  brandName: string,
+  dbBrandId?: string,
+): AccountBrandGroup {
   const name = brandName.trim();
-  const id = createBrandId();
+  const id = brandGroupId(name, dbBrandId);
 
   return {
     id,

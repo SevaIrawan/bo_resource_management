@@ -1,20 +1,23 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
-import { restoreTelegramSession } from './telegramScrape';
+import { countGroupsTimeoutMs } from './deviceGroupScale';
 
 export async function countTelegramGroups(
   sessionId: string,
   storedSessionString?: string | null,
+  options?: { quick?: boolean },
 ): Promise<{ valid: boolean; totalGroups: number; adminGroups: number; message?: string }> {
   await ensureSidecarRunning();
 
+  const quick = Boolean(options?.quick);
   const res = await fetch(`${SIDECAR_URL}/telegram/count/${encodeURIComponent(sessionId)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       sessionId,
       sessionString: storedSessionString ?? undefined,
+      quick,
     }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(countGroupsTimeoutMs()),
   });
 
   const json = (await res.json()) as {

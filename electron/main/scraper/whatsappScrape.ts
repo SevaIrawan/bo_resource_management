@@ -12,6 +12,7 @@ import {
   waitForWhatsAppStoreReady,
 } from './whatsappGroupDiscovery';
 import { emitScrapeProgress } from './scrapeProgress';
+import { DEVICE_GROUP_TARGET_MAX, runPooled, WA_GROUP_PROCESS_CONCURRENCY } from './deviceGroupScale';
 
 const { Client } = pkg;
 
@@ -76,26 +77,35 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
 
       const rows: ScrapedGroupRow[] = [];
       const meId = client.info?.wid?._serialized;
+      const scrapeIds = groupIds.slice(0, DEVICE_GROUP_TARGET_MAX);
 
-      for (let i = 0; i < groupIds.length; i += 1) {
-        const groupId = groupIds[i];
+      if (groupIds.length > DEVICE_GROUP_TARGET_MAX) {
+        console.warn(
+          `[wa-scrape] ${groupIds.length} groups; scraping first ${DEVICE_GROUP_TARGET_MAX}`,
+        );
+      }
+
+      const scraped = await runPooled(scrapeIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId, index) => {
         const chat = await client.getChatById(groupId);
-        if (!chat || !isWhatsAppGroupChat(chat)) continue;
+        if (!chat || !isWhatsAppGroupChat(chat)) return null;
 
         const groupName = chat.name ?? chat.id._serialized;
-        emitScrapeProgress({
-          sessionId,
-          phase: 'group',
-          current: i + 1,
-          total,
-          label: groupName,
-        });
-
         const participants = await fetchGroupParticipants(client, chat);
         const stats = meParticipantStats(participants, meId);
         const inviteLink = await resolveInviteLink(chat);
 
-        rows.push({
+        const current = index + 1;
+        if (current % 20 === 0 || current === scrapeIds.length) {
+          emitScrapeProgress({
+            sessionId,
+            phase: 'group',
+            current,
+            total: scrapeIds.length,
+            label: `${groupName} (${current}/${scrapeIds.length})`,
+          });
+        }
+
+        return {
           group_id: chat.id._serialized,
           group_name: groupName,
           invite_link: inviteLink,
@@ -103,7 +113,11 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
           member_count: stats.memberCount,
           admin_count: stats.adminCount,
           owner_count: stats.ownerCount,
-        });
+        } satisfies ScrapedGroupRow;
+      });
+
+      for (const row of scraped) {
+        if (row) rows.push(row);
       }
 
       emitScrapeProgress({

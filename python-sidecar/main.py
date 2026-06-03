@@ -69,6 +69,7 @@ class TwoFaBody(BaseModel):
 class CountBody(BaseModel):
     sessionId: str
     sessionString: str | None = None
+    quick: bool = False
 
 class RestoreBody(BaseModel):
     sessionId: str
@@ -124,7 +125,8 @@ async def telegram_scrape(session_id: str, body: ScrapeBody | None = None) -> di
 @app.post("/telegram/count/{session_id}")
 async def telegram_count(session_id: str, body: CountBody | None = None) -> dict:
     session_string = body.sessionString if body else None
-    return await count_telegram_groups(session_id, session_string)
+    quick = bool(body.quick) if body else False
+    return await count_telegram_groups(session_id, session_string, quick=quick)
 
 @app.post("/telegram/validate/{session_id}")
 async def telegram_validate(session_id: str, body: CountBody | None = None) -> dict:

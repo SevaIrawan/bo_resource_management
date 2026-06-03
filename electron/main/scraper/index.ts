@@ -73,7 +73,9 @@ export function registerScraperIpc() {
 
   ipcMain.handle('scraper:count-groups', async (_event, payload: CountGroupsPayload) => {
     if (payload.platform === 'telegram') {
-      return countTelegramGroups(payload.sessionId, payload.storedSessionString);
+      return countTelegramGroups(payload.sessionId, payload.storedSessionString, {
+        quick: payload.quick,
+      });
     }
     return payload.quick
       ? countWhatsAppGroupsQuick(payload.sessionId)

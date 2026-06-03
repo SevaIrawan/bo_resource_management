@@ -51,14 +51,15 @@ import {
   updateMessagingAccountPhone,
 } from '@/lib/accountPhone';
 import { scrapeFailureNeedsLoginModal } from '@/lib/scrapeErrorUi';
+import { loginSyncAfterTimeoutMs, manualSyncTimeoutMs } from '@/lib/deviceGroupScale';
 import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
 const LOGIN_PERSIST_TIMEOUT_MS = 90_000;
-const LOGIN_SYNC_AFTER_TIMEOUT_MS = 180_000;
-/** Manual Sync (VALID): gate + hitung grup device — lewat ini = error, bukan PROC SYNC selamanya. */
-const MANUAL_SYNC_TIMEOUT_MS = 180_000;
+const LOGIN_SYNC_AFTER_TIMEOUT_MS = loginSyncAfterTimeoutMs();
+/** Manual Sync (VALID): gate + hitung grup device (siap ~2000 grup). */
+const MANUAL_SYNC_TIMEOUT_MS = manualSyncTimeoutMs();
 export type SyncFlowStep =
   | 'idle'
   | 'missing-phone'
@@ -465,6 +466,7 @@ export function useAccountSyncFlow({
             account,
             dbAccountId,
             brandStandardHint: brandStandard,
+            quickDeviceCount: true,
           }),
           MANUAL_SYNC_TIMEOUT_MS,
           'Manual sync',
@@ -917,7 +919,7 @@ export function useAccountSyncFlow({
           dbAccountId,
           brandStandardHint: masterAfterLogin.brandMasterTotal,
           skipPersist: true,
-          quickDeviceCount: account.platform === 'whatsapp',
+          quickDeviceCount: true,
         }),
         LOGIN_SYNC_AFTER_TIMEOUT_MS,
         'Sync after login',

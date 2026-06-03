@@ -23,12 +23,12 @@ const checks = [
     ok: scraperIdx.includes('quick?: boolean') && scraperIdx.includes('countWhatsAppGroupsQuick'),
   },
   {
-    name: 'handleLoginSuccess pakai quickDeviceCount untuk WA',
-    ok: /quickDeviceCount:\s*account\.platform === 'whatsapp'/.test(syncFlow),
+    name: 'handleLoginSuccess pakai quickDeviceCount',
+    ok: /quickDeviceCount:\s*true/.test(syncFlow),
   },
   {
-    name: 'Timeout sync setelah login >= 180s',
-    ok: /LOGIN_SYNC_AFTER_TIMEOUT_MS = 180_000/.test(syncFlow),
+    name: 'Timeout sync setelah login skala 2000 grup',
+    ok: syncFlow.includes('loginSyncAfterTimeoutMs'),
   },
   {
     name: 'Fallback scrape prompt jika persist OK tapi count gagal',

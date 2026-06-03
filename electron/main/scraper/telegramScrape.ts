@@ -1,4 +1,5 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
+import { scrapeGroupsTimeoutMs } from './deviceGroupScale';
 import { emitScrapeProgress } from './scrapeProgress';
 import type { ScrapedGroupRow } from './index';
 
@@ -78,7 +79,7 @@ async function postTelegramScrape(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionString: sessionString ?? undefined }),
-    signal: AbortSignal.timeout(180_000),
+    signal: AbortSignal.timeout(scrapeGroupsTimeoutMs()),
   });
 
   return (await res.json()) as {

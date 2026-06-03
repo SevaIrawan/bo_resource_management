@@ -1,6 +1,7 @@
 import type { Client } from 'whatsapp-web.js';
+import { DEVICE_GROUP_TARGET_MAX, WA_STORE_GROUP_LIST_CAP } from './deviceGroupScale';
 
-const WA_STORE_WAIT_MS = 90_000;
+const WA_STORE_WAIT_MS = 120_000;
 const WA_STORE_POLL_MS = 250;
 
 async function isWWebJsReady(client: Client): Promise<boolean> {
@@ -78,5 +79,19 @@ export async function listWhatsAppGroupIds(client: Client): Promise<string[]> {
     return out;
   });
 
-  return Array.from(new Set(ids));
+  const unique = Array.from(new Set(ids));
+  if (unique.length > WA_STORE_GROUP_LIST_CAP) {
+    console.warn(
+      `[wa-groups] ${unique.length} groups on device; capping list at ${WA_STORE_GROUP_LIST_CAP}`,
+    );
+    return unique.slice(0, WA_STORE_GROUP_LIST_CAP);
+  }
+
+  if (unique.length > DEVICE_GROUP_TARGET_MAX) {
+    console.info(
+      `[wa-groups] Large account: ${unique.length} groups (prepared for up to ${DEVICE_GROUP_TARGET_MAX}+)`,
+    );
+  }
+
+  return unique;
 }

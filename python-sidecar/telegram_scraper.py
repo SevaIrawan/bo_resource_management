@@ -13,6 +13,8 @@ from telethon.tl.types import (
 
 from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 
+DEVICE_GROUP_TARGET_MAX = 2000
+
 
 def _admin_label(is_admin: bool) -> str:
     return "yes" if is_admin else "no"
@@ -190,7 +192,57 @@ async def scrape_telegram_groups(
     return payload
 
 
-async def count_telegram_groups(session_id: str, session_string: str | None = None) -> dict:
+async def _count_groups_quick_locked(session_id: str) -> dict:
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"status": "error", "message": "Login session not found. Log in first.", "valid": False}
+    if session.status != "ready":
+        return {
+            "status": "error",
+            "message": f"Session not ready (status={session.status}). Complete login first.",
+            "valid": False,
+        }
+
+    client = session.client
+    if not await client.is_user_authorized():
+        return {"status": "error", "message": "Session is not authorized", "valid": False}
+
+    me = await client.get_me()
+    total_groups = 0
+    admin_groups = 0
+
+    async for dialog in client.iter_dialogs():
+        entity = dialog.entity
+        is_group = dialog.is_group
+        is_megagroup = isinstance(entity, Channel) and bool(getattr(entity, "megagroup", False))
+        if not is_group and not is_megagroup:
+            continue
+        total_groups += 1
+        try:
+            if await _is_group_admin(client, entity, me):
+                admin_groups += 1
+        except Exception:  # noqa: BLE001
+            pass
+
+    return {
+        "status": "ok",
+        "valid": True,
+        "totalGroups": total_groups,
+        "adminGroups": admin_groups,
+    }
+
+
+async def _count_groups_quick(session_id: str) -> dict:
+    async with tg_session_lock(session_id):
+        return await _count_groups_quick_locked(session_id)
+
+
+async def count_telegram_groups(
+    session_id: str,
+    session_string: str | None = None,
+    *,
+    quick: bool = False,
+) -> dict:
     session = SESSIONS.get(session_id)
     if not session and session_string:
         restored = await restore_telegram_session(session_id, session_string)
@@ -200,6 +252,17 @@ async def count_telegram_groups(session_id: str, session_string: str | None = No
                 "valid": False,
                 "message": restored.get("message", "Session restore failed"),
             }
+
+    if quick:
+        quick_result = await _count_groups_quick(session_id)
+        if quick_result.get("status") == "error":
+            return quick_result
+        return {
+            "status": "ok",
+            "valid": True,
+            "totalGroups": quick_result.get("totalGroups", 0),
+            "adminGroups": quick_result.get("adminGroups", 0),
+        }
 
     result = await _collect_groups(session_id)
     if result.get("status") == "error":

@@ -4,6 +4,6 @@ export function isWhatsAppBrowserBusyMessage(message: string | undefined): boole
   return (
     lower.includes('browser is already running') ||
     lower.includes('still starting from a previous attempt') ||
-    lower.includes('qr code did not appear within 10 seconds')
+    lower.includes('qr code did not appear within')
   );
 }

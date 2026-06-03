@@ -25,8 +25,8 @@ const sessions = new Map<string, WaSession>();
 const sessionLocks = new Map<string, Promise<unknown>>();
 /** Lock per sessionId — multi-akun WA boleh paralel (folder LocalAuth terpisah). */
 const WA_INIT_TIMEOUT_MS = 120_000;
-/** QR wajib tampil di UI dalam batas ini (login modal). */
-const WA_QR_APPEAR_DEADLINE_MS = 10_000;
+/** QR wajib tampil setelah Chrome headless + web.whatsapp.com (bundled Chrome bisa >10s). */
+const WA_QR_APPEAR_DEADLINE_MS = 60_000;
 const WA_DESTROY_SETTLE_MS = 900;
 const WA_LOGIN_PREPARE_SETTLE_MS = 1_500;
 const WA_LOCK_WAIT_MS = 4_000;
@@ -343,7 +343,7 @@ function armQrAppearDeadline(
           sessionId,
           platform: 'whatsapp',
           message:
-            'QR code did not appear within 10 seconds. Close this window, wait a few seconds, then tap Sync again.',
+            'QR code did not appear within 60 seconds. Close this window, wait a few seconds, then tap Sync again.',
         });
       }
     })();
@@ -658,10 +658,10 @@ export async function startWhatsAppQrLogin(
     const client = createClient(sessionId, 'qr');
     attachCommonHandlers(sessionId, client, win);
     armWhatsAppLoginTimeout(sessionId, client, win);
-    armQrAppearDeadline(sessionId, client, win);
     sessions.set(sessionId, { client, mode: 'qr', forwardQrToUi: true, qrGeneration: 0 });
 
     try {
+      armQrAppearDeadline(sessionId, client, win);
       await initializeClientWithRetry(sessionId, client);
     } catch (error) {
       clearQrAppearDeadline(sessionId);

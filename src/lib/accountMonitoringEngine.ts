@@ -38,7 +38,7 @@ export async function fetchDeviceGroupCounts(
     platform: Platform;
     accountId: string;
   },
-  options?: { assumeSessionValid?: boolean },
+  options?: { assumeSessionValid?: boolean; quick?: boolean },
 ): Promise<DeviceGroupCountResult> {
   if (!options?.assumeSessionValid) {
     const probe = await probeLivePlatformSession(input);
@@ -71,6 +71,8 @@ export interface RefreshAccountMetricsInput {
   brandStandard?: number;
   /** Sudah di-probe di Sync manual — jangan buka WA/TG dua kali. */
   assumeSessionValid?: boolean;
+  /** Setelah login QR WA — hitung grup cepat (tanpa loop admin per grup). */
+  quickDeviceCount?: boolean;
 }
 
 export interface RefreshAccountMetricsResult {
@@ -108,7 +110,10 @@ export async function refreshAccountMetrics(
       platform: account.platform,
       accountId: dbAccountId,
     },
-    { assumeSessionValid: input.assumeSessionValid },
+    {
+      assumeSessionValid: input.assumeSessionValid,
+      quick: input.quickDeviceCount,
+    },
   );
 
   return {

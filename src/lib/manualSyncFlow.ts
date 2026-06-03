@@ -92,6 +92,7 @@ export async function detectGroupsAndBuildSyncPayload(input: {
   dbAccountId: string;
   brandStandardHint: number;
   skipPersist?: boolean;
+  quickDeviceCount?: boolean;
 }): Promise<SyncSuccessPayload> {
   return completeSyncAfterLiveSession({
     userId: input.userId,
@@ -100,6 +101,7 @@ export async function detectGroupsAndBuildSyncPayload(input: {
     brandStandardHint: input.brandStandardHint,
     skipPersist: input.skipPersist,
     assumeSessionValid: true,
+    quickDeviceCount: input.quickDeviceCount,
   });
 }
 

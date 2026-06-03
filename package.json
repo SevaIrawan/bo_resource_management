@@ -1,6 +1,6 @@
 {
   "name": "resource-management",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "Resource Management Desktop — Group Monitoring Dashboard",
   "author": "Seva Irawan <tanjungbambangirawan85@gmail.com>",
@@ -26,7 +26,8 @@
     "validate:puppeteer-chrome": "node scripts/validate-puppeteer-chrome.mjs",
     "validate:wa-qr-login": "node scripts/validate-wa-qr-login-flow.mjs",
     "validate:electron-imports": "node scripts/validate-electron-runtime-imports.mjs",
-    "validate:desktop": "npm run validate:session-flow && npm run validate:multi-account-wa && npm run validate:telegram-login && npm run validate:puppeteer-chrome && npm run validate:wa-qr-login && npm run validate:electron-imports",
+    "validate:post-login-sync": "node scripts/validate-post-login-sync.mjs",
+    "validate:desktop": "npm run validate:session-flow && npm run validate:multi-account-wa && npm run validate:telegram-login && npm run validate:puppeteer-chrome && npm run validate:wa-qr-login && npm run validate:electron-imports && npm run validate:post-login-sync",
     "audit:reload": "node scripts/audit-reload-all-flow.mjs",
     "diagnose:session": "node scripts/diagnose-session.mjs",
     "repair:wa-session": "node scripts/repair-wa-session.mjs",

@@ -113,6 +113,7 @@ declare global {
           sessionId: string;
           platform: Platform;
           storedSessionString?: string | null;
+          quick?: boolean;
         }) => Promise<{
           valid: boolean;
           totalGroups: number;

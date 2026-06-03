@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { countTelegramGroups } from './countGroups';
-import { countWhatsAppGroups } from './countWhatsApp';
+import { countWhatsAppGroups, countWhatsAppGroupsQuick } from './countWhatsApp';
 import {
   exportTelegramSession,
   runTelegramScrape,
@@ -24,6 +24,8 @@ export interface CountGroupsPayload {
   storedSessionString?: string | null;
   /** true = WA harus CONNECTED; TG harus authorized (bukan disk/DB saja). */
   strict?: boolean;
+  /** Setelah login QR WA — hitung grup cepat, admin diisi saat scraper penuh. */
+  quick?: boolean;
 }
 
 export interface ScrapedGroupRow {
@@ -73,7 +75,9 @@ export function registerScraperIpc() {
     if (payload.platform === 'telegram') {
       return countTelegramGroups(payload.sessionId, payload.storedSessionString);
     }
-    return countWhatsAppGroups(payload.sessionId);
+    return payload.quick
+      ? countWhatsAppGroupsQuick(payload.sessionId)
+      : countWhatsAppGroups(payload.sessionId);
   });
 
   ipcMain.handle('scraper:validate-session', async (_event, payload: CountGroupsPayload) => {

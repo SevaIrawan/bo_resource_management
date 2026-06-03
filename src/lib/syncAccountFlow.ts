@@ -46,6 +46,8 @@ export async function completeSyncAfterLiveSession(input: {
   skipPersist?: boolean;
   /** Sudah di-probe di Sync manual (badge VALID) — satu kali hitung grup, tanpa validate ulang. */
   assumeSessionValid?: boolean;
+  /** Setelah login QR WA — count cepat lalu modal Scrape now / Later. */
+  quickDeviceCount?: boolean;
 }): Promise<SyncSuccessPayload> {
   if (!input.skipPersist) {
     const hasSession = await hasActivePlatformSession(input.dbAccountId);
@@ -81,6 +83,7 @@ export async function completeSyncAfterLiveSession(input: {
     dbAccountId: input.dbAccountId,
     brandStandard,
     assumeSessionValid: input.assumeSessionValid,
+    quickDeviceCount: input.quickDeviceCount,
   });
 
   let result = metrics.result;

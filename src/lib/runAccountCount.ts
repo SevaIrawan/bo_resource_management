@@ -9,11 +9,14 @@ export interface DeviceGroupCountResult {
   message?: string;
 }
 
-export async function countDeviceGroups(input: {
-  sessionId: string;
-  platform: Platform;
-  accountId: string;
-}): Promise<DeviceGroupCountResult> {
+export async function countDeviceGroups(
+  input: {
+    sessionId: string;
+    platform: Platform;
+    accountId: string;
+  },
+  options?: { quick?: boolean },
+): Promise<DeviceGroupCountResult> {
   const api = window.electronAPI?.scraper?.countGroups;
   if (!api) {
     return {
@@ -36,6 +39,7 @@ export async function countDeviceGroups(input: {
       sessionId,
       platform: input.platform,
       storedSessionString,
+      quick: options?.quick,
     });
   } catch (error) {
     return {

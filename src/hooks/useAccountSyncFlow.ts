@@ -38,7 +38,9 @@ import {
   backfillPlatformSessionIfNeeded,
   hasStoredPlatformSession,
 } from '@/lib/sessionAvailability';
+import { buildAccountSyncResult } from '@/lib/accountDisplayMetrics';
 import { persistLoginSessionAfterSuccess } from '@/lib/persistLoginSession';
+import { hasActivePlatformSession } from '@/lib/platformSessions';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
 import { markAccountLoginGrace, markAccountScrapeGrace } from '@/lib/sessionRealtimePolicy';
 import { isRowMisaligned, postSyncModalStep } from '@/lib/accountSyncUiFlow';
@@ -54,7 +56,7 @@ import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitori
 import type { Platform } from '@/types/database';
 
 const LOGIN_PERSIST_TIMEOUT_MS = 90_000;
-const LOGIN_SYNC_AFTER_TIMEOUT_MS = 120_000;
+const LOGIN_SYNC_AFTER_TIMEOUT_MS = 180_000;
 /** Manual Sync (VALID): gate + hitung grup device — lewat ini = error, bukan PROC SYNC selamanya. */
 const MANUAL_SYNC_TIMEOUT_MS = 180_000;
 export type SyncFlowStep =
@@ -877,8 +879,12 @@ export function useAccountSyncFlow({
     setLoginIntent(null);
     setRowProcessing(groupId, account.id, 'sync');
 
+    let persistedToDb = false;
+    let dbAccountId = '';
+
     try {
-      const { accountId: dbAccountId } = await resolveDbAccountForRow({ userId, account });
+      const resolved = await resolveDbAccountForRow({ userId, account });
+      dbAccountId = resolved.accountId;
 
       markAccountLoginGrace(account.id);
       setPostLoginGraceAccountId(account.id);
@@ -891,6 +897,7 @@ export function useAccountSyncFlow({
         LOGIN_PERSIST_TIMEOUT_MS,
         'Save session after login',
       );
+      persistedToDb = true;
 
       // Tutup modal login — sync grup lanjut di baris (PROC SYNC), bukan menahan modal 2FA.
       setStep('idle');
@@ -910,6 +917,7 @@ export function useAccountSyncFlow({
           dbAccountId,
           brandStandardHint: masterAfterLogin.brandMasterTotal,
           skipPersist: true,
+          quickDeviceCount: account.platform === 'whatsapp',
         }),
         LOGIN_SYNC_AFTER_TIMEOUT_MS,
         'Sync after login',
@@ -948,6 +956,38 @@ export function useAccountSyncFlow({
         }),
       );
     } catch (error) {
+      if (persistedToDb && dbAccountId && (await hasActivePlatformSession(dbAccountId))) {
+        try {
+          const master = await fetchMasterGroupStats(
+            account.brandName,
+            account.accountName,
+            account.phoneNumber,
+            account.platform,
+            dbAccountId,
+          );
+          const fallbackResult = buildAccountSyncResult({
+            master,
+            device: { valid: true, totalGroups: 0, adminGroups: 0 },
+            brandStandard: master.brandMasterTotal,
+          });
+          await applyResult(groupId, account.id, fallbackResult, {
+            masterTotal: master.joinedInMaster,
+            lastSyncAt: new Date().toISOString(),
+          });
+          clearRowProcessing(groupId, account.id);
+          setStep(
+            postSyncModalStep({
+              result: fallbackResult,
+              deviceGroupCount: 0,
+              hasDailyToday: false,
+            }),
+          );
+          return;
+        } catch {
+          // fall through to error modal
+        }
+      }
+
       clearRowProcessing(groupId, account.id);
       showSyncError(getErrorMessage(error, 'Gagal menyimpan session setelah login'), groupId, account);
       setStep('sync-error');

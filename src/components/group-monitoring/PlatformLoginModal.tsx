@@ -116,10 +116,10 @@ export function PlatformLoginModal({
     status !== 'ready' &&
     status !== '2fa' &&
     status !== 'code';
-  const showPhoneForm = view === 'phone' && !pairingCode;
-  const showCodeForm = view === 'code';
-  const show2faForm = view === '2fa';
   const showSavingPanel = status === 'ready' || persisting;
+  const showPhoneForm = view === 'phone' && !pairingCode && !showSavingPanel;
+  const showCodeForm = view === 'code' && !showSavingPanel;
+  const show2faForm = view === '2fa' && !showSavingPanel;
   const isFormLayout = showPhoneForm || showCodeForm || show2faForm || showSavingPanel;
 
   function handlePhoneSubmit(event: FormEvent) {
@@ -229,6 +229,11 @@ export function PlatformLoginModal({
             <div className="platform-login-form platform-login-form--saving">
               <Loader2 className="platform-login-qr-spinner" strokeWidth={2} aria-hidden />
               <p className="platform-login-hint">{statusLabel}</p>
+              {persistError ? (
+                <p className="platform-login-field-error" role="alert">
+                  {persistError}
+                </p>
+              ) : null}
             </div>
           ) : null}
 

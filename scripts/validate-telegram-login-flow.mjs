@@ -20,6 +20,8 @@ const appEnvTs = read('electron/main/appEnv.ts');
 const autoUpdateTs = read('electron/main/autoUpdate.ts');
 const indexTs = read('electron/main/index.ts');
 const loginTs = read('src/hooks/usePlatformLogin.ts');
+const loginModalTs = read('src/components/group-monitoring/PlatformLoginModal.tsx');
+const syncFlowTs = read('src/hooks/useAccountSyncFlow.ts');
 
 function fnBlock(source, name) {
   const re = new RegExp(`async def ${name}[\\s\\S]*?(?=\\nasync def |\\nexport )`);
@@ -93,6 +95,29 @@ const checks = [
       autoUpdateTs.includes('autoUpdater') &&
       autoUpdateTs.includes('update-downloaded') &&
       indexTs.includes('setupAutoUpdate'),
+  },
+  {
+    name: '2FA / kode login pakai tg_session_lock (hindari race Telethon)',
+    ok:
+      tgPy.includes('async def submit_telegram_2fa') &&
+      /submit_telegram_2fa[\s\S]*?tg_session_lock/.test(tgPy) &&
+      /submit_telegram_code[\s\S]*?tg_session_lock/.test(tgPy),
+  },
+  {
+    name: 'Export session pakai tg_session_lock',
+    ok: /export_telegram_session[\s\S]*?tg_session_lock/.test(tgPy),
+  },
+  {
+    name: 'Modal: form 2FA disembunyikan saat menyimpan session',
+    ok:
+      loginModalTs.includes('showSavingPanel') &&
+      loginModalTs.includes("view === '2fa' && !showSavingPanel"),
+  },
+  {
+    name: 'Setelah persist login: tutup modal (sync lanjut di baris)',
+    ok:
+      syncFlowTs.includes('persistLoginSessionAfterSuccess') &&
+      /setStep\('idle'\)[\s\S]*?fetchMasterGroupStats/.test(syncFlowTs),
   },
 ];
 

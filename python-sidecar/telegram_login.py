@@ -295,6 +295,11 @@ async def start_telegram_phone(session_id: str, phone: str) -> dict:
     return _session_payload(session)
 
 async def submit_telegram_code(session_id: str, code: str) -> dict:
+    async with tg_session_lock(session_id):
+        return await _submit_telegram_code_locked(session_id, code)
+
+
+async def _submit_telegram_code_locked(session_id: str, code: str) -> dict:
     session = SESSIONS.get(session_id)
     if not session:
         return {"status": "error", "message": "Session not found"}
@@ -329,6 +334,11 @@ async def submit_telegram_code(session_id: str, code: str) -> dict:
     return _session_payload(session)
 
 async def submit_telegram_2fa(session_id: str, password: str) -> dict:
+    async with tg_session_lock(session_id):
+        return await _submit_telegram_2fa_locked(session_id, password)
+
+
+async def _submit_telegram_2fa_locked(session_id: str, password: str) -> dict:
     session = SESSIONS.get(session_id)
     if not session:
         return {"status": "error", "message": "Session not found"}
@@ -386,6 +396,11 @@ async def _get_telegram_status_locked(session_id: str) -> dict:
         return {"status": "error", "message": str(exc)}
 
 async def export_telegram_session(session_id: str) -> dict:
+    async with tg_session_lock(session_id):
+        return await _export_telegram_session_locked(session_id)
+
+
+async def _export_telegram_session_locked(session_id: str) -> dict:
     session = SESSIONS.get(session_id)
     if not session:
         return {"status": "error", "message": "Login session not found. Scan QR again."}

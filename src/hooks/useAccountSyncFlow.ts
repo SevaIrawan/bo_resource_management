@@ -892,6 +892,9 @@ export function useAccountSyncFlow({
         'Save session after login',
       );
 
+      // Tutup modal login — sync grup lanjut di baris (PROC SYNC), bukan menahan modal 2FA.
+      setStep('idle');
+
       const masterAfterLogin = await fetchMasterGroupStats(
         account.brandName,
         account.accountName,

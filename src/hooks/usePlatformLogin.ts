@@ -225,6 +225,7 @@ export function usePlatformLogin(
       clearQrTimeout();
       sessionReadyRef.current = true;
       loginSucceededRef.current = true;
+      setView('qr');
       setStatus('ready');
       setError(null);
     });

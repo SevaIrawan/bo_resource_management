@@ -40,6 +40,19 @@ const checks = [
     ok: waTs.includes('withWaBrowserSlot') && poolTs.includes('RM_WA_MAX_CONCURRENT_BROWSERS'),
   },
   {
+    name: 'withWaBrowserSlot import (bukan typo withWaBrowserPool)',
+    ok:
+      waTs.includes("import { withWaBrowserSlot } from './waBrowserPool'") &&
+      !waTs.includes('withWaBrowserPool') &&
+      poolTs.includes('export async function withWaBrowserSlot'),
+  },
+  {
+    name: 'Puppeteer executablePath terbundel',
+    ok:
+      waTs.includes('resolveWaChromeExecutable()') &&
+      fs.existsSync(path.join(root, 'electron/main/platformLogin/waPuppeteerChrome.ts')),
+  },
+  {
     name: 'Renderer resolves device session id',
     ok: fs.existsSync(path.join(root, 'src/lib/deviceSessionId.ts')),
   },

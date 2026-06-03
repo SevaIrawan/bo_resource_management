@@ -52,6 +52,10 @@ const checks = [
       waTs.includes('BrowserWindow.getAllWindows'),
   },
   {
+    name: 'Login QR memanggil initializeClientWithRetry dengan win',
+    ok: /await initializeClientWithRetry\(sessionId, client, win\)/.test(waTs),
+  },
+  {
     name: 'Sync modal skipDiskRestore (AccountMonitoringSyncModals)',
     ok: fs
       .readFileSync(

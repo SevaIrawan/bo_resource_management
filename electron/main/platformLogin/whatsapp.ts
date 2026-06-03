@@ -392,11 +392,13 @@ export async function forceReleaseWhatsAppForLogin(
 async function initializeClientWithRetry(
   sessionId: string,
   client: InstanceType<typeof Client>,
+  /** Dari modal login — wajib pakai window utama, jangan lookup global (hindari regresi import). */
+  loginWin?: BrowserWindow | null,
 ): Promise<void> {
   const maxAttempts = 5;
 
   await withWaBrowserSlot(async () => {
-    const win = getNotifierWindow();
+    const win = loginWin ?? getNotifierWindow();
     if (win && !win.isDestroyed()) {
       win.webContents.send('platform-login:phase', {
         sessionId,
@@ -674,7 +676,7 @@ export async function startWhatsAppQrLogin(
 
     try {
       armQrAppearDeadline(sessionId, client, win);
-      await initializeClientWithRetry(sessionId, client);
+      await initializeClientWithRetry(sessionId, client, win);
     } catch (error) {
       clearQrAppearDeadline(sessionId);
       await destroyWhatsAppSession(sessionId);
@@ -699,7 +701,7 @@ export async function startWhatsAppPhoneLogin(
     sessions.set(sessionId, { client, mode: 'phone' });
 
     try {
-      await initializeClientWithRetry(sessionId, client);
+      await initializeClientWithRetry(sessionId, client, win);
     } catch (error) {
       await destroyWhatsAppSession(sessionId);
       sendWhatsAppLoginError(sessionId, win, error);

@@ -3,11 +3,18 @@ import fs from 'fs';
 import path from 'path';
 import puppeteer from 'puppeteer';
 
-const CHROME_BINARY = process.platform === 'win32' ? 'chrome.exe' : 'chrome';
+function chromeBinaryNames(): string[] {
+  if (process.platform === 'win32') return ['chrome.exe'];
+  if (process.platform === 'darwin') {
+    return ['Google Chrome for Testing', 'chrome', 'Chromium'];
+  }
+  return ['chrome', 'google-chrome', 'chromium', 'chrome-browser'];
+}
 
 function findChromeExeUnder(dir: string, depth = 0): string | null {
-  if (depth > 10 || !fs.existsSync(dir)) return null;
+  if (depth > 14 || !fs.existsSync(dir)) return null;
 
+  const names = new Set(chromeBinaryNames());
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -17,7 +24,7 @@ function findChromeExeUnder(dir: string, depth = 0): string | null {
 
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
-    if (entry.isFile() && entry.name === CHROME_BINARY) {
+    if (entry.isFile() && names.has(entry.name)) {
       return full;
     }
     if (entry.isDirectory()) {

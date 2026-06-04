@@ -7,32 +7,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CHROME_BINARY = process.platform === 'win32' ? 'chrome.exe' : 'chrome';
-
-function findChromeExeUnder(dir, depth = 0) {
-  if (depth > 10 || !fs.existsSync(dir)) return null;
-  let entries;
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isFile() && entry.name === CHROME_BINARY) return full;
-    if (entry.isDirectory()) {
-      const nested = findChromeExeUnder(full, depth + 1);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
+import { CHROME_BINARY, findChromeBinaryUnder } from './lib/cross-platform-artifacts.mjs';
 
 const cacheChromeRoot = path.join(root, 'resources', 'puppeteer-cache', 'chrome');
 const packagedChromeRoot = path.join(root, 'resources', 'puppeteer-cache', 'chrome');
 const extraResourcesTarget = 'puppeteer-chrome/chrome';
 
-const devExe = findChromeExeUnder(cacheChromeRoot);
+const devExe = findChromeBinaryUnder(cacheChromeRoot);
 const errors = [];
 
 if (!devExe) {

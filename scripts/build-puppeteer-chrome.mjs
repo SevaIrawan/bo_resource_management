@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import puppeteer from 'puppeteer';
 import { CHROME_BINARY, findChromeBinaryUnder } from './lib/cross-platform-artifacts.mjs';
 import { npxBin, runProcess } from './lib/run-process.mjs';
 
@@ -27,9 +28,21 @@ if (!fs.existsSync(chromeRoot)) {
   process.exit(1);
 }
 
-const binary = findChromeBinaryUnder(chromeRoot);
+let binary = findChromeBinaryUnder(chromeRoot);
 if (!binary) {
-  console.error(`ERROR: ${CHROME_BINARY} tidak ditemukan di bawah ${chromeRoot}`);
+  try {
+    const fromPuppeteer = puppeteer.executablePath();
+    if (fromPuppeteer && fs.existsSync(fromPuppeteer)) {
+      binary = fromPuppeteer;
+    }
+  } catch {
+    // ignore
+  }
+}
+if (!binary) {
+  console.error(
+    `ERROR: Chrome (${CHROME_BINARY} / Google Chrome for Testing) tidak ditemukan di ${chromeRoot}`,
+  );
   process.exit(1);
 }
 

@@ -108,7 +108,7 @@ export function usePlatformLogin(
         setStatus('error');
         setError(
           t('groupMonitoring.sync.qrAppearTimeout') ??
-            'QR is still loading. Wait up to 2 minutes, or close and tap Sync again.',
+            'QR is still loading. Please wait, or close and tap Sync again.',
         );
       }, WA_QR_MUST_APPEAR_MS);
     },

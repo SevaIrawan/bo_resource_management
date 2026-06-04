@@ -19,7 +19,7 @@ const entryPoints = [
   ['CI Mac', '.github/workflows/release-multiplatform.yml', 'npm run build:installer:mac'],
   ['CI Linux', '.github/workflows/release-multiplatform.yml', 'npm run build:installer:linux'],
   ['Lokal', 'scripts/build-installer.mjs', 'node scripts/build-installer.mjs <win|mac|linux>'],
-  ['Publish manual', 'scripts/publish-release.mjs', '--config electron-builder.publish.json + --prepackaged'],
+  ['Publish manual', 'scripts/publish-release.mjs', '--config electron-builder.publish.mjs + --prepackaged'],
 ];
 
 console.log('\n--- Tiga platform (sama skrip, beda runner OS) ---');

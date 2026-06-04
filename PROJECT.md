@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-02  
-**Versi aplikasi:** `1.0.8` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.9` (lihat `package.json`)  
 **Status:** Produksi internal — desktop Windows untuk tim operasional perusahaan  
 **Rencana:** Installer macOS & Linux — [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) (prepare, belum rilis)
 
@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.8)
+## 4. Konfigurasi & installer (kondisi 1.0.9)
 
 ### 4.1 Variabel lingkungan
 
@@ -314,4 +314,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.8**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.9**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*

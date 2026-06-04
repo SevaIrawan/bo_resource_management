@@ -101,7 +101,6 @@ jobs:
           name: release-win
           path: |
             release/*.exe
-            release/latest.yml
 
   build-mac:
     needs: gate
@@ -141,7 +140,6 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
-            release/latest-mac.yml
 
   build-linux:
     needs: gate
@@ -178,7 +176,6 @@ jobs:
           name: release-linux
           path: |
             release/*.AppImage
-            release/latest-linux.yml
 
   publish:
     needs: [gate, build-win, build-mac, build-linux]

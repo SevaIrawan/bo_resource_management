@@ -350,7 +350,7 @@ function armQrAppearDeadline(
           sessionId,
           platform: 'whatsapp',
           message:
-            'QR is still loading (Chrome may take up to 3 minutes on first login). Wait, or close and tap Sync again.',
+            'QR is still loading. Please wait, or close and tap Sync again.',
         });
       }
     })();

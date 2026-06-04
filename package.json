@@ -1,6 +1,6 @@
 {
   "name": "resource-management",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "description": "Resource Management Desktop — Group Monitoring Dashboard",
   "author": "Seva Irawan <tanjungbambangirawan85@gmail.com>",
@@ -103,6 +103,7 @@
       "output": "release"
     },
     "win": {
+      "artifactName": "Resource.Management.Setup.${version}.${ext}",
       "target": [
         "nsis"
       ],
@@ -115,6 +116,7 @@
       ]
     },
     "mac": {
+      "artifactName": "Resource.Management-${version}-${arch}-mac.${ext}",
       "target": [
         "dmg",
         "zip"
@@ -132,6 +134,7 @@
       ]
     },
     "linux": {
+      "artifactName": "Resource.Management-${version}.${ext}",
       "target": [
         "AppImage"
       ],

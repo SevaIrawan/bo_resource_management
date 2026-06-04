@@ -8,6 +8,24 @@ const FIRST_CHECK_DELAY_MS = 12_000;
 const GITHUB_OWNER = 'SevaIrawan';
 const GITHUB_REPO = 'bo_resource_management';
 
+/** Metadata rilis salah → unduhan 404 di Win/Mac/Linux (spasi vs titik, atau artefak OS lain). */
+function releaseMetadataBroken(urls: string): string | null {
+  if (!urls.trim()) return null;
+  if (/\s/.test(urls)) {
+    return 'Metadata rilis salah (nama file ada spasi). IT: jalankan Fix release yml, atau install manual dari GitHub Releases.';
+  }
+  if (process.platform === 'darwin' && /\.exe/i.test(urls)) {
+    return 'Update Mac salah arah (metadata rilis). Install .dmg dari Releases atau IT: Fix release yml.';
+  }
+  if (process.platform === 'win32' && /\.(dmg|AppImage|zip)/i.test(urls)) {
+    return 'Update Windows salah arah (metadata rilis). Install .exe dari Releases atau IT: Fix release yml.';
+  }
+  if (process.platform === 'linux' && /\.(exe|dmg)/i.test(urls)) {
+    return 'Update Linux salah arah (metadata rilis). Install .AppImage dari Releases atau IT: Fix release yml.';
+  }
+  return null;
+}
+
 export type AppUpdateUiStatus =
   | 'idle'
   | 'available'
@@ -42,11 +60,12 @@ function showRestartDialog(version: string) {
   const win = getMainWindow?.();
   const options = {
     type: 'info' as const,
-    title: 'Pembaruan tersedia',
-    message: `Versi ${version} sudah diunduh.`,
+    title: 'Update ready to install',
+    message: `Version ${version} has been downloaded.`,
     detail:
-      'Klik Restart untuk pasang update. File .env dan sesi WhatsApp/Telegram di PC ini tetap aman.',
-    buttons: ['Restart sekarang', 'Nanti'],
+      'Click "Restart now" to finish installing this update on your computer.\n\n' +
+      'What stays safe: your .env settings and WhatsApp/Telegram login sessions on this PC are not removed.',
+    buttons: ['Restart now', 'Later'],
     defaultId: 0,
     cancelId: 1,
   };
@@ -100,11 +119,10 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
   autoUpdater.on('update-available', (info) => {
     const files = (info as { files?: Array<{ url?: string }> }).files ?? [];
     const urls = files.map((f) => f.url ?? '').join(' ');
-    if (process.platform === 'darwin' && /\.exe/i.test(urls)) {
-      const msg =
-        'Update Mac salah arah (metadata rilis). Install dari .dmg di GitHub Releases atau tunggu IT jalankan Fix release yml.';
-      console.error('[auto-update]', msg, urls);
-      broadcastUpdateStatus({ status: 'error', version: info.version, errorMessage: msg });
+    const brokenMeta = releaseMetadataBroken(urls);
+    if (brokenMeta) {
+      console.error('[auto-update]', brokenMeta, urls);
+      broadcastUpdateStatus({ status: 'error', version: info.version, errorMessage: brokenMeta });
       return;
     }
     console.info('[auto-update] update available:', info.version, urls);

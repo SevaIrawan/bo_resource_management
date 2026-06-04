@@ -181,15 +181,11 @@ export function PlatformLoginModal({
                   ? t('groupMonitoring.sync.scanQr')
                   : status === 'restoring'
                     ? t('groupMonitoring.sync.restoringSession')
-                    : status === 'starting-qr'
-                      ? isTelegram
-                        ? t('groupMonitoring.sync.generatingQr')
-                        : t('groupMonitoring.sync.startingWhatsApp')
-                      : isTelegram
-                        ? t('groupMonitoring.sync.generatingQr')
-                        : qrDataUrl
-                          ? t('groupMonitoring.sync.scanQr')
-                          : t('groupMonitoring.sync.loadingQr');
+                    : status === 'starting-qr' || status === 'loading'
+                      ? t('groupMonitoring.sync.generatingQr')
+                      : qrDataUrl
+                        ? t('groupMonitoring.sync.scanQr')
+                        : t('groupMonitoring.sync.loadingQr');
 
   return (
     <BrandModalRoot onBackdropClick={onClose}>

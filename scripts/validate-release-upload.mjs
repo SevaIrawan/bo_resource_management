@@ -15,8 +15,62 @@ if (!fs.existsSync(releaseDir)) {
   process.exit(1);
 }
 
-const files = fs.readdirSync(releaseDir);
+const files = fs.readdirSync(releaseDir).filter((n) => {
+  try {
+    return fs.statSync(path.join(releaseDir, n)).isFile();
+  } catch {
+    return false;
+  }
+});
 const errors = [];
+
+function publicAssetName(localName) {
+  if (!/\s/.test(localName)) return localName;
+  if (/^Resource Management/i.test(localName)) {
+    return localName.replace(/Resource Management/g, 'Resource.Management');
+  }
+  return localName;
+}
+
+function installerBackingFile(ymlPath) {
+  if (!ymlPath) return null;
+  if (files.includes(ymlPath)) return ymlPath;
+  const spaced = ymlPath.replace(/Resource\.Management/g, 'Resource Management');
+  if (files.includes(spaced)) return spaced;
+  return null;
+}
+
+function assertYmlMatchesDisk(ymlName) {
+  const p = path.join(releaseDir, ymlName);
+  if (!fs.existsSync(p)) {
+    errors.push(`Missing ${ymlName}`);
+    return;
+  }
+  const text = fs.readFileSync(p, 'utf8');
+  const url = text.match(/^path:\s*(.+)$/m)?.[1]?.trim();
+  if (!url) {
+    errors.push(`${ymlName} tanpa path`);
+    return;
+  }
+  if (/\s/.test(url)) {
+    errors.push(`${ymlName} path mengandung spasi — auto-update Win/Mac/Linux akan 404`);
+    return;
+  }
+  if (/^Resource-Management-/i.test(url)) {
+    errors.push(`${ymlName} path pakai strip (Resource-Management-) — harus Resource.Management… (titik)`);
+    return;
+  }
+  const backing = installerBackingFile(url);
+  if (!backing) {
+    errors.push(
+      `${ymlName} path "${url}" tidak punya installer di folder (${files.filter((f) => /\.(exe|dmg|zip|AppImage)$/i.test(f)).join(', ')})`,
+    );
+    return;
+  }
+  if (url !== publicAssetName(backing)) {
+    errors.push(`${ymlName} path harus ${publicAssetName(backing)} (nama publik GitHub), bukan variasi lain`);
+  }
+}
 
 function mustExist(predicate, label) {
   const hit = files.find(predicate);
@@ -30,19 +84,15 @@ const zip = mustExist((n) => /\.zip$/i.test(n) && /arm64/i.test(n), 'Mac arm64 .
 const appImage = mustExist((n) => /\.AppImage$/i.test(n), 'Linux .AppImage');
 
 for (const yml of ['latest.yml', 'latest-mac.yml', 'latest-linux.yml']) {
+  assertYmlMatchesDisk(yml);
   const p = path.join(releaseDir, yml);
-  if (!fs.existsSync(p)) {
-    errors.push(`Missing ${yml}`);
-    continue;
-  }
-  const text = fs.readFileSync(p, 'utf8');
-  const pathMatch = text.match(/^path:\s*(.+)$/m);
-  const url = pathMatch?.[1]?.trim();
-  if (!url || !files.includes(url)) {
-    errors.push(`${yml} path "${url}" tidak cocok dengan file di folder: ${files.join(', ')}`);
-  }
+  if (!fs.existsSync(p)) continue;
+  const url = fs.readFileSync(p, 'utf8').match(/^path:\s*(.+)$/m)?.[1]?.trim();
   if (yml === 'latest-mac.yml' && url && /\.exe$/i.test(url)) {
     errors.push(`${yml} mengarah ke .exe — Mac akan salah unduh`);
+  }
+  if (yml === 'latest-mac.yml' && url && /\.dmg$/i.test(url)) {
+    errors.push(`${yml} mengarah ke .dmg — auto-update Mac butuh .zip`);
   }
 }
 

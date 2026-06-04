@@ -97,11 +97,11 @@ export function groupOpenTickets(tickets: TicketItem[]): TicketSummaryGroup[] {
 
 export function ticketTypeExportLabel(type: TicketType): string {
   const labels: Record<TicketType, string> = {
-    missing_group: 'Missing on device (need invite)',
-    not_admin: 'Not admin yet',
-    duplicate_group_id: 'Same group ID, wrong name',
-    duplicate_group_name: 'Same name, different ID',
-    daily_junk_group: 'Extra on device (not in master)',
+    missing_group: 'Missing on device — join via invite',
+    not_admin: 'Joined — not admin yet',
+    duplicate_group_id: 'Same group ID — name differs from master',
+    duplicate_group_name: 'Master has duplicate names (different IDs)',
+    daily_junk_group: 'On device only — not in brand master',
   };
   return labels[type];
 }

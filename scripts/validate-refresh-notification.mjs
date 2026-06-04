@@ -1,5 +1,5 @@
 /**
- * Tombol Refresh: notifikasi pembaruan + dropdown Update now / Refresh.
+ * Tombol Refresh: refresh tab aktif + dot jika ada data baru dari server.
  */
 import fs from 'fs';
 import path from 'path';
@@ -14,8 +14,8 @@ const realtime = read('src/hooks/useRealtimeMonitoring.ts');
 const i18n = read('src/i18n/locales/en.ts');
 
 const checks = [
-  { name: 'Dropdown Update now + Refresh', ok: btn.includes('updateNow') && btn.includes('refreshMenu') },
-  { name: 'Notifikasi dot saat ada update', ok: btn.includes('monitoring-refresh-update-dot') && btn.includes('showMenu') },
+  { name: 'Refresh tanpa dropdown', ok: !btn.includes('monitoring-refresh-menu') && btn.includes('refreshActiveTab') },
+  { name: 'Tanpa dot notifikasi di tombol', ok: !btn.includes('monitoring-refresh-update-dot') },
   { name: 'Pending data context', ok: providers.includes('MonitoringPendingContext') },
   { name: 'Realtime memicu onDataChangeNotice', ok: realtime.includes('onDataChangeNotice') },
   { name: 'installUpdate IPC', ok: read('electron/preload/index.ts').includes('installUpdate') },

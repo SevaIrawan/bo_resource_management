@@ -1,0 +1,115 @@
+name: Repair release auto-update
+
+# Perbaiki release yang sudah ada (v1.0.6 / v1.0.7): hapus blockmap, rebuild Mac zip, upload metadata benar.
+# Client 1.0.4+ bisa auto-update tanpa install manual setelah ini.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag rilis (contoh v1.0.7)'
+        required: true
+        type: string
+      rebuild_mac:
+        description: 'Build ulang artefak Mac (zip) dari tag tersebut'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild-mac:
+    if: inputs.rebuild_mac
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Write org .env from secret
+        env:
+          ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
+        run: |
+          if [ -n "$ORG_ENV_FILE" ]; then
+            echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
+            node scripts/validate-org-env.mjs
+          fi
+
+      - run: npm run build:installer:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_FOR_PULL_REQUEST: 'true'
+
+      - run: node scripts/prepare-github-release-assets.mjs release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-repair
+          path: |
+            release/*.zip
+            release/latest-mac.yml
+
+  repair-publish:
+    runs-on: ubuntu-latest
+    needs: [rebuild-mac]
+    if: always() && (needs.rebuild-mac.result == 'success' || needs.rebuild-mac.result == 'skipped')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Mac repair artifacts
+        if: inputs.rebuild_mac
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-repair
+          path: mac-repair
+
+      - name: Hapus blockmap dari release GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="${{ inputs.tag }}"
+          gh release view "$TAG" --json assets -q '.assets[].name' | while read -r name; do
+            case "$name" in
+              *.blockmap)
+                echo "Hapus asset: $name"
+                gh release delete-asset "$TAG" "$name" -y
+                ;;
+            esac
+          done
+
+      - name: Upload Mac zip + latest-mac.yml
+        if: inputs.rebuild_mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          gh release upload "$TAG" mac-repair/* --clobber
+
+      - name: Patch latest.yml & latest-linux.yml (tanpa blockMapSize)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="${{ inputs.tag }}"
+          mkdir -p patch
+          gh release download "$TAG" -p "latest.yml" -p "latest-linux.yml" -D patch || true
+          for f in latest.yml latest-linux.yml; do
+            [ -f "patch/$f" ] || continue
+            grep -v 'blockMapSize:' "patch/$f" > "patch/$f.clean" || cp "patch/$f" "patch/$f.clean"
+            mv "patch/$f.clean" "patch/$f"
+            gh release upload "$TAG" "patch/$f" --clobber
+            echo "OK: $f"
+          done

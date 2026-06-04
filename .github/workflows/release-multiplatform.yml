@@ -160,6 +160,8 @@ jobs:
     needs: [build-win, build-mac, build-linux]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -168,15 +170,58 @@ jobs:
         with:
           path: artifacts
 
-      - name: Merge release folder
+      - name: Merge installer assets (Win + Mac + Linux)
         run: |
+          set -e
           mkdir -p release
-          cp -v artifacts/release-win/* release/ 2>/dev/null || true
-          cp -v artifacts/release-mac/* release/ 2>/dev/null || true
-          cp -v artifacts/release-linux/* release/ 2>/dev/null || true
+          merge_platform() {
+            local dir="$1"
+            [ -d "$dir" ] || return 0
+            shopt -s nullglob
+            for pattern in \
+              '*.exe' '*.exe.blockmap' 'latest.yml' \
+              '*.dmg' '*.dmg.blockmap' 'latest-mac.yml' \
+              '*.AppImage' 'latest-linux.yml'; do
+              for f in "$dir"/$pattern; do
+                cp -v "$f" release/
+              done
+            done
+          }
+          merge_platform artifacts/release-win
+          merge_platform artifacts/release-mac
+          merge_platform artifacts/release-linux
+          echo "==> Release assets:"
           ls -la release/
+          test -f release/latest.yml || (echo "ERROR: missing latest.yml (Windows)" && exit 1)
+          test -f release/latest-mac.yml || (echo "ERROR: missing latest-mac.yml (macOS)" && exit 1)
+          test -f release/latest-linux.yml || (echo "ERROR: missing latest-linux.yml (Linux)" && exit 1)
 
-      - name: Create GitHub Release (manual upload step)
+      - name: Resolve version tag
+        id: ver
         run: |
-          echo "Artefak siap di folder release/. Upload ke GitHub Release v$(node -p "require('./package.json').version") via gh CLI atau UI."
-          echo "Set GH_TOKEN + gh release create ... jika otomatis penuh diperlukan."
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release (auto-update semua platform)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Resource Management ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true
+          overwrite_files: true
+          files: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+            release/*.dmg
+            release/*.dmg.blockmap
+            release/latest-mac.yml
+            release/*.AppImage
+            release/latest-linux.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

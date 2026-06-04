@@ -24,4 +24,4 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""
 Write-Host "Selesai. PC Windows yang sudah install akan dapat update otomatis." -ForegroundColor Green
-Write-Host "Mac/Linux: npm run build:installer:mac|linux di runner OS masing-masing, lalu publish-release.mjs" -ForegroundColor Yellow
+Write-Host "Mac/Linux + upload Releases: jalankan workflow GitHub Actions 'Release multi-platform' (otomatis)." -ForegroundColor Yellow

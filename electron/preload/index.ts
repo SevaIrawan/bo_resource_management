@@ -26,15 +26,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('app:install-update') as Promise<{ ok: boolean; message?: string }>,
     getUpdateStatus: () =>
       ipcRenderer.invoke('app:get-update-status') as Promise<{
-        status: 'idle' | 'available' | 'downloaded';
+        status: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
         version?: string;
+        percent?: number;
+        errorMessage?: string;
+        currentVersion?: string;
       }>,
     onUpdateStatus: (
-      callback: (payload: { status: 'idle' | 'available' | 'downloaded'; version?: string }) => void,
+      callback: (payload: {
+        status: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
+        version?: string;
+        percent?: number;
+        errorMessage?: string;
+        currentVersion?: string;
+      }) => void,
     ) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
-        payload: { status: 'idle' | 'available' | 'downloaded'; version?: string },
+        payload: {
+          status: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
+          version?: string;
+          percent?: number;
+          errorMessage?: string;
+          currentVersion?: string;
+        },
       ) => {
         callback(payload);
       };

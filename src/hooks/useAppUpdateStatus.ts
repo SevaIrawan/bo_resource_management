@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
 import { APP_VERSION } from '@/lib/appVersion';
 
-export type AppUpdateUiStatus = 'idle' | 'available' | 'downloaded';
+export type AppUpdateUiStatus =
+  | 'idle'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
 
 export interface AppUpdateStatus {
   status: AppUpdateUiStatus;
-  /** Versi pembaruan di GitHub (jika ada). */
   version?: string;
-  /** Versi terpasang di PC ini. */
+  percent?: number;
+  errorMessage?: string;
   currentVersion: string;
 }
 
@@ -17,6 +22,8 @@ function normalizeStatus(
   return {
     status: payload.status ?? 'idle',
     version: payload.version,
+    percent: payload.percent,
+    errorMessage: payload.errorMessage,
     currentVersion: payload.currentVersion?.trim() || APP_VERSION,
   };
 }
@@ -48,5 +55,10 @@ export function useAppUpdateStatus(): AppUpdateStatus {
 }
 
 export function hasAppUpdateNotice(status: AppUpdateUiStatus): boolean {
-  return status === 'available' || status === 'downloaded';
+  return (
+    status === 'available' ||
+    status === 'downloading' ||
+    status === 'downloaded' ||
+    status === 'error'
+  );
 }

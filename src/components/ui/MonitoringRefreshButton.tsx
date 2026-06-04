@@ -21,7 +21,13 @@ export function MonitoringRefreshButton() {
   const showMenu = hasAppUpdate || hasPendingDataUpdate;
   const installedVersion = updateStatus.currentVersion || APP_VERSION;
   const newVersion = updateStatus.version;
-  const appUpdateLine = appUpdateStatusLine(t, updateStatus.status, newVersion);
+  const appUpdateLine = appUpdateStatusLine(
+    t,
+    updateStatus.status,
+    newVersion,
+    updateStatus.percent,
+    updateStatus.errorMessage,
+  );
 
   const label =
     tab === 'ticket' ? t('tabs.refreshTicket') : t('tabs.refreshAccount');

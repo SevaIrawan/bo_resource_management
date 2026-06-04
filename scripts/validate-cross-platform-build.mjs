@@ -25,8 +25,11 @@ function hasSidecarExtra(platformKey, binaryName) {
 
 const checks = [
   {
-    name: 'build.mac target dmg',
-    ok: Array.isArray(build.mac?.target) && build.mac.target.includes('dmg'),
+    name: 'build.mac target dmg + zip (auto-update)',
+    ok:
+      Array.isArray(build.mac?.target) &&
+      build.mac.target.includes('dmg') &&
+      build.mac.target.includes('zip'),
   },
   {
     name: 'build.linux target AppImage',

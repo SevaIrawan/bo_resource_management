@@ -6,17 +6,35 @@ export type TranslateFn = (
 ) => string;
 
 export function hasNewerAppVersion(status: AppUpdateUiStatus): boolean {
-  return status === 'available' || status === 'downloaded';
+  return (
+    status === 'available' ||
+    status === 'downloading' ||
+    status === 'downloaded' ||
+    status === 'error'
+  );
 }
 
 export function appUpdateStatusLine(
   t: TranslateFn,
   status: AppUpdateUiStatus,
   availableVersion?: string,
+  percent?: number,
+  errorMessage?: string,
 ): string | null {
+  if (status === 'error') {
+    return errorMessage?.trim()
+      ? t('appUpdate.failedDetail', { message: errorMessage })
+      : t('appUpdate.failed');
+  }
   if (!hasNewerAppVersion(status) || !availableVersion) return null;
   if (status === 'downloaded') {
     return t('appUpdate.readyToInstall', { version: availableVersion });
+  }
+  if (status === 'downloading') {
+    const pct = percent != null && percent >= 0 ? Math.min(100, Math.round(percent)) : null;
+    return pct != null
+      ? t('appUpdate.downloadingPercent', { version: availableVersion, percent: pct })
+      : t('appUpdate.downloading', { version: availableVersion });
   }
   return t('appUpdate.downloading', { version: availableVersion });
 }

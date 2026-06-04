@@ -58,14 +58,18 @@ declare global {
         }>;
         installUpdate?: () => Promise<{ ok: boolean; message?: string }>;
         getUpdateStatus: () => Promise<{
-          status: 'idle' | 'available' | 'downloaded';
+          status: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
           version?: string;
+          percent?: number;
+          errorMessage?: string;
           currentVersion?: string;
         }>;
         onUpdateStatus: (
           callback: (payload: {
-            status: 'idle' | 'available' | 'downloaded';
+            status: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
             version?: string;
+            percent?: number;
+            errorMessage?: string;
             currentVersion?: string;
           }) => void,
         ) => () => void;

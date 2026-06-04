@@ -50,7 +50,10 @@ export const zh: Messages = {
   },
   appUpdate: {
     downloading: '正在下载 v{{version}}…',
+    downloadingPercent: '正在下载 v{{version}}… {{percent}}%',
     readyToInstall: 'v{{version}} 已就绪 — 重启后安装',
+    failed: '更新下载失败',
+    failedDetail: '更新失败：{{message}}',
   },
   brand: {
     name: '后端运营',

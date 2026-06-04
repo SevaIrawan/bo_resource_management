@@ -50,8 +50,10 @@ export function electronBuilderArgs(target) {
     target === 'win' ? ['--win'] : target === 'mac' ? ['--mac'] : target === 'linux' ? ['--linux'] : null;
   if (!args) throw new Error(`Unknown build target: ${target}`);
 
-  // Installer build saja — jangan upload GitHub (butuh GH_TOKEN). Publish via publish-release.mjs.
-  return [...args, '--publish', 'never'];
+  // Embed app-update.yml (config publish) tanpa upload — upload lewat CI / publish-release.mjs.
+  const publishConfig = path.join(process.cwd(), 'electron-builder.publish.json');
+  const configFlag = fs.existsSync(publishConfig) ? ['--config', publishConfig] : [];
+  return [...args, ...configFlag, '--publish', 'never'];
 }
 
 /** @param {NodeJS.Platform | string} [platform] */

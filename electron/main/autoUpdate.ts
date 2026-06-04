@@ -5,11 +5,22 @@ import { autoUpdater } from 'electron-updater';
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const FIRST_CHECK_DELAY_MS = 12_000;
 
-export type AppUpdateUiStatus = 'idle' | 'available' | 'downloaded';
+const GITHUB_OWNER = 'SevaIrawan';
+const GITHUB_REPO = 'bo_resource_management';
+
+export type AppUpdateUiStatus =
+  | 'idle'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
 
 export interface AppUpdateStatusPayload {
   status: AppUpdateUiStatus;
   version?: string;
+  /** 0–100 saat status downloading */
+  percent?: number;
+  errorMessage?: string;
 }
 
 let checkTimer: ReturnType<typeof setInterval> | null = null;
@@ -55,7 +66,9 @@ function showRestartDialog(version: string) {
 function schedulePeriodicChecks() {
   const runCheck = () => {
     void autoUpdater.checkForUpdates().catch((err) => {
-      console.error('[auto-update] check failed:', err instanceof Error ? err.message : err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[auto-update] check failed:', message);
+      broadcastUpdateStatus({ status: 'error', errorMessage: message });
     });
   };
 
@@ -69,8 +82,16 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
 
   getMainWindow = resolveWindow;
 
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+  });
+
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  /** Hindari unduhan diferensial macet (loncatan versi besar, blockmap lama). */
+  autoUpdater.disableDifferentialDownload = true;
 
   autoUpdater.on('checking-for-update', () => {
     console.info('[auto-update] checking for updates...');
@@ -87,14 +108,25 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
   });
 
   autoUpdater.on('error', (err) => {
-    console.error('[auto-update]', err.message);
+    const message = err.message || 'Update gagal';
+    console.error('[auto-update]', message);
+    broadcastUpdateStatus({
+      status: 'error',
+      version: updateStatus.version,
+      errorMessage: message,
+    });
   });
 
   autoUpdater.on('download-progress', (progress) => {
     const pct = Math.round(progress.percent);
-    if (pct % 20 === 0 || pct >= 95) {
+    if (pct % 10 === 0 || pct >= 95) {
       console.info(`[auto-update] downloading ${pct}%`);
     }
+    broadcastUpdateStatus({
+      status: 'downloading',
+      version: updateStatus.version,
+      percent: pct,
+    });
   });
 
   autoUpdater.on('update-downloaded', (info) => {
@@ -122,9 +154,12 @@ export function installDownloadedUpdate(): { ok: boolean; message?: string } {
     return {
       ok: false,
       message:
-        updateStatus.status === 'available'
+        updateStatus.status === 'available' ||
+        updateStatus.status === 'downloading'
           ? 'Update masih diunduh. Tunggu sebentar lalu pilih Update Now lagi.'
-          : 'Tidak ada update yang siap dipasang.',
+          : updateStatus.status === 'error'
+            ? updateStatus.errorMessage ?? 'Unduhan update gagal. Install manual dari IT.'
+            : 'Tidak ada update yang siap dipasang.',
     };
   }
   autoUpdater.quitAndInstall(false, true);
@@ -146,8 +181,16 @@ export async function checkForUpdatesNow(): Promise<{
   try {
     await autoUpdater.checkForUpdates();
     const latest = updateStatus.version;
+    if (updateStatus.status === 'error') {
+      return {
+        status: 'error',
+        message: updateStatus.errorMessage ?? 'Update check failed',
+      };
+    }
     const extra =
-      updateStatus.status === 'available' || updateStatus.status === 'downloaded'
+      updateStatus.status === 'available' ||
+      updateStatus.status === 'downloading' ||
+      updateStatus.status === 'downloaded'
         ? ` Pembaruan v${latest ?? '?'} tersedia.`
         : ' App sudah versi terbaru.';
     return {

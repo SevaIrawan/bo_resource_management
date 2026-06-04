@@ -2,6 +2,7 @@
   "publish": {
     "provider": "github",
     "owner": "SevaIrawan",
-    "repo": "bo_resource_management"
+    "repo": "bo_resource_management",
+    "releaseType": "release"
   }
 }

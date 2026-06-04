@@ -21,7 +21,13 @@ export function AdminPage() {
 
   const installedVersion = updateStatus.currentVersion || APP_VERSION;
   const newVersion = updateStatus.version;
-  const updateLine = appUpdateStatusLine(t, updateStatus.status, newVersion);
+  const updateLine = appUpdateStatusLine(
+    t,
+    updateStatus.status,
+    newVersion,
+    updateStatus.percent,
+    updateStatus.errorMessage,
+  );
 
   const items = [
     {

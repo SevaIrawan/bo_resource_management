@@ -48,7 +48,10 @@ export const en = {
   },
   appUpdate: {
     downloading: 'Downloading v{{version}}…',
+    downloadingPercent: 'Downloading v{{version}}… {{percent}}%',
     readyToInstall: 'v{{version}} ready — restart to install',
+    failed: 'Update download failed',
+    failedDetail: 'Update failed: {{message}}',
   },
   brand: {
     name: 'Backend Operation',

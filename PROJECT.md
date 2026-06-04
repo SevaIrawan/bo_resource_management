@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-02  
-**Versi aplikasi:** `1.0.5` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.6` (lihat `package.json`)  
 **Status:** Produksi internal — desktop Windows untuk tim operasional perusahaan  
 **Rencana:** Installer macOS & Linux — [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) (prepare, belum rilis)
 
@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.5)
+## 4. Konfigurasi & installer (kondisi 1.0.6)
 
 ### 4.1 Variabel lingkungan
 
@@ -95,7 +95,7 @@ npm run build:installer:linux
 # atau: bash scripts/build-installer.sh mac
 ```
 
-Output Windows: `release\Resource Management Setup 1.0.5.exe`  
+Output Windows: `release\Resource Management Setup 1.0.6.exe`  
 Output macOS: `release/Resource Management-x.x.x.dmg`  
 Output Linux: `release/Resource Management-x.x.x.AppImage` (+ `.deb`)
 
@@ -122,10 +122,10 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 
 | Peran | Langkah |
 |--------|---------|
-| **Developer / IT** | Naikkan `version` di `package.json` → `npm run publish:github` (butuh `GH_TOKEN`) |
+| **Developer / IT** | Naikkan `version` di `package.json` → `git push origin main` → GitHub Actions otomatis build + publish Release (Win/Mac/Linux). Opsional publish cepat Windows dari PC: `$env:GH_TOKEN = "ghp_..."` lalu `npm run publish:github`. |
 | **Tim internal** | App cek GitHub ~12 detik setelah buka + tiap 4 jam → unduh → **Restart** |
 
-**Bukan** cukup `git push` saja — harus ada **GitHub Release** berisi artefak update (`latest.yml`, installer, blockmap).
+`GH_TOKEN` di PowerShell = hanya untuk publish **lokal**. Push `main` tidak butuh token Anda di GitHub Secrets.
 
 `.env` organisasi dan sesi WA di PC user **tetap** setelah restart.
 
@@ -312,4 +312,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.5**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.6**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*

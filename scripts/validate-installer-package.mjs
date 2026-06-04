@@ -26,7 +26,6 @@ const files = build.files ?? [];
 const asarUnpack = build.asarUnpack ?? [];
 const sidecarName = sidecarBinaryName(platform);
 const sidecarPath = sidecarResourcePath(root, platform);
-const chromeCache = path.join(root, 'resources', 'puppeteer-cache', 'chrome');
 const orgDefaultPath = path.join(root, 'resources', 'org-default.env');
 const envTemplatePath = path.join(root, 'resources', 'env-template.env');
 
@@ -49,7 +48,7 @@ const nodeModulesChecks = ['whatsapp-web.js', 'puppeteer', '@supabase/supabase-j
 const checks = [
   {
     name: `[${target}] Chrome terbundel (resources/puppeteer-cache)`,
-    ok: Boolean(findChromeBinaryUnder(chromeCache, 0, platform)),
+    ok: Boolean(findChromeBinaryUnder(path.join(root, 'resources', 'puppeteer-cache'), 0, platform)),
   },
   {
     name: `[${target}] Sidecar Telegram (${sidecarName})`,

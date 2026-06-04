@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = parseBuildTargetArg(process.argv[2]);
 const platform = platformForBuildTarget(target);
 
-const cacheChromeRoot = path.join(root, 'resources', 'puppeteer-cache', 'chrome');
+const cacheChromeRoot = path.join(root, 'resources', 'puppeteer-cache');
 const extraResourcesTarget = 'puppeteer-chrome/chrome';
 
 const devExe = findChromeBinaryUnder(cacheChromeRoot, 0, platform);

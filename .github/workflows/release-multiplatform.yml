@@ -47,6 +47,8 @@ jobs:
 
       - name: Build Windows installer
         run: npm run build:installer:win
+        env:
+          GH_TOKEN: ''
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -93,6 +95,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_FOR_PULL_REQUEST: 'true'
+          GH_TOKEN: ''
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -139,6 +142,8 @@ jobs:
 
       - name: Build Linux installer
         run: npm run build:installer:linux
+        env:
+          GH_TOKEN: ''
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4

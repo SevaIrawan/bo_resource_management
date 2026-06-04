@@ -1,17 +1,10 @@
 /**
  * Publish installer ke GitHub Releases (auto-update).
- * Usage:
- *   node scripts/publish-release.mjs win
- *   node scripts/publish-release.mjs mac
- *   node scripts/publish-release.mjs linux
- *
- * Prasyarat: GH_TOKEN, build selesai (release/*-unpacked atau artefak penuh).
  */
 import fs from 'fs';
 import path from 'path';
-import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { npmBin, npxBin } from './lib/run-process.mjs';
+import { runNpm, runProjectTool } from './lib/run-process.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = process.argv[2];
@@ -48,12 +41,7 @@ if (!fs.existsSync(publishConfig)) {
 }
 
 console.log(`==> Validasi pre-release v${version}`);
-const validate = spawnSync(npmBin(), ['run', 'validate:pre-release'], {
-  cwd: root,
-  stdio: 'inherit',
-  shell: false,
-});
-if (validate.status !== 0) process.exit(validate.status ?? 1);
+runNpm(root, 'Validasi pre-release', ['run', 'validate:pre-release']);
 
 const platformFlag = target === 'win' ? '--win' : target === 'mac' ? '--mac' : '--linux';
 const ebFlags = [
@@ -67,11 +55,6 @@ const ebFlags = [
 ];
 console.log(`==> Upload GitHub Releases (${ebFlags.join(' ')})`);
 
-const publish = spawnSync(npxBin(), ['electron-builder', ...ebFlags], {
-  cwd: root,
-  stdio: 'inherit',
-  shell: false,
-});
-if (publish.status !== 0) process.exit(publish.status ?? 1);
+runProjectTool(root, 'electron-builder publish', 'electron-builder/cli.js', ebFlags);
 
 console.log(`\nSelesai publish ${target} v${version}. Pastikan Release PUBLIC (bukan draft).`);

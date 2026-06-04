@@ -1,17 +1,12 @@
 /**
  * Build installer lengkap (Chrome + sidecar + org env + validate + electron-builder).
- * Usage:
- *   node scripts/build-installer.mjs        → OS saat ini
- *   node scripts/build-installer.mjs win
- *   node scripts/build-installer.mjs mac
- *   node scripts/build-installer.mjs linux
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { electronBuilderArgs, resolveBuildTarget } from './lib/cross-platform-artifacts.mjs';
 import { hostMatchesTarget } from './lib/installer-bundle-manifest.mjs';
-import { npmBin, npxBin, runProcess } from './lib/run-process.mjs';
+import { runProcess, runNpm, runProjectTool } from './lib/run-process.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = process.argv[2];
@@ -55,7 +50,7 @@ console.log('OK: org-default.env dari .env');
 const validateArgs = [target];
 
 if (process.env.CI === 'true') {
-  runProcess('Validasi CI (typecheck)', npmBin(), ['run', 'typecheck'], { cwd: root });
+  runProjectTool(root, 'Validasi CI (typecheck)', 'typescript/bin/tsc', ['--noEmit']);
   runProcess('Validasi runtime installer (QR, 3k grup, ticket)', process.execPath, [
     path.join(root, 'scripts', 'validate-installer-runtime.mjs'),
   ], { cwd: root });
@@ -64,9 +59,7 @@ if (process.env.CI === 'true') {
     ...validateArgs,
   ], { cwd: root });
 } else {
-  runProcess('Validasi pre-release (desktop + typecheck)', npmBin(), ['run', 'validate:pre-release'], {
-    cwd: root,
-  });
+  runNpm(root, 'Validasi pre-release (desktop + typecheck)', ['run', 'validate:pre-release']);
   runProcess('Validasi paket installer (target)', process.execPath, [
     path.join(root, 'scripts', 'validate-installer-package.mjs'),
     ...validateArgs,
@@ -77,12 +70,10 @@ runProcess('Validasi Chrome bundel', process.execPath, [
   path.join(root, 'scripts', 'validate-puppeteer-chrome.mjs'),
   ...validateArgs,
 ], { cwd: root });
-runProcess('Vite production build', npxBin(), ['vite', 'build'], { cwd: root });
+runProjectTool(root, 'Vite production build', 'vite/bin/vite.js', ['build']);
 
 const ebFlags = electronBuilderArgs(target);
-runProcess(`Electron builder (${ebFlags.join(' ')})`, npxBin(), ['electron-builder', ...ebFlags], {
-  cwd: root,
-});
+runProjectTool(root, `Electron builder (${ebFlags.join(' ')})`, 'electron-builder/cli.js', ebFlags);
 
 runProcess('Validasi artefak release (bundel di installer)', process.execPath, [
   path.join(root, 'scripts', 'validate-release-artifact.mjs'),
@@ -91,4 +82,3 @@ runProcess('Validasi artefak release (bundel di installer)', process.execPath, [
 
 console.log('\nSelesai. Installer: release/');
 console.log('User client: jalankan installer sekali — Chrome, Telegram, Supabase, WA/TG sudah terbundel.');
-console.log('Tim internal: login saja; update berikutnya otomatis (Restart).');

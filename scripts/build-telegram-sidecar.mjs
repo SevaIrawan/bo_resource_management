@@ -8,12 +8,14 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { sidecarBinaryName, sidecarResourcePath } from './lib/cross-platform-artifacts.mjs';
+import { runProcess } from './lib/run-process.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sidecarDir = path.join(root, 'python-sidecar');
 const outDir = path.join(root, 'resources', 'sidecar');
 const distPath = path.join(root, 'resources', 'sidecar-dist');
 const workPath = path.join(root, 'resources', 'sidecar-build');
+const venvDir = path.join(workPath, 'pyinstaller-venv');
 const binaryName = sidecarBinaryName();
 const builtPath = path.join(distPath, binaryName);
 const destPath = sidecarResourcePath(root);
@@ -28,13 +30,13 @@ function pythonCommand() {
           ['python', []],
           ['py', ['-3']],
         ]
-      : [['python3', []], ['python', []]];
+      : [
+          ['python3', []],
+          ['python', []],
+        ];
 
   for (const [bin, args] of candidates) {
-    const probe = spawnSync(bin, [...args, '--version'], {
-      shell: process.platform === 'win32',
-      stdio: 'ignore',
-    });
+    const probe = spawnSync(bin, [...args, '--version'], { stdio: 'ignore', shell: false });
     if (probe.status === 0) return { bin, args };
   }
 
@@ -43,39 +45,43 @@ function pythonCommand() {
     : { bin: 'python3', args: [] };
 }
 
-function run(label, bin, args, cwd = root) {
-  console.log(`==> ${label}`);
-  const r = spawnSync(bin, args, {
-    cwd,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  });
-  if (r.status !== 0) {
-    process.exit(r.status ?? 1);
-  }
+function venvPythonPath() {
+  return process.platform === 'win32'
+    ? path.join(venvDir, 'Scripts', 'python.exe')
+    : path.join(venvDir, 'bin', 'python');
 }
 
-const py = pythonCommand();
+const hostPy = pythonCommand();
+
+for (const dir of [distPath, workPath, outDir, venvDir]) {
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+fs.mkdirSync(workPath, { recursive: true });
+fs.mkdirSync(outDir, { recursive: true });
+
+runProcess('Buat virtualenv Python', hostPy.bin, [...hostPy.args, '-m', 'venv', venvDir]);
+
+const venvPy = venvPythonPath();
+if (!fs.existsSync(venvPy)) {
+  console.error(`ERROR: venv Python tidak ada: ${venvPy}`);
+  process.exit(1);
+}
+
 const reqFile = path.join(sidecarDir, 'requirements.txt');
 
-run('pip install (sidecar + PyInstaller)', py.bin, [
-  ...py.args,
+runProcess('pip install (sidecar + PyInstaller)', venvPy, [
   '-m',
   'pip',
   'install',
   '-q',
+  '--upgrade',
+  'pip',
+  'pyinstaller',
   '-r',
   reqFile,
-  'pyinstaller',
 ]);
 
-for (const dir of [distPath, workPath, outDir]) {
-  fs.rmSync(dir, { recursive: true, force: true });
-}
-fs.mkdirSync(outDir, { recursive: true });
-
-run('PyInstaller (onefile)', py.bin, [
-  ...py.args,
+runProcess('PyInstaller (onefile)', venvPy, [
   '-m',
   'PyInstaller',
   '--noconfirm',
@@ -96,7 +102,7 @@ run('PyInstaller (onefile)', py.bin, [
   '--hidden-import=telethon',
   '--hidden-import=qrcode',
   'main.py',
-], sidecarDir);
+], { cwd: sidecarDir });
 
 if (!fs.existsSync(builtPath)) {
   console.error(`ERROR: PyInstaller gagal — ${builtPath} tidak ada`);

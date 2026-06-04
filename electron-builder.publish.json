@@ -1,5 +1,5 @@
 {
-  "extends": "./package.json",
+  "_comment": "Legacy — pakai electron-builder.publish.mjs untuk npm run publish:github",
   "publish": {
     "provider": "github",
     "owner": "SevaIrawan",

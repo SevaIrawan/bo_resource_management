@@ -52,11 +52,16 @@ for (const bad of ['build:dir', 'build:app:win']) {
   }
 }
 
-const publishJson = path.join(root, 'electron-builder.publish.json');
-if (fs.existsSync(publishJson)) {
-  const pub = JSON.parse(fs.readFileSync(publishJson, 'utf8'));
-  if (!pub.extends || !String(pub.extends).includes('package.json')) {
-    errors.push('electron-builder.publish.json harus "extends": "./package.json" agar upload tidak mengabaikan build config');
+const publishMjs = path.join(root, 'electron-builder.publish.mjs');
+if (!fs.existsSync(publishMjs)) {
+  errors.push('electron-builder.publish.mjs wajib ada untuk publish:github');
+} else {
+  const pubSrc = fs.readFileSync(publishMjs, 'utf8');
+  if (pubSrc.includes('extends') && pubSrc.includes('package.json')) {
+    errors.push('electron-builder.publish.mjs tidak boleh extends package.json (schema invalid)');
+  }
+  if (!pubSrc.includes('provider') || !pubSrc.includes('github')) {
+    errors.push('electron-builder.publish.mjs harus export publish github');
   }
 }
 

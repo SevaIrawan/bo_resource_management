@@ -6,7 +6,7 @@
 
 Kegagalan **v1.0.8** bukan karena secret hilang, melainkan:
 
-1. **`--config electron-builder.publish.json` di `build:installer`** — file itu hanya blok `publish`; electron-builder **mengabaikan** `package.json` → output ke `dist/` (bukan `release/`), Linux ikut snap, validator gagal. Perbaikan: `scripts/lib/cross-platform-artifacts.mjs` tanpa `--config`; publish hanya `scripts/publish-release.mjs`.
+1. **`--config electron-builder.publish.json` di `build:installer`** — dilarang (mengabaikan `package.json`). File `electron-builder.publish.json` **hanya** blok `publish`, **tanpa** `"extends": "./package.json"` (itu bikin error `unknown property build` saat `npm run publish:github`). Build: `cross-platform-artifacts.mjs`. Upload lokal: `publish-release.mjs` + `GH_TOKEN`.
 2. **`resources/sidecar-build/` (venv PyInstaller)** — symlink `bin/python` ke Python sistem → Mac error `Cannot copy file ... outside the package`. Perbaikan: hapus folder sebelum pack + exclude di `package.json` `build.files`.
 3. **Windows:** `prepare-win-codesign-cache.ps1` — extract `7za -xr!darwin` (hindari symlink macOS di cache).
 4. **Metadata rilis:** `latest*.yml` nama strip vs titik; Mac butuh `.zip` untuk auto-update (`sync-release-yml.mjs` di job publish).

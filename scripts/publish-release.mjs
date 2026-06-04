@@ -1,10 +1,11 @@
 /**
- * Publish installer ke GitHub Releases (auto-update).
+ * Publish installer ke GitHub Releases (auto-update) — setelah build:installer:*.
+ * Pakai electron-builder.publish.mjs (root-level config + publish), bukan extends package.json.
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { runNpm, runProjectTool } from './lib/run-process.mjs';
+import { runProjectTool } from './lib/run-process.mjs';
 import { resolvePrepackagedDir } from './lib/installer-bundle-manifest.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,19 +30,11 @@ if (!fs.existsSync(unpacked)) {
   process.exit(1);
 }
 
-const publishConfig = path.join(root, 'electron-builder.publish.json');
+const publishConfig = path.join(root, 'electron-builder.publish.mjs');
 if (!fs.existsSync(publishConfig)) {
   console.error(`ERROR: ${publishConfig} tidak ada.`);
   process.exit(1);
 }
-const publishCfg = JSON.parse(fs.readFileSync(publishConfig, 'utf8'));
-if (!publishCfg.extends || !String(publishCfg.extends).includes('package.json')) {
-  console.error('ERROR: electron-builder.publish.json wajib "extends": "./package.json"');
-  process.exit(1);
-}
-
-console.log(`==> Validasi pre-release v${version}`);
-runNpm(root, 'Validasi pre-release', ['run', 'validate:pre-release']);
 
 const platformFlag = target === 'win' ? '--win' : target === 'mac' ? '--mac' : '--linux';
 const ebFlags = [
@@ -53,7 +46,8 @@ const ebFlags = [
   '--prepackaged',
   unpacked,
 ];
-console.log(`==> Upload GitHub Releases (${ebFlags.join(' ')})`);
+
+console.log(`==> Upload GitHub Releases v${version} (${ebFlags.join(' ')})`);
 
 runProjectTool(root, 'electron-builder publish', 'electron-builder/cli.js', ebFlags);
 

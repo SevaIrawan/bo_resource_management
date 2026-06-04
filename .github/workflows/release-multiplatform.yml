@@ -38,7 +38,8 @@ jobs:
             echo "ORG_ENV_FILE secret missing — skip (build may fail validate-org-env)"
             exit 0
           fi
-          echo "$ORG_ENV_FILE" | base64 -d > .env
+          echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
+          node scripts/validate-org-env.mjs
 
       - name: Build Windows installer
         run: npm run build:installer:win
@@ -75,13 +76,15 @@ jobs:
           ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
         run: |
           if [ -n "$ORG_ENV_FILE" ]; then
-            echo "$ORG_ENV_FILE" | base64 -d > .env
+            echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
+            node scripts/validate-org-env.mjs
           fi
 
       - name: Build macOS installer
         run: npm run build:installer:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_FOR_PULL_REQUEST: 'true'
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -118,7 +121,8 @@ jobs:
           ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
         run: |
           if [ -n "$ORG_ENV_FILE" ]; then
-            echo "$ORG_ENV_FILE" | base64 -d > .env
+            echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
+            node scripts/validate-org-env.mjs
           fi
 
       - name: Build Linux installer

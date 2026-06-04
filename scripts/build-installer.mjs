@@ -72,6 +72,15 @@ runProcess('Validasi Chrome bundel', process.execPath, [
 ], { cwd: root });
 runProjectTool(root, 'Vite production build', 'vite/bin/vite.js', ['build']);
 
+if (target === 'win' && process.platform === 'win32') {
+  runProcess('Prepare winCodeSign cache (Windows)', 'powershell', [
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    path.join(root, 'scripts', 'prepare-win-codesign-cache.ps1'),
+  ], { cwd: root });
+}
+
 const ebFlags = electronBuilderArgs(target);
 runProjectTool(root, `Electron builder (${ebFlags.join(' ')})`, 'electron-builder/cli.js', ebFlags);
 

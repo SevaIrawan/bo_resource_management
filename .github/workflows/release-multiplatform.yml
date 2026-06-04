@@ -51,6 +51,7 @@ jobs:
     env:
       CI: 'true'
       PYTHON: python
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -61,6 +62,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
+      - name: Prepare winCodeSign cache (electron-builder #8149)
+        shell: pwsh
+        run: ./scripts/prepare-win-codesign-cache.ps1
       - name: Write org .env from secret
         shell: bash
         env:

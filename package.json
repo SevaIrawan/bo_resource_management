@@ -103,7 +103,9 @@
       "target": [
         "nsis"
       ],
+      "sign": null,
       "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false,
       "extraResources": [
         {
           "from": "resources/sidecar/rm-telegram-sidecar.exe",

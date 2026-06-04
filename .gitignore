@@ -8,6 +8,7 @@ docs/guides/pdf/
 resources/sidecar-dist/
 resources/sidecar-build/
 resources/puppeteer-cache/
+chrome/
 .env
 .env.local
 *.log

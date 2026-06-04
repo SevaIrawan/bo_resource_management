@@ -1,0 +1,104 @@
+/**
+ * Post-build: pastikan artefak di release/ berisi semua bundel runtime (PC user klik install saja).
+ * Usage: node scripts/validate-release-artifact.mjs [win|mac|linux]
+ */
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import {
+  findChromeBinaryUnder,
+  sidecarBinaryName,
+} from './lib/cross-platform-artifacts.mjs';
+import {
+  expectedInstallerArtifacts,
+  findMacResourcesDir,
+  findReleaseFiles,
+  packagedResourcesDir,
+  parseBuildTargetArg,
+  platformForBuildTarget,
+} from './lib/installer-bundle-manifest.mjs';
+import { missingOrgEnvKeys } from './lib/org-env-required.mjs';
+
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const target = parseBuildTargetArg(process.argv[2]);
+const platform = platformForBuildTarget(target);
+const sidecarName = sidecarBinaryName(platform);
+
+const { unpacked, patterns, excludeUnpacked } = expectedInstallerArtifacts(root, target);
+const resourcesDir = packagedResourcesDir(root, target);
+
+const errors = [];
+
+const installers = findReleaseFiles(path.join(root, 'release'), patterns);
+if (installers.length === 0) {
+  errors.push(`Tidak ada installer ${patterns.join('/')} di release/`);
+}
+
+if (!excludeUnpacked && !fs.existsSync(unpacked)) {
+  errors.push(`Folder unpacked tidak ada: ${unpacked}`);
+}
+
+if (!resourcesDir || !fs.existsSync(resourcesDir)) {
+  errors.push(`resources/ tidak ada untuk target ${target}: ${resourcesDir ?? '(mac .app tidak ditemukan)'}`);
+} else {
+  const chromeRoot = path.join(resourcesDir, 'puppeteer-chrome', 'chrome');
+  const chromeExe = findChromeBinaryUnder(chromeRoot, 0, platform);
+  if (!chromeExe) {
+    errors.push(`Chrome WhatsApp tidak ada di ${chromeRoot}`);
+  }
+
+  const sidecarPath = path.join(resourcesDir, 'sidecar', sidecarName);
+  if (!fs.existsSync(sidecarPath)) {
+    errors.push(`Sidecar Telegram tidak ada: ${sidecarPath}`);
+  } else if (platform !== 'win32') {
+    try {
+      fs.accessSync(sidecarPath, fs.constants.X_OK);
+    } catch {
+      errors.push(`Sidecar tidak executable: ${sidecarPath}`);
+    }
+  }
+
+  for (const envName of ['org-default.env', 'env-template.env']) {
+    const envPath = path.join(resourcesDir, envName);
+    if (!fs.existsSync(envPath)) {
+      errors.push(`${envName} tidak ada di resources/`);
+      continue;
+    }
+    if (envName === 'org-default.env') {
+      const missing = missingOrgEnvKeys(dotenv.parse(fs.readFileSync(envPath)));
+      if (missing.length) {
+        errors.push(`org-default.env kurang kunci: ${missing.join(', ')}`);
+      }
+    }
+  }
+
+  const asarPath = path.join(resourcesDir, 'app.asar');
+  if (!fs.existsSync(asarPath)) {
+    errors.push('app.asar tidak ada');
+  }
+
+  const unpackedNm = path.join(resourcesDir, 'app.asar.unpacked', 'node_modules');
+  for (const mod of ['whatsapp-web.js', 'puppeteer']) {
+    const modPath = path.join(unpackedNm, mod);
+    if (!fs.existsSync(modPath)) {
+      errors.push(`asarUnpack: node_modules/${mod} tidak ada di ${modPath}`);
+    }
+  }
+}
+
+if (target === 'mac' && !findMacResourcesDir(root)) {
+  errors.push('Resource Management.app tidak ditemukan di release/mac/');
+}
+
+if (errors.length) {
+  console.error(`[validate-release-artifact] GAGAL — target ${target}\n`);
+  for (const e of errors) console.error(`  - ${e}`);
+  process.exit(1);
+}
+
+console.log(`[validate-release-artifact] OK — target ${target}`);
+console.log(`  installer: ${installers.map((p) => path.basename(p)).join(', ')}`);
+console.log(`  resources: ${resourcesDir}`);
+console.log(`  sidecar: ${sidecarName}`);
+console.log('  bundel: Chrome, Telegram sidecar, org env, whatsapp-web.js, puppeteer');

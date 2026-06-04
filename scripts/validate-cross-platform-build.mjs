@@ -11,6 +11,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const pkg = JSON.parse(read('package.json'));
 const sidecarTs = read('electron/main/platformLogin/telegramSidecar.ts');
 const build = pkg.build ?? {};
+const extra = build.extraResources ?? [];
 
 function hasSidecarExtra(platformKey, binaryName) {
   const section = build[platformKey];
@@ -72,6 +73,14 @@ const checks = [
   {
     name: 'Skrip build-installer.mjs',
     ok: fs.existsSync(path.join(root, 'scripts', 'build-installer.mjs')),
+  },
+  {
+    name: 'extraResources: env-template.env',
+    ok: extra.some((e) => String(e.to).includes('env-template.env')),
+  },
+  {
+    name: 'validate:release-artifact script',
+    ok: Boolean(pkg.scripts?.['validate:release-artifact']),
   },
   {
     name: 'npm build:installer:win/mac/linux',

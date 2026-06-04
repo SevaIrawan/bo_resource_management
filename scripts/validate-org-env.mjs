@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { missingOrgEnvKeys } from './lib/org-env-required.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const envPath = path.join(root, '.env');
@@ -16,13 +17,7 @@ if (!fs.existsSync(envPath)) {
 }
 
 const parsed = dotenv.parse(fs.readFileSync(envPath));
-const required = [
-  'VITE_SUPABASE_URL',
-  'SUPABASE_SERVICE_ROLE_KEY',
-  'TELEGRAM_API_ID',
-  'TELEGRAM_API_HASH',
-];
-const missing = required.filter((k) => !parsed[k]?.trim());
+const missing = missingOrgEnvKeys(parsed);
 
 if (missing.length > 0) {
   console.error('ERROR: .env belum lengkap untuk installer:', missing.join(', '));

@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { electronBuilderArgs, resolveBuildTarget } from './lib/cross-platform-artifacts.mjs';
+import { hostMatchesTarget } from './lib/installer-bundle-manifest.mjs';
 import { npmBin, npxBin, runProcess } from './lib/run-process.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,17 +18,19 @@ const arg = process.argv[2];
 const target =
   arg && ['win', 'mac', 'linux'].includes(arg) ? arg : resolveBuildTarget(process.platform);
 
+process.env.BUILD_TARGET = target;
+
 console.log(`Build installer — target: ${target} (host: ${process.platform})`);
 
-if (target === 'mac' && process.platform !== 'darwin') {
-  console.warn(
-    'PERINGATAN: build Mac dari non-macOS biasanya gagal. Gunakan runner macOS / GitHub Actions.',
-  );
-}
-if (target === 'linux' && process.platform !== 'linux') {
-  console.warn(
-    'PERINGATAN: build Linux dari Windows/Mac sering gagal untuk sidecar/Chrome. Gunakan runner Linux.',
-  );
+if (!hostMatchesTarget(target)) {
+  const msg =
+    `Build target "${target}" harus di runner OS yang sama (host: ${process.platform}). ` +
+    'Gunakan GitHub Actions matrix: build-win / build-mac / build-linux.';
+  if (process.env.CI === 'true') {
+    console.error(`ERROR: ${msg}`);
+    process.exit(1);
+  }
+  console.warn(`PERINGATAN: ${msg}`);
 }
 
 runProcess('Chrome untuk WhatsApp (Puppeteer)', process.execPath, [
@@ -49,19 +52,30 @@ if (!fs.existsSync(envFile)) {
 fs.copyFileSync(envFile, orgDefault);
 console.log('OK: org-default.env dari .env');
 
+const validateArgs = [target];
+
 if (process.env.CI === 'true') {
   runProcess('Validasi CI (typecheck)', npmBin(), ['run', 'typecheck'], { cwd: root });
+  runProcess('Validasi runtime installer (QR, 3k grup, ticket)', process.execPath, [
+    path.join(root, 'scripts', 'validate-installer-runtime.mjs'),
+  ], { cwd: root });
   runProcess('Validasi paket installer', process.execPath, [
     path.join(root, 'scripts', 'validate-installer-package.mjs'),
+    ...validateArgs,
   ], { cwd: root });
 } else {
   runProcess('Validasi pre-release (desktop + typecheck)', npmBin(), ['run', 'validate:pre-release'], {
     cwd: root,
   });
+  runProcess('Validasi paket installer (target)', process.execPath, [
+    path.join(root, 'scripts', 'validate-installer-package.mjs'),
+    ...validateArgs,
+  ], { cwd: root });
 }
 
 runProcess('Validasi Chrome bundel', process.execPath, [
   path.join(root, 'scripts', 'validate-puppeteer-chrome.mjs'),
+  ...validateArgs,
 ], { cwd: root });
 runProcess('Vite production build', npxBin(), ['vite', 'build'], { cwd: root });
 
@@ -70,5 +84,11 @@ runProcess(`Electron builder (${ebFlags.join(' ')})`, npxBin(), ['electron-build
   cwd: root,
 });
 
+runProcess('Validasi artefak release (bundel di installer)', process.execPath, [
+  path.join(root, 'scripts', 'validate-release-artifact.mjs'),
+  ...validateArgs,
+], { cwd: root });
+
 console.log('\nSelesai. Installer: release/');
-console.log('Tim internal: install sekali, login saja. Update berikutnya otomatis (Restart).');
+console.log('User client: jalankan installer sekali — Chrome, Telegram, Supabase, WA/TG sudah terbundel.');
+console.log('Tim internal: login saja; update berikutnya otomatis (Restart).');

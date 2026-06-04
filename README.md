@@ -64,7 +64,7 @@ npm run build:installer
 
 Output: `release\Resource Management Setup ….exe`
 
-Panduan: **[INSTALL-WINDOWS.md](./INSTALL-WINDOWS.md)** · Rilis/update: `npm run publish:github`
+Panduan: **[INSTALL-WINDOWS.md](./INSTALL-WINDOWS.md)** · **[Bundel installer (Win/Mac/Linux)](./docs/INSTALLER-BUNDLE.md)** · Rilis/update: `npm run publish:github`
 
 Ringkas: tim internal install `.exe` sekali → login → SYNC WA/TG. Config terbundel; update kode via auto-update (Restart).
 

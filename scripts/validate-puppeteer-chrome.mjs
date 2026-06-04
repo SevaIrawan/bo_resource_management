@@ -1,35 +1,43 @@
 /**
  * Audit: Chrome Puppeteer untuk WhatsApp harus ada sebelum build installer.
- * Meniru resolve path di electron/main/platformLogin/waPuppeteerChrome.ts
+ * Usage: node scripts/validate-puppeteer-chrome.mjs [win|mac|linux]
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { findChromeBinaryUnder } from './lib/cross-platform-artifacts.mjs';
+import { parseBuildTargetArg, platformForBuildTarget } from './lib/installer-bundle-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-import { CHROME_BINARY, findChromeBinaryUnder } from './lib/cross-platform-artifacts.mjs';
+const target = parseBuildTargetArg(process.argv[2]);
+const platform = platformForBuildTarget(target);
 
 const cacheChromeRoot = path.join(root, 'resources', 'puppeteer-cache', 'chrome');
-const packagedChromeRoot = path.join(root, 'resources', 'puppeteer-cache', 'chrome');
 const extraResourcesTarget = 'puppeteer-chrome/chrome';
 
-const devExe = findChromeBinaryUnder(cacheChromeRoot);
+const devExe = findChromeBinaryUnder(cacheChromeRoot, 0, platform);
 const errors = [];
 
 if (!devExe) {
   errors.push(
-    `${CHROME_BINARY} tidak ditemukan di ${cacheChromeRoot}\n` +
-      '  Jalankan: npm run build:chrome',
+    `Chrome tidak ditemukan di ${cacheChromeRoot} untuk platform ${platform}\n` +
+      '  Jalankan: npm run build:chrome (di runner OS yang sama dengan target installer)',
   );
-} else {
+} else if (platform === 'win32') {
   const chromeWinDir = path.dirname(devExe);
   const siblings = fs.readdirSync(chromeWinDir);
   const hasSupportFiles = siblings.some((n) => n.endsWith('.dll') || n === 'locales');
-  if (process.platform === 'win32' && !hasSupportFiles) {
+  if (!hasSupportFiles) {
     errors.push(
-      `Folder Chrome tidak lengkap (hanya chrome.exe?): ${chromeWinDir}\n` +
+      `Folder Chrome Windows tidak lengkap: ${chromeWinDir}\n` +
         '  Puppeteer butuh seluruh folder chrome-win64, bukan satu file saja.',
     );
+  }
+} else if (platform === 'linux') {
+  try {
+    fs.accessSync(devExe, fs.constants.X_OK);
+  } catch {
+    errors.push(`Chrome Linux tidak executable: ${devExe}`);
   }
 }
 
@@ -55,12 +63,12 @@ if (!waTs.includes('executablePath:')) {
 }
 
 if (errors.length) {
-  console.error('[validate-puppeteer-chrome] GAGAL\n');
+  console.error(`[validate-puppeteer-chrome] GAGAL — target ${target}\n`);
   for (const e of errors) console.error(`- ${e}\n`);
   process.exit(1);
 }
 
-console.log('[validate-puppeteer-chrome] OK');
+console.log(`[validate-puppeteer-chrome] OK — target ${target}`);
 console.log(`  dev/cache: ${devExe}`);
 console.log(`  extraResources: ${extra.from} -> ${extra.to}`);
-console.log(`  packaged runtime: %resources%/${extraResourcesTarget}/.../${CHROME_BINARY}`);
+console.log(`  packaged runtime: %resources%/${extraResourcesTarget}/...`);

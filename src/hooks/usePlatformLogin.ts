@@ -106,7 +106,7 @@ export function usePlatformLogin(
         setStatus('error');
         setError(
           t('groupMonitoring.sync.qrAppearTimeout') ??
-            'QR code did not appear within 10 seconds. Close this window, wait a few seconds, then tap Sync again.',
+            'QR is still loading. Wait up to 2 minutes, or close and tap Sync again.',
         );
       }, WA_QR_MUST_APPEAR_MS);
     },

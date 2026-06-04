@@ -103,21 +103,13 @@
       "target": [
         "nsis"
       ],
-      "sign": null,
       "signAndEditExecutable": false,
-      "verifyUpdateCodeSignature": false,
       "extraResources": [
         {
           "from": "resources/sidecar/rm-telegram-sidecar.exe",
           "to": "sidecar/rm-telegram-sidecar.exe"
         }
       ]
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "SevaIrawan",
-      "repo": "bo_resource_management",
-      "releaseType": "release"
     },
     "mac": {
       "target": [

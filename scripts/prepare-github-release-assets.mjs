@@ -26,4 +26,11 @@ const sync = spawnSync(process.execPath, [path.join(root, 'scripts', 'sync-relea
 });
 if (sync.status !== 0) process.exit(sync.status ?? 1);
 
+const validate = spawnSync(
+  process.execPath,
+  [path.join(root, 'scripts', 'validate-release-upload.mjs'), releaseDir],
+  { stdio: 'inherit' },
+);
+if (validate.status !== 0) process.exit(validate.status ?? 1);
+
 console.log('\nSiap upload GitHub.');

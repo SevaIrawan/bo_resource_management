@@ -1,9 +1,17 @@
 name: Release multi-platform
 
-# Push main → build + publish. Artefak disiapkan agar auto-update client lama (1.0.4+) jalan tanpa install manual.
+# Otomatis HANYA saat version di package.json berubah. Wajib secret ORG_ENV_FILE.
+# Lihat docs/RELEASE-CI.md
 on:
   push:
     branches: [main]
+    paths:
+      - 'package.json'
+      - '.github/workflows/release-multiplatform.yml'
+      - 'scripts/**'
+      - 'electron/**'
+      - 'src/**'
+      - 'resources/**'
   workflow_dispatch:
     inputs:
       force:
@@ -23,24 +31,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Perlu rilis baru?
+      - name: Gate rilis
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HAS_ORG_ENV: ${{ secrets.ORG_ENV_FILE != '' }}
         run: |
+          set -e
           VERSION=$(node -p "require('./package.json').version")
           TAG="v$VERSION"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
+
+          if [ "$HAS_ORG_ENV" != "true" ]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::ORG_ENV_FILE tidak terbaca di gate (fork PR?). Cek secret di Settings → Actions."
             exit 0
           fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Force rebuild $TAG"
+            exit 0
+          fi
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "should_release=false" >> "$GITHUB_OUTPUT"
             echo "Release $TAG sudah ada — skip."
           else
             echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "Akan build + publish $TAG"
+            echo "Will build and publish $TAG"
           fi
 
   build-win:
@@ -65,12 +84,15 @@ jobs:
       - name: Prepare winCodeSign cache (electron-builder #8149)
         shell: pwsh
         run: ./scripts/prepare-win-codesign-cache.ps1
-      - name: Write org .env from secret
+      - name: Write org .env (wajib)
         shell: bash
         env:
           ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
         run: |
-          if [ -z "$ORG_ENV_FILE" ]; then exit 0; fi
+          if [ -z "$ORG_ENV_FILE" ]; then
+            echo "::error::ORG_ENV_FILE secret kosong"
+            exit 1
+          fi
           echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
           node scripts/validate-org-env.mjs
       - run: npm run build:installer:win
@@ -99,14 +121,16 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
-      - name: Write org .env from secret
+      - name: Write org .env (wajib)
         env:
           ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
         run: |
-          if [ -n "$ORG_ENV_FILE" ]; then
-            echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
-            node scripts/validate-org-env.mjs
+          if [ -z "$ORG_ENV_FILE" ]; then
+            echo "::error::ORG_ENV_FILE secret kosong"
+            exit 1
           fi
+          echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
+          node scripts/validate-org-env.mjs
       - run: npm run build:installer:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -138,14 +162,16 @@ jobs:
           python-version: '3.12'
       - run: sudo apt-get update && sudo apt-get install -y libfuse2 fuse libgtk-3-0 libnss3
       - run: npm ci
-      - name: Write org .env from secret
+      - name: Write org .env (wajib)
         env:
           ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
         run: |
-          if [ -n "$ORG_ENV_FILE" ]; then
-            echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
-            node scripts/validate-org-env.mjs
+          if [ -z "$ORG_ENV_FILE" ]; then
+            echo "::error::ORG_ENV_FILE secret kosong"
+            exit 1
           fi
+          echo "$ORG_ENV_FILE" | tr -d '\n\r ' | base64 -d > .env
+          node scripts/validate-org-env.mjs
       - run: npm run build:installer:linux
       - uses: actions/upload-artifact@v4
         with:
@@ -163,7 +189,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Merge & siapkan auto-update
+      - name: Merge & validasi upload
         run: |
           set -e
           mkdir -p release
@@ -171,6 +197,7 @@ jobs:
             [ -d "$dir" ] && cp -v "$dir"/* release/ 2>/dev/null || true
           done
           node scripts/prepare-github-release-assets.mjs release
+          node scripts/validate-release-upload.mjs release
           ls -la release/
       - uses: softprops/action-gh-release@v2
         with:

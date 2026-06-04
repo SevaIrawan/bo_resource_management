@@ -1,6 +1,6 @@
 # Install Resource Management (macOS) — Tim Internal
 
-Dokumen lengkap: **[PROJECT.md](./PROJECT.md)**
+Dokumen lengkap: **[PROJECT.md](./PROJECT.md)** · Panduan client: **[docs/CLIENT-INSTALL.md](./docs/CLIENT-INSTALL.md)** · CI/rilis IT: **[docs/RELEASE-CI.md](./docs/RELEASE-CI.md)**
 
 ---
 

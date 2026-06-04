@@ -98,7 +98,16 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
   });
 
   autoUpdater.on('update-available', (info) => {
-    console.info('[auto-update] update available:', info.version);
+    const files = (info as { files?: Array<{ url?: string }> }).files ?? [];
+    const urls = files.map((f) => f.url ?? '').join(' ');
+    if (process.platform === 'darwin' && /\.exe/i.test(urls)) {
+      const msg =
+        'Update Mac salah arah (metadata rilis). Install dari .dmg di GitHub Releases atau tunggu IT jalankan Fix release yml.';
+      console.error('[auto-update]', msg, urls);
+      broadcastUpdateStatus({ status: 'error', version: info.version, errorMessage: msg });
+      return;
+    }
+    console.info('[auto-update] update available:', info.version, urls);
     broadcastUpdateStatus({ status: 'available', version: info.version });
   });
 

@@ -1,0 +1,41 @@
+name: Fix release yml (hotfix)
+
+# Perbaiki latest*.yml di release yang sudah ada — nama file salah → Mac unduh .exe.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag (contoh v1.0.6)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  fix-yml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release
+          gh release download "${{ inputs.tag }}" -D release
+          ls -la release/
+
+      - name: Sync latest.yml ke nama file sebenarnya
+        run: node scripts/sync-release-yml.mjs release
+
+      - name: Upload yml yang sudah diperbaiki
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ inputs.tag }}" \
+            release/latest.yml \
+            release/latest-mac.yml \
+            release/latest-linux.yml \
+            --clobber
+          echo "Selesai. Mac auto-update tidak akan mengarah ke URL .exe yang salah."

@@ -19,9 +19,10 @@ Dokumen lengkap: **[PROJECT.md](./PROJECT.md)**
 
 1. Buka: **https://github.com/SevaIrawan/bo_resource_management/releases**
 2. Pilih release terbaru (mis. **v1.0.6** atau **v1.0.8** setelah CI hijau)
-3. Unduh **hanya** file yang berakhiran **`arm64.dmg`**  
-   Contoh: `Resource Management-1.0.6-arm64.dmg`
-4. **Jangan** unduh `.exe`, `latest.yml`, atau source code zip
+3. Unduh **hanya** file **`arm64.dmg`** — nama persis di halaman Releases, contoh v1.0.6:  
+   **`Resource.Management-1.0.6-arm64.dmg`** (pakai **titik**, bukan strip `Resource-Management-…`)
+4. **Jangan** pakai tombol **Check for app updates** di app versi lama (bisa unduh file `.exe` Windows salah). Pasang dari DMG dulu.
+5. **Jangan** unduh `.exe`, `latest.yml`, atau source code zip
 
 ---
 
@@ -70,7 +71,8 @@ Output: `release/Resource Management-x.x.x-arm64.dmg` + `release/*.zip` (untuk a
 
 | Gejala | Penyebab | Solusi |
 |--------|----------|--------|
-| File .exe tidak buka | File Windows | Unduh **.dmg** dari GitHub |
+| File .exe muncul / tidak buka | App update salah metadata atau file Windows | Pasang dari **.dmg** di Mac; jangan pakai update in-app sampai IT fix yml |
+| File .exe tidak buka | File Windows dikirim ke Mac | Unduh **.dmg** dari GitHub **di Mac** |
 | "App is damaged" | Unsigned build | Klik kanan → Open, atau `xattr -cr` |
 | DMG tidak mount | Download corrupt | Unduh ulang .dmg |
 | Auto-update macet | Rilis lama | Tunggu v1.0.8+ / Repair workflow |

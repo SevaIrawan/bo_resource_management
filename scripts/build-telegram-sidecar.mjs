@@ -8,6 +8,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { sidecarBinaryName, sidecarResourcePath } from './lib/cross-platform-artifacts.mjs';
+import { cleanSidecarBuildDirs } from './lib/clean-installer-pack-artifacts.mjs';
 import { runProcess } from './lib/run-process.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -115,3 +116,5 @@ if (process.platform !== 'win32') {
 }
 
 console.log(`OK: ${destPath}`);
+
+cleanSidecarBuildDirs(root);

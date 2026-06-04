@@ -1,6 +1,5 @@
 /**
- * Post-build: pastikan artefak di release/ berisi semua bundel runtime (PC user klik install saja).
- * Usage: node scripts/validate-release-artifact.mjs [win|mac|linux]
+ * Post-build: pastikan artefak di release/ untuk target win|mac|linux (versi package.json).
  */
 import fs from 'fs';
 import path from 'path';
@@ -24,15 +23,43 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = parseBuildTargetArg(process.argv[2]);
 const platform = platformForBuildTarget(target);
 const sidecarName = sidecarBinaryName(platform);
+const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+const releaseDir = path.join(root, 'release');
 
-const { unpacked, patterns, excludeUnpacked } = expectedInstallerArtifacts(root, target);
+const { unpacked, excludeUnpacked } = expectedInstallerArtifacts(root, target);
 const resourcesDir = packagedResourcesDir(root, target);
 
 const errors = [];
 
-const installers = findReleaseFiles(path.join(root, 'release'), patterns);
-if (installers.length === 0) {
-  errors.push(`Tidak ada installer ${patterns.join('/')} di release/`);
+function releaseFiles() {
+  if (!fs.existsSync(releaseDir)) return [];
+  return fs.readdirSync(releaseDir).filter((n) => fs.statSync(path.join(releaseDir, n)).isFile());
+}
+
+function pickVersioned(nameTest) {
+  const hits = releaseFiles().filter((n) => nameTest(n) && n.includes(version));
+  return hits.length ? hits : releaseFiles().filter(nameTest);
+}
+
+if (target === 'win') {
+  const exes = pickVersioned((n) => /\.exe$/i.test(n) && /Setup/i.test(n));
+  if (exes.length === 0) {
+    errors.push(`Tidak ada Windows Setup .exe versi ${version} di release/`);
+  }
+} else if (target === 'mac') {
+  const dmgs = pickVersioned((n) => /\.dmg$/i.test(n));
+  const zips = pickVersioned((n) => /\.zip$/i.test(n) && /arm64/i.test(n));
+  if (dmgs.length === 0) {
+    errors.push(`Tidak ada .dmg Mac versi ${version} di release/`);
+  }
+  if (zips.length === 0) {
+    errors.push(`Tidak ada .zip arm64 Mac versi ${version} di release/ (wajib auto-update)`);
+  }
+} else if (target === 'linux') {
+  const images = pickVersioned((n) => /\.AppImage$/i.test(n));
+  if (images.length === 0) {
+    errors.push(`Tidak ada .AppImage Linux versi ${version} di release/`);
+  }
 }
 
 if (!excludeUnpacked && !fs.existsSync(unpacked)) {
@@ -94,13 +121,23 @@ if (target === 'mac' && !findMacUnpackedDir(root)) {
 }
 
 if (errors.length) {
-  console.error(`[validate-release-artifact] GAGAL — target ${target}\n`);
+  console.error(`[validate-release-artifact] GAGAL — target ${target} v${version}\n`);
   for (const e of errors) console.error(`  - ${e}`);
   process.exit(1);
 }
 
-console.log(`[validate-release-artifact] OK — target ${target}`);
-console.log(`  installer: ${installers.map((p) => path.basename(p)).join(', ')}`);
+const listed =
+  target === 'win'
+    ? pickVersioned((n) => /\.exe$/i.test(n) && /Setup/i.test(n))
+    : target === 'mac'
+      ? [
+          ...pickVersioned((n) => /\.dmg$/i.test(n)),
+          ...pickVersioned((n) => /\.zip$/i.test(n)),
+        ]
+      : pickVersioned((n) => /\.AppImage$/i.test(n));
+
+console.log(`[validate-release-artifact] OK — target ${target} v${version}`);
+console.log(`  installer: ${listed.join(', ')}`);
 console.log(`  resources: ${resourcesDir}`);
 console.log(`  sidecar: ${sidecarName}`);
 console.log('  bundel: Chrome, Telegram sidecar, org env, whatsapp-web.js, puppeteer');

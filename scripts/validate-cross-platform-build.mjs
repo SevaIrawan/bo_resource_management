@@ -9,6 +9,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const pkg = JSON.parse(read('package.json'));
+const crossArtifacts = read('scripts/lib/cross-platform-artifacts.mjs');
 const sidecarTs = read('electron/main/platformLogin/telegramSidecar.ts');
 const build = pkg.build ?? {};
 const extra = build.extraResources ?? [];
@@ -99,6 +100,27 @@ const checks = [
   {
     name: 'extraResources shared: org-default.env',
     ok: (build.extraResources ?? []).some((e) => String(e.to).includes('org-default.env')),
+  },
+  {
+    name: 'package.json files: exclude sidecar-build/dist',
+    ok:
+      (build.files ?? []).some((f) => String(f).includes('!resources/sidecar-build')) &&
+      (build.files ?? []).some((f) => String(f).includes('!resources/sidecar-dist')),
+  },
+  {
+    name: 'build-installer: bersihkan sidecar-build sebelum pack',
+    ok: read('scripts/build-installer.mjs').includes('cleanSidecarBuildDirs'),
+  },
+  {
+    name: 'electronBuilderArgs tanpa --config publish.json',
+    ok: (() => {
+      const fn = crossArtifacts.match(/export function electronBuilderArgs[\s\S]*?^}/m);
+      return Boolean(fn && !fn[0].includes("'--config'") && !fn[0].includes('"--config"'));
+    })(),
+  },
+  {
+    name: 'directories.output = release',
+    ok: build.directories?.output === 'release',
   },
 ];
 

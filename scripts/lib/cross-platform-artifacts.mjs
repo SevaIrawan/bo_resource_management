@@ -50,10 +50,10 @@ export function electronBuilderArgs(target) {
     target === 'win' ? ['--win'] : target === 'mac' ? ['--mac'] : target === 'linux' ? ['--linux'] : null;
   if (!args) throw new Error(`Unknown build target: ${target}`);
 
-  // Embed app-update.yml (config publish) tanpa upload — upload lewat CI / publish-release.mjs.
-  const publishConfig = path.join(process.cwd(), 'electron-builder.publish.json');
-  const configFlag = fs.existsSync(publishConfig) ? ['--config', publishConfig] : [];
-  return [...args, ...configFlag, '--publish', 'never'];
+  // Jangan pakai --config electron-builder.publish.json di sini — file itu hanya berisi
+  // `publish` dan membuat electron-builder mengabaikan package.json (output ke dist/, target salah).
+  // Publish GitHub: scripts/publish-release.mjs. Feed URL: electron/main/autoUpdate.ts.
+  return [...args, '--publish', 'never'];
 }
 
 /** @param {NodeJS.Platform | string} [platform] */

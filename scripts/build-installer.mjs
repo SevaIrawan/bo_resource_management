@@ -1,9 +1,15 @@
 /**
  * Build installer lengkap (Chrome + sidecar + org env + validate + electron-builder).
+ * Win / Mac / Linux — harus di runner OS yang sama (CI: matrix build-win / build-mac / build-linux).
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  cleanOldReleaseInstallers,
+  cleanSidecarBuildDirs,
+  cleanStaleNsisArtifacts,
+} from './lib/clean-installer-pack-artifacts.mjs';
 import { electronBuilderArgs, resolveBuildTarget } from './lib/cross-platform-artifacts.mjs';
 import { hostMatchesTarget } from './lib/installer-bundle-manifest.mjs';
 import { runProcess, runNpm, runProjectTool } from './lib/run-process.mjs';
@@ -41,7 +47,9 @@ runProcess('Validasi .env organisasi', process.execPath, [
 const envFile = path.join(root, '.env');
 const orgDefault = path.join(root, 'resources', 'org-default.env');
 if (!fs.existsSync(envFile)) {
-  console.error('ERROR: .env tidak ada. Build dibatalkan.');
+  console.error('ERROR: .env tidak ada di root project.');
+  console.error('Wajib 4 kunci: VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TELEGRAM_API_ID, TELEGRAM_API_HASH');
+  console.error('(Disalin ke org-default.env di installer — user akhir tidak isi manual.)');
   process.exit(1);
 }
 fs.copyFileSync(envFile, orgDefault);
@@ -71,6 +79,15 @@ runProcess('Validasi Chrome bundel', process.execPath, [
   ...validateArgs,
 ], { cwd: root });
 runProjectTool(root, 'Vite production build', 'vite/bin/vite.js', ['build']);
+
+const pkgVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+cleanSidecarBuildDirs(root);
+cleanStaleNsisArtifacts(root);
+cleanOldReleaseInstallers(root, pkgVersion);
+
+runProcess('Validasi konfigurasi electron-builder', process.execPath, [
+  path.join(root, 'scripts', 'validate-installer-electron-config.mjs'),
+], { cwd: root });
 
 if (target === 'win' && process.platform === 'win32') {
   runProcess('Prepare winCodeSign cache (Windows)', 'powershell', [

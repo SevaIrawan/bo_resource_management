@@ -6,10 +6,10 @@
 
 Kegagalan **v1.0.8** bukan karena secret hilang, melainkan:
 
-1. **Regresi `publish` di `package.json`** — v1.0.6 **tidak** punya blok ini; CI + `electron-builder` bisa minta `GH_TOKEN` → Win/Mac/Linux gagal di `build:installer`. Publish hanya lewat `electron-builder.publish.json` + `npm run publish:github`.
-2. **Windows:** `prepare-win-codesign-cache.ps1` salah folder (isi `winCodeSign/` harus langsung di `winCodeSign-2.6.0/`, bukan root zip).
-3. **Metadata rilis:** `latest*.yml` nama file strip vs titik (`Resource.Management.…`) + Mac butuh `.zip` untuk auto-update.
-4. **Workflow:** push `main` berulang memicu build **v1.0.8** sebelum perbaikan selesai → run merah beruntun (bukan IP/VPN).
+1. **`--config electron-builder.publish.json` di `build:installer`** — file itu hanya blok `publish`; electron-builder **mengabaikan** `package.json` → output ke `dist/` (bukan `release/`), Linux ikut snap, validator gagal. Perbaikan: `scripts/lib/cross-platform-artifacts.mjs` tanpa `--config`; publish hanya `scripts/publish-release.mjs`.
+2. **`resources/sidecar-build/` (venv PyInstaller)** — symlink `bin/python` ke Python sistem → Mac error `Cannot copy file ... outside the package`. Perbaikan: hapus folder sebelum pack + exclude di `package.json` `build.files`.
+3. **Windows:** `prepare-win-codesign-cache.ps1` — extract `7za -xr!darwin` (hindari symlink macOS di cache).
+4. **Metadata rilis:** `latest*.yml` nama strip vs titik; Mac butuh `.zip` untuk auto-update (`sync-release-yml.mjs` di job publish).
 
 ---
 
@@ -45,7 +45,16 @@ Kunci wajib di `.env`: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGR
    - `latest.yml`, `latest-mac.yml`, `latest-linux.yml`
 5. **Hotfix metadata rilis lama** (mis. v1.0.6): **Actions → Fix release yml** → tag `v1.0.6` → Run.
 
-**Jangan** push berkali-kali kalau CI belum hijau — perbaiki secret / log error dulu.
+**Jangan** push berkali-kali kalau CI belum hijau.
+
+**Satu push saja** setelah di PC build lokal sukses:
+
+```powershell
+npm run validate:installer-pipeline
+npm run build:installer:win
+```
+
+Kalau release `v1.0.8` sudah ada di GitHub tapi gagal, workflow **skip** otomatis — pakai **Actions → Release multi-platform → Run workflow → centang Force rebuild**, bukan push ulang berkali-kali.
 
 ---
 

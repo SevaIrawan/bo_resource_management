@@ -95,9 +95,11 @@ npm run build:installer:linux
 # atau: bash scripts/build-installer.sh mac
 ```
 
-Output Windows: `release\Resource Management Setup 1.0.8.exe`  
-Output macOS: `release/Resource Management-x.x.x.dmg`  
-Output Linux: `release/Resource Management-x.x.x.AppImage` (+ `.deb`)
+Output Windows: `release/Resource Management Setup x.y.z.exe`  
+Output macOS: `release/*.dmg` + `release/*-arm64.zip` (zip = auto-update)  
+Output Linux: `release/*.AppImage`  
+
+CI: workflow **Release multi-platform** — job `build-win`, `build-mac`, `build-linux` → publish gabung ketiga artefak.
 
 Rencana lengkap: [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md)
 

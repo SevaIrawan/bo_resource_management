@@ -36,3 +36,6 @@ if (-not (Test-Path $built)) {
 
 Copy-Item -Force $built (Join-Path $outDir $exeName)
 Write-Host "OK: $outDir\$exeName" -ForegroundColor Green
+
+Remove-Item -Recurse -Force $distPath, $workPath -ErrorAction SilentlyContinue
+Write-Host "OK: bersihkan resources/sidecar-build dan sidecar-dist" -ForegroundColor Green

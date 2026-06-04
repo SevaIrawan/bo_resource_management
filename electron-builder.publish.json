@@ -1,4 +1,5 @@
 {
+  "extends": "./package.json",
   "publish": {
     "provider": "github",
     "owner": "SevaIrawan",

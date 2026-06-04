@@ -34,6 +34,11 @@ if (!fs.existsSync(publishConfig)) {
   console.error(`ERROR: ${publishConfig} tidak ada.`);
   process.exit(1);
 }
+const publishCfg = JSON.parse(fs.readFileSync(publishConfig, 'utf8'));
+if (!publishCfg.extends || !String(publishCfg.extends).includes('package.json')) {
+  console.error('ERROR: electron-builder.publish.json wajib "extends": "./package.json"');
+  process.exit(1);
+}
 
 console.log(`==> Validasi pre-release v${version}`);
 runNpm(root, 'Validasi pre-release', ['run', 'validate:pre-release']);

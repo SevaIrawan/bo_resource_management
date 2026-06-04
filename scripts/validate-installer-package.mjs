@@ -111,6 +111,16 @@ const checks = [
     ok: files.some((f) => f.includes('dist-electron')),
   },
   {
+    name: 'build.files exclude sidecar-build/dist (Mac asar)',
+    ok:
+      files.some((f) => String(f).includes('!resources/sidecar-build')) &&
+      files.some((f) => String(f).includes('!resources/sidecar-dist')),
+  },
+  {
+    name: 'build.directories.output = release',
+    ok: build.directories?.output === 'release',
+  },
+  {
     name: 'Dependencies runtime: whatsapp-web.js, puppeteer, supabase',
     ok:
       Boolean(pkg.dependencies?.['whatsapp-web.js']) &&

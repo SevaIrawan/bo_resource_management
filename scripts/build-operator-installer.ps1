@@ -32,4 +32,6 @@ Write-Host "OK v$version" -ForegroundColor Green
 Write-Host "Copy ke PC operator:" -ForegroundColor Cyan
 Write-Host "  $dest"
 Write-Host ""
-Write-Host "Operator: install .exe ini (bukan versi lama). GitHub/auto-update opsional." -ForegroundColor Yellow
+Write-Host "HANYA untuk PC Windows — JANGAN kirim .exe ke user Mac (tidak bisa dibuka)." -ForegroundColor Red
+Write-Host "Mac (M1/M2/M3): unduh .dmg dari GitHub Releases — lihat INSTALL-MACOS.md" -ForegroundColor Yellow
+Write-Host "Operator Windows: install .exe ini. Update via auto-update atau Release GitHub." -ForegroundColor Yellow

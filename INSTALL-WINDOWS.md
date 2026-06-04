@@ -14,7 +14,9 @@ npm install
 npm run build:installer
 ```
 
-Output: `release\Resource Management Setup x.x.x.exe` — **hanya file ini** yang dibagikan ke tim.
+Output: `release\Resource Management Setup x.x.x.exe` — **hanya file ini** yang dibagikan ke tim **Windows**.
+
+**Mac** pakai `.dmg` dari GitHub Releases — lihat **[INSTALL-MACOS.md](./INSTALL-MACOS.md)**. Jangan kirim `.exe` ke Mac.
 
 **Update kode (layout/logic/fix) ke semua PC:**
 

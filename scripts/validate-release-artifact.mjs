@@ -12,7 +12,7 @@ import {
 } from './lib/cross-platform-artifacts.mjs';
 import {
   expectedInstallerArtifacts,
-  findMacResourcesDir,
+  findMacUnpackedDir,
   findReleaseFiles,
   packagedResourcesDir,
   parseBuildTargetArg,
@@ -87,8 +87,10 @@ if (!resourcesDir || !fs.existsSync(resourcesDir)) {
   }
 }
 
-if (target === 'mac' && !findMacResourcesDir(root)) {
-  errors.push('Resource Management.app tidak ditemukan di release/mac/');
+if (target === 'mac' && !findMacUnpackedDir(root)) {
+  errors.push(
+    'Resource Management.app tidak ditemukan di release/mac-arm64, mac-x64, atau mac/',
+  );
 }
 
 if (errors.length) {

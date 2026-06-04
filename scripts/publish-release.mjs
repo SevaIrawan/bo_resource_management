@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { runNpm, runProjectTool } from './lib/run-process.mjs';
+import { resolvePrepackagedDir } from './lib/installer-bundle-manifest.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = process.argv[2];
@@ -22,13 +23,7 @@ if (!target || !['win', 'mac', 'linux'].includes(target)) {
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const version = pkg.version;
 
-const unpackedDirs = {
-  win: path.join(root, 'release', 'win-unpacked'),
-  mac: path.join(root, 'release', 'mac'),
-  linux: path.join(root, 'release', 'linux-unpacked'),
-};
-
-const unpacked = unpackedDirs[target];
+const unpacked = resolvePrepackagedDir(root, target);
 if (!fs.existsSync(unpacked)) {
   console.error(`ERROR: ${unpacked} tidak ada. Jalankan npm run build:installer:${target} dulu.`);
   process.exit(1);

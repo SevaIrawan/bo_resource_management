@@ -106,6 +106,8 @@ jobs:
             release/*.dmg.blockmap
             release/latest-mac.yml
             release/mac/**
+            release/mac-arm64/**
+            release/mac-x64/**
 
   build-linux:
     runs-on: ubuntu-latest

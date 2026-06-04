@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { electronBuilderArgs } from './lib/cross-platform-artifacts.mjs';
+import { npmBin, npxBin } from './lib/run-process.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = process.argv[2];
@@ -41,21 +41,36 @@ if (!fs.existsSync(unpacked)) {
   process.exit(1);
 }
 
+const publishConfig = path.join(root, 'electron-builder.publish.json');
+if (!fs.existsSync(publishConfig)) {
+  console.error(`ERROR: ${publishConfig} tidak ada.`);
+  process.exit(1);
+}
+
 console.log(`==> Validasi pre-release v${version}`);
-const validate = spawnSync('npm', ['run', 'validate:pre-release'], {
+const validate = spawnSync(npmBin(), ['run', 'validate:pre-release'], {
   cwd: root,
   stdio: 'inherit',
-  shell: process.platform === 'win32',
+  shell: false,
 });
 if (validate.status !== 0) process.exit(validate.status ?? 1);
 
-const ebFlags = [...electronBuilderArgs(target), '--publish', 'always', '--prepackaged', unpacked];
+const platformFlag = target === 'win' ? '--win' : target === 'mac' ? '--mac' : '--linux';
+const ebFlags = [
+  platformFlag,
+  '--config',
+  publishConfig,
+  '--publish',
+  'always',
+  '--prepackaged',
+  unpacked,
+];
 console.log(`==> Upload GitHub Releases (${ebFlags.join(' ')})`);
 
-const publish = spawnSync('npx', ['electron-builder', ...ebFlags], {
+const publish = spawnSync(npxBin(), ['electron-builder', ...ebFlags], {
   cwd: root,
   stdio: 'inherit',
-  shell: process.platform === 'win32',
+  shell: false,
 });
 if (publish.status !== 0) process.exit(publish.status ?? 1);
 

@@ -50,10 +50,8 @@ export function electronBuilderArgs(target) {
     target === 'win' ? ['--win'] : target === 'mac' ? ['--mac'] : target === 'linux' ? ['--linux'] : null;
   if (!args) throw new Error(`Unknown build target: ${target}`);
 
-  if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
-    return [...args, '--publish', 'never'];
-  }
-  return args;
+  // Installer build saja — jangan upload GitHub (butuh GH_TOKEN). Publish via publish-release.mjs.
+  return [...args, '--publish', 'never'];
 }
 
 /** @param {NodeJS.Platform | string} [platform] */

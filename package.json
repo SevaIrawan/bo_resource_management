@@ -38,6 +38,7 @@
     "validate:installer-runtime": "node scripts/validate-installer-runtime.mjs",
     "validate:release-artifact": "node scripts/validate-release-artifact.mjs",
     "validate:installer-bundle": "node scripts/validate-installer-package.mjs && node scripts/validate-puppeteer-chrome.mjs && node scripts/validate-installer-runtime.mjs",
+    "validate:full-build-audit": "node scripts/validate-full-build-audit.mjs",
     "validate:refresh-notification": "node scripts/validate-refresh-notification.mjs",
     "validate:brand-card-badges": "node scripts/validate-brand-card-badges.mjs",
     "validate:kpi-five-cards": "node scripts/validate-kpi-five-cards.mjs",

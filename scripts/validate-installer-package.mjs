@@ -12,11 +12,12 @@ import {
   sidecarResourcePath,
 } from './lib/cross-platform-artifacts.mjs';
 import { missingOrgEnvKeys } from './lib/org-env-required.mjs';
-import { parseBuildTargetArg, platformForBuildTarget } from './lib/installer-bundle-manifest.mjs';
+import { hostMatchesTarget, parseBuildTargetArg, platformForBuildTarget } from './lib/installer-bundle-manifest.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = parseBuildTargetArg(process.argv[2]);
 const platform = platformForBuildTarget(target);
+const onBuildHost = hostMatchesTarget(target);
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const pkg = JSON.parse(read('package.json'));
@@ -48,11 +49,15 @@ const nodeModulesChecks = ['whatsapp-web.js', 'puppeteer', '@supabase/supabase-j
 const checks = [
   {
     name: `[${target}] Chrome terbundel (resources/puppeteer-cache)`,
-    ok: Boolean(findChromeBinaryUnder(path.join(root, 'resources', 'puppeteer-cache'), 0, platform)),
+    ok: onBuildHost
+      ? Boolean(findChromeBinaryUnder(path.join(root, 'resources', 'puppeteer-cache'), 0, platform))
+      : true,
+    skip: onBuildHost ? undefined : `build di runner ${target} (host: ${process.platform})`,
   },
   {
     name: `[${target}] Sidecar Telegram (${sidecarName})`,
-    ok: fs.existsSync(sidecarPath),
+    ok: onBuildHost ? fs.existsSync(sidecarPath) : true,
+    skip: onBuildHost ? undefined : `build di runner ${target}`,
   },
   {
     name: 'env-template.env (repo)',
@@ -141,7 +146,8 @@ let failed = 0;
 console.log(`Installer package checks — build target: ${target} (platform ${platform})\n`);
 for (const c of checks) {
   const ok = c.ok;
-  console.log(`${ok ? 'OK' : 'FAIL'}  ${c.name}${c.detail && !ok ? ` (${c.detail})` : ''}`);
+  const skip = c.skip ? ` [SKIP: ${c.skip}]` : '';
+  console.log(`${ok ? 'OK' : 'FAIL'}  ${c.name}${skip}${c.detail && !ok ? ` (${c.detail})` : ''}`);
   if (!ok) failed += 1;
 }
 if (failed) {

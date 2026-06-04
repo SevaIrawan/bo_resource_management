@@ -32,7 +32,7 @@ export function AccountBrandCardList({
   const { user } = useAuth();
   const { t } = useLanguage();
   const { canManageStructure, canOperatePlatform } = usePermissions();
-  const { reloadTickets } = useGroupMonitoring();
+  const { refreshIssues } = useGroupMonitoring();
   const [modalOpen, setModalOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<AccountBrandGroup | null>(null);
   const [removeSaving, setRemoveSaving] = useState(false);
@@ -123,7 +123,7 @@ export function AccountBrandCardList({
 
       onGroupsChange((prev) => prev.filter((g) => g.id !== group.id));
       setRemoveTarget(null);
-      void reloadTickets();
+      void refreshIssues();
     } catch (error) {
       setRemoveError(getErrorMessage(error, t('groupMonitoring.removeBrandFailed')));
     } finally {

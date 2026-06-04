@@ -11,10 +11,6 @@ const TYPE_KEYS: Record<TicketType, { badge: string; export: string }> = {
     badge: 'groupMonitoring.ticketPanel.badgeNotAdmin',
     export: 'groupMonitoring.ticketPanel.types.notAdmin',
   },
-  group_count_mismatch: {
-    badge: 'groupMonitoring.ticketPanel.badgeCountMismatch',
-    export: 'groupMonitoring.ticketPanel.types.countMismatch',
-  },
   duplicate_group_id: {
     badge: 'groupMonitoring.ticketPanel.badgeDuplicateGroupId',
     export: 'groupMonitoring.ticketPanel.types.duplicateGroupId',

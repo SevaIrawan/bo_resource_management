@@ -84,6 +84,7 @@ export async function completeSyncAfterLiveSession(input: {
     brandStandard,
     assumeSessionValid: input.assumeSessionValid,
     quickDeviceCount: input.quickDeviceCount,
+    skipMergeDeviceGroups: input.quickDeviceCount,
   });
 
   let result = metrics.result;

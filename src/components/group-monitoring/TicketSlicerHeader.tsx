@@ -30,11 +30,10 @@ function SlicerSelect({ value, onChange, options }: FilterSelectProps) {
 
 const TICKET_TYPE_OPTIONS: TicketType[] = [
   'missing_group',
+  'daily_junk_group',
   'not_admin',
-  'group_count_mismatch',
   'duplicate_group_id',
   'duplicate_group_name',
-  'daily_junk_group',
 ];
 
 export function TicketSlicerHeader() {
@@ -174,7 +173,6 @@ function ticketTypeI18nKey(type: TicketType): string {
   const map: Record<TicketType, string> = {
     missing_group: 'missingGroup',
     not_admin: 'notAdmin',
-    group_count_mismatch: 'countMismatch',
     duplicate_group_id: 'duplicateGroupId',
     duplicate_group_name: 'duplicateGroupName',
     daily_junk_group: 'dailyJunk',

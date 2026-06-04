@@ -6,6 +6,8 @@ export interface DeviceGroupCountResult {
   valid: boolean;
   totalGroups: number;
   adminGroups: number;
+  /** Daftar group_id di device — dipakai sync daily agar issue ticket realtime. */
+  groupIds?: string[];
   message?: string;
 }
 

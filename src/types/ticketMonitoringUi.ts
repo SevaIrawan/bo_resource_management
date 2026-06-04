@@ -3,7 +3,6 @@ import type { Platform } from '@/types/database';
 export type TicketType =
   | 'missing_group'
   | 'not_admin'
-  | 'group_count_mismatch'
   | 'duplicate_group_id'
   | 'duplicate_group_name'
   | 'daily_junk_group';

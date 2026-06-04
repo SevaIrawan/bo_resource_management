@@ -8,9 +8,12 @@ function sessionColumnRoute(sessionStatus) {
 }
 
 const FLOW = {
-  invalid: { sync: ['login_modal_qr_phone'], run: ['login_modal_qr_phone'] },
+  invalid: {
+    sync: ['login_modal_qr_phone', 'close_login_modal', 'update_groups_admin'],
+    run: ['login_modal_qr_phone', 'close_login_modal', 'update_groups_admin'],
+  },
   valid: {
-    sync: ['check_device_session', 'detect_groups', 'scrape_prompt'],
+    sync: ['check_device_session', 'detect_groups_admin', 'scrape_prompt_or_resume_empty'],
     run: ['check_device_session', 'execute_scraper'],
   },
 };
@@ -45,8 +48,11 @@ const uiChecks = [
   ['INVALID+RUN skips device probe', true],
   ['VALID+SYNC requires device probe before metrics', true],
   ['VALID+RUN requires device probe before scrape', true],
+  ['VALID+RUN/SYNC: device dead → login meski grid valid', true],
   ['Login modal uses attemptRestore=false (fast QR)', true],
-  ['After login: persist → detect groups → scrape prompt', true],
+  ['After login: close login modal → update group+admin → prompt', true],
+  ['0 grup → resume-empty; else Now/Later', true],
+  ['WA login fail: auto QR; TG: error (no auto-loop)', true],
 ];
 
 console.log('\n--- Implementasi (cek manual di repo) ---');

@@ -15,10 +15,6 @@ import {
   fetchMasterGroupStats,
 } from '@/lib/accountSyncData';
 import { resolveBrandStandardTotal } from '@/lib/brandStandardCount';
-import {
-  reconcileTicketsAfterScrape,
-  reconcileTicketsForAccount,
-} from '@/lib/reconcileTickets';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
 import { ensurePlatformSessionInDatabase } from '@/lib/ensureWaSessionInDb';
@@ -52,6 +48,7 @@ import {
 } from '@/lib/accountPhone';
 import { scrapeFailureNeedsLoginModal } from '@/lib/scrapeErrorUi';
 import { loginSyncAfterTimeoutMs, manualSyncTimeoutMs } from '@/lib/deviceGroupScale';
+import { withNetworkRetry } from '@/lib/networkRetry';
 import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
@@ -81,7 +78,7 @@ interface SyncTarget {
 interface UseAccountSyncFlowOptions {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   userId?: string | null;
-  onTicketsReload?: () => void;
+  onTicketsReload?: (dbAccountId: string) => void | Promise<void>;
   /** false untuk non-admin — blok Sync/Run/login platform. */
   canOperatePlatform?: boolean;
 }
@@ -139,6 +136,7 @@ export function useAccountSyncFlow({
   const [loginModalEpoch, setLoginModalEpoch] = useState(0);
   /** UUID DB saat sync/scrape — jangan useState (urutan hook harus stabil). */
   const processingDbAccountIdRef = useRef<string | null>(null);
+  const [processingDbAccountId, setProcessingDbAccountId] = useState<string | null>(null);
   const [scrapeProgressBySession, setScrapeProgressBySession] = useState<
     Record<string, UiScrapeProgress>
   >({});
@@ -199,6 +197,7 @@ export function useAccountSyncFlow({
     setSyncMessage(null);
     setLoginIntent(null);
     setProcessingAccountId(null);
+    setProcessingDbAccountId(null);
     processingDbAccountIdRef.current = null;
     setProcessingAction(null);
   }, []);
@@ -217,6 +216,7 @@ export function useAccountSyncFlow({
   const clearRowProcessing = useCallback(
     (groupId: string, accountId: string) => {
       setProcessingAccountId(null);
+      setProcessingDbAccountId(null);
       processingDbAccountIdRef.current = null;
       setProcessingAction(null);
       updateGroups((groups) =>
@@ -373,9 +373,10 @@ export function useAccountSyncFlow({
           userId,
           account,
         });
+        setProcessingDbAccountId(dbAccountId);
         processingDbAccountIdRef.current = dbAccountId;
 
-        // SYNC — cabang 1: kolom Session INVALID → login (tanpa cek device).
+        // SYNC — INVALID: modal login (modal utama); sukses → tutup login → update group+admin → Now/Later.
         if (routeFromSessionColumn(account.sessionStatus) === 'open_login') {
           const hasStored = await hasStoredPlatformSession(dbAccountId, account.platform);
           const hasDaily = await fetchHasDailyData(
@@ -461,18 +462,20 @@ export function useAccountSyncFlow({
           return;
         }
 
-        // SYNC — cabang 2a: device valid → detect X+Y → update kolom → scrape prompt.
+        // SYNC — VALID: tanpa modal login → detect grup+admin → Now/Later atau resume-empty (0 grup).
         const brandStandard = master.brandMasterTotal;
-        const syncPayload = await withTimeout(
-          detectGroupsAndBuildSyncPayload({
-            userId,
-            account,
-            dbAccountId,
-            brandStandardHint: brandStandard,
-            quickDeviceCount: true,
-          }),
-          MANUAL_SYNC_TIMEOUT_MS,
-          'Manual sync',
+        const syncPayload = await withNetworkRetry('Manual sync', () =>
+          withTimeout(
+            detectGroupsAndBuildSyncPayload({
+              userId,
+              account,
+              dbAccountId,
+              brandStandardHint: brandStandard,
+              quickDeviceCount: true,
+            }),
+            MANUAL_SYNC_TIMEOUT_MS,
+            'Manual sync',
+          ),
         );
 
         const syncedAt = new Date().toISOString();
@@ -501,17 +504,6 @@ export function useAccountSyncFlow({
               .eq('id', dbAccountId)
               .maybeSingle()
           )?.data?.brand_id as string | undefined;
-        if (brandId) {
-          await reconcileTicketsForAccount({
-            accountId: dbAccountId,
-            brandId,
-            brandName: account.brandName,
-            platform: account.platform,
-            deviceY: syncPayload.result.groupsCurrent,
-          });
-          onTicketsReload?.();
-        }
-
         stopLoading();
 
         setTarget({
@@ -533,6 +525,10 @@ export function useAccountSyncFlow({
             hasDailyToday: syncPayload.hasDailyToday,
           }),
         );
+
+        if (brandId) {
+          void Promise.resolve(onTicketsReload?.(dbAccountId)).catch(() => undefined);
+        }
       } catch (error) {
         stopLoading();
         const code =
@@ -544,6 +540,7 @@ export function useAccountSyncFlow({
       applyResult,
       canOperatePlatform,
       clearRowProcessing,
+      onTicketsReload,
       setRowProcessing,
       showLoginModal,
       showSyncError,
@@ -585,8 +582,14 @@ export function useAccountSyncFlow({
     setRowProcessing(groupId, account.id, 'scraper');
     setCheckError(null);
 
+    let dbAccountId = '';
+    let scrapeSucceeded = false;
+
     try {
-      const { accountId: dbAccountId } = await resolveDbAccountForRow({ userId, account });
+      const resolved = await resolveDbAccountForRow({ userId, account });
+      dbAccountId = resolved.accountId;
+      setProcessingDbAccountId(dbAccountId);
+      processingDbAccountIdRef.current = dbAccountId;
       const deviceSessionId = await resolveDeviceSessionId({
         sessionId: account.id,
         platform: account.platform,
@@ -678,6 +681,7 @@ export function useAccountSyncFlow({
         deviceGroupCount: scrapeCounts.deviceGroupCount,
         deviceAdminCount: scrapeCounts.deviceAdminCount,
       });
+      scrapeSucceeded = true;
 
       const scrapedAt = new Date().toISOString();
       await applyResult(groupId, account.id, built, {
@@ -707,16 +711,6 @@ export function useAccountSyncFlow({
         );
       }
 
-      if (brandId) {
-        await reconcileTicketsAfterScrape({
-          accountId: dbAccountId,
-          platform: account.platform,
-          brandName: account.brandName,
-          deviceY: built.groupsCurrent,
-        });
-      }
-
-      onTicketsReload?.();
     } catch (error) {
       const message = getErrorMessage(error, 'SCRAPER_FAILED');
       clearRowProcessing(groupId, account.id);
@@ -745,6 +739,10 @@ export function useAccountSyncFlow({
       scrapeActiveAccountIdsRef.current.delete(account.id);
       clearScrapeProgress(account.id);
       clearRowProcessing(groupId, account.id);
+    }
+
+    if (scrapeSucceeded && dbAccountId) {
+      await onTicketsReload?.(dbAccountId);
     }
   }, [
     applyResult,
@@ -796,7 +794,7 @@ export function useAccountSyncFlow({
       try {
         const { accountId: dbAccountId } = await resolveDbAccountForRow({ userId, account });
 
-        // RUN — keputusan dari kolom Session di baris.
+        // RUN — INVALID → login; sukses → auto-scrape. VALID → probe device (gagal → login meski badge valid).
         if (routeFromSessionColumn(account.sessionStatus) === 'open_login') {
           const hasStored = await hasStoredPlatformSession(dbAccountId, account.platform);
           showLoginModal(
@@ -897,14 +895,16 @@ export function useAccountSyncFlow({
         setPostLoginGraceAccountId((current) => (current === account.id ? null : current));
       }, 120_000);
 
-      await withTimeout(
-        persistLoginSessionAfterSuccess({ userId, account }),
-        LOGIN_PERSIST_TIMEOUT_MS,
-        'Save session after login',
+      await withNetworkRetry('Save session after login', () =>
+        withTimeout(
+          persistLoginSessionAfterSuccess({ userId, account }),
+          LOGIN_PERSIST_TIMEOUT_MS,
+          'Save session after login',
+        ),
       );
       persistedToDb = true;
 
-      // Tutup modal login — sync grup lanjut di baris (PROC SYNC), bukan menahan modal 2FA.
+      // Tutup modal login segera (konfirmasi produk); sync group+admin lanjut di background baris.
       setStep('idle');
 
       const masterAfterLogin = await fetchMasterGroupStats(
@@ -915,17 +915,19 @@ export function useAccountSyncFlow({
         dbAccountId,
       );
 
-      const syncPayload = await withTimeout(
-        detectGroupsAndBuildSyncPayload({
-          userId,
-          account,
-          dbAccountId,
-          brandStandardHint: masterAfterLogin.brandMasterTotal,
-          skipPersist: true,
-          quickDeviceCount: true,
-        }),
-        loginSyncAfterTimeoutMs(loginGroupEstimate(account)),
-        'Sync after login',
+      const syncPayload = await withNetworkRetry('Post-login sync', () =>
+        withTimeout(
+          detectGroupsAndBuildSyncPayload({
+            userId,
+            account,
+            dbAccountId,
+            brandStandardHint: masterAfterLogin.brandMasterTotal,
+            skipPersist: true,
+            quickDeviceCount: true,
+          }),
+          loginSyncAfterTimeoutMs(loginGroupEstimate(account)),
+          'Sync after login',
+        ),
       );
 
       const syncedAt = new Date().toISOString();
@@ -957,19 +959,11 @@ export function useAccountSyncFlow({
             .eq('id', dbAccountId)
             .maybeSingle()
         )?.data?.brand_id as string | undefined;
-      if (brandIdAfterLogin) {
-        await reconcileTicketsForAccount({
-          accountId: dbAccountId,
-          brandId: brandIdAfterLogin,
-          brandName: account.brandName,
-          platform: account.platform,
-          deviceY: syncPayload.result.groupsCurrent,
-        });
-        onTicketsReload?.();
-      }
-
       if (savedIntent === 'scraper') {
         void runScrapeInBackground({ groupId, account: updatedAccount, dbAccountId });
+        if (brandIdAfterLogin) {
+          void Promise.resolve(onTicketsReload?.(dbAccountId)).catch(() => undefined);
+        }
         return;
       }
 
@@ -980,6 +974,10 @@ export function useAccountSyncFlow({
           hasDailyToday: syncPayload.hasDailyToday,
         }),
       );
+
+      if (brandIdAfterLogin) {
+        void Promise.resolve(onTicketsReload?.(dbAccountId)).catch(() => undefined);
+      }
     } catch (error) {
       if (persistedToDb && dbAccountId && (await hasActivePlatformSession(dbAccountId))) {
         try {
@@ -1061,7 +1059,7 @@ export function useAccountSyncFlow({
 
   return {
     processingAccountId,
-    processingDbAccountId: processingDbAccountIdRef.current,
+    processingDbAccountId,
     processingAction,
     postLoginGraceAccountId,
     step,

@@ -1,5 +1,6 @@
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
+import { withNetworkRetry } from '@/lib/networkRetry';
 import { withTimeout } from '@/lib/withTimeout';
 import {
   hasActivePlatformSession,
@@ -30,12 +31,10 @@ export async function persistTelegramLoginSession(input: {
     accountId: dbAccountId,
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
 
-  const exported = await withTimeout(
-    exporter(deviceSessionId),
-    60_000,
-    'Export Telegram session',
+  const exported = await withNetworkRetry('Export Telegram session', () =>
+    withTimeout(exporter(deviceSessionId), 90_000, 'Export Telegram session'),
   );
   await saveTelegramPlatformSession({
     accountId: dbAccountId,

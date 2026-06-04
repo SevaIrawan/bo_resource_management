@@ -3,18 +3,20 @@ import { loginQrTimeoutMessage } from '@/lib/platformSyncCopy';
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
 import { isWhatsAppBrowserBusyMessage } from '@/lib/waLoginErrors';
+import { isRetryableNetworkError, NETWORK_RETRY_ATTEMPTS } from '@/lib/networkRetry';
 import { withTimeout } from '@/lib/withTimeout';
 import type { Platform } from '@/types/database';
 
-const TG_LOGIN_RESTORE_TIMEOUT_MS = 8_000;
-const WA_QR_SCAN_TIMEOUT_MS = 180_000;
-const TG_QR_TIMEOUT_MS = 120_000;
-/** UI guard — lebih longgar dari main (120s); timer mulai saat modal buka. */
-const WA_QR_MUST_APPEAR_MS = 150_000;
-const WA_PREPARE_SETTLE_MS = 2_000;
-/** Setelah scan: WA `authenticated` → `ready` bisa lama (~2000 grup). */
+const TG_LOGIN_RESTORE_TIMEOUT_MS = 15_000;
+const WA_QR_SCAN_TIMEOUT_MS = 240_000;
+const TG_QR_TIMEOUT_MS = 180_000;
+/** UI guard — selaras main (240s); timer mulai saat modal buka. */
+const WA_QR_MUST_APPEAR_MS = 240_000;
+const WA_PREPARE_SETTLE_MS = 3_500;
+/** Setelah scan: WA `authenticated` → `ready` bisa lama (~3000 grup). */
 const WA_CONFIRMING_TIMEOUT_MS = 600_000;
-const TG_CONFIRMING_TIMEOUT_MS = 120_000;
+const TG_CONFIRMING_TIMEOUT_MS = 180_000;
+const WA_QR_MAX_RETRIES = NETWORK_RETRY_ATTEMPTS;
 
 type PlatformLoginApi = NonNullable<NonNullable<Window['electronAPI']>['platformLogin']>;
 
@@ -239,6 +241,7 @@ export function usePlatformLogin(
 
       const message = payload.message ?? '';
       if (platform === 'telegram') {
+        // TG: abaikan noise sementara saat QR; kegagalan tetap → error (tanpa auto-loop QR / restart login).
         const transient =
           /internal server error|session not found|sidecar|invalid json|empty response/i.test(
             message,
@@ -347,7 +350,10 @@ export function usePlatformLogin(
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (retryCount < 1 && isWhatsAppBrowserBusyMessage(message)) {
+        const canRetry =
+          retryCount < WA_QR_MAX_RETRIES - 1 &&
+          (isWhatsAppBrowserBusyMessage(message) || isRetryableNetworkError(error));
+        if (canRetry) {
           await prepareWhatsAppForQr(deviceSessionId, purgeDisk);
           return startWhatsAppQr(deviceSessionId, api, purgeDisk, retryCount + 1);
         }
@@ -670,6 +676,8 @@ export function usePlatformLogin(
     [platform],
   );
 
+  const refreshQrManual = switchToQr;
+
   return {
     view,
     status,
@@ -680,6 +688,7 @@ export function usePlatformLogin(
     submitting,
     defaultPhone,
     switchToQr,
+    refreshQrManual,
     switchToPhoneForm,
     startPhoneLogin,
     submitCode,

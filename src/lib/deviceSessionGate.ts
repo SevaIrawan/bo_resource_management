@@ -7,8 +7,8 @@ import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import type { Platform } from '@/types/database';
 import type { SessionUiStatus } from '@/types/accountMonitoringUi';
 
-export const DEVICE_WARM_MS = 20_000;
-export const DEVICE_PROBE_MS = 20_000;
+export const DEVICE_WARM_MS = 45_000;
+export const DEVICE_PROBE_MS = 45_000;
 
 export type DeviceSessionGateMode = 'sync' | 'scrape';
 

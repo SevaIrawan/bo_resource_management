@@ -19,8 +19,14 @@ const deadlineBlock = waTs.slice(
 
 const checks = [
   {
-    name: 'QR deadline >= 180s (bundled Chrome)',
-    ok: /WA_QR_APPEAR_DEADLINE_MS = 180_000/.test(waTs),
+    name: 'QR deadline >= 240s (bundled Chrome + lag)',
+    ok: /WA_QR_APPEAR_DEADLINE_MS = 240_000/.test(waTs),
+  },
+  {
+    name: 'WA init retry untuk jaringan lag (3x)',
+    ok:
+      waTs.includes('NETWORK_RETRY_ATTEMPTS') &&
+      waTs.includes('isRetryableNetworkError'),
   },
   {
     name: 'Timeout tidak destroyWhatsAppSession (biarkan QR sempat emit)',

@@ -25,7 +25,6 @@ function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
 function ticketAccent(type: Ticket['ticket_type']): TicketAccent {
   if (
     type === 'missing_group' ||
-    type === 'group_count_mismatch' ||
     type === 'duplicate_group_id' ||
     type === 'duplicate_group_name' ||
     type === 'daily_junk_group'
@@ -81,6 +80,7 @@ export async function loadOpenTicketsForUser(userId: string): Promise<TicketItem
   if (error) throw error;
 
   const items = ((data ?? []) as TicketRow[])
+    .filter((row) => (row.ticket_type as string) !== 'group_count_mismatch')
     .map(toTicketItem)
     .filter((t): t is TicketItem => t !== null);
 

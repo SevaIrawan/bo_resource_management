@@ -7,6 +7,10 @@ import {
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { AddAccountHeaderMenu } from '@/components/group-monitoring/AddAccountHeaderMenu';
+import {
+  BrandMasterGroupsModal,
+  BrandPlatformGroupsBadgeButton,
+} from '@/components/group-monitoring/BrandMasterGroupsModal';
 import { CardDismissButton } from '@/components/group-monitoring/CardDismissButton';
 import {
   AddAccountModal,
@@ -57,6 +61,7 @@ export function AccountBrandCard({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [comparePlatform, setComparePlatform] = useState<Platform | null>(null);
 
   const allAligned = group.misalignedCount === 0;
 
@@ -149,11 +154,17 @@ export function AccountBrandCard({
                 tg: accountsByPlatform.telegram,
               })}
             </span>
-            <span className="brand-card-badge brand-card-badge--neutral brand-card-badge--split">
-              {t('groupMonitoring.accountCard.platformGroupsBadge', {
-                wa: groupsByPlatform.whatsapp,
-                tg: groupsByPlatform.telegram,
-              })}
+            <span className="brand-card-header-platform-badges">
+              <BrandPlatformGroupsBadgeButton
+                platform="whatsapp"
+                count={groupsByPlatform.whatsapp}
+                onClick={() => setComparePlatform('whatsapp')}
+              />
+              <BrandPlatformGroupsBadgeButton
+                platform="telegram"
+                count={groupsByPlatform.telegram}
+                onClick={() => setComparePlatform('telegram')}
+              />
             </span>
             <span
               className={cn(
@@ -223,6 +234,15 @@ export function AccountBrandCard({
         onClose={closeAddFlow}
         onSubmit={handleSaveAccount}
       />
+
+      {comparePlatform ? (
+        <BrandMasterGroupsModal
+          open
+          brandName={group.brandName}
+          platform={comparePlatform}
+          onClose={() => setComparePlatform(null)}
+        />
+      ) : null}
     </>
   );
 }

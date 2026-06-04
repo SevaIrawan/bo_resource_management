@@ -4,7 +4,6 @@ import type { TicketType } from '@/types/ticketMonitoringUi';
 const TYPE_CODE: Record<TicketType, string> = {
   missing_group: 'MG',
   not_admin: 'NA',
-  group_count_mismatch: 'CM',
   duplicate_group_id: 'DI',
   duplicate_group_name: 'DN',
   daily_junk_group: 'JK',

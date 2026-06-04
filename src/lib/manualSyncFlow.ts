@@ -1,6 +1,8 @@
 /**
  * Keputusan SYNC / RUN = kolom Session di baris grid (`account.sessionStatus`).
- * Spesifikasi lengkap: `sessionColumnFlowSpec.ts`
+ * Spesifikasi lengkap: `sessionColumnFlowSpec.ts`, `logic_sync_scraper.txt`
+ *
+ * Probe device pada kolom VALID: jika session mati di device, buka login lagi (grid boleh masih valid).
  */
 
 import { sessionColumnRoute as routeImpl } from '@/lib/sessionColumnFlowSpec';

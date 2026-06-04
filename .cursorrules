@@ -52,16 +52,15 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     Treat the user as an intelligent adult.
 
 11. ISSUE / TICKET — KONTRAK BISNIS (Resource Management)
-    Session login/logout TIDAK masuk Issue, KPI Issue, atau ticket.
-    Semua ticket per akun (`account_id` = satu baris messaging account); daily dibaca per akun; master brand dipakai sebagai standar X untuk brand itu.
-    Yang masuk Issue hanya:
-    - Data group tidak match (jumlah grup device/daily vs standar brand X; termasuk grup master yang belum ada di daily).
-    - Data admin dalam group tidak match dengan total group brand X (jumlah admin vs X; plus per-grup bukan admin di master).
-    - Group sampah: banned, not used, no invite link, not admin, unidentify — perbandingan daily vs master brand.
-    - Group ID duplicate.
-    - Group name duplicate.
-    Implementasi ticket: `reconcileTickets.ts` + tipe di `TicketType`. Jangan tambah dokumen audit terpisah; ubah kode sesuai kontrak ini setelah konfirmasi user.
-    UI Ticket (sudah ada di kode): satu kartu = satu topik issue per akun (`account` + `brand` + `ticketType` → `TicketSummaryGroup.key`); banyak baris DB digabung di `groupOpenTickets`; double-click kartu → `TicketIssueDetailModal` (detail per grup/barisan); Export issue / Export all → Excel acuan perbaikan.
+    Session login/logout TIDAK masuk Issue.
+    Hanya 5 tipe ticket per akun (banding master vs daily akun):
+    - daily_junk_group — grup di device, tidak di master (MORE / sampah).
+    - missing_group — grup di master, belum di device akun (LESS / perlu invite).
+    - not_admin — sudah join, belum admin.
+    - duplicate_group_id — group_id sama, nama beda vs master.
+    - duplicate_group_name — nama sama di master, group_id beda.
+    TIDAK ada group_count_mismatch (agregat Y≠X).
+    Implementasi: reconcileTickets.ts + label UI ticketPanel (en/zh).
 
 12. MULTI-AKUN (100+ WA & Telegram per platform)
     Produk ini multi-akun: setiap baris `messaging_accounts` = satu sesi terpisah.
@@ -79,3 +78,25 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     - UI: `onError` abaikan jika sudah `ready` / pesan sidecar sementara saat QR.
     - Sidecar version 3; exception handler FastAPI selalu JSON.
     - Sebelum merge: `npm run validate:telegram-login` (atau `validate:desktop`).
+
+14. PRODUKSI NYATA — DILARANG DIAGNOSA TANPA FAKTA (Resource Management)
+    Ini project besar, live, multi-akun (100+ WA/TG), installer cross-platform, Supabase realtime — BUKAN sandbox / coba-coba.
+    DILARANG KERAS:
+    - Menyimpulkan root cause dari asumsi ("mungkin user belum Sync", "mungkin daily belum update") tanpa bukti dari kode, log, DB flow, atau pernyataan user yang sudah dikonfirmasi.
+    - Menyalahkan operator/user sebelum trace alur lengkap (Scraper → daily → reconcile → realtime → UI state).
+    - Mengubah banyak file berdasarkan teori tanpa baca file terkait dulu (`Read`, `Grep`, trace call chain).
+    WAJIB SEBELUM JAWAB BUG / PERILAKU SISTEM:
+    1. Baca kode path yang relevan end-to-end (contoh Issue: `reconcileTickets.ts` → `loadTickets.ts` → `GroupMonitoringProvider` → `useRealtimeMonitoring`).
+    2. Pisahkan fakta vs hipotesis; tulis eksplisit jika belum diverifikasi.
+    3. Jika user sudah state fakta ("sudah Scraper", "kolom Groups sudah update") — percaya dan cari bug di layer lain, jangan ulangi teori yang user sudah bantah.
+    4. Verifikasi dengan validator/skrip repo jika ada (`npm run validate:*`).
+    5. Kalau bukti belum cukup — tanya SATU pertanyaan kritis, jangan tebak.
+    Saat user marah karena diagnosa salah: akui kesalahan, revisi berdasarkan trace ulang — jangan defend asumsi lama.
+
+15. REALTIME SETELAH SYNC / SCRAPER (wajib)
+    Contoh: brand X=150, akun punya 146 di daily → missing_group ticket = 4 (bukan 50 lama).
+    Urutan wajib setelah execute:
+    1. Tulis daily (scrape) + snapshot
+    2. reconcileTicketsForAccountFromDb(accountId) — banding master vs daily, tutup ticket yang sudah join
+    3. reloadTickets() — kartu Issue realtime
+    Trigger: onTicketsReload / refreshIssues(dbAccountId) setelah Run Scraper & Sync; Supabase realtime daily → onAccountDailyChanged; master brand → reconcile user.

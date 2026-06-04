@@ -3,18 +3,25 @@ import type { SessionUiStatus } from '@/types/accountMonitoringUi';
 /**
  * Spesifikasi resmi — kolom Session di grid (`account.sessionStatus`).
  * Dipakai dokumentasi + audit; implementasi di `manualSyncFlow.ts` + `useAccountSyncFlow.ts`.
+ *
+ * UX (konfirmasi produk):
+ * - "Modal utama" pada jalur INVALID = modal login; ditutup sebelum Now/Later (`setStep('idle')`).
+ * - Jalur VALID + SYNC: tidak ada modal login; langsung backend lalu Now/Later atau resume-empty.
+ * - resume-empty hanya bila 0 grup (device/DB/brand); Now/Later bila ada data yang bisa di-scrape.
+ * - VALID + RUN/SYNC: probe device tetap jalan; gagal → login meski badge grid masih valid.
+ * - Login FAIL: WA auto-QR; TG error + pesan (tanpa auto-loop QR).
  */
 export const SESSION_COLUMN_FLOW = {
   invalid: {
-    sync: ['login_modal_qr_phone'] as const,
-    run: ['login_modal_qr_phone'] as const,
+    sync: ['login_modal_qr_phone', 'close_login_modal', 'update_groups_admin_columns'] as const,
+    run: ['login_modal_qr_phone', 'close_login_modal', 'update_groups_admin_columns'] as const,
   },
   valid: {
     sync: [
       'check_device_session',
       'detect_brand_x_and_device_groups',
       'update_groups_admin_columns',
-      'scrape_now_or_not_modal',
+      'scrape_now_or_not_modal_or_resume_empty',
     ] as const,
     run: ['check_device_session', 'execute_scraper'] as const,
   },

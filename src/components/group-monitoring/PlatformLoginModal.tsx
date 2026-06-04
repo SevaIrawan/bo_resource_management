@@ -51,7 +51,7 @@ export function PlatformLoginModal({
     pairingCode,
     error,
     submitting,
-    switchToQr,
+    refreshQrManual,
     switchToPhoneForm,
     startPhoneLogin,
     submitCode,
@@ -116,6 +116,19 @@ export function PlatformLoginModal({
     status !== 'ready' &&
     status !== '2fa' &&
     status !== 'code';
+
+  const qrLoading =
+    !pairingCode &&
+    !qrDataUrl &&
+    status !== 'error' &&
+    (status === 'loading' ||
+      status === 'restoring' ||
+      status === 'starting-qr' ||
+      status === 'qr' ||
+      status === 'confirming');
+
+  const qrFailed =
+    !pairingCode && status === 'error' && (view === 'qr' || view === 'phone');
   const showSavingPanel = status === 'ready' || persisting;
   const showPhoneForm = view === 'phone' && !pairingCode && !showSavingPanel;
   const showCodeForm = view === 'code' && !showSavingPanel;
@@ -266,7 +279,7 @@ export function PlatformLoginModal({
                 type="button"
                 className="platform-login-alt-link"
                 disabled={submitting}
-                onClick={() => void switchToQr()}
+                onClick={() => void refreshQrManual()}
               >
                 {t('groupMonitoring.sync.switchToQr')}
               </button>
@@ -366,12 +379,35 @@ export function PlatformLoginModal({
               </ol>
 
               <div className="platform-login-qr-box">
+                {qrFailed ? (
+                  <div className="platform-login-qr-overlay" role="alert">
+                    <p className="platform-login-qr-overlay-title">
+                      {error?.toLowerCase().includes('timeout') ||
+                      error?.toLowerCase().includes('expired')
+                        ? t('groupMonitoring.sync.qrExpiredTitle')
+                        : t('groupMonitoring.sync.qrLoadFailedTitle')}
+                    </p>
+                    <p className="platform-login-qr-overlay-msg">
+                      {error ?? t('groupMonitoring.sync.loginFailed')}
+                    </p>
+                    <button
+                      type="button"
+                      className="platform-login-qr-refresh-btn"
+                      disabled={submitting}
+                      onClick={() => void refreshQrManual()}
+                    >
+                      {t('groupMonitoring.sync.refreshQr')}
+                    </button>
+                  </div>
+                ) : null}
+
                 {pairingCode ? (
                   <p className="platform-login-pairing-code">{formatPairingCode(pairingCode)}</p>
-                ) : status === 'error' ? (
-                  <p className="platform-login-qr-error" role="alert">
-                    {error ?? statusLabel}
-                  </p>
+                ) : qrLoading ? (
+                  <div className="platform-login-qr-skeleton" aria-busy="true">
+                    <Loader2 className="platform-login-qr-spinner" strokeWidth={2} aria-hidden />
+                    <p className="platform-login-qr-skeleton-label">{statusLabel}</p>
+                  </div>
                 ) : qrDataUrl && status !== 'confirming' ? (
                   <img
                     key={`qr-${qrGeneration}`}
@@ -379,15 +415,16 @@ export function PlatformLoginModal({
                     alt="Login QR code"
                     className="platform-login-qr-img"
                   />
-                ) : (
+                ) : status !== 'error' ? (
                   <Loader2 className="platform-login-qr-spinner" strokeWidth={2} aria-hidden />
-                )}
+                ) : null}
+
                 {persistError ? (
                   <p className="platform-login-qr-error" role="alert">
                     {persistError}
                   </p>
                 ) : null}
-                {status !== 'error' ? (
+                {!qrFailed ? (
                   <p className="platform-login-qr-status">
                     {statusLabel}
                     {qrGeneration > 1

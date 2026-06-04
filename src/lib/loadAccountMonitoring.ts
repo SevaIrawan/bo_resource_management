@@ -145,6 +145,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
           platform: account.platform,
           brandStandard: brandX > 0 ? brandX : undefined,
           sessionValid: hasSession,
+          masterHint: master,
         });
         const lastActivityAt = lastActivityAtByAccount.get(account.id);
         row = {

@@ -4,6 +4,7 @@
  */
 import { buildAccountSyncResult } from '@/lib/accountDisplayMetrics';
 import { fetchHasDailyData, fetchMasterGroupStats } from '@/lib/accountSyncData';
+import { mergeDeviceGroupIdsIntoDaily } from '@/lib/mergeDeviceGroupIdsIntoDaily';
 import { countDeviceGroups, type DeviceGroupCountResult } from '@/lib/runAccountCount';
 import { probePlatformSession } from '@/lib/sessionProbe';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
@@ -73,6 +74,8 @@ export interface RefreshAccountMetricsInput {
   assumeSessionValid?: boolean;
   /** Setelah login QR WA — hitung grup cepat (tanpa loop admin per grup). */
   quickDeviceCount?: boolean;
+  /** Lewati merge ribuan group_id ke daily (cukup angka device; detail saat scrape). */
+  skipMergeDeviceGroups?: boolean;
 }
 
 export interface RefreshAccountMetricsResult {
@@ -115,6 +118,27 @@ export async function refreshAccountMetrics(
       quick: input.quickDeviceCount,
     },
   );
+
+  const shouldMerge =
+    !input.skipMergeDeviceGroups &&
+    !input.quickDeviceCount &&
+    device.valid &&
+    device.groupIds?.length;
+
+  if (shouldMerge) {
+    try {
+      await mergeDeviceGroupIdsIntoDaily({
+        accountId: dbAccountId,
+        brand: account.brandName,
+        accName: account.accountName,
+        phoneNumber: account.phoneNumber,
+        platform: account.platform,
+        groupIds: device.groupIds ?? [],
+      });
+    } catch (error) {
+      console.warn('[sync] merge device groups into daily failed:', error);
+    }
+  }
 
   return {
     hasDailyToday,

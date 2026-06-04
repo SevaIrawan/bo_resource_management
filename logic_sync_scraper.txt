@@ -1,0 +1,29 @@
+BAGIAN 1: ALUR UTAMA (SYNC & RUN SCRAPER)
+Setiap update metrik mencakup GROUP (Y/X) dan ADMIN (Y/X).
+Daftar grup di device dibaca di Electron/sidecar (bukan isi pesan). Pencocokan master↔daily di Postgres RPC.
+
+A. SYNC — cek kolom session:
+VALID: tanpa modal login → hitung grup+admin di device → update grid → [Now|Later] atau resume-empty (0 grup).
+INVALID: modal login → sukses: save session, update group+admin, tutup login → [Now|Later].
+Login FAIL: WA auto-QR; TG error + pesan (tanpa auto-loop). Tutup modal = batalkan, session tetap INVALID.
+
+B. RUN SCRAPER:
+VALID (+ probe device; gagal → login meski grid valid): langsung scraper.
+INVALID: login → sukses → auto-scrape tanpa Now/Later.
+
+BAGIAN 2: KOLOM SCRAPER (real-time)
+STANDBY: INVALID → "Use Sync (↻) to log in first"; VALID+MATCH → timestamp saja; VALID+NOT MATCH → RUN + timestamp; pending → "—".
+RUNNING: bar + X/Y + marquee "Reading groups…".
+SELESAI: update group+admin + timestamp; MATCH/NOT MATCH seperti standby.
+
+BAGIAN 3: MODAL LOGIN & QR
+Panel lebar (min ~36rem), kotak QR besar (~14rem), skeleton saat generate, overlay expired/gagal + tombol Refresh QR.
+WA: auto-regenerate QR. TG: error dulu, refresh manual.
+
+BAGIAN 4: PERFORMA (3000 grup)
+- quickDeviceCount: hanya total dari device; tidak merge ribuan group_id ke daily di renderer.
+- rm_account_master_stats (Supabase RPC): agregasi master↔daily di SQL, fallback loop JS jika RPC belum deploy.
+- reconcile ticket setelah sync/login: background (tidak blok modal Now/Later).
+
+Implementasi: useAccountSyncFlow.ts, accountMonitoringEngine.ts, accountMasterStatsRpc.ts,
+PlatformLoginModal.tsx, electron/main/scraper/countWhatsApp.ts, migrations/028_rm_account_master_stats_rpc.sql

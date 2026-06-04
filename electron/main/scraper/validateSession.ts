@@ -1,4 +1,5 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
+import { withNetworkRetry } from '../lib/networkRetry';
 import {
   getWhatsAppSessionClient,
   hasWhatsAppDiskAuth,
@@ -22,27 +23,33 @@ export async function validateTelegramSession(
 ): Promise<{ valid: boolean; message?: string }> {
   await ensureSidecarRunning();
 
-  const res = await fetch(`${SIDECAR_URL}/telegram/validate/${encodeURIComponent(sessionId)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId,
-      sessionString: storedSessionString ?? undefined,
-    }),
-    signal: AbortSignal.timeout(60_000),
+  return withNetworkRetry('Validate Telegram session', async () => {
+    const res = await fetch(`${SIDECAR_URL}/telegram/validate/${encodeURIComponent(sessionId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        sessionString: storedSessionString ?? undefined,
+      }),
+      signal: AbortSignal.timeout(90_000),
+    });
+
+    const json = (await res.json()) as {
+      status: string;
+      valid?: boolean;
+      message?: string;
+    };
+
+    if (!res.ok) {
+      throw new Error(json.message ?? `Telegram validate HTTP ${res.status}`);
+    }
+
+    if (json.status === 'error') {
+      return { valid: false, message: json.message ?? 'Telegram validate failed' };
+    }
+
+    return { valid: Boolean(json.valid), message: json.message };
   });
-
-  const json = (await res.json()) as {
-    status: string;
-    valid?: boolean;
-    message?: string;
-  };
-
-  if (!res.ok || json.status === 'error') {
-    return { valid: false, message: json.message ?? 'Telegram validate failed' };
-  }
-
-  return { valid: Boolean(json.valid), message: json.message };
 }
 
 export async function validateWhatsAppSession(

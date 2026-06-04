@@ -117,8 +117,6 @@ function summaryHeadline(
       return t('groupMonitoring.ticketPanel.headlineDuplicateId', { count });
     case 'duplicate_group_name':
       return t('groupMonitoring.ticketPanel.headlineDuplicateName', { count });
-    case 'group_count_mismatch':
-      return group.lines[0]?.description ?? t('groupMonitoring.ticketPanel.headlineCountMismatch');
     default:
       return t('groupMonitoring.ticketPanel.headlineDefault', { count });
   }

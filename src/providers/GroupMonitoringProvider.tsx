@@ -30,7 +30,8 @@ import {
   TICKET_WORKFLOW_CHANGED_EVENT,
 } from '@/lib/ticketWorkflowLocal';
 import { groupOpenTickets } from '@/lib/ticketGroups';
-import { reconcileOpenTicketsForUser } from '@/lib/reconcileTickets';
+import { applyAccountGroupsDailyPatch } from '@/lib/patchAccountGroupsFromDaily';
+import { reconcileOpenTicketsForUser, reconcileTicketsForAccountFromDb } from '@/lib/reconcileTickets';
 import { computeAccountKpis, computeTicketKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
@@ -107,8 +108,41 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     ticketReconcileTimerRef.current = setTimeout(() => {
       ticketReconcileTimerRef.current = null;
       void runTicketReconcile();
-    }, 1500);
+    }, 600);
   }, [runTicketReconcile]);
+
+  /** Reconcile DB dulu, lalu reload kartu Issue (kontrak 150−146=4 ticket). */
+  const refreshIssues = useCallback(
+    async (dbAccountId?: string) => {
+      if (dbAccountId) {
+        await reconcileTicketsForAccountFromDb(dbAccountId);
+        await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
+      } else if (user?.id) {
+        const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+        await reconcileOpenTicketsForUser(dataUserId, { concurrency: 2 });
+      }
+      await reloadTickets();
+    },
+    [user?.id, user?.userName, reloadTickets],
+  );
+
+  const handleAccountDailyChanged = useCallback(
+    (dbAccountId: string) => {
+      notifyPendingDataUpdate();
+      void (async () => {
+        await reconcileTicketsForAccountFromDb(dbAccountId);
+        await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
+        await reloadTickets();
+      })();
+    },
+    [notifyPendingDataUpdate, reloadTickets],
+  );
+
+  /** Realtime master brand (banyak akun) — reconcile semua user. */
+  const scheduleIssueRefreshFromData = useCallback(() => {
+    void reloadTickets();
+    scheduleTicketReconcile();
+  }, [reloadTickets, scheduleTicketReconcile]);
 
   const reloadAll = useCallback(async () => {
     if (!user?.id) {
@@ -253,7 +287,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     suspendAccountIds: probeSuspendAccountIds,
     onGroupsChange: setGroups,
     onTicketsChange: handleTicketsRealtime,
-    onIssueReconcile: scheduleTicketReconcile,
+    onIssueReconcile: scheduleIssueRefreshFromData,
+    onAccountDailyChanged: handleAccountDailyChanged,
     onRegistryChange: handleRegistryRealtime,
     onDataChangeNotice: notifyPendingDataUpdate,
   });
@@ -277,6 +312,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       ticketFilters,
       setTicketFilters,
       reloadTickets,
+      refreshIssues: refreshIssues,
       accountKpis,
       ticketKpis,
       loading,
@@ -296,6 +332,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       loading,
       reportError,
       reloadTickets,
+      refreshIssues,
+      runTicketReconcile,
     ],
   );
 

@@ -22,6 +22,8 @@ export interface GroupMonitoringContextValue {
   ticketFilters: TicketSlicerFilters;
   setTicketFilters: Dispatch<SetStateAction<TicketSlicerFilters>>;
   reloadTickets: () => Promise<void>;
+  /** Rekonsiliasi issue dari DB + muat ulang kartu (setelah sync/scrape). */
+  refreshIssues: (dbAccountId?: string) => Promise<void>;
   accountKpis: KpiItem[];
   ticketKpis: KpiItem[];
   loading: boolean;

@@ -2,6 +2,7 @@ import { writeScrapeDailyRows, type ScrapedGroupPayload } from '@/lib/accountScr
 import { dedupeScrapedGroupsByGroupId } from '@/lib/dedupeScrapedGroups';
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
+import { withNetworkRetry } from '@/lib/networkRetry';
 import { finishScrapeRun, startScrapeRun } from '@/lib/scrapeRuns';
 import {
   loadTelegramPlatformSession,
@@ -25,7 +26,9 @@ async function persistTelegramSession(accountId: string, sessionId: string): Pro
   const exporter = window.electronAPI?.scraper?.exportTelegramSession;
   if (!exporter) return;
 
-  const exported = await exporter(sessionId);
+  const exported = await withNetworkRetry('Export Telegram session after scrape', () =>
+    exporter(sessionId),
+  );
   await saveTelegramPlatformSession({
     accountId,
     sessionString: exported.sessionString,
@@ -72,11 +75,13 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
   });
 
   try {
-    const result = await api.run({
-      sessionId: deviceSessionId,
-      platform: input.account.platform,
-      storedSessionString,
-    });
+    const result = await withNetworkRetry('Scrape groups', () =>
+      api.run({
+        sessionId: deviceSessionId,
+        platform: input.account.platform,
+        storedSessionString,
+      }),
+    );
 
     const scrapedGroups = dedupeScrapedGroupsByGroupId(result.groups as ScrapedGroupPayload[]);
     const scrapeWrite = await writeScrapeDailyRows({

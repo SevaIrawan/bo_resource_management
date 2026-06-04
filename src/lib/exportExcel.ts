@@ -54,6 +54,26 @@ export function exportGroupLinksExcel(input: {
   saveWorkbook(workbook, `RM-${safeBrand}-${safeAcc}-groups-${stamp()}.xlsx`);
 }
 
+export function exportBrandMasterGroupsExcel(input: {
+  brandName: string;
+  platform: 'whatsapp' | 'telegram';
+  rows: { groupName: string; groupId: string; inviteLink: string | null; lastSync: string | null }[];
+}) {
+  const safeBrand = safeFilePart(input.brandName);
+  const plat = input.platform === 'whatsapp' ? 'WA' : 'TG';
+  const sheet = XLSX.utils.json_to_sheet(
+    input.rows.map((row) => ({
+      'Group Name': row.groupName,
+      'Group ID': row.groupId,
+      'Invite Link': row.inviteLink ?? '',
+      'Last sync': row.lastSync ?? '',
+    })),
+  );
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Master groups');
+  saveWorkbook(workbook, `RM-${safeBrand}-${plat}-master-${stamp()}.xlsx`);
+}
+
 export function exportAllAccountsExcel(groups: AccountBrandGroup[]) {
   const rows = groups.flatMap((group) => group.accounts);
   const sheet = XLSX.utils.json_to_sheet(accountRowsForExport(rows));

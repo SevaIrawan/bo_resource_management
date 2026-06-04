@@ -8,9 +8,11 @@ import {
 import { markPlatformSessionSynced } from '@/lib/platformSessions';
 import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
 import { isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
+import { NETWORK_RETRY_ATTEMPTS, NETWORK_RETRY_BASE_DELAY_MS } from '@/lib/networkRetry';
 import type { Platform } from '@/types/database';
 
-const USER_SESSION_RETRY_MS = 2_500;
+const USER_SESSION_GATE_RETRIES = NETWORK_RETRY_ATTEMPTS;
+const USER_SESSION_RETRY_BASE_MS = NETWORK_RETRY_BASE_DELAY_MS;
 
 export type UserSessionGateMode = 'sync' | 'scrape';
 
@@ -82,8 +84,11 @@ export async function checkUserActionDeviceSession(input: {
 
   let gate = await gateOnce(input);
 
-  if (!gate.ok && gate.kind === 'warm_pending') {
-    await new Promise((resolve) => window.setTimeout(resolve, USER_SESSION_RETRY_MS));
+  for (let attempt = 0; attempt < USER_SESSION_GATE_RETRIES - 1; attempt += 1) {
+    if (gate.ok || gate.kind !== 'warm_pending') break;
+    await new Promise((resolve) =>
+      window.setTimeout(resolve, USER_SESSION_RETRY_BASE_MS * (attempt + 1)),
+    );
     gate = await gateOnce(input);
   }
 

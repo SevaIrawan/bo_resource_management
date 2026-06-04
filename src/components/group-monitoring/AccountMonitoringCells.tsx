@@ -182,6 +182,7 @@ function ScraperColumnCell({
     );
   }
 
+  // pending / belum synced: tampilan netral (—); standby penuh mengikuti valid/invalid/running.
   return <span className="brand-account-slot-muted text-xs">—</span>;
 }
 
@@ -390,6 +391,7 @@ export function AccountTableRow({
                   type="button"
                   className="brand-card-action-btn brand-card-action-btn--nowrap"
                   disabled={isPending}
+                  title={t('groupMonitoring.accountCard.groupLinkHint')}
                   onClick={() => setLinksOpen(true)}
                 >
                   {t('groupMonitoring.accountCard.groupLink')}

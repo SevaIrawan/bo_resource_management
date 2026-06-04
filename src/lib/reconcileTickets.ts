@@ -1,18 +1,29 @@
-import { resolveBrandStandardTotal } from '@/lib/brandStandardCount';
 import { dedupeDailyRowsByGroupId, dedupeScrapeDailyRowsForAccount } from '@/lib/dedupeScrapeDaily';
+import {
+  buildDailyMatchIndexes,
+  findDailyRowForMaster,
+  isDailyRowInMasterSet,
+  normalizeGroupIdForMatch,
+  type MasterDailyRow,
+} from '@/lib/masterDailyMatch';
 import { TABLES } from '@/config/tables';
 import { ticketDescriptionEn } from '@/lib/ticketNote';
 import { openTicketDedupeKey } from '@/lib/ticketDedupe';
 import { getSupabase } from '@/lib/supabase';
 import type { GroupsMaster, Platform, TicketType } from '@/types/database';
 
+/**
+ * Kontrak issue (missing_group):
+ * - Brand X = jumlah grup standar di master (contoh 150).
+ * - Daily akun = grup yang ada di HP setelah scrape (contoh 146 baris match master).
+ * - Open ticket missing_group = master yang BELUM ada di daily akun (~ X − joined = 4).
+ * Setiap daily/master berubah → reconcileTicketsForAccount → resolve/insert ticket → UI reload.
+ */
 interface ReconcileInput {
   accountId: string;
   brandId: string;
   brandName: string;
   platform: Platform;
-  /** Y device — dari scrape/sync terbaru; kalau diisi, dipakai untuk group_count_mismatch */
-  deviceY?: number;
 }
 
 interface DailyRow {
@@ -20,6 +31,20 @@ interface DailyRow {
   group_name: string | null;
   invite_link: string | null;
   is_admin: string;
+}
+
+/** Tutup ticket lama group_count_mismatch (tipe dihapus). */
+async function resolveLegacyCountMismatchTickets(accountId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const now = new Date().toISOString();
+  await supabase
+    .from(TABLES.tickets)
+    .update({ status: 'resolved', resolved_at: now })
+    .eq('account_id', accountId)
+    .eq('ticket_type', 'group_count_mismatch')
+    .eq('status', 'open');
 }
 
 /** Satu baris open per (account, type, group_id) — bersihkan duplikat historis. */
@@ -98,8 +123,16 @@ async function batchUpsertOpenTicketsByGroupId(input: {
   rows: OpenTicketRowInput[];
 }): Promise<Set<string>> {
   const supabase = getSupabase();
+  /** Hanya group_id yang masih issue — jangan keep semua open ticket lama. */
   const keepIds = new Set<string>();
-  if (!supabase || !input.rows.length) return keepIds;
+  if (!supabase) return keepIds;
+
+  for (const row of input.rows) {
+    const gid = String(row.groupId ?? '').trim();
+    if (gid) keepIds.add(gid);
+  }
+
+  if (!input.rows.length) return keepIds;
 
   const { data: openRows, error: openError } = await supabase
     .from(TABLES.tickets)
@@ -113,21 +146,14 @@ async function batchUpsertOpenTicketsByGroupId(input: {
   const existingGids = new Set<string>();
   for (const row of openRows ?? []) {
     const gid = String(row.group_id ?? '').trim();
-    if (gid) {
-      existingGids.add(gid);
-      keepIds.add(gid);
-    }
+    if (gid) existingGids.add(gid);
   }
 
   const toInsert: Record<string, unknown>[] = [];
   for (const row of input.rows) {
     const gid = String(row.groupId ?? '').trim();
-    if (!gid || existingGids.has(gid)) {
-      if (gid) keepIds.add(gid);
-      continue;
-    }
+    if (!gid || existingGids.has(gid)) continue;
     existingGids.add(gid);
-    keepIds.add(gid);
     toInsert.push({
       account_id: input.accountId,
       brand_id: input.brandId,
@@ -168,20 +194,35 @@ async function resolveTickets(input: {
 
   if (error) throw error;
 
+  const keepNormalized = new Set(
+    [...input.keepGroupIds].map((gid) => normalizeGroupIdForMatch(gid)).filter(Boolean),
+  );
+
   const now = new Date().toISOString();
+  const idsToResolve: string[] = [];
+
   for (const row of openRows ?? []) {
     const gid = row.group_id as string | null;
     const gname = (row.group_name as string | null)?.trim().toLowerCase() ?? '';
+    const gidNorm = gid ? normalizeGroupIdForMatch(gid) : '';
     const stillOpen =
-      (gid && input.keepGroupIds.has(gid)) ||
+      (gidNorm && keepNormalized.has(gidNorm)) ||
+      (gid && input.keepGroupIds.has(gid.trim())) ||
       (!gid && gname && input.keepGroupNames.has(gname));
 
-    if (stillOpen) continue;
+    if (!stillOpen) {
+      idsToResolve.push(row.id as string);
+    }
+  }
 
-    await supabase
+  const RESOLVE_CHUNK = 100;
+  for (let i = 0; i < idsToResolve.length; i += RESOLVE_CHUNK) {
+    const chunk = idsToResolve.slice(i, i + RESOLVE_CHUNK);
+    const { error: updateError } = await supabase
       .from(TABLES.tickets)
       .update({ status: 'resolved', resolved_at: now })
-      .eq('id', row.id as string);
+      .in('id', chunk);
+    if (updateError) throw updateError;
   }
 }
 
@@ -288,6 +329,7 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
   const supabase = getSupabase();
   if (!supabase) return;
 
+  await resolveLegacyCountMismatchTickets(input.accountId);
   await dedupeOpenTicketsForAccount(input.accountId);
   await dedupeScrapeDailyRowsForAccount(input.accountId);
 
@@ -307,7 +349,8 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
 
   const masterRows = (master ?? []) as Pick<GroupsMaster, 'group_id' | 'group_name' | 'invite_link'>[];
   const dailyRows = dedupeDailyRowsByGroupId((daily ?? []) as DailyRow[]);
-  const dailyByGid = new Map(dailyRows.map((d) => [String(d.group_id).trim(), d]));
+  const dailyIndexes = buildDailyMatchIndexes(dailyRows as MasterDailyRow[]);
+  const masterIndexes = buildDailyMatchIndexes(masterRows as MasterDailyRow[]);
 
   const masterGids = new Set(
     masterRows.map((m) => String(m.group_id ?? '').trim()).filter(Boolean),
@@ -316,7 +359,8 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
   const junkRows: OpenTicketRowInput[] = [];
   for (const d of dailyRows) {
     const gid = String(d.group_id ?? '').trim();
-    if (!gid || masterGids.has(gid)) continue;
+    if (!gid) continue;
+    if (isDailyRowInMasterSet(d as MasterDailyRow, masterGids, masterIndexes)) continue;
     const label = d.group_name?.trim() || gid;
     junkRows.push({
       description: ticketDescriptionEn.dailyJunk(label),
@@ -346,7 +390,7 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
     const gid = String(m.group_id ?? '').trim();
     if (!gid) continue;
 
-    const d = dailyByGid.get(gid);
+    const d = findDailyRowForMaster(m, dailyIndexes);
     const label = m.group_name?.trim() || gid;
 
     if (!d) {
@@ -400,69 +444,34 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
   if (masterRows.length) {
     await detectFraudTickets(input);
   }
-
-  const { data: snap, error: snapError } = await supabase
-    .from(TABLES.accountSnapshots)
-    .select('groups_current, groups_total, session_status')
-    .eq('account_id', input.accountId)
-    .maybeSingle();
-
-  if (snapError) throw snapError;
-
-  /** Y untuk count mismatch — max(daily, snapshot, input) agar selaras kartu 30/1893. */
-  const dailyY = dailyRows.length;
-  const snapY =
-    snap?.session_status === 'valid' ? Math.max(0, Number(snap?.groups_current ?? 0)) : 0;
-  const deviceY =
-    input.deviceY !== undefined && input.deviceY >= 0
-      ? input.deviceY
-      : Math.max(dailyY, snapY);
-  const brandX = await resolveBrandStandardTotal(
-    input.brandId,
-    input.platform,
-    Number(snap?.groups_total ?? 0),
-    brand,
-  );
-
-  if (brandX > 0 && deviceY !== brandX) {
-    await upsertOpenTicket({
-      accountId: input.accountId,
-      brandId: input.brandId,
-      platform: input.platform,
-      ticketType: 'group_count_mismatch',
-      description: ticketDescriptionEn.countMismatch(deviceY, brandX),
-    });
-  } else if (brandX > 0) {
-    const { data: openMismatch } = await supabase
-      .from(TABLES.tickets)
-      .select('id')
-      .eq('account_id', input.accountId)
-      .eq('ticket_type', 'group_count_mismatch')
-      .eq('status', 'open')
-      .maybeSingle();
-
-    if (openMismatch?.id) {
-      await supabase
-        .from(TABLES.tickets)
-        .update({ status: 'resolved', resolved_at: new Date().toISOString() })
-        .eq('id', openMismatch.id as string);
-    }
-  }
 }
 
 export async function reconcileTicketsAfterScrape(input: {
   accountId: string;
   platform: Platform;
   brandName: string;
-  deviceY?: number;
 }): Promise<void> {
+  await reconcileTicketsForAccountFromDb(input.accountId, {
+    brandName: input.brandName,
+    platform: input.platform,
+  });
+}
+
+/** Satu akun — dipakai setelah scrape/sync/realtime daily. */
+export async function reconcileTicketsForAccountFromDb(
+  accountId: string,
+  options?: {
+    brandName?: string;
+    platform?: Platform;
+  },
+): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
 
   const { data: account, error } = await supabase
     .from(TABLES.messagingAccounts)
-    .select('brand_id, metadata')
-    .eq('id', input.accountId)
+    .select('brand_id, platform, metadata')
+    .eq('id', accountId)
     .maybeSingle();
 
   if (error) throw error;
@@ -470,16 +479,15 @@ export async function reconcileTicketsAfterScrape(input: {
   if (!brandId) return;
 
   const meta = account?.metadata as { brand?: string } | null;
-  const brandName = input.brandName.trim() || meta?.brand?.trim() || '';
-
-  if (!brandName) return;
+  const brandName = options?.brandName?.trim() || meta?.brand?.trim() || '';
+  const platform = (options?.platform ?? account?.platform) as Platform | undefined;
+  if (!brandName || !platform) return;
 
   await reconcileTicketsForAccount({
-    accountId: input.accountId,
+    accountId,
     brandId,
     brandName,
-    platform: input.platform,
-    deviceY: input.deviceY,
+    platform,
   });
 }
 
@@ -534,21 +542,6 @@ export async function reconcileOpenTicketsForUser(
     }
   }
 
-  const accountIds = accounts.map((row) => row.id as string);
-  const deviceYByAccount = new Map<string, number>();
-  if (accountIds.length) {
-    const { data: snaps, error: snapError } = await supabase
-      .from(TABLES.accountSnapshots)
-      .select('account_id, groups_current, session_status')
-      .in('account_id', accountIds);
-    if (snapError) throw snapError;
-    for (const snap of snaps ?? []) {
-      const id = snap.account_id as string;
-      if (snap.session_status !== 'valid') continue;
-      deviceYByAccount.set(id, Math.max(0, Number(snap.groups_current ?? 0)));
-    }
-  }
-
   const jobs: ReconcileInput[] = [];
   for (const row of accounts) {
     const accountId = row.id as string;
@@ -564,7 +557,6 @@ export async function reconcileOpenTicketsForUser(
       brandId,
       brandName,
       platform: row.platform as Platform,
-      deviceY: deviceYByAccount.get(accountId),
     });
   }
 

@@ -13,7 +13,8 @@ export function isRowMisaligned(result: AccountSyncResult): boolean {
 
 /**
  * DB tidak punya grup akun + device 0 grup + brand X di master juga 0 → popup resume (OK saja).
- * Jika master X > 0 tetapi device 0 → tetap Scrape now / Not now.
+ * Modal [Now | Later] hanya bila ada data yang bisa di-scrape (device > 0, daily hari ini, atau brand X > 0).
+ * Jika master X > 0 tetapi device 0 → tetap Scrape now / Later.
  */
 export function shouldShowResumeOnlyEmpty(input: {
   result: AccountSyncResult;

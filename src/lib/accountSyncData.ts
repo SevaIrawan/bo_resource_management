@@ -2,9 +2,15 @@ import { DAILY_PHONE_SELECT } from '@/config/dbColumns';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import { computeIsMisaligned } from '@/lib/accountDisplayMetrics';
 import { dedupeDailyRowsByGroupId } from '@/lib/dedupeScrapeDaily';
+import {
+  buildDailyMatchIndexes,
+  findDailyRowForMaster,
+  type MasterDailyRow,
+} from '@/lib/masterDailyMatch';
 import { fetchDailyGroupCount } from '@/lib/accountScrapeData';
 import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
 import { hasValidAccountPhone } from '@/lib/accountPhone';
+import { fetchMasterGroupStatsViaRpc } from '@/lib/accountMasterStatsRpc';
 import { countBrandMasterGroups } from '@/lib/brandStandardCount';
 import { phonesMatch } from '@/lib/phoneNormalize';
 import { TABLES } from '@/config/tables';
@@ -63,7 +69,7 @@ function normalizeDbAccountId(accountId: string): string | null {
   return null;
 }
 
-/** Bandingkan daily akun vs master brand (join by group_id). */
+/** Bandingkan daily akun vs master brand — RPC Postgres dulu, fallback loop JS. */
 export async function fetchMasterGroupStatsForAccount(input: {
   accountId: string;
   brand: string;
@@ -74,15 +80,39 @@ export async function fetchMasterGroupStatsForAccount(input: {
   const empty = { brandMasterTotal: 0, joinedInMaster: 0, adminInMaster: 0 };
   if (!dbId) return empty;
 
+  const viaRpc = await fetchMasterGroupStatsViaRpc({
+    accountId: dbId,
+    brand,
+    platform: input.platform,
+  });
+  if (viaRpc) return viaRpc;
+
   const supabase = getSupabase();
   if (!supabase) return empty;
 
   const brandMasterTotal = await countBrandMasterGroups(brand, input.platform);
   if (brandMasterTotal <= 0) return { ...empty, brandMasterTotal: 0 };
 
+  const { count: dailyRowCount, error: dailyCountError } = await supabase
+    .from(TABLES.groupScrapeDaily)
+    .select('id', { count: 'exact', head: true })
+    .eq('account_id', dbId);
+
+  if (!dailyCountError) {
+    return {
+      brandMasterTotal,
+      joinedInMaster: Math.min(dailyRowCount ?? 0, brandMasterTotal),
+      adminInMaster: 0,
+    };
+  }
+
+  if (brandMasterTotal > 800) {
+    return { brandMasterTotal, joinedInMaster: 0, adminInMaster: 0 };
+  }
+
   const { data: masterRows, error: masterError } = await supabase
     .from(TABLES.groupsMaster)
-    .select('group_id')
+    .select('group_id, group_name, invite_link')
     .eq('brand', brand)
     .eq('platform', input.platform);
 
@@ -91,16 +121,13 @@ export async function fetchMasterGroupStatsForAccount(input: {
     throw masterError;
   }
 
-  const masterGids = new Set(
-    (masterRows ?? []).map((r) => String(r.group_id ?? '').trim()).filter(Boolean),
-  );
-  if (!masterGids.size) {
+  if (!masterRows?.length) {
     return { brandMasterTotal, joinedInMaster: 0, adminInMaster: 0 };
   }
 
-  const { data: dailyRows, error: dailyError } = await supabase
+  const { data: dailyRaw, error: dailyError } = await supabase
     .from(TABLES.groupScrapeDaily)
-    .select('group_id, is_admin')
+    .select('group_id, group_name, invite_link, is_admin')
     .eq('account_id', dbId);
 
   if (dailyError) {
@@ -108,13 +135,30 @@ export async function fetchMasterGroupStatsForAccount(input: {
     throw dailyError;
   }
 
+  const dailyRows = dedupeDailyRowsByGroupId(dailyRaw ?? []);
+  const dailyIndexes = buildDailyMatchIndexes(dailyRows as MasterDailyRow[]);
+
   let joinedInMaster = 0;
   let adminInMaster = 0;
-  for (const row of dedupeDailyRowsByGroupId(dailyRows ?? [])) {
-    const gid = String(row.group_id ?? '').trim();
-    if (!masterGids.has(gid)) continue;
+  const matchedDaily = new Set<string>();
+
+  for (const m of masterRows) {
+    const gid = String(m.group_id ?? '').trim();
+    if (!gid) continue;
+    const d = findDailyRowForMaster(
+      {
+        group_id: gid,
+        group_name: (m.group_name as string | null) ?? null,
+        invite_link: (m.invite_link as string | null) ?? null,
+      },
+      dailyIndexes,
+    );
+    if (!d) continue;
+    const dailyKey = String(d.group_id ?? '').trim();
+    if (matchedDaily.has(dailyKey)) continue;
+    matchedDaily.add(dailyKey);
     joinedInMaster += 1;
-    if (row.is_admin === 'yes') adminInMaster += 1;
+    if (d.is_admin === 'yes') adminInMaster += 1;
   }
 
   return { brandMasterTotal, joinedInMaster, adminInMaster };
@@ -134,12 +178,16 @@ export async function buildMetricsFromScrapeDaily(input: {
   deviceGroupCount?: number;
   /** Admin di device (grup scrape is_admin=yes). */
   deviceAdminCount?: number;
+  /** Sudah di-load batch — hindari RPC ganda saat buka halaman monitoring. */
+  masterHint?: MasterGroupStats;
 }): Promise<{ result: AccountSyncResult; master: MasterGroupStats }> {
-  const master = await fetchMasterGroupStatsForAccount({
-    accountId: input.accountId,
-    brand: input.brand,
-    platform: input.platform,
-  });
+  const master =
+    input.masterHint ??
+    (await fetchMasterGroupStatsForAccount({
+      accountId: input.accountId,
+      brand: input.brand,
+      platform: input.platform,
+    }));
 
   const dbId = normalizeDbAccountId(input.accountId);
   const dailyCount =
@@ -170,22 +218,27 @@ export async function buildMetricsFromScrapeDaily(input: {
   };
 }
 
+const MASTER_STATS_BATCH_CONCURRENCY = 3;
+
 export async function fetchMasterGroupStatsBatch(
   accounts: { id: string; brandName: string; platform: Platform }[],
 ): Promise<Map<string, MasterGroupStats>> {
   const map = new Map<string, MasterGroupStats>();
 
-  await Promise.all(
-    accounts.map(async (acc) => {
-      const key = normalizeDbAccountId(acc.id) ?? acc.id;
-      const stats = await fetchMasterGroupStatsForAccount({
-        accountId: acc.id,
-        brand: acc.brandName,
-        platform: acc.platform,
-      });
-      map.set(key, stats);
-    }),
-  );
+  for (let i = 0; i < accounts.length; i += MASTER_STATS_BATCH_CONCURRENCY) {
+    const chunk = accounts.slice(i, i + MASTER_STATS_BATCH_CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (acc) => {
+        const key = normalizeDbAccountId(acc.id) ?? acc.id;
+        const stats = await fetchMasterGroupStatsForAccount({
+          accountId: acc.id,
+          brand: acc.brandName,
+          platform: acc.platform,
+        });
+        map.set(key, stats);
+      }),
+    );
+  }
 
   return map;
 }

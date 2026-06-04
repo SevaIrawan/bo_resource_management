@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
 import { getEnvFilePath, loadAppEnv } from '../appEnv';
+import { withNetworkRetry } from '../lib/networkRetry';
 
 const SIDECAR_URL = 'http://127.0.0.1:8765';
 export { SIDECAR_URL };
@@ -78,17 +79,17 @@ async function parseSidecarJson<T>(res: Response): Promise<T> {
   }
 }
 
-async function waitForHealth(timeoutMs = 15000) {
+async function waitForHealth(timeoutMs = 25_000) {
   const started = Date.now();
 
   while (Date.now() - started < timeoutMs) {
     try {
-      const res = await fetch(`${SIDECAR_URL}/health`, { signal: AbortSignal.timeout(2000) });
+      const res = await fetch(`${SIDECAR_URL}/health`, { signal: AbortSignal.timeout(4_000) });
       if (res.ok) return;
     } catch {
       // sidecar still booting
     }
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 600));
   }
 
   throw new Error('Telegram sidecar failed to start');
@@ -158,7 +159,7 @@ export async function ensureSidecarRunning() {
         sidecarStarting = null;
       });
 
-      await waitForHealth();
+      await withNetworkRetry('Telegram sidecar boot', () => waitForHealth());
 
       const version = await readSidecarVersion();
       if (version !== SIDECAR_VERSION) {

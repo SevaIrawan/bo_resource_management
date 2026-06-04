@@ -4,6 +4,15 @@ import { app, BrowserWindow } from 'electron';
 import QRCode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
+import {
+  delayMs,
+  HUMAN_SETTLE_LONG_MS,
+  HUMAN_SETTLE_MEDIUM_MS,
+  HUMAN_SETTLE_SHORT_MS,
+  isRetryableNetworkError,
+  NETWORK_RETRY_ATTEMPTS,
+  withNetworkRetry,
+} from '../lib/networkRetry';
 import { withWaBrowserSlot } from './waBrowserPool';
 import { resolveWaChromeExecutable } from './waPuppeteerChrome';
 
@@ -23,12 +32,12 @@ interface WaSession {
 const sessions = new Map<string, WaSession>();
 const sessionLocks = new Map<string, Promise<unknown>>();
 /** Lock per sessionId — multi-akun WA boleh paralel (folder LocalAuth terpisah). */
-const WA_INIT_TIMEOUT_MS = 180_000;
+const WA_INIT_TIMEOUT_MS = 240_000;
 /** Bundled Chrome + web.whatsapp.com — PC lambat; jangan bunuh client sebelum QR sempat emit. */
-const WA_QR_APPEAR_DEADLINE_MS = 180_000;
-const WA_DESTROY_SETTLE_MS = 900;
-const WA_LOGIN_PREPARE_SETTLE_MS = 1_500;
-const WA_LOCK_WAIT_MS = 4_000;
+const WA_QR_APPEAR_DEADLINE_MS = 240_000;
+const WA_DESTROY_SETTLE_MS = HUMAN_SETTLE_SHORT_MS;
+const WA_LOGIN_PREPARE_SETTLE_MS = HUMAN_SETTLE_LONG_MS;
+const WA_LOCK_WAIT_MS = 6_000;
 
 const qrAppearTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function waSessionsRoot() {
@@ -50,10 +59,6 @@ export function hasWhatsAppDiskAuth(sessionId: string): boolean {
 function isBrowserAlreadyRunningError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
   return msg.toLowerCase().includes('browser is already running');
-}
-
-async function delayMs(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Satu operasi WA per sessionId — cegah double Puppeteer pada folder yang sama. */
@@ -395,7 +400,7 @@ async function initializeClientWithRetry(
   /** Dari modal login — wajib pakai window utama, jangan lookup global (hindari regresi import). */
   loginWin?: BrowserWindow | null,
 ): Promise<void> {
-  const maxAttempts = 5;
+  const maxAttempts = NETWORK_RETRY_ATTEMPTS;
 
   await withWaBrowserSlot(async () => {
     const win = loginWin ?? getNotifierWindow();
@@ -413,11 +418,17 @@ async function initializeClientWithRetry(
         await client.initialize();
         return;
       } catch (error) {
-        if (!isBrowserAlreadyRunningError(error) || attempt >= maxAttempts - 1) {
+        const retryable =
+          isBrowserAlreadyRunningError(error) || isRetryableNetworkError(error);
+        if (!retryable || attempt >= maxAttempts - 1) {
           throw error;
         }
+        console.warn(
+          `[WA init] retry ${attempt + 1}/${maxAttempts}:`,
+          error instanceof Error ? error.message : error,
+        );
         await destroyWhatsAppSession(sessionId);
-        await delayMs(WA_DESTROY_SETTLE_MS + 800 * (attempt + 1));
+        await delayMs(WA_DESTROY_SETTLE_MS + HUMAN_SETTLE_MEDIUM_MS * (attempt + 1));
       }
     }
   });
@@ -465,7 +476,7 @@ async function emitWhatsAppReady(sessionId: string, win: BrowserWindow) {
 }
 
 /** Restore disk saat buka modal login — gagal cepat, lanjut QR. */
-const WA_DISK_RESTORE_TIMEOUT_MS = 15_000;
+const WA_DISK_RESTORE_TIMEOUT_MS = 25_000;
 
 /** Client sudah hidup dari login QR — jangan buka Puppeteer kedua. */
 async function reuseConnectedWhatsAppSession(

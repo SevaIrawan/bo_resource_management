@@ -18,13 +18,16 @@ const checks = [
     ok: en.includes("platformAccountsBadge: 'WA {{wa}} Acc | TG {{tg}} ACC'"),
   },
   {
-    name: 'i18n grup: WA {{wa}} Group | TG {{tg}} Group',
-    ok: en.includes("platformGroupsBadge: 'WA {{wa}} Group | TG {{tg}} Group'"),
+    name: 'i18n grup per platform (klik → master detail)',
+    ok:
+      en.includes('platformGroupsBadgeWa') && en.includes('platformGroupsBadgeTg'),
   },
   {
-    name: 'Card memakai platformAccountsBadge + platformGroupsBadge',
+    name: 'Card: akun badge + grup badge klik (master modal)',
     ok:
-      card.includes('platformAccountsBadge') && card.includes('platformGroupsBadge'),
+      card.includes('platformAccountsBadge') &&
+      card.includes('BrandPlatformGroupsBadgeButton') &&
+      card.includes('BrandMasterGroupsModal'),
   },
   {
     name: 'Helper countAccountsByPlatform',

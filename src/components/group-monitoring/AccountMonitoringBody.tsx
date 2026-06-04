@@ -23,7 +23,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     filteredGroups,
     onGroupsChange,
     loading,
-    reloadTickets,
+    refreshIssues,
     setProbeSuspendAccountIds,
   } = useGroupMonitoring();
 
@@ -31,9 +31,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     onGroupsChange,
     userId: user?.id ?? null,
     canOperatePlatform,
-    onTicketsReload: () => {
-      void reloadTickets();
-    },
+    onTicketsReload: (dbAccountId) => refreshIssues(dbAccountId),
   });
 
   const removeSlot = useRemoveAccountFromSlot(onGroupsChange, user?.id, canManageStructure);

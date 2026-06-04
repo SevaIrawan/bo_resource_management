@@ -19,6 +19,7 @@ async function countWhatsAppGroupsInner(
   valid: boolean;
   totalGroups: number;
   adminGroups: number;
+  groupIds?: string[];
   message?: string;
 }> {
   return withWhatsAppClient(sessionId, async (client) => {
@@ -88,6 +89,7 @@ async function countWhatsAppGroupsInner(
       valid: true,
       totalGroups,
       adminGroups,
+      groupIds,
     };
   });
 }
@@ -97,6 +99,7 @@ export async function countWhatsAppGroupsQuick(sessionId: string): Promise<{
   valid: boolean;
   totalGroups: number;
   adminGroups: number;
+  groupIds?: string[];
   message?: string;
 }> {
   try {
@@ -116,6 +119,7 @@ export async function countWhatsAppGroups(sessionId: string): Promise<{
   valid: boolean;
   totalGroups: number;
   adminGroups: number;
+  groupIds?: string[];
   message?: string;
 }> {
   try {

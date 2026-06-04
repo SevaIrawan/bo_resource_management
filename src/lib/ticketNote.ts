@@ -5,16 +5,13 @@ type TranslateFn = (key: string, vars?: Record<string, string | number>) => stri
 
 /** English descriptions stored in DB (canonical). */
 export const ticketDescriptionEn = {
-  dailyJunk: (label: string) =>
-    `On device but not in brand master (inactive/banned/broken/history): ${label}`,
-  missingGroup: (label: string) => `Not joined to brand master group: ${label}`,
+  dailyJunk: (label: string) => `Extra on device, not in brand master: ${label}`,
+  missingGroup: (label: string) => `In brand master, missing on account: ${label}`,
   notAdmin: (label: string) => `Joined but not admin: ${label}`,
   duplicateGroupId: (deviceName: string, masterName: string) =>
     `Same group ID, different name: device "${deviceName}" vs master "${masterName}"`,
   duplicateGroupName: (name: string) =>
-    `Duplicate group name with different group IDs in brand master: "${name}"`,
-  countMismatch: (deviceY: number, brandX: number) =>
-    `Device (${deviceY}) does not match brand standard (${brandX}). Run Scraper or invite groups via export links.`,
+    `Same group name in master with different IDs: "${name}"`,
 };
 
 function suffixAfterColon(description: string): string {
@@ -35,17 +32,11 @@ function parseDuplicateName(description: string): string | null {
   return suffixAfterColon(description) || null;
 }
 
-function parseCountMismatch(description: string): { deviceY: number; brandX: number } | null {
-  const match = description.match(/\((\d+)\)[^(]*\((\d+)\)/);
-  if (!match) return null;
-  return { deviceY: Number(match[1]), brandX: Number(match[2]) };
-}
-
 function lineLabel(line?: Pick<TicketDetailLine, 'groupName' | 'groupId'>): string {
   return line?.groupName?.trim() || line?.groupId?.trim() || '';
 }
 
-/** UI / export note — EN or ZH via i18n; supports legacy Indonesian rows in DB. */
+/** UI / export note — EN or ZH via i18n. */
 export function ticketNoteForDisplay(
   t: TranslateFn,
   ticketType: TicketType,
@@ -53,24 +44,15 @@ export function ticketNoteForDisplay(
   line?: Pick<TicketDetailLine, 'groupName' | 'groupId'>,
 ): string {
   const desc = description.trim();
-  if (!desc && ticketType !== 'group_count_mismatch') {
-    const label = lineLabel(line);
-    if (!label) return '—';
-  }
+  const label = lineLabel(line) || suffixAfterColon(desc);
 
   switch (ticketType) {
-    case 'daily_junk_group': {
-      const label = lineLabel(line) || suffixAfterColon(desc);
-      return t('groupMonitoring.ticketPanel.notes.dailyJunk', { label });
-    }
-    case 'missing_group': {
-      const label = lineLabel(line) || suffixAfterColon(desc);
-      return t('groupMonitoring.ticketPanel.notes.missingGroup', { label });
-    }
-    case 'not_admin': {
-      const label = lineLabel(line) || suffixAfterColon(desc);
-      return t('groupMonitoring.ticketPanel.notes.notAdmin', { label });
-    }
+    case 'daily_junk_group':
+      return t('groupMonitoring.ticketPanel.notes.dailyJunk', { label: label || '—' });
+    case 'missing_group':
+      return t('groupMonitoring.ticketPanel.notes.missingGroup', { label: label || '—' });
+    case 'not_admin':
+      return t('groupMonitoring.ticketPanel.notes.notAdmin', { label: label || '—' });
     case 'duplicate_group_id': {
       const pair = parseQuotedPair(desc);
       if (pair) {
@@ -84,13 +66,6 @@ export function ticketNoteForDisplay(
         return t('groupMonitoring.ticketPanel.notes.duplicateGroupName', { name });
       }
       return desc || '—';
-    }
-    case 'group_count_mismatch': {
-      const counts = parseCountMismatch(desc);
-      if (counts) {
-        return t('groupMonitoring.ticketPanel.notes.countMismatch', counts);
-      }
-      return t('groupMonitoring.ticketPanel.headlineCountMismatch');
     }
     default:
       return desc || '—';

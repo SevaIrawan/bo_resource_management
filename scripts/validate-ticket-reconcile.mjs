@@ -11,21 +11,20 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const reconcile = read('src/lib/reconcileTickets.ts');
 const provider = read('src/providers/GroupMonitoringProvider.tsx');
 const groups = read('src/lib/ticketGroups.ts');
+const engine = read('src/lib/accountMonitoringEngine.ts');
+const realtime = read('src/hooks/useRealtimeMonitoring.ts');
 
 const checks = [
   {
-    name: 'missing_group: bandingkan master vs daily by group_id + invite_link master',
+    name: 'missing_group: bandingkan master vs daily (id + invite + nama)',
     ok:
       reconcile.includes("ticketType: 'missing_group'") &&
       reconcile.includes('groupLink: m.invite_link') &&
-      reconcile.includes('dailyByGid.get(gid)'),
+      reconcile.includes('findDailyRowForMaster'),
   },
   {
-    name: 'group_count_mismatch bila deviceY !== brandX (30 vs 1893)',
-    ok:
-      reconcile.includes("ticketType: 'group_count_mismatch'") &&
-      reconcile.includes('deviceY !== brandX') &&
-      reconcile.includes('Math.max(dailyY, snapY)'),
+    name: 'Tidak ada group_count_mismatch di reconcile',
+    ok: !reconcile.includes("ticketType: 'group_count_mismatch'"),
   },
   {
     name: 'Batch insert missing_group (skala ribuan grup)',
@@ -34,10 +33,16 @@ const checks = [
       reconcile.includes('TICKET_INSERT_CHUNK'),
   },
   {
-    name: 'reconcileOpenTicketsForUser + snapshot deviceY',
+    name: 'Lima tipe ticket (tanpa group_count_mismatch)',
     ok:
-      reconcile.includes('export async function reconcileOpenTicketsForUser') &&
-      reconcile.includes('deviceYByAccount'),
+      reconcile.includes("ticketType: 'daily_junk_group'") &&
+      reconcile.includes("ticketType: 'missing_group'") &&
+      reconcile.includes("ticketType: 'not_admin'") &&
+      reconcile.includes('resolveLegacyCountMismatchTickets'),
+  },
+  {
+    name: 'reconcileOpenTicketsForUser semua akun aktif',
+    ok: reconcile.includes('export async function reconcileOpenTicketsForUser'),
   },
   {
     name: 'Provider: reconcile saat load + refresh tab Ticket',
@@ -49,6 +54,61 @@ const checks = [
   {
     name: 'UI: satu kartu issue per akun+jenis (banyak baris link)',
     ok: groups.includes('ticketGroupKey') && groups.includes('group.lines'),
+  },
+  {
+    name: 'Sync: merge group_id device ke daily (issue ikut update)',
+    ok:
+      engine.includes('mergeDeviceGroupIdsIntoDaily') &&
+      engine.includes('device.groupIds'),
+  },
+  {
+    name: 'Provider: reconcile dulu lalu reload ticket',
+    ok:
+      provider.includes('reconcileTicketsForAccountFromDb') &&
+      provider.includes('applyAccountGroupsDailyPatch') &&
+      provider.includes('await reloadTickets()'),
+  },
+  {
+    name: 'Sync flow: await onTicketsReload(dbAccountId)',
+    ok:
+      /await onTicketsReload\?\.\(dbAccountId/.test(read('src/hooks/useAccountSyncFlow.ts')) &&
+      /refreshIssues\(dbAccountId/.test(
+        read('src/components/group-monitoring/AccountMonitoringBody.tsx'),
+      ),
+  },
+  {
+    name: 'Scrape: refresh Issue setelah clearRowProcessing',
+    ok: read('src/hooks/useAccountSyncFlow.ts').includes('scrapeSucceeded && dbAccountId'),
+  },
+  {
+    name: 'Realtime tickets: reload kartu segera',
+    ok:
+      realtime.includes('table: TABLES.tickets') &&
+      realtime.includes('onTicketsChangeRef.current()'),
+  },
+  {
+    name: 'batchUpsert: keepIds hanya dari rows masih missing (bukan semua open lama)',
+    ok:
+      reconcile.includes('Hanya group_id yang masih issue') &&
+      !reconcile.includes('keepIds.add(gid);\n    }\n  }\n\n  const toInsert'),
+  },
+  {
+    name: 'Match master↔daily: invite link + nama (masterDailyMatch)',
+    ok:
+      reconcile.includes('findDailyRowForMaster') &&
+      fs.existsSync(path.join(root, 'src/lib/masterDailyMatch.ts')),
+  },
+  {
+    name: 'Realtime daily: reconcile akun lalu patch groups',
+    ok:
+      realtime.includes('onAccountDailyChangedRef.current?.(accountId)') &&
+      !realtime.includes('onTicketsChangeRef.current();\n            notifyChange();'),
+  },
+  {
+    name: 'Realtime snapshot: trigger reconcile issue',
+    ok:
+      realtime.includes('patchAccountSnapshotInGroups') &&
+      realtime.includes('onIssueReconcileRef'),
   },
 ];
 

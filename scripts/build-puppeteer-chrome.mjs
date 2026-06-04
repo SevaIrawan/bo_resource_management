@@ -7,9 +7,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import puppeteer from 'puppeteer';
 import { findChromeBinaryUnder } from './lib/cross-platform-artifacts.mjs';
-import { npxBin, runProcess } from './lib/run-process.mjs';
+import { runProcess } from './lib/run-process.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const puppeteerBrowsersCli = path.join(
+  root,
+  'node_modules',
+  '@puppeteer',
+  'browsers',
+  'lib',
+  'cjs',
+  'main-cli.js',
+);
 const cacheDir = path.join(root, 'resources', 'puppeteer-cache');
 const chromeRoot = path.join(cacheDir, 'chrome');
 
@@ -19,7 +28,12 @@ process.env.PUPPETEER_CACHE_DIR = cacheDir;
 console.log(`==> Puppeteer: install Chrome (cache: resources/puppeteer-cache)`);
 console.log(`    Platform: ${process.platform}`);
 
-runProcess('puppeteer browsers install chrome', npxBin(), ['puppeteer', 'browsers', 'install', 'chrome'], {
+if (!fs.existsSync(puppeteerBrowsersCli)) {
+  console.error(`ERROR: ${puppeteerBrowsersCli} tidak ada. Jalankan npm ci dulu.`);
+  process.exit(1);
+}
+
+runProcess('puppeteer browsers install chrome', process.execPath, [puppeteerBrowsersCli, 'install', 'chrome'], {
   cwd: root,
   env: { ...process.env, PUPPETEER_CACHE_DIR: cacheDir },
 });

@@ -30,8 +30,12 @@ if (target === 'linux' && process.platform !== 'linux') {
   );
 }
 
-runProcess('Chrome untuk WhatsApp (Puppeteer)', npmBin(), ['run', 'build:chrome'], { cwd: root });
-runProcess('Sidecar Telegram', npmBin(), ['run', 'build:sidecar'], { cwd: root });
+runProcess('Chrome untuk WhatsApp (Puppeteer)', process.execPath, [
+  path.join(root, 'scripts', 'build-puppeteer-chrome.mjs'),
+], { cwd: root });
+runProcess('Sidecar Telegram', process.execPath, [
+  path.join(root, 'scripts', 'build-telegram-sidecar.mjs'),
+], { cwd: root });
 runProcess('Validasi .env organisasi', process.execPath, [
   path.join(root, 'scripts', 'validate-org-env.mjs'),
 ], { cwd: root });

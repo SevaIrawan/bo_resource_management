@@ -30,19 +30,23 @@ function projectRoot() {
   return app.isPackaged ? app.getAppPath() : process.cwd();
 }
 
-function bundledSidecarExe(): string {
-  return path.join(process.resourcesPath, 'sidecar', 'rm-telegram-sidecar.exe');
+export function sidecarBinaryFileName(platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' ? 'rm-telegram-sidecar.exe' : 'rm-telegram-sidecar';
+}
+
+function bundledSidecarPath(): string {
+  return path.join(process.resourcesPath, 'sidecar', sidecarBinaryFileName());
 }
 
 function resolveSidecarLaunch(): { command: string; args: string[]; cwd: string } {
   if (app.isPackaged) {
-    const exe = bundledSidecarExe();
-    if (!fs.existsSync(exe)) {
+    const binary = bundledSidecarPath();
+    if (!fs.existsSync(binary)) {
       throw new Error(
         'Komponen Telegram tidak ditemukan di instalasi. Install ulang Resource Management.',
       );
     }
-    return { command: exe, args: [], cwd: path.dirname(exe) };
+    return { command: binary, args: [], cwd: path.dirname(binary) };
   }
 
   const root = projectRoot();

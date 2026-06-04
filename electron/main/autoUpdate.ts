@@ -63,7 +63,7 @@ function schedulePeriodicChecks() {
   checkTimer = setInterval(runCheck, CHECK_INTERVAL_MS);
 }
 
-/** Auto-update dari GitHub Releases — hanya app terinstall (.exe), bukan npm run dev. */
+/** Auto-update dari GitHub Releases — hanya app terinstall, bukan npm run dev. */
 export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
   if (!app.isPackaged) return;
 

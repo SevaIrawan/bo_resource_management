@@ -4,44 +4,36 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  CHROME_BINARY,
+  findChromeBinaryUnder,
+  sidecarBinaryName,
+  sidecarResourcePath,
+} from './lib/cross-platform-artifacts.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-const CHROME_BINARY = process.platform === 'win32' ? 'chrome.exe' : 'chrome';
-
-function findChromeExeUnder(dir, depth = 0) {
-  if (depth > 10 || !fs.existsSync(dir)) return null;
-  let entries;
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isFile() && entry.name === CHROME_BINARY) return full;
-    if (entry.isDirectory()) {
-      const nested = findChromeExeUnder(full, depth + 1);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
-
 const pkg = JSON.parse(read('package.json'));
-const extra = pkg.build?.extraResources ?? [];
-const files = pkg.build?.files ?? [];
-const asarUnpack = pkg.build?.asarUnpack ?? [];
+const build = pkg.build ?? {};
+const extra = build.extraResources ?? [];
+const files = build.files ?? [];
+const asarUnpack = build.asarUnpack ?? [];
+const sidecarName = sidecarBinaryName();
+const sidecarPath = sidecarResourcePath(root);
+
+function platformExtraResources(platformKey) {
+  return [...extra, ...(build[platformKey]?.extraResources ?? [])];
+}
 
 const checks = [
   {
-    name: 'Chrome terbundel (resources/puppeteer-cache)',
-    ok: Boolean(findChromeExeUnder(path.join(root, 'resources', 'puppeteer-cache', 'chrome'))),
+    name: `Chrome terbundel (resources/puppeteer-cache) — ${CHROME_BINARY}`,
+    ok: Boolean(findChromeBinaryUnder(path.join(root, 'resources', 'puppeteer-cache', 'chrome'))),
   },
   {
-    name: 'Sidecar Telegram (.exe)',
-    ok: fs.existsSync(path.join(root, 'resources', 'sidecar', 'rm-telegram-sidecar.exe')),
+    name: `Sidecar Telegram (${sidecarName})`,
+    ok: fs.existsSync(sidecarPath),
   },
   {
     name: 'Template env organisasi',
@@ -52,8 +44,16 @@ const checks = [
     ok: extra.some((e) => String(e.to).includes('puppeteer-chrome')),
   },
   {
-    name: 'extraResources: sidecar exe',
-    ok: extra.some((e) => String(e.to).includes('sidecar/rm-telegram-sidecar')),
+    name: `extraResources Win: sidecar ${sidecarBinaryName('win32')}`,
+    ok: platformExtraResources('win').some((e) =>
+      String(e.to).includes(`sidecar/${sidecarBinaryName('win32')}`),
+    ),
+  },
+  {
+    name: `extraResources Mac/Linux: sidecar ${sidecarBinaryName('darwin')}`,
+    ok: platformExtraResources('mac').some((e) =>
+      String(e.to).includes(`sidecar/${sidecarBinaryName('darwin')}`),
+    ),
   },
   {
     name: 'extraResources: org-default.env',

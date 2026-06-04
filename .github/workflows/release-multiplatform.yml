@@ -1,0 +1,160 @@
+name: Release multi-platform
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versi rilis (kosongkan = package.json)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write org .env from secret
+        shell: bash
+        env:
+          ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
+        run: |
+          if [ -z "$ORG_ENV_FILE" ]; then
+            echo "ORG_ENV_FILE secret missing — skip (build may fail validate-org-env)"
+            exit 0
+          fi
+          echo "$ORG_ENV_FILE" | base64 -d > .env
+
+      - name: Build Windows installer
+        run: npm run build:installer:win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-win
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+            release/win-unpacked/**
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write org .env from secret
+        env:
+          ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
+        run: |
+          if [ -n "$ORG_ENV_FILE" ]; then
+            echo "$ORG_ENV_FILE" | base64 -d > .env
+          fi
+
+      - name: Build macOS installer
+        run: npm run build:installer:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-mac
+          path: |
+            release/*.dmg
+            release/*.dmg.blockmap
+            release/latest-mac.yml
+            release/mac/**
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Linux build deps
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write org .env from secret
+        env:
+          ORG_ENV_FILE: ${{ secrets.ORG_ENV_FILE }}
+        run: |
+          if [ -n "$ORG_ENV_FILE" ]; then
+            echo "$ORG_ENV_FILE" | base64 -d > .env
+          fi
+
+      - name: Build Linux installer
+        run: npm run build:installer:linux
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/latest-linux.yml
+            release/linux-unpacked/**
+
+  publish:
+    needs: [build-win, build-mac, build-linux]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Merge release folder
+        run: |
+          mkdir -p release
+          cp -v artifacts/release-win/* release/ 2>/dev/null || true
+          cp -v artifacts/release-mac/* release/ 2>/dev/null || true
+          cp -v artifacts/release-linux/* release/ 2>/dev/null || true
+          ls -la release/
+
+      - name: Create GitHub Release (manual upload step)
+        run: |
+          echo "Artefak siap di folder release/. Upload ke GitHub Release v$(node -p "require('./package.json').version") via gh CLI atau UI."
+          echo "Set GH_TOKEN + gh release create ... jika otomatis penuh diperlukan."

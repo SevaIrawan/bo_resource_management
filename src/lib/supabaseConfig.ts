@@ -21,7 +21,7 @@ function applyConfig(nextUrl: string, nextKey: string) {
       : null;
 }
 
-/** Dev: .env Vite. Produksi (.exe): baca %APPDATA%/Resource Management/.env via Electron. */
+/** Dev: .env Vite. Produksi (app terinstall): userData/.env via Electron IPC. */
 export async function initSupabaseConfig(): Promise<void> {
   if (initDone) return;
   initDone = true;

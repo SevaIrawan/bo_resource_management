@@ -37,7 +37,7 @@ const errors = [];
 
 if (!devExe) {
   errors.push(
-    `chrome.exe tidak ditemukan di ${cacheChromeRoot}\n` +
+    `${CHROME_BINARY} tidak ditemukan di ${cacheChromeRoot}\n` +
       '  Jalankan: npm run build:chrome',
   );
 } else {

@@ -3,6 +3,7 @@
 **Versi dokumen:** 2026-06-02  
 **Versi aplikasi:** `1.0.4` (lihat `package.json`)  
 **Status:** Produksi internal — desktop Windows untuk tim operasional perusahaan  
+**Rencana:** Installer macOS & Linux — [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) (prepare, belum rilis)
 
 ---
 
@@ -82,10 +83,23 @@ WhatsApp **tidak** memakai API key — login QR/pairing per akun.
 ```powershell
 cd "C:\Work\Resource Management"
 # .env di root project HARUS lengkap (validate-org-env)
-npm run build:installer
+npm run build:installer        # OS saat ini
+npm run build:installer:win    # Windows eksplisit
 ```
 
-Output: `release\Resource Management Setup 1.0.4.exe`
+**macOS / Linux** (build di mesin atau CI OS yang sama):
+
+```bash
+npm run build:installer:mac
+npm run build:installer:linux
+# atau: bash scripts/build-installer.sh mac
+```
+
+Output Windows: `release\Resource Management Setup 1.0.4.exe`  
+Output macOS: `release/Resource Management-x.x.x.dmg`  
+Output Linux: `release/Resource Management-x.x.x.AppImage` (+ `.deb`)
+
+Rencana lengkap: [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md)
 
 **Yang terbundel dalam satu paket:**
 
@@ -276,12 +290,15 @@ release/                Output installer (gitignore)
 
 | File | Isi |
 |------|-----|
+| **[docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md)** | **Perencanaan installer Windows + macOS + Linux** (Fase 0–7) |
 | **[docs/guides/documents/](./docs/guides/documents/)** | **Panduan user — PDF & Word (EN + 中文)** — bukan Markdown |
 | [docs/guides/README.md](./docs/guides/README.md) | Cara bagikan ke tim |
 | [docs/HANDBOOK.md](./docs/HANDBOOK.md) | Referensi internal (ID) |
 | `docs/guides/_source/` | Sumber IT saja — jangan kirim ke user |
 | [SUPABASE_RUNBOOK.md](./SUPABASE_RUNBOOK.md) | Urutan SQL wajib |
-| [INSTALL-WINDOWS.md](./INSTALL-WINDOWS.md) | Panduan install singkat |
+| [INSTALL-WINDOWS.md](./INSTALL-WINDOWS.md) | Panduan install singkat (Windows — produksi) |
+| [INSTALL-MACOS.md](./INSTALL-MACOS.md) | Panduan install Mac (setelah rilis multi-platform) |
+| [INSTALL-LINUX.md](./INSTALL-LINUX.md) | Panduan install Linux (setelah rilis multi-platform) |
 | [README.md](./README.md) | Quick start developer |
 | [.cursorrules](./.cursorrules) | Kontrak bisnis ticket & multi-akun untuk AI/dev |
 

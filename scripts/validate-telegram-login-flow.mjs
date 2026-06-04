@@ -84,9 +84,10 @@ const checks = [
     ok: mainPy.includes('RM_ENV_FILE') && mainPy.includes('load_dotenv'),
   },
   {
-    name: 'Installer: bundled sidecar exe path (packaged)',
+    name: 'Installer: bundled sidecar path (packaged, multi-platform)',
     ok:
-      sidecarTs.includes('rm-telegram-sidecar.exe') &&
+      sidecarTs.includes('sidecarBinaryFileName') &&
+      sidecarTs.includes('bundledSidecarPath') &&
       sidecarTs.includes('process.resourcesPath'),
   },
   {

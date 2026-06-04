@@ -7,10 +7,16 @@
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
-    "build:sidecar": "powershell -ExecutionPolicy Bypass -File scripts/build-telegram-sidecar.ps1",
-    "build:chrome": "powershell -ExecutionPolicy Bypass -File scripts/build-puppeteer-chrome.ps1",
+    "build:sidecar": "node scripts/build-telegram-sidecar.mjs",
+    "build:chrome": "node scripts/build-puppeteer-chrome.mjs",
     "build:app": "node scripts/validate-puppeteer-chrome.mjs && vite build && electron-builder --win",
-    "build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
+    "build:app:win": "node scripts/validate-puppeteer-chrome.mjs && vite build && electron-builder --win",
+    "build:app:mac": "node scripts/validate-puppeteer-chrome.mjs && vite build && electron-builder --mac",
+    "build:app:linux": "node scripts/validate-puppeteer-chrome.mjs && vite build && electron-builder --linux",
+    "build:installer": "node scripts/build-installer.mjs",
+    "build:installer:win": "node scripts/build-installer.mjs win",
+    "build:installer:mac": "node scripts/build-installer.mjs mac",
+    "build:installer:linux": "node scripts/build-installer.mjs linux",
     "build:operator": "powershell -ExecutionPolicy Bypass -File scripts/build-operator-installer.ps1",
     "build:handbook-docs": "node scripts/build-handbook-documents.mjs",
     "build:handbook-pdf": "npm run build:handbook-docs",
@@ -36,7 +42,8 @@
     "validate:brand-card-filter": "node scripts/validate-brand-card-filter.mjs",
     "validate:brand-remove-detail": "node scripts/validate-brand-remove-detail.mjs",
     "validate:ticket-reconcile": "node scripts/validate-ticket-reconcile.mjs",
-    "validate:desktop": "npm run validate:session-flow && npm run validate:multi-account-wa && npm run validate:telegram-login && npm run validate:puppeteer-chrome && npm run validate:wa-qr-login && npm run validate:electron-imports && npm run validate:post-login-sync && npm run validate:device-group-scale && npm run validate:installer-package && npm run validate:refresh-notification && npm run validate:brand-card-badges && npm run validate:kpi-five-cards && npm run validate:release-version && npm run validate:brand-card-filter && npm run validate:brand-remove-detail && npm run validate:ticket-reconcile",
+    "validate:cross-platform-build": "node scripts/validate-cross-platform-build.mjs",
+    "validate:desktop": "npm run validate:session-flow && npm run validate:multi-account-wa && npm run validate:telegram-login && npm run validate:puppeteer-chrome && npm run validate:wa-qr-login && npm run validate:electron-imports && npm run validate:post-login-sync && npm run validate:device-group-scale && npm run validate:installer-package && npm run validate:refresh-notification && npm run validate:brand-card-badges && npm run validate:kpi-five-cards && npm run validate:release-version && npm run validate:brand-card-filter && npm run validate:brand-remove-detail && npm run validate:ticket-reconcile && npm run validate:cross-platform-build",
     "validate:pre-release": "npm run validate:desktop && npm run typecheck",
     "audit:reload": "node scripts/audit-reload-all-flow.mjs",
     "diagnose:session": "node scripts/diagnose-session.mjs",
@@ -91,7 +98,43 @@
       "target": [
         "nsis"
       ],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "extraResources": [
+        {
+          "from": "resources/sidecar/rm-telegram-sidecar.exe",
+          "to": "sidecar/rm-telegram-sidecar.exe"
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extraResources": [
+        {
+          "from": "resources/sidecar/rm-telegram-sidecar",
+          "to": "sidecar/rm-telegram-sidecar"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "executableName": "resource-management",
+      "extraResources": [
+        {
+          "from": "resources/sidecar/rm-telegram-sidecar",
+          "to": "sidecar/rm-telegram-sidecar"
+        }
+      ]
     },
     "files": [
       "dist/**/*",
@@ -105,10 +148,6 @@
       "**/node_modules/@puppeteer/**"
     ],
     "extraResources": [
-      {
-        "from": "resources/sidecar/rm-telegram-sidecar.exe",
-        "to": "sidecar/rm-telegram-sidecar.exe"
-      },
       {
         "from": "resources/env-template.env",
         "to": "env-template.env"

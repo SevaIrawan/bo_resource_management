@@ -4,6 +4,8 @@ Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary
 
 **Dokumen resmi (kondisi proyek terkini):** **[PROJECT.md](./PROJECT.md)** — arsitektur, installer, auto-update, Supabase realtime, kontrak internal.
 
+**Rencana installer macOS & Linux:** [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) (prepare — produksi saat ini Windows only).
+
 **Panduan user (PDF / Word, bukan Markdown):** [docs/guides/documents/](./docs/guides/documents/) · rebuild: `npm run build:handbook-docs`
 
 ## Stack

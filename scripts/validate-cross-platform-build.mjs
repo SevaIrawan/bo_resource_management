@@ -29,7 +29,10 @@ const checks = [
   },
   {
     name: 'build.linux target AppImage',
-    ok: Array.isArray(build.linux?.target) && build.linux.target.includes('AppImage'),
+    ok:
+      Array.isArray(build.linux?.target) &&
+      build.linux.target.includes('AppImage') &&
+      !build.linux.target.includes('deb'),
   },
   {
     name: 'Mac entitlements.plist',

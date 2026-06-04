@@ -125,8 +125,7 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ],
       "category": "Office",
       "executableName": "resource-management",

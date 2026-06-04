@@ -19,10 +19,28 @@ const builtPath = path.join(distPath, binaryName);
 const destPath = sidecarResourcePath(root);
 
 function pythonCommand() {
-  if (process.platform === 'win32') {
-    return { bin: 'py', args: ['-3'] };
+  const fromEnv = process.env.PYTHON?.trim();
+  if (fromEnv) return { bin: fromEnv, args: [] };
+
+  const candidates =
+    process.platform === 'win32'
+      ? [
+          ['python', []],
+          ['py', ['-3']],
+        ]
+      : [['python3', []], ['python', []]];
+
+  for (const [bin, args] of candidates) {
+    const probe = spawnSync(bin, [...args, '--version'], {
+      shell: process.platform === 'win32',
+      stdio: 'ignore',
+    });
+    if (probe.status === 0) return { bin, args };
   }
-  return { bin: 'python3', args: [] };
+
+  return process.platform === 'win32'
+    ? { bin: 'python', args: [] }
+    : { bin: 'python3', args: [] };
 }
 
 function run(label, bin, args, cwd = root) {

@@ -55,7 +55,12 @@ if (!fs.existsSync(envFile)) {
 fs.copyFileSync(envFile, orgDefault);
 console.log('OK: org-default.env dari .env');
 
-run('Validasi pre-release (desktop + typecheck)', 'npm', ['run', 'validate:pre-release']);
+if (process.env.CI === 'true') {
+  run('Validasi CI (installer + typecheck)', 'npm', ['run', 'typecheck']);
+  run('Validasi paket installer', 'node', ['scripts/validate-installer-package.mjs']);
+} else {
+  run('Validasi pre-release (desktop + typecheck)', 'npm', ['run', 'validate:pre-release']);
+}
 run('Validasi Chrome bundel', 'node', ['scripts/validate-puppeteer-chrome.mjs']);
 run('Vite production build', 'npx', ['vite', 'build']);
 

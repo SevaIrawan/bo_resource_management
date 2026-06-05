@@ -1,15 +1,6 @@
 # Rilis GitHub Actions — panduan IT (wajib baca)
 
-## Kenapa CI merah setelah v1.0.6?
-
-**`ORG_ENV_FILE` sudah benar** (bukti: rilis **v1.0.6** sukses, run #7).
-
-Kegagalan **v1.0.8** bukan karena secret hilang, melainkan:
-
-1. **`--config electron-builder.publish.json` di `build:installer`** — dilarang (mengabaikan `package.json`). File `electron-builder.publish.json` **hanya** blok `publish`, **tanpa** `"extends": "./package.json"` (itu bikin error `unknown property build` saat `npm run publish:github`). Build: `cross-platform-artifacts.mjs`. Upload lokal: `publish-release.mjs` + `GH_TOKEN`.
-2. **`resources/sidecar-build/` (venv PyInstaller)** — symlink `bin/python` ke Python sistem → Mac error `Cannot copy file ... outside the package`. Perbaikan: hapus folder sebelum pack + exclude di `package.json` `build.files`.
-3. **Windows:** `prepare-win-codesign-cache.ps1` — extract `7za -xr!darwin` (hindari symlink macOS di cache).
-4. **Metadata rilis:** `latest*.yml` nama strip vs titik; Mac butuh `.zip` untuk auto-update (`sync-release-yml.mjs` di job publish).
+**Versi acuan saat ini:** `1.0.10` (`package.json` + `scripts/validate-release-version.mjs` + `PROJECT.md`)
 
 ---
 
@@ -35,15 +26,15 @@ Kunci wajib di `.env`: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGR
 
 ## Cara rilis (urutan benar)
 
-1. Naikkan `version` di `package.json` + `scripts/validate-release-version.mjs` + `PROJECT.md`.
-2. Commit & push (hanya perubahan version memicu workflow otomatis).
+1. Naikkan `version` di `package.json` + `scripts/validate-release-version.mjs` + `PROJECT.md` (+ dokumen install jika perlu).
+2. Commit & push ke `main` (perubahan `package.json` version memicu workflow **Release multi-platform**).
 3. **Actions → Release multi-platform** — tunggu hijau (~30–90 menit).
 4. Cek **Releases → v{x.y.z}** ada:
    - `Resource.Management.Setup.x.y.z.exe` (Windows)
-   - `Resource.Management-x.y.z-arm64.dmg` + `.zip` (Mac)
+   - `Resource.Management-x.y.z-arm64.dmg` + `.zip` (Mac auto-update)
    - `Resource.Management-x.y.z.AppImage` (Linux)
-   - `latest.yml`, `latest-mac.yml`, `latest-linux.yml`
-5. **Hotfix metadata rilis lama** (mis. v1.0.6): **Actions → Fix release yml** → tag `v1.0.6` → Run.
+   - `latest.yml`, `latest-mac.yml`, `latest-linux.yml` (dari job publish + `sync-release-yml.mjs`)
+5. **Hotfix metadata rilis lama:** **Actions → Fix release yml** → isi tag (mis. `v1.0.10`) → Run.
 
 **Jangan** push berkali-kali kalau CI belum hijau.
 
@@ -54,7 +45,7 @@ npm run validate:installer-pipeline
 npm run build:installer:win
 ```
 
-Kalau release `v1.0.8` sudah ada di GitHub tapi gagal, workflow **skip** otomatis — pakai **Actions → Release multi-platform → Run workflow → centang Force rebuild**, bukan push ulang berkali-kali.
+Kalau release sudah ada di GitHub tapi gagal, workflow **skip** otomatis — pakai **Actions → Release multi-platform → Run workflow → centang Force rebuild**.
 
 ---
 
@@ -69,6 +60,16 @@ npm run build:operator   # HANYA .exe Windows
 
 ---
 
+## Catatan historis (v1.0.8)
+
+Kegagalan **v1.0.8** bukan karena secret hilang. Penyebab utama sudah diperbaiki di **v1.0.9+**:
+
+- `artifactName` titik di `package.json` (bukan spasi)
+- `sync-release-yml.mjs` + validasi upload
+- CI tidak upload `latest*.yml` duplikat dari job platform
+
+---
+
 ## Client tidak bisa install / update
 
-Lihat **[CLIENT-INSTALL.md](./CLIENT-INSTALL.md)** — install manual dari **v1.0.6** dulu; update in-app setelah yml diperbaiki + rilis baru Published.
+Lihat **[CLIENT-INSTALL.md](./CLIENT-INSTALL.md)** — install manual dari release terbaru; update in-app setelah rilis **Published** + yml valid.

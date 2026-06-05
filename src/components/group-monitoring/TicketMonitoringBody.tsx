@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TicketCardList } from '@/components/group-monitoring/TicketCard';
 import { TicketIssueDetailModal } from '@/components/group-monitoring/TicketIssueDetailModal';
 import type { TicketSummaryGroup } from '@/lib/ticketGroups';
@@ -10,6 +10,13 @@ export function TicketMonitoringBody() {
   const { filteredTicketSummaries, ticketSummaries, loading, ticketFilters } =
     useGroupMonitoring();
   const [detailGroup, setDetailGroup] = useState<TicketSummaryGroup | null>(null);
+
+  useEffect(() => {
+    setDetailGroup((current) => {
+      if (!current) return null;
+      return ticketSummaries.find((group) => group.key === current.key) ?? null;
+    });
+  }, [ticketSummaries]);
 
   if (loading) {
     return <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>;
@@ -37,22 +44,21 @@ export function TicketMonitoringBody() {
   return (
     <div className="ticket-monitoring-body">
       {hasFiltered ? (
-        <>
-          <TicketCardList
-            groups={filteredTicketSummaries}
-            onOpenDetail={setDetailGroup}
-          />
-          <TicketIssueDetailModal
-            group={detailGroup}
-            onClose={() => setDetailGroup(null)}
-          />
-        </>
+        <TicketCardList
+          groups={filteredTicketSummaries}
+          onOpenDetail={setDetailGroup}
+        />
       ) : (
         <div className="ticket-card-list ticket-card-list--empty">
           <p className="ticket-empty-title">{emptyTitle}</p>
           <p className="ticket-empty-desc">{emptyDesc}</p>
         </div>
       )}
+
+      <TicketIssueDetailModal
+        group={detailGroup}
+        onClose={() => setDetailGroup(null)}
+      />
     </div>
   );
 }

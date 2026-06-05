@@ -57,8 +57,8 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     - daily_junk_group — grup di device, tidak di master (MORE / sampah).
     - missing_group — grup di master, belum di device akun (LESS / perlu invite).
     - not_admin — sudah join, belum admin.
-    - duplicate_group_id — group_id sama, nama beda vs master.
-    - duplicate_group_name — nama sama di master, group_id beda.
+    - duplicate_group_id — group_id sama (HP & master), nama beda.
+    - duplicate_group_name — group_id beda (HP vs master), nama sama.
     TIDAK ada group_count_mismatch (agregat Y≠X).
     Implementasi: reconcileTickets.ts + label UI ticketPanel (en/zh).
 

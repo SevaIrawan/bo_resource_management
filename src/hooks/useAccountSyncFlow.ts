@@ -527,7 +527,7 @@ export function useAccountSyncFlow({
         );
 
         if (brandId) {
-          void Promise.resolve(onTicketsReload?.(dbAccountId)).catch(() => undefined);
+          await onTicketsReload?.(dbAccountId);
         }
       } catch (error) {
         stopLoading();
@@ -961,9 +961,6 @@ export function useAccountSyncFlow({
         )?.data?.brand_id as string | undefined;
       if (savedIntent === 'scraper') {
         void runScrapeInBackground({ groupId, account: updatedAccount, dbAccountId });
-        if (brandIdAfterLogin) {
-          void Promise.resolve(onTicketsReload?.(dbAccountId)).catch(() => undefined);
-        }
         return;
       }
 
@@ -976,7 +973,7 @@ export function useAccountSyncFlow({
       );
 
       if (brandIdAfterLogin) {
-        void Promise.resolve(onTicketsReload?.(dbAccountId)).catch(() => undefined);
+        await onTicketsReload?.(dbAccountId);
       }
     } catch (error) {
       if (persistedToDb && dbAccountId && (await hasActivePlatformSession(dbAccountId))) {

@@ -105,6 +105,34 @@ const checks = [
       !realtime.includes('onTicketsChangeRef.current();\n            notifyChange();'),
   },
   {
+    name: 'Realtime scrape selesai → reconcile akun + reload ticket',
+    ok:
+      realtime.includes('table: TABLES.scrapeRuns') &&
+      realtime.includes("status === 'completed'") &&
+      realtime.includes('onAccountDailyChangedRef.current?.(accountId)'),
+  },
+  {
+    name: 'Detail ticket: double-click modal + export Excel',
+    ok:
+      fs.existsSync(path.join(root, 'src/components/group-monitoring/TicketIssueDetailModal.tsx')) &&
+      read('src/components/group-monitoring/TicketCard.tsx').includes('onDoubleClick') &&
+      read('src/components/group-monitoring/TicketCard.tsx').includes('exportTicketGroupExcel') &&
+      read('src/lib/ticketExportRows.ts').includes('ticketGroupToExportRows'),
+  },
+  {
+    name: 'Scrape selesai → await refreshIssues (reconcile + reload)',
+    ok:
+      read('src/hooks/useAccountSyncFlow.ts').includes('scrapeSucceeded && dbAccountId') &&
+      read('src/hooks/useAccountSyncFlow.ts').includes('await onTicketsReload?.(dbAccountId)'),
+  },
+  {
+    name: 'Issue hilang → resolveTickets tutup open ticket',
+    ok:
+      reconcile.includes('async function resolveTickets') &&
+      reconcile.includes("status: 'resolved'") &&
+      reconcile.includes('await resolveTickets({'),
+  },
+  {
     name: 'Realtime snapshot: trigger reconcile issue',
     ok:
       realtime.includes('patchAccountSnapshotInGroups') &&

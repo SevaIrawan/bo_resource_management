@@ -4,6 +4,7 @@ import {
   findDailyRowForMaster,
   isDailyRowInMasterSet,
   normalizeGroupIdForMatch,
+  normalizeGroupNameForMatch,
   type MasterDailyRow,
 } from '@/lib/masterDailyMatch';
 import { TABLES } from '@/config/tables';
@@ -285,35 +286,44 @@ async function detectFraudTickets(input: ReconcileInput): Promise<void> {
     keepGroupNames: new Set(),
   });
 
-  const nameToGids = new Map<string, Set<string>>();
-  for (const m of masterRows) {
-    const name = String(m.group_name ?? '').trim().toLowerCase();
-    const gid = String(m.group_id ?? '').trim();
-    if (!name || !gid) continue;
-    if (!nameToGids.has(name)) nameToGids.set(name, new Set());
-    nameToGids.get(name)!.add(gid);
-  }
+  for (const d of dailyRows) {
+    const gid = String(d.group_id ?? '').trim();
+    const gname = String(d.group_name ?? '').trim();
+    const gnameNorm = normalizeGroupNameForMatch(d.group_name);
+    if (!gid || !gnameNorm) continue;
 
-  for (const [name, gids] of nameToGids) {
-    if (gids.size < 2) continue;
-
-    for (const d of dailyRows) {
-      const gname = String(d.group_name ?? '').trim().toLowerCase();
-      const gid = String(d.group_id ?? '').trim();
-      if (gname !== name || !gids.has(gid)) continue;
-
-      await upsertOpenTicket({
-        accountId: input.accountId,
-        brandId: input.brandId,
-        platform: input.platform,
-        ticketType: 'duplicate_group_name',
-        description: ticketDescriptionEn.duplicateGroupName(name),
-        groupLink: d.invite_link,
-        groupId: gid,
-        groupName: d.group_name,
-      });
-      dupNameKeep.add(gid);
+    const gidNorm = normalizeGroupIdForMatch(gid);
+    const canon = masterByGid.get(gid);
+    if (canon) {
+      const canonNameNorm = normalizeGroupNameForMatch(canon.group_name);
+      if (gnameNorm !== canonNameNorm) {
+        // Same group ID, different name → duplicate_group_id (handled above).
+        continue;
+      }
     }
+
+    const masterClash = masterRows.find((m) => {
+      const mGidNorm = normalizeGroupIdForMatch(m.group_id);
+      const mNameNorm = normalizeGroupNameForMatch(m.group_name);
+      return mNameNorm === gnameNorm && mGidNorm !== gidNorm;
+    });
+    if (!masterClash) continue;
+
+    await upsertOpenTicket({
+      accountId: input.accountId,
+      brandId: input.brandId,
+      platform: input.platform,
+      ticketType: 'duplicate_group_name',
+      description: ticketDescriptionEn.duplicateGroupName(
+        gname,
+        gid,
+        String(masterClash.group_id ?? '').trim(),
+      ),
+      groupLink: d.invite_link,
+      groupId: gid,
+      groupName: gname,
+    });
+    dupNameKeep.add(gid);
   }
 
   await resolveTickets({

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 0.1.1 |
+| **App version** | 1.0.10 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows desktop (`.exe`) |
 | **UI languages** | English / 中文 (Admin → Language) |
@@ -617,4 +617,4 @@ Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type,
 
 ---
 
-*This guide matches application version **0.1.1**. Update this document when new features ship.*
+*This guide matches application version **1.0.10**. Update this document when new features ship.*

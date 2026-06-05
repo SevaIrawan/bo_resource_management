@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
-**Versi dokumen:** 2026-06-02  
-**Versi aplikasi:** `1.0.9` (lihat `package.json`)  
+**Versi dokumen:** 2026-06-03  
+**Versi aplikasi:** `1.0.10` (lihat `package.json`)  
 **Status:** Produksi internal — desktop Windows untuk tim operasional perusahaan  
 **Rencana:** Installer macOS & Linux — [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) (prepare, belum rilis)
 
@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.9)
+## 4. Konfigurasi & installer (kondisi 1.0.10)
 
 ### 4.1 Variabel lingkungan
 
@@ -159,8 +159,12 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 
 - Issue dari rekonsiliasi daily vs master brand (`reconcileTickets.ts`)
 - **Kontrak bisnis:** login/logout session **bukan** ticket; hanya mismatch grup/admin, grup sampah, duplicate ID/nama
-- Workflow: handle issue, modal detail, proses ticket (migrasi 024–026)
-- Realtime reload saat tabel `tickets` / `scrape_runs` berubah
+- **Duplicate Group ID:** `group_id` sama (HP & master), nama beda
+- **Duplicate Name:** `group_id` beda (HP vs master), nama sama
+- **Detail:** double-click kartu → tabel lengkap (Group ID, invite link, note); export Excel per issue atau semua issue terfilter
+- **Auto-close:** issue hilang setelah scrape/sync → `resolveTickets` menutup baris open; kartu hilang dari UI
+- Workflow: handle issue, modal proses ticket (migrasi 024–026)
+- Realtime: `group_scrape_daily` + `scrape_runs` completed → reconcile akun → reload ticket
 
 ### 6.3 Admin (`/admin`)
 
@@ -314,4 +318,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.9**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.10**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*

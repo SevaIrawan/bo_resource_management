@@ -86,8 +86,10 @@ const implChecks = [
       read('src/components/group-monitoring/PlatformLoginModal.tsx').includes('refreshQrManual'),
   },
   {
-    name: 'ticket reconcile deferred setelah modal sync',
-    ok: /void Promise\.resolve\(onTicketsReload/.test(syncFlow),
+    name: 'ticket reconcile setelah sync/scrape (await refreshIssues)',
+    ok:
+      /await onTicketsReload\?\.\(dbAccountId\)/.test(syncFlow) &&
+      syncFlow.includes('scrapeSucceeded && dbAccountId'),
   },
 ];
 

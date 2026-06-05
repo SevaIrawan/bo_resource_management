@@ -10,8 +10,8 @@ export const ticketDescriptionEn = {
   notAdmin: (label: string) => `Joined but not admin: ${label}`,
   duplicateGroupId: (deviceName: string, masterName: string) =>
     `Same group ID, different name: device "${deviceName}" vs master "${masterName}"`,
-  duplicateGroupName: (name: string) =>
-    `Same group name in master with different IDs: "${name}"`,
+  duplicateGroupName: (name: string, deviceId: string, masterId: string) =>
+    `Same group name, different ID: "${name}" (device ${deviceId} vs master ${masterId})`,
 };
 
 function suffixAfterColon(description: string): string {
@@ -27,8 +27,8 @@ function parseQuotedPair(description: string): { deviceName: string; masterName:
 }
 
 function parseDuplicateName(description: string): string | null {
-  const quoted = description.match(/"([^"]+)"\s*$/);
-  if (quoted) return quoted[1];
+  const match = description.match(/"([^"]+)"/);
+  if (match) return match[1];
   return suffixAfterColon(description) || null;
 }
 

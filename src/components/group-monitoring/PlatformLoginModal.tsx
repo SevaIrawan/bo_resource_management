@@ -402,7 +402,6 @@ export function PlatformLoginModal({
                 ) : qrLoading ? (
                   <div className="platform-login-qr-skeleton" aria-busy="true">
                     <Loader2 className="platform-login-qr-spinner" strokeWidth={2} aria-hidden />
-                    <p className="platform-login-qr-skeleton-label">{statusLabel}</p>
                   </div>
                 ) : qrDataUrl && status !== 'confirming' ? (
                   <img

@@ -1,8 +1,10 @@
-import { ShieldBan } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Download, ShieldBan } from 'lucide-react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { TicketProcessModal } from '@/components/group-monitoring/TicketProcessModal';
 import { BrandImage } from '@/components/brand/BrandImage';
+import { exportTicketGroupExcel } from '@/lib/exportExcel';
 import type { TicketSummaryGroup } from '@/lib/ticketGroups';
+import { ticketNoteForDisplay } from '@/lib/ticketNote';
 import { ticketTypeLabel } from '@/lib/ticketTypeLabel';
 import {
   getTicketProcess,
@@ -131,6 +133,14 @@ export function TicketSummaryCard({
 }) {
   const { t } = useLanguage();
   const [processModalOpen, setProcessModalOpen] = useState(false);
+  const typeLabel = ticketTypeLabel(t, group.ticketType, 'export');
+  const formatNote = (line: (typeof group.lines)[number]) =>
+    ticketNoteForDisplay(t, group.ticketType, line.description, line);
+
+  const handleExport = (event: MouseEvent) => {
+    event.stopPropagation();
+    exportTicketGroupExcel(group, typeLabel, formatNote);
+  };
 
   return (
     <article
@@ -165,6 +175,15 @@ export function TicketSummaryCard({
       </div>
 
       <div className="ticket-card-actions">
+        <button
+          type="button"
+          className="ticket-link-btn"
+          onClick={handleExport}
+          title={t('groupMonitoring.ticketPanel.exportIssue')}
+        >
+          <Download className="h-3 w-3" strokeWidth={2} aria-hidden />
+          {t('groupMonitoring.ticketPanel.exportIssue')}
+        </button>
         <TicketProcessNewCaption
           issueId={group.issueId}
           onOpen={() => setProcessModalOpen(true)}

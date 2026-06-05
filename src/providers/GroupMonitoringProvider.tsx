@@ -114,14 +114,17 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   /** Reconcile DB dulu, lalu reload kartu Issue (kontrak 150−146=4 ticket). */
   const refreshIssues = useCallback(
     async (dbAccountId?: string) => {
-      if (dbAccountId) {
-        await reconcileTicketsForAccountFromDb(dbAccountId);
-        await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
-      } else if (user?.id) {
-        const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
-        await reconcileOpenTicketsForUser(dataUserId, { concurrency: 2 });
+      try {
+        if (dbAccountId) {
+          await reconcileTicketsForAccountFromDb(dbAccountId);
+          await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
+        } else if (user?.id) {
+          const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+          await reconcileOpenTicketsForUser(dataUserId, { concurrency: 2 });
+        }
+      } finally {
+        await reloadTickets();
       }
-      await reloadTickets();
     },
     [user?.id, user?.userName, reloadTickets],
   );

@@ -23,7 +23,7 @@ WA: auto-regenerate QR. TG: error dulu, refresh manual.
 BAGIAN 4: PERFORMA (3000 grup)
 - quickDeviceCount: hanya total dari device; tidak merge ribuan group_id ke daily di renderer.
 - rm_account_master_stats (Supabase RPC): agregasi master↔daily di SQL, fallback loop JS jika RPC belum deploy.
-- reconcile ticket setelah sync/login: background (tidak blok modal Now/Later).
+- reconcile ticket: setelah scrape selesai → `await refreshIssues(accountId)`; realtime daily/scrape_runs → reconcile per akun.
 
 Implementasi: useAccountSyncFlow.ts, accountMonitoringEngine.ts, accountMasterStatsRpc.ts,
 PlatformLoginModal.tsx, electron/main/scraper/countWhatsApp.ts, migrations/028_rm_account_master_stats_rpc.sql

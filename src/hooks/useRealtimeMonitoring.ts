@@ -32,6 +32,11 @@ type GroupsMasterRow = {
   platform?: Platform;
 };
 
+type ScrapeRunRow = {
+  account_id?: string;
+  status?: string;
+};
+
 type DailyRow = {
   account_id?: string;
   brand?: string;
@@ -176,7 +181,17 @@ export function useRealtimeMonitoring({
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: TABLES.scrapeRuns },
-        () => {
+        (payload) => {
+          const row = (payload.new ?? payload.old) as ScrapeRunRow | undefined;
+          const accountId = row?.account_id;
+          const status = row?.status;
+          if (
+            accountId &&
+            status === 'completed' &&
+            !suspendedRef.current.includes(accountId)
+          ) {
+            onAccountDailyChangedRef.current?.(accountId);
+          }
           onTicketsChangeRef.current();
           notifyChange();
         },

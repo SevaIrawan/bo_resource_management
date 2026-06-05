@@ -44,7 +44,7 @@
 </tr>
 <tr>
 <td><strong>App version</strong></td>
-<td>1.0.10</td>
+<td>1.0.11</td>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
@@ -650,7 +650,23 @@
 </tbody></table>
 <p>After login, you may see: <em>Login OK. Device group &amp; admin counts are updated. Save the full group list to the database now?</em> → choose <strong>Run scraper</strong> or <strong>Later</strong>.</p>
 <h3 id="4-7-group-link-modal">4.7 Group link modal</h3>
-<p>Open via <strong>Action → Group link</strong>.</p>
+<p>Open via <strong>Action → Group link</strong>. Choose a mode:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>List contents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Groups on this account</strong></td>
+<td>All groups on the device (Y) — daily scrape snapshot</td>
+</tr>
+<tr>
+<td><strong>Admin vs master list</strong></td>
+<td><strong>Brand master</strong> groups only (X) + this account’s admin/join status</td>
+</tr>
+</tbody></table>
 <table>
 <thead>
 <tr>
@@ -670,11 +686,8 @@
 <td>Pagination</td>
 <td>Previous / Next when many groups</td>
 </tr>
-<tr>
-<td>Scroll</td>
-<td>Scroll inside table (viewport hint for large pages)</td>
-</tr>
 </tbody></table>
+<p><strong>Admin vs master</strong> total matches the Groups/Admin denominator (X) and the <strong>WA x Group</strong> badge — device junk groups are <strong>not</strong> listed here (see Tickets → Junk).</p>
 <p>Empty list? Run <strong>Run</strong> scraper first. Message: <em>No links. Run scraper first.</em></p>
 <h3 id="4-8-remove-account-from-slot">4.8 Remove account from slot</h3>
 <table>
@@ -751,6 +764,7 @@
 <h2 id="5-ticket-tab-issues-and-remediation">5. Ticket tab — issues and remediation</h2>
 <h3 id="5-1-when-do-tickets-appear">5.1 When do tickets appear?</h3>
 <p>After an account has scrape/sync data, the system compares <strong>device groups (daily snapshot)</strong> vs <strong>brand master</strong>. Mismatches create tickets automatically.</p>
+<p>Ticket card counts use the <strong>same engine</strong> as the Groups/Admin columns on the Account tab — not raw database row counts.</p>
 <h3 id="5-2-issue-types-filter-all-ticket-types">5.2 Issue types (filter: All ticket types)</h3>
 <table>
 <thead>
@@ -1291,11 +1305,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>This guide matches application version <strong>1.0.10</strong>. Update this document when new features ship.</em></p>
+<p><em>This guide matches application version <strong>1.0.11</strong>. Update this document when new features ship.</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — Resource Management v1.0.10</p>
+    <p>Internal use only — Resource Management v1.0.11</p>
   </footer>
 </body>
 </html>

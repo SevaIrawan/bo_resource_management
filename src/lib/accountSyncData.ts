@@ -1,16 +1,9 @@
 import { DAILY_PHONE_SELECT } from '@/config/dbColumns';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import { computeIsMisaligned } from '@/lib/accountDisplayMetrics';
-import { dedupeDailyRowsByGroupId } from '@/lib/dedupeScrapeDaily';
-import {
-  buildDailyMatchIndexes,
-  findDailyRowForMaster,
-  type MasterDailyRow,
-} from '@/lib/masterDailyMatch';
-import { fetchDailyGroupCount } from '@/lib/accountScrapeData';
+import { fetchAccountBookmarkMetrics } from '@/lib/accountMasterDailyCompare';
 import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
 import { hasValidAccountPhone } from '@/lib/accountPhone';
-import { fetchMasterGroupStatsViaRpc } from '@/lib/accountMasterStatsRpc';
 import { countBrandMasterGroups } from '@/lib/brandStandardCount';
 import { phonesMatch } from '@/lib/phoneNormalize';
 import { TABLES } from '@/config/tables';
@@ -19,11 +12,13 @@ import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
 export interface MasterGroupStats {
-  /** X — total grup valid di master brand+platform */
+  /** Y — distinct group_id daily (kolom Groups current = ticket). */
+  dailyTotal: number;
+  /** X — distinct group_id master brand (kolom Groups total = ticket). */
   brandMasterTotal: number;
-  /** Grup master yang ada di daily akun ini */
+  /** Master ∩ daily by raw group_id. */
   joinedInMaster: number;
-  /** Dari joined, berapa is_admin = yes */
+  /** Admin di grup master yang ada di daily (kolom Admin current = ticket not_admin inverse). */
   adminInMaster: number;
 }
 
@@ -69,7 +64,7 @@ function normalizeDbAccountId(accountId: string): string | null {
   return null;
 }
 
-/** Bandingkan daily akun vs master brand — RPC Postgres dulu, fallback loop JS. */
+/** Metrik master↔daily — logic sama ticket reconcile (group_id raw, semua akun). */
 export async function fetchMasterGroupStatsForAccount(input: {
   accountId: string;
   brand: string;
@@ -77,110 +72,49 @@ export async function fetchMasterGroupStatsForAccount(input: {
 }): Promise<MasterGroupStats> {
   const dbId = normalizeDbAccountId(input.accountId);
   const brand = input.brand.trim();
-  const empty = { brandMasterTotal: 0, joinedInMaster: 0, adminInMaster: 0 };
-  if (!dbId) return empty;
+  const empty = { dailyTotal: 0, brandMasterTotal: 0, joinedInMaster: 0, adminInMaster: 0 };
+  if (!dbId || !brand) return empty;
 
-  const viaRpc = await fetchMasterGroupStatsViaRpc({
-    accountId: dbId,
-    brand,
-    platform: input.platform,
-  });
-  if (viaRpc) return viaRpc;
-
-  const supabase = getSupabase();
-  if (!supabase) return empty;
-
-  const brandMasterTotal = await countBrandMasterGroups(brand, input.platform);
-  if (brandMasterTotal <= 0) return { ...empty, brandMasterTotal: 0 };
-
-  const { count: dailyRowCount, error: dailyCountError } = await supabase
-    .from(TABLES.groupScrapeDaily)
-    .select('id', { count: 'exact', head: true })
-    .eq('account_id', dbId);
-
-  if (!dailyCountError) {
+  try {
+    const m = await fetchAccountBookmarkMetrics({
+      accountId: dbId,
+      brandName: brand,
+      platform: input.platform,
+    });
     return {
-      brandMasterTotal,
-      joinedInMaster: Math.min(dailyRowCount ?? 0, brandMasterTotal),
-      adminInMaster: 0,
+      dailyTotal: m.groupsCurrent,
+      brandMasterTotal: m.groupsTotal,
+      joinedInMaster: m.joinedInMaster,
+      adminInMaster: m.adminCurrent,
     };
+  } catch (error) {
+    throwIfSchemaError(error as { message?: string });
+    throw error;
   }
-
-  if (brandMasterTotal > 800) {
-    return { brandMasterTotal, joinedInMaster: 0, adminInMaster: 0 };
-  }
-
-  const { data: masterRows, error: masterError } = await supabase
-    .from(TABLES.groupsMaster)
-    .select('group_id, group_name, invite_link')
-    .eq('brand', brand)
-    .eq('platform', input.platform);
-
-  if (masterError) {
-    throwIfSchemaError(masterError);
-    throw masterError;
-  }
-
-  if (!masterRows?.length) {
-    return { brandMasterTotal, joinedInMaster: 0, adminInMaster: 0 };
-  }
-
-  const { data: dailyRaw, error: dailyError } = await supabase
-    .from(TABLES.groupScrapeDaily)
-    .select('group_id, group_name, invite_link, is_admin')
-    .eq('account_id', dbId);
-
-  if (dailyError) {
-    throwIfSchemaError(dailyError);
-    throw dailyError;
-  }
-
-  const dailyRows = dedupeDailyRowsByGroupId(dailyRaw ?? []);
-  const dailyIndexes = buildDailyMatchIndexes(dailyRows as MasterDailyRow[]);
-
-  let joinedInMaster = 0;
-  let adminInMaster = 0;
-  const matchedDaily = new Set<string>();
-
-  for (const m of masterRows) {
-    const gid = String(m.group_id ?? '').trim();
-    if (!gid) continue;
-    const d = findDailyRowForMaster(
-      {
-        group_id: gid,
-        group_name: (m.group_name as string | null) ?? null,
-        invite_link: (m.invite_link as string | null) ?? null,
-      },
-      dailyIndexes,
-    );
-    if (!d) continue;
-    const dailyKey = String(d.group_id ?? '').trim();
-    if (matchedDaily.has(dailyKey)) continue;
-    matchedDaily.add(dailyKey);
-    joinedInMaster += 1;
-    if (d.is_admin === 'yes') adminInMaster += 1;
-  }
-
-  return { brandMasterTotal, joinedInMaster, adminInMaster };
 }
 
 /**
- * Metrik UI setelah scrape — dari daily + master DB (bukan hitung ulang di device).
- * Groups Y = baris daily akun; Admin = admin di grup standar brand (join group_id) / X.
+ * Kolom Groups Y/X & Admin di card bookmark — WAJIB sama dengan ticket reconcile.
+ * Sumber: fetchAccountBookmarkMetrics (group_scrape_daily + groups_master, raw group_id).
  */
 export async function buildMetricsFromScrapeDaily(input: {
   accountId: string;
   brand: string;
   platform: Platform;
+  /** @deprecated Diabaikan — metrik selalu dari DB breakdown (= ticket). */
   brandStandard?: number;
   sessionValid?: boolean;
-  /** Jumlah grup dari hasil scrape (sama dengan baris daily yang di-insert). */
+  /** @deprecated Diabaikan — jangan override device; card = ticket = daily DB. */
   deviceGroupCount?: number;
-  /** Admin di device (grup scrape is_admin=yes). */
+  /** @deprecated Diabaikan — admin dari breakdown DB. */
   deviceAdminCount?: number;
-  /** Sudah di-load batch — hindari RPC ganda saat buka halaman monitoring. */
+  /** Batch load — hindari query ganda saat buka monitoring. */
   masterHint?: MasterGroupStats;
 }): Promise<{ result: AccountSyncResult; master: MasterGroupStats }> {
+  void input.brandStandard;
+  void input.deviceGroupCount;
+  void input.deviceAdminCount;
+
   const master =
     input.masterHint ??
     (await fetchMasterGroupStatsForAccount({
@@ -189,30 +123,16 @@ export async function buildMetricsFromScrapeDaily(input: {
       platform: input.platform,
     }));
 
-  const dbId = normalizeDbAccountId(input.accountId);
-  const dailyCount =
-    input.deviceGroupCount != null && input.deviceGroupCount >= 0
-      ? input.deviceGroupCount
-      : dbId
-        ? await fetchDailyGroupCount(input.brand, '', '', dbId)
-        : 0;
-
-  const brandX =
-    input.brandStandard != null ? Math.max(0, input.brandStandard) : master.brandMasterTotal;
-
   const sessionValid = input.sessionValid !== false;
-  const adminY =
-    input.deviceAdminCount != null && input.deviceAdminCount >= 0
-      ? input.deviceAdminCount
-      : master.adminInMaster;
+  const x = master.brandMasterTotal;
 
   return {
     master,
     result: {
-      groupsCurrent: dailyCount,
-      groupsTotal: brandX,
-      adminCurrent: adminY,
-      adminTotal: brandX,
+      groupsCurrent: master.dailyTotal,
+      groupsTotal: x,
+      adminCurrent: master.adminInMaster,
+      adminTotal: x,
       sessionStatus: sessionValid ? 'valid' : 'invalid',
     },
   };
@@ -268,22 +188,20 @@ export function applyMasterStatsToAccountRow(
   master: MasterGroupStats,
   options?: { deviceConnected?: boolean; brandStandard?: number },
 ): AccountBrandRow {
-  const brandX = Math.max(0, options?.brandStandard ?? master.brandMasterTotal);
-  const groupsCurrent = row.groupsCurrent;
-  const adminCurrent =
-    row.adminCurrent > 0 ? row.adminCurrent : master.adminInMaster;
+  void options;
+  const x = master.brandMasterTotal;
   return {
     ...row,
-    groupsCurrent,
-    groupsTotal: brandX,
-    adminCurrent,
-    adminTotal: brandX,
+    groupsCurrent: master.dailyTotal,
+    groupsTotal: x,
+    adminCurrent: master.adminInMaster,
+    adminTotal: x,
     syncState: row.syncState === 'pending' ? 'synced' : row.syncState,
     isMisaligned: computeIsMisaligned({
-      groupsCurrent,
-      groupsTotal: brandX,
-      adminCurrent,
-      adminTotal: brandX,
+      groupsCurrent: master.dailyTotal,
+      groupsTotal: x,
+      adminCurrent: master.adminInMaster,
+      adminTotal: x,
     }),
   };
 }
@@ -328,5 +246,5 @@ export async function fetchMasterGroupStats(
     return fetchMasterGroupStatsForAccount({ accountId, brand, platform });
   }
   const brandMasterTotal = await countBrandMasterGroups(brand.trim(), platform);
-  return { brandMasterTotal, joinedInMaster: 0, adminInMaster: 0 };
+  return { dailyTotal: 0, brandMasterTotal, joinedInMaster: 0, adminInMaster: 0 };
 }

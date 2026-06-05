@@ -1,23 +1,28 @@
-import { dedupeDailyRowsByGroupId, dedupeScrapeDailyRowsForAccount } from '@/lib/dedupeScrapeDaily';
 import {
-  buildDailyMatchIndexes,
-  findDailyRowForMaster,
-  isDailyRowInMasterSet,
-  normalizeGroupIdForMatch,
-  normalizeGroupNameForMatch,
-  type MasterDailyRow,
-} from '@/lib/masterDailyMatch';
+  computeAccountTicketBreakdown,
+  loadMasterDailyForAccount,
+} from '@/lib/accountMasterDailyCompare';
+import { dedupeScrapeDailyRowsForAccount } from '@/lib/dedupeScrapeDaily';
+import {
+  pickBrandNameForReconcile,
+  resolveBrandNameForReconcileAccount,
+} from '@/lib/reconcileBrandName';
 import { TABLES } from '@/config/tables';
 import { ticketDescriptionEn } from '@/lib/ticketNote';
 import { openTicketDedupeKey } from '@/lib/ticketDedupe';
 import { getSupabase } from '@/lib/supabase';
-import type { GroupsMaster, Platform, TicketType } from '@/types/database';
+import type { Platform, TicketType } from '@/types/database';
 
 /**
- * Kontrak issue (missing_group):
- * - Brand X = jumlah grup standar di master (contoh 150).
- * - Daily akun = grup yang ada di HP setelah scrape (contoh 146 baris match master).
- * - Open ticket missing_group = master yang BELUM ada di daily akun (~ X − joined = 4).
+ * Gap master ↔ daily per akun (dua arah):
+ *
+ * - daily_junk_group (UI: Group mismatch) — daily LEBIH besar: baris daily yang group_id-nya
+ *   TIDAK ada di master. Gap di sisi daily (device/HP). Semua baris daily, tanpa filter admin/invite.
+ *
+ * - missing_group (UI: Missing groups) — kebalikannya: baris master yang BELUM ada di daily akun.
+ *   Gap di sisi master (perlu invite/join).
+ *
+ * Contoh: master 100, daily 120 → Group mismatch = 20 baris daily; Missing = 0 (jika semua master ada di daily).
  * Setiap daily/master berubah → reconcileTicketsForAccount → resolve/insert ticket → UI reload.
  */
 interface ReconcileInput {
@@ -25,13 +30,6 @@ interface ReconcileInput {
   brandId: string;
   brandName: string;
   platform: Platform;
-}
-
-interface DailyRow {
-  group_id: string;
-  group_name: string | null;
-  invite_link: string | null;
-  is_admin: string;
 }
 
 /** Tutup ticket lama group_count_mismatch (tipe dihapus). */
@@ -87,32 +85,6 @@ interface OpenTicketRowInput {
   groupLink?: string | null;
   groupId?: string | null;
   groupName?: string | null;
-}
-
-async function upsertOpenTicket(input: {
-  accountId: string;
-  brandId: string;
-  platform: Platform;
-  ticketType: TicketType;
-  description: string;
-  groupLink?: string | null;
-  groupId?: string | null;
-  groupName?: string | null;
-}): Promise<void> {
-  await batchUpsertOpenTicketsByGroupId({
-    accountId: input.accountId,
-    brandId: input.brandId,
-    platform: input.platform,
-    ticketType: input.ticketType,
-    rows: [
-      {
-        description: input.description,
-        groupLink: input.groupLink,
-        groupId: input.groupId,
-        groupName: input.groupName,
-      },
-    ],
-  });
 }
 
 /** Satu query existing + insert chunk — untuk ribuan missing_group (master >> daily). */
@@ -195,21 +167,16 @@ async function resolveTickets(input: {
 
   if (error) throw error;
 
-  const keepNormalized = new Set(
-    [...input.keepGroupIds].map((gid) => normalizeGroupIdForMatch(gid)).filter(Boolean),
-  );
-
   const now = new Date().toISOString();
   const idsToResolve: string[] = [];
 
   for (const row of openRows ?? []) {
     const gid = row.group_id as string | null;
     const gname = (row.group_name as string | null)?.trim().toLowerCase() ?? '';
-    const gidNorm = gid ? normalizeGroupIdForMatch(gid) : '';
+    const gidTrim = gid?.trim() ?? '';
     const stillOpen =
-      (gidNorm && keepNormalized.has(gidNorm)) ||
-      (gid && input.keepGroupIds.has(gid.trim())) ||
-      (!gid && gname && input.keepGroupNames.has(gname));
+      (gidTrim && input.keepGroupIds.has(gidTrim)) ||
+      (!gidTrim && gname && input.keepGroupNames.has(gname));
 
     if (!stillOpen) {
       idsToResolve.push(row.id as string);
@@ -227,114 +194,42 @@ async function resolveTickets(input: {
   }
 }
 
-async function detectFraudTickets(input: ReconcileInput): Promise<void> {
-  const supabase = getSupabase();
-  if (!supabase) return;
-
-  const brand = input.brandName.trim();
-
-  const [{ data: master }, { data: daily }] = await Promise.all([
-    supabase
-      .from(TABLES.groupsMaster)
-      .select('group_id, group_name, invite_link')
-      .eq('brand', brand)
-      .eq('platform', input.platform),
-    supabase
-      .from(TABLES.groupScrapeDaily)
-      .select('group_id, group_name, invite_link, is_admin')
-      .eq('account_id', input.accountId),
-  ]);
-
-  const masterRows = (master ?? []) as Pick<GroupsMaster, 'group_id' | 'group_name' | 'invite_link'>[];
-  const dailyRows = dedupeDailyRowsByGroupId((daily ?? []) as DailyRow[]);
-
-  const masterByGid = new Map(
-    masterRows.map((m) => [String(m.group_id).trim(), m]),
-  );
-
-  const dupGidKeep = new Set<string>();
-  const dupNameKeep = new Set<string>();
-
-  for (const d of dailyRows) {
-    const gid = String(d.group_id ?? '').trim();
-    const gname = String(d.group_name ?? '').trim();
-    if (!gid) continue;
-
-    const canon = masterByGid.get(gid);
-    if (canon) {
-      const canonName = String(canon.group_name ?? '').trim();
-      if (gname && canonName && gname.toLowerCase() !== canonName.toLowerCase()) {
-        await upsertOpenTicket({
-          accountId: input.accountId,
-          brandId: input.brandId,
-          platform: input.platform,
-          ticketType: 'duplicate_group_id',
-          description: ticketDescriptionEn.duplicateGroupId(gname, canonName),
-          groupLink: d.invite_link,
-          groupId: gid,
-          groupName: gname,
-        });
-        dupGidKeep.add(gid);
-      }
-    }
-  }
-
-  await resolveTickets({
-    accountId: input.accountId,
-    ticketType: 'duplicate_group_id',
-    keepGroupIds: dupGidKeep,
-    keepGroupNames: new Set(),
+function toOpenRows(
+  items: { groupId: string; groupName: string | null; groupLink: string | null }[],
+  describe: (label: string) => string,
+): OpenTicketRowInput[] {
+  return items.map((row) => {
+    const label = row.groupName?.trim() || row.groupId;
+    return {
+      description: describe(label),
+      groupLink: row.groupLink,
+      groupId: row.groupId,
+      groupName: row.groupName,
+    };
   });
+}
 
-  for (const d of dailyRows) {
-    const gid = String(d.group_id ?? '').trim();
-    const gname = String(d.group_name ?? '').trim();
-    const gnameNorm = normalizeGroupNameForMatch(d.group_name);
-    if (!gid || !gnameNorm) continue;
-
-    const gidNorm = normalizeGroupIdForMatch(gid);
-    const canon = masterByGid.get(gid);
-    if (canon) {
-      const canonNameNorm = normalizeGroupNameForMatch(canon.group_name);
-      if (gnameNorm !== canonNameNorm) {
-        // Same group ID, different name → duplicate_group_id (handled above).
-        continue;
-      }
-    }
-
-    const masterClash = masterRows.find((m) => {
-      const mGidNorm = normalizeGroupIdForMatch(m.group_id);
-      const mNameNorm = normalizeGroupNameForMatch(m.group_name);
-      return mNameNorm === gnameNorm && mGidNorm !== gidNorm;
-    });
-    if (!masterClash) continue;
-
-    await upsertOpenTicket({
-      accountId: input.accountId,
-      brandId: input.brandId,
-      platform: input.platform,
-      ticketType: 'duplicate_group_name',
-      description: ticketDescriptionEn.duplicateGroupName(
-        gname,
-        gid,
-        String(masterClash.group_id ?? '').trim(),
-      ),
-      groupLink: d.invite_link,
-      groupId: gid,
-      groupName: gname,
-    });
-    dupNameKeep.add(gid);
-  }
-
+async function syncTicketType(
+  input: ReconcileInput,
+  ticketType: TicketType,
+  rows: OpenTicketRowInput[],
+): Promise<void> {
+  const keepIds = await batchUpsertOpenTicketsByGroupId({
+    accountId: input.accountId,
+    brandId: input.brandId,
+    platform: input.platform,
+    ticketType,
+    rows,
+  });
   await resolveTickets({
     accountId: input.accountId,
-    ticketType: 'duplicate_group_name',
-    keepGroupIds: dupNameKeep,
+    ticketType,
+    keepGroupIds: keepIds,
     keepGroupNames: new Set(),
   });
 }
 
-/** Ticket dari master brand + daily per akun (join by group_id). */
+/** Ticket dari master brand + daily per akun — logic = grid Y/X (accountMasterDailyCompare). */
 export async function reconcileTicketsForAccount(input: ReconcileInput): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
@@ -343,117 +238,55 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
   await dedupeOpenTicketsForAccount(input.accountId);
   await dedupeScrapeDailyRowsForAccount(input.accountId);
 
-  const brand = input.brandName.trim();
+  const { masterRows, dailyRows } = await loadMasterDailyForAccount({
+    accountId: input.accountId,
+    brandName: input.brandName,
+    platform: input.platform,
+  });
 
-  const [{ data: master }, { data: daily }] = await Promise.all([
-    supabase
-      .from(TABLES.groupsMaster)
-      .select('group_id, group_name, invite_link')
-      .eq('brand', brand)
-      .eq('platform', input.platform),
-    supabase
-      .from(TABLES.groupScrapeDaily)
-      .select('group_id, group_name, invite_link, is_admin')
-      .eq('account_id', input.accountId),
-  ]);
+  if (!masterRows.length && !dailyRows.length) return;
 
-  const masterRows = (master ?? []) as Pick<GroupsMaster, 'group_id' | 'group_name' | 'invite_link'>[];
-  const dailyRows = dedupeDailyRowsByGroupId((daily ?? []) as DailyRow[]);
-  const dailyIndexes = buildDailyMatchIndexes(dailyRows as MasterDailyRow[]);
-  const masterIndexes = buildDailyMatchIndexes(masterRows as MasterDailyRow[]);
+  const breakdown = computeAccountTicketBreakdown(masterRows, dailyRows);
 
-  const masterGids = new Set(
-    masterRows.map((m) => String(m.group_id ?? '').trim()).filter(Boolean),
+  await syncTicketType(
+    input,
+    'daily_junk_group',
+    toOpenRows(breakdown.junk, ticketDescriptionEn.dailyJunk),
   );
 
-  const junkRows: OpenTicketRowInput[] = [];
-  for (const d of dailyRows) {
-    const gid = String(d.group_id ?? '').trim();
-    if (!gid) continue;
-    if (isDailyRowInMasterSet(d as MasterDailyRow, masterGids, masterIndexes)) continue;
-    const label = d.group_name?.trim() || gid;
-    junkRows.push({
-      description: ticketDescriptionEn.dailyJunk(label),
-      groupLink: d.invite_link,
-      groupId: gid,
-      groupName: d.group_name,
-    });
-  }
-  const junkKeepIds = await batchUpsertOpenTicketsByGroupId({
-    accountId: input.accountId,
-    brandId: input.brandId,
-    platform: input.platform,
-    ticketType: 'daily_junk_group',
-    rows: junkRows,
-  });
-  await resolveTickets({
-    accountId: input.accountId,
-    ticketType: 'daily_junk_group',
-    keepGroupIds: junkKeepIds,
-    keepGroupNames: new Set(),
-  });
+  await syncTicketType(
+    input,
+    'missing_group',
+    toOpenRows(breakdown.missing, ticketDescriptionEn.missingGroup),
+  );
 
-  const missingRows: OpenTicketRowInput[] = [];
-  const notAdminRows: OpenTicketRowInput[] = [];
+  await syncTicketType(
+    input,
+    'not_admin',
+    toOpenRows(breakdown.notAdmin, ticketDescriptionEn.notAdmin),
+  );
 
-  for (const m of masterRows) {
-    const gid = String(m.group_id ?? '').trim();
-    if (!gid) continue;
+  if (!masterRows.length) return;
 
-    const d = findDailyRowForMaster(m, dailyIndexes);
-    const label = m.group_name?.trim() || gid;
+  const dupGidRows: OpenTicketRowInput[] = breakdown.duplicateGroupId.map((row) => ({
+    description: ticketDescriptionEn.duplicateGroupId(row.deviceName, row.masterName),
+    groupLink: row.groupLink,
+    groupId: row.groupId,
+    groupName: row.groupName,
+  }));
+  await syncTicketType(input, 'duplicate_group_id', dupGidRows);
 
-    if (!d) {
-      missingRows.push({
-        description: ticketDescriptionEn.missingGroup(label),
-        groupLink: m.invite_link,
-        groupId: gid,
-        groupName: m.group_name,
-      });
-      continue;
-    }
-
-    if (d.is_admin !== 'yes') {
-      notAdminRows.push({
-        description: ticketDescriptionEn.notAdmin(label),
-        groupLink: m.invite_link ?? d.invite_link,
-        groupId: gid,
-        groupName: m.group_name ?? d.group_name,
-      });
-    }
-  }
-
-  const missingKeepIds = await batchUpsertOpenTicketsByGroupId({
-    accountId: input.accountId,
-    brandId: input.brandId,
-    platform: input.platform,
-    ticketType: 'missing_group',
-    rows: missingRows,
-  });
-  await resolveTickets({
-    accountId: input.accountId,
-    ticketType: 'missing_group',
-    keepGroupIds: missingKeepIds,
-    keepGroupNames: new Set(),
-  });
-
-  const notAdminKeepIds = await batchUpsertOpenTicketsByGroupId({
-    accountId: input.accountId,
-    brandId: input.brandId,
-    platform: input.platform,
-    ticketType: 'not_admin',
-    rows: notAdminRows,
-  });
-  await resolveTickets({
-    accountId: input.accountId,
-    ticketType: 'not_admin',
-    keepGroupIds: notAdminKeepIds,
-    keepGroupNames: new Set(),
-  });
-
-  if (masterRows.length) {
-    await detectFraudTickets(input);
-  }
+  const dupNameRows: OpenTicketRowInput[] = breakdown.duplicateGroupName.map((row) => ({
+    description: ticketDescriptionEn.duplicateGroupName(
+      row.groupName?.trim() || row.groupId,
+      row.groupId,
+      row.clashMasterGroupId,
+    ),
+    groupLink: row.groupLink,
+    groupId: row.groupId,
+    groupName: row.groupName,
+  }));
+  await syncTicketType(input, 'duplicate_group_name', dupNameRows);
 }
 
 export async function reconcileTicketsAfterScrape(input: {
@@ -489,7 +322,11 @@ export async function reconcileTicketsForAccountFromDb(
   if (!brandId) return;
 
   const meta = account?.metadata as { brand?: string } | null;
-  const brandName = options?.brandName?.trim() || meta?.brand?.trim() || '';
+  const brandName = await resolveBrandNameForReconcileAccount({
+    brandId,
+    meta,
+    optionsBrand: options?.brandName,
+  });
   const platform = (options?.platform ?? account?.platform) as Platform | undefined;
   if (!brandName || !platform) return;
 
@@ -559,7 +396,7 @@ export async function reconcileOpenTicketsForUser(
     if (!brandId) continue;
 
     const meta = row.metadata as { brand?: string } | null;
-    const brandName = meta?.brand?.trim() || brandNameById.get(brandId) || '';
+    const brandName = pickBrandNameForReconcile(brandId, meta, brandNameById);
     if (!brandName) continue;
 
     jobs.push({
@@ -626,7 +463,7 @@ export async function reconcileTicketsForBrandPlatform(input: {
     if (!brandId) continue;
 
     const meta = row.metadata as { brand?: string } | null;
-    const resolvedBrand = meta?.brand?.trim() || brandNameById.get(brandId) || '';
+    const resolvedBrand = pickBrandNameForReconcile(brandId, meta, brandNameById);
     if (!resolvedBrand || resolvedBrand.toLowerCase() !== brandKey) continue;
 
     jobs.push({

@@ -25,6 +25,7 @@ const specChecks = [
   ['probe device meski grid valid', /meski.*valid|grid masih/i.test(spec)],
   ['sync pending tampil —', /pending.*—|sync_state/i.test(spec)],
   ['timestamp tanpa (Terbaru)', /timestamp|MATCH/i.test(spec) && !/\(Terbaru\)/.test(spec)],
+  ['satu engine grid/ticket/modal group link', /accountMasterDailyCompare|buildTicketSummariesFromEngine|fetchAccountGroupLinks/i.test(spec)],
 ];
 
 const implChecks = [
@@ -65,12 +66,11 @@ const implChecks = [
     ok: loginHook.includes('setQrGeneration') && read('src/i18n/locales/en.ts').includes('qrUpdated'),
   },
   {
-    name: 'RPC rm_account_master_stats + fetchMasterGroupStatsViaRpc',
+    name: 'Metrik bookmark: fetchAccountBookmarkMetrics + migrasi 029 raw group_id',
     ok:
-      fs.existsSync(path.join(root, 'supabase/migrations/028_rm_account_master_stats_rpc.sql')) &&
-      read('src/lib/accountSyncData.ts').includes('fetchMasterGroupStatsViaRpc') &&
-      !fs.existsSync(path.join(root, 'supabase/migrations/029_rm_account_master_stats_fast.sql')) &&
-      read('supabase/migrations/028_rm_account_master_stats_rpc.sql').includes('daily_gid'),
+      read('src/lib/accountSyncData.ts').includes('fetchAccountBookmarkMetrics') &&
+      read('src/lib/accountMasterDailyCompare.ts').includes('computeAccountTicketBreakdown') &&
+      fs.existsSync(path.join(root, 'supabase/migrations/029_rm_account_master_stats_raw.sql')),
   },
   {
     name: 'quick sync skip merge device group ids',
@@ -90,6 +90,19 @@ const implChecks = [
     ok:
       /await onTicketsReload\?\.\(dbAccountId\)/.test(syncFlow) &&
       syncFlow.includes('scrapeSucceeded && dbAccountId'),
+  },
+  {
+    name: 'Modal Admin vs master: fetchAccountGroupLinks master-only + dedupe',
+    ok: (() => {
+      const links = read('src/lib/accountGroupLinks.ts');
+      const start = links.indexOf('export async function fetchAccountGroupLinks');
+      const fn = links.slice(start, start + 1200);
+      return (
+        links.includes('dedupeMasterRowsByGroupId') &&
+        fn.includes('inMaster: true') &&
+        !fn.includes('inMaster: false')
+      );
+    })(),
   },
 ];
 

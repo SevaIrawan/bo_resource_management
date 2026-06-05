@@ -82,6 +82,47 @@ export function findDailyRowForMaster(
   return undefined;
 }
 
+/** Set group_id mentah (trim) — gap ticket daily↔master harus sama dengan grid Y/X. */
+export function buildRawGroupIdSet(rows: Pick<MasterDailyRow, 'group_id'>[]): Set<string> {
+  const set = new Set<string>();
+  for (const r of rows) {
+    const gid = String(r.group_id ?? '').trim();
+    if (gid) set.add(gid);
+  }
+  return set;
+}
+
+/** @deprecated alias — ticket gap pakai raw ID. */
+export function buildMasterGroupIdSet(rows: Pick<MasterDailyRow, 'group_id'>[]): Set<string> {
+  return buildRawGroupIdSet(rows);
+}
+
+export function isDailyGroupIdInMaster(dailyGroupId: string, masterIdSet: Set<string>): boolean {
+  const gid = String(dailyGroupId ?? '').trim();
+  return gid ? masterIdSet.has(gid) : false;
+}
+
+export function isMasterGroupIdInDaily(masterGroupId: string, dailyIdSet: Set<string>): boolean {
+  const gid = String(masterGroupId ?? '').trim();
+  return gid ? dailyIdSet.has(gid) : false;
+}
+
+/** Baris daily untuk master — hanya by group_id (bukan invite/nama). */
+export function findDailyRowByGroupId(
+  masterGroupId: string,
+  indexes: DailyMatchIndexes,
+): MasterDailyRow | undefined {
+  const gid = String(masterGroupId ?? '').trim();
+  if (!gid) return undefined;
+  return (
+    indexes.byGroupId.get(gid) ?? indexes.byGroupId.get(normalizeGroupIdForMatch(gid))
+  );
+}
+
+export function buildDailyGroupIdSet(dailyRows: Pick<MasterDailyRow, 'group_id'>[]): Set<string> {
+  return buildRawGroupIdSet(dailyRows);
+}
+
 export function isDailyRowInMasterSet(
   daily: MasterDailyRow,
   masterGids: Set<string>,

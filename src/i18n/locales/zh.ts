@@ -147,7 +147,7 @@ export const zh: Messages = {
       groupsUnit: '群',
       groupsShort: '少 {{count}}',
       groupLink: '群链接',
-      groupLinkHint: '品牌主数据群列表 + 本账号抓取记录的加入/管理员状态（不单是设备群总数）。',
+      groupLinkHint: '选择：本账号全部群组，或与品牌主数据对比的管理员状态。',
       export: '导出',
       addCardView: '添加卡片',
       addBrandTitle: '添加品牌卡片',
@@ -196,6 +196,11 @@ export const zh: Messages = {
       loadFailed: '无法加载主数据。',
     },
     groupLinks: {
+      pickerTitle: '要查看哪种群列表？',
+      modeAccount: '本账号全部群组',
+      modeAccountDesc: '该账号设备最新抓取到的全部群组。',
+      modeAdminMaster: '管理员 vs 主数据',
+      modeAdminMasterDesc: '品牌主数据群组 + 本账号的加入与管理员状态。',
       colName: '群名称',
       colId: '群 ID',
       colLink: '邀请链接',
@@ -315,6 +320,7 @@ export const zh: Messages = {
     },
     loadingAccounts: '正在加载账号…',
     loadAccountsFailed: '无法从数据库加载账号。',
+    ticketReconcileFailed: '工单同步失败，请在 Ticket 页点击刷新。',
     ticketPanel: {
       bookmarksLabel: '工单进度视图',
       bookmarkInProgress: '进行中',

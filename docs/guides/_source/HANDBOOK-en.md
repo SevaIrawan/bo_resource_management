@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.10 |
+| **App version** | 1.0.11 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows desktop (`.exe`) |
 | **UI languages** | English / 中文 (Admin → Language) |
@@ -277,14 +277,20 @@ After login, you may see: *Login OK. Device group & admin counts are updated. Sa
 
 ### 4.7 Group link modal
 
-Open via **Action → Group link**.
+Open via **Action → Group link**. Choose a mode:
+
+| Mode | List contents |
+|------|----------------|
+| **Groups on this account** | All groups on the device (Y) — daily scrape snapshot |
+| **Admin vs master list** | **Brand master** groups only (X) + this account’s admin/join status |
 
 | Feature | Function |
 |---------|----------|
 | Table | Group name, Group ID, Invite link, Admin (Yes/No) |
 | Admin filter | All / admin only / non-admin |
 | Pagination | Previous / Next when many groups |
-| Scroll | Scroll inside table (viewport hint for large pages) |
+
+**Admin vs master** total matches the Groups/Admin denominator (X) and the **WA x Group** badge — device junk groups are **not** listed here (see Tickets → Junk).
 
 Empty list? Run **Run** scraper first. Message: *No links. Run scraper first.*
 
@@ -328,6 +334,8 @@ Modal actions: close, switch QR ↔ phone, verify code/password, **OK** when con
 ### 5.1 When do tickets appear?
 
 After an account has scrape/sync data, the system compares **device groups (daily snapshot)** vs **brand master**. Mismatches create tickets automatically.
+
+Ticket card counts use the **same engine** as the Groups/Admin columns on the Account tab — not raw database row counts.
 
 ### 5.2 Issue types (filter: All ticket types)
 
@@ -617,4 +625,4 @@ Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type,
 
 ---
 
-*This guide matches application version **1.0.10**. Update this document when new features ship.*
+*This guide matches application version **1.0.11**. Update this document when new features ship.*

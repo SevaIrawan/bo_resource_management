@@ -3,6 +3,10 @@ import { RefreshCw, X } from 'lucide-react';
 import { PermissionLockedButton } from '@/components/ui/PermissionLockedButton';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { GroupLinksModal } from '@/components/group-monitoring/GroupLinksModal';
+import {
+  GroupLinksPickerModal,
+  type GroupLinksViewMode,
+} from '@/components/group-monitoring/GroupLinksPickerModal';
 import { accountNeedsRelogin } from '@/lib/platformSyncCopy';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -293,7 +297,9 @@ export function AccountTableRow({
   scrapeProgress?: UiScrapeProgress | null;
 }) {
   const { t } = useLanguage();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
+  const [linksViewMode, setLinksViewMode] = useState<GroupLinksViewMode>('adminMaster');
   const isPending = row.syncState === 'pending';
   const isProcessing = row.actionProcess !== null;
 
@@ -392,7 +398,7 @@ export function AccountTableRow({
                   className="brand-card-action-btn brand-card-action-btn--nowrap"
                   disabled={isPending}
                   title={t('groupMonitoring.accountCard.groupLinkHint')}
-                  onClick={() => setLinksOpen(true)}
+                  onClick={() => setPickerOpen(true)}
                 >
                   {t('groupMonitoring.accountCard.groupLink')}
                 </button>
@@ -402,12 +408,23 @@ export function AccountTableRow({
         ) : null}
       </tr>
 
+      <GroupLinksPickerModal
+        open={pickerOpen}
+        accountName={row.accountName}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(mode) => {
+          setLinksViewMode(mode);
+          setPickerOpen(false);
+          setLinksOpen(true);
+        }}
+      />
       <GroupLinksModal
         open={linksOpen}
         brandName={row.brandName}
         accountName={row.accountName}
         platform={row.platform}
         accountId={row.id}
+        viewMode={linksViewMode}
         onClose={() => setLinksOpen(false)}
       />
     </>

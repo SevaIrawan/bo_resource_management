@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.10 |
+| **Versi app** | 1.0.11 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Windows desktop (`.exe`) |
 | **Bahasa UI** | English / 中文 (Admin → Language) |
@@ -230,14 +230,20 @@ Sync mengikuti nilai kolom **Session**:
 
 ### 4.7 Modal **Group link**
 
-Buka dari **Action → Group link**.
+Buka dari **Action → Group link**. Pilih mode:
+
+| Mode | Isi daftar |
+|------|------------|
+| **Groups on this account** | Semua grup di device akun (Y) — hasil scrape daily |
+| **Admin vs master list** | Hanya grup **master brand** (X) + status admin dari akun ini |
 
 | Fitur | Fungsi |
 |-------|--------|
 | Tabel grup | Nama, Group ID, invite link, Admin (Yes/No) |
 | Filter Admin | All / hanya admin / non-admin |
 | Pagination | Navigasi halaman jika grup banyak |
-| Scroll | Area tabel bisa di-scroll |
+
+Total di mode **Admin vs master** sama dengan denominator kolom Groups/Admin (`Y/X`) dan badge **WA x Group** di header card — **bukan** termasuk grup junk di device (junk hanya di tab Ticket).
 
 Kosong? Jalankan **Run** scraper dulu.
 
@@ -275,6 +281,8 @@ Tombol di modal: tutup, ganti QR/phone, lanjut setelah kode.
 ### 5.1 Kapan ticket muncul?
 
 Setelah akun punya data scrape/sync, sistem membandingkan **grup di device (daily)** vs **master brand**. Jika ada selisih, ticket dibuat otomatis.
+
+Angka di kartu tab Ticket memakai **engine yang sama** dengan kolom Groups/Admin di tab Account — bukan hitungan baris database mentah.
 
 **Jenis issue (filter Type):**
 
@@ -499,4 +507,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.10**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*
+*Handbook ini selaras dengan aplikasi versi **1.0.11**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*

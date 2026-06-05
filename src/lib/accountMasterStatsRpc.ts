@@ -60,9 +60,12 @@ export async function fetchMasterGroupStatsViaRpc(input: {
   }
 
   const row = (typeof data === 'object' && data !== null ? data : {}) as RpcRow;
+  const x = Number(row.brand_master_total ?? 0);
+  const joined = Number(row.joined_in_master ?? 0);
   return {
-    brandMasterTotal: Number(row.brand_master_total ?? 0),
-    joinedInMaster: Number(row.joined_in_master ?? 0),
+    dailyTotal: joined,
+    brandMasterTotal: x,
+    joinedInMaster: joined,
     adminInMaster: Number(row.admin_in_master ?? 0),
   };
 }

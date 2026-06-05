@@ -11,7 +11,7 @@ import { useMonitoringPending } from '@/hooks/useMonitoringPending';
 import { assertRmSchema } from '@/lib/assertRmSchema';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { loadAccountMonitoringGroups } from '@/lib/loadAccountMonitoring';
-import { loadOpenTicketsForUser } from '@/lib/loadTickets';
+import { buildTicketSummariesForUser } from '@/lib/buildTicketSummariesFromEngine';
 import { resolveMonitoringUserId } from '@/lib/monitoringDataUser';
 import {
   ACCOUNT_FILTER_DEFAULT,
@@ -29,13 +29,15 @@ import {
   hydrateTicketProcessCache,
   TICKET_WORKFLOW_CHANGED_EVENT,
 } from '@/lib/ticketWorkflowLocal';
-import { groupOpenTickets } from '@/lib/ticketGroups';
+import type { TicketSummaryGroup } from '@/lib/ticketGroups';
 import { applyAccountGroupsDailyPatch } from '@/lib/patchAccountGroupsFromDaily';
 import { reconcileOpenTicketsForUser, reconcileTicketsForAccountFromDb } from '@/lib/reconcileTickets';
 import { computeAccountKpis, computeTicketKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
-import type { TicketItem } from '@/types/ticketMonitoringUi';
+/** Bump saat logic ticket berubah — paksa reload (HMR tidak remount provider). */
+const TICKET_SYNC_VERSION = '6';
+const TICKET_SYNC_STORAGE_KEY = 'rm-ticket-sync-version';
 
 interface GroupMonitoringProviderProps {
   children: ReactNode;
@@ -49,7 +51,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const { t } = useLanguage();
   const { setTicketCount } = useMonitoringTab();
   const [groups, setGroups] = useState<AccountBrandGroup[]>([]);
-  const [tickets, setTickets] = useState<TicketItem[]>([]);
+  const [ticketSummaries, setTicketSummaries] = useState<TicketSummaryGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [probeSuspendAccountIds, setProbeSuspendAccountIds] = useState<string[]>([]);
@@ -57,17 +59,20 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const [ticketFilters, setTicketFilters] = useState(TICKET_FILTER_DEFAULT);
   const [workflowTick, setWorkflowTick] = useState(0);
   const ticketReconcileBusyRef = useRef(false);
-  const ticketReconcileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadAllBusyRef = useRef(false);
+  const reloadAllSeqRef = useRef(0);
+  /** Blok realtime ticket reload saat reconcile — cegah UI angka sementara (11,5,5,4). */
+  const ticketSyncLockedRef = useRef(false);
+  const ticketReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reportError = useCallback((message: string) => {
     setError(message);
   }, []);
 
-  const reloadTicketHandles = useCallback(async (loaded: TicketItem[]) => {
-    const accountIds = [...new Set(loaded.map((ticket) => ticket.accountId))];
+  const reloadTicketHandles = useCallback(async (summaries: TicketSummaryGroup[]) => {
+    const accountIds = [...new Set(summaries.map((s) => s.accountId))];
     try {
       const handles = await loadIssueHandlesForAccounts(accountIds);
-      const summaries = groupOpenTickets(loaded);
       const synced = await resetReopenedCompletedHandles(summaries, handles);
       hydrateTicketProcessCache(synced);
     } catch {
@@ -75,110 +80,127 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     }
   }, []);
 
-  const reloadTickets = useCallback(async () => {
+  /** UI ticket = engine master↔daily (sama bookmark), bukan hitung baris load DB. */
+  const reloadTicketSummaries = useCallback(async () => {
+    if (ticketSyncLockedRef.current) return;
     if (!user?.id) {
-      setTickets([]);
+      setTicketSummaries([]);
       hydrateTicketProcessCache({});
       return;
     }
     const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
-    const loaded = await loadOpenTicketsForUser(dataUserId);
-    setTickets(loaded);
-    await reloadTicketHandles(loaded);
+    const summaries = await buildTicketSummariesForUser(dataUserId);
+    setTicketSummaries(summaries);
+    await reloadTicketHandles(summaries);
   }, [user?.id, user?.userName, reloadTicketHandles]);
 
   const runTicketReconcile = useCallback(async () => {
     if (!user?.id || ticketReconcileBusyRef.current) return;
     ticketReconcileBusyRef.current = true;
+    ticketSyncLockedRef.current = true;
     try {
       const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
-      await reconcileOpenTicketsForUser(dataUserId, { concurrency: 2 });
-      const loaded = await loadOpenTicketsForUser(dataUserId);
-      setTickets(loaded);
-      await reloadTicketHandles(loaded);
-    } catch {
-      /* background — UI tetap pakai ticket terakhir */
+      await reconcileOpenTicketsForUser(dataUserId, { concurrency: 1 });
+      const summaries = await buildTicketSummariesForUser(dataUserId);
+      setTicketSummaries(summaries);
+      await reloadTicketHandles(summaries);
+      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
+      setGroups(loadedGroups);
+    } catch (e) {
+      reportError(getErrorMessage(e, t('groupMonitoring.ticketReconcileFailed')));
     } finally {
+      ticketSyncLockedRef.current = false;
       ticketReconcileBusyRef.current = false;
     }
-  }, [user?.id, user?.userName, reloadTicketHandles]);
-
-  const scheduleTicketReconcile = useCallback(() => {
-    if (ticketReconcileTimerRef.current) clearTimeout(ticketReconcileTimerRef.current);
-    ticketReconcileTimerRef.current = setTimeout(() => {
-      ticketReconcileTimerRef.current = null;
-      void runTicketReconcile();
-    }, 600);
-  }, [runTicketReconcile]);
+  }, [user?.id, user?.userName, reloadTicketHandles, reportError, t]);
 
   /** Reconcile DB dulu, lalu reload kartu Issue (kontrak 150−146=4 ticket). */
   const refreshIssues = useCallback(
     async (dbAccountId?: string) => {
+      ticketSyncLockedRef.current = true;
       try {
         if (dbAccountId) {
           await reconcileTicketsForAccountFromDb(dbAccountId);
           await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
         } else if (user?.id) {
-          const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
-          await reconcileOpenTicketsForUser(dataUserId, { concurrency: 2 });
+          await runTicketReconcile();
+          return;
         }
+        await reloadTicketSummaries();
       } finally {
-        await reloadTickets();
+        ticketSyncLockedRef.current = false;
       }
     },
-    [user?.id, user?.userName, reloadTickets],
+    [user?.id, runTicketReconcile, reloadTicketSummaries],
   );
 
   const handleAccountDailyChanged = useCallback(
     (dbAccountId: string) => {
       notifyPendingDataUpdate();
       void (async () => {
-        await reconcileTicketsForAccountFromDb(dbAccountId);
-        await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
-        await reloadTickets();
+        ticketSyncLockedRef.current = true;
+        try {
+          await reconcileTicketsForAccountFromDb(dbAccountId);
+          await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
+          await reloadTicketSummaries();
+        } finally {
+          ticketSyncLockedRef.current = false;
+        }
       })();
     },
-    [notifyPendingDataUpdate, reloadTickets],
+    [notifyPendingDataUpdate, reloadTicketSummaries],
   );
 
-  /** Realtime master brand (banyak akun) — reconcile semua user. */
+  /** Realtime master/daily — refresh kartu dari engine (tanpa reconcile DB). */
   const scheduleIssueRefreshFromData = useCallback(() => {
-    void reloadTickets();
-    scheduleTicketReconcile();
-  }, [reloadTickets, scheduleTicketReconcile]);
+    void reloadTicketSummaries();
+  }, [reloadTicketSummaries]);
 
   const reloadAll = useCallback(async () => {
     if (!user?.id) {
       setGroups([]);
-      setTickets([]);
+      setTicketSummaries([]);
       setLoading(false);
       return;
     }
+    if (reloadAllBusyRef.current) return;
 
+    const seq = ++reloadAllSeqRef.current;
+    reloadAllBusyRef.current = true;
     setLoading(true);
     setError(null);
+
     try {
+      try {
+        localStorage.setItem(TICKET_SYNC_STORAGE_KEY, TICKET_SYNC_VERSION);
+      } catch {
+        /* private mode */
+      }
+
       await assertRmSchema();
       const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
-      const [loadedGroups, loadedTickets] = await Promise.all([
+
+      const [loadedGroups, summaries] = await Promise.all([
         loadAccountMonitoringGroups(dataUserId),
-        loadOpenTicketsForUser(dataUserId),
+        buildTicketSummariesForUser(dataUserId),
       ]);
+      if (seq !== reloadAllSeqRef.current) return;
       setGroups(loadedGroups);
-      setTickets(loadedTickets);
-      void reloadTicketHandles(loadedTickets).catch(() => {
-        hydrateTicketProcessCache({});
-      });
+      setTicketSummaries(summaries);
+      await reloadTicketHandles(summaries);
     } catch (e) {
+      if (seq !== reloadAllSeqRef.current) return;
       setError(getErrorMessage(e, t('groupMonitoring.loadAccountsFailed')));
       setGroups([]);
-      setTickets([]);
+      setTicketSummaries([]);
       hydrateTicketProcessCache({});
     } finally {
-      setLoading(false);
-      scheduleTicketReconcile();
+      if (seq === reloadAllSeqRef.current) {
+        setLoading(false);
+      }
+      reloadAllBusyRef.current = false;
     }
-  }, [user?.id, user?.userName, t, reloadTicketHandles, scheduleTicketReconcile]);
+  }, [user?.id, user?.userName, t, reloadTicketHandles]);
 
   useEffect(() => {
     void reloadAll();
@@ -202,8 +224,6 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     return () => registerFullRefreshHandler(null);
   }, [registerFullRefreshHandler, reloadAll]);
 
-  const ticketSummaries = useMemo(() => groupOpenTickets(tickets), [tickets]);
-
   const filteredGroups = useMemo(
     () => filterAccountGroups(groups, accountFilters),
     [groups, accountFilters],
@@ -225,9 +245,15 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   }, [ticketSummaries.length, setTicketCount]);
 
   const handleTicketsRealtime = useCallback(() => {
+    if (ticketSyncLockedRef.current) return;
     notifyPendingDataUpdate();
-    void reloadTickets();
-  }, [notifyPendingDataUpdate, reloadTickets]);
+    if (ticketReloadDebounceRef.current) clearTimeout(ticketReloadDebounceRef.current);
+    ticketReloadDebounceRef.current = setTimeout(() => {
+      ticketReloadDebounceRef.current = null;
+      if (ticketSyncLockedRef.current) return;
+      void reloadTicketSummaries();
+    }, 500);
+  }, [notifyPendingDataUpdate, reloadTicketSummaries]);
 
   const reloadGroupsOnly = useCallback(async () => {
     if (!user?.id) return;
@@ -309,12 +335,12 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       accountFilters,
       setAccountFilters,
       onGroupsChange: setGroups,
-      tickets,
+      tickets: [],
       ticketSummaries,
       filteredTicketSummaries,
       ticketFilters,
       setTicketFilters,
-      reloadTickets,
+      reloadTickets: reloadTicketSummaries,
       refreshIssues: refreshIssues,
       accountKpis,
       ticketKpis,
@@ -326,7 +352,6 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       groups,
       filteredGroups,
       accountFilters,
-      tickets,
       ticketSummaries,
       filteredTicketSummaries,
       ticketFilters,
@@ -334,9 +359,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       ticketKpis,
       loading,
       reportError,
-      reloadTickets,
+      reloadTicketSummaries,
       refreshIssues,
-      runTicketReconcile,
     ],
   );
 

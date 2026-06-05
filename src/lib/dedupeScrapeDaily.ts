@@ -1,9 +1,11 @@
+import { normalizeGroupIdForMatch } from '@/lib/masterDailyMatch';
+import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
 
 type DailyRowRef = { id: string; group_id: string; scrape_date: string; scraped_at: string };
 
-/** In-memory: satu baris per `group_id` (untuk reconcile/metrik). */
+/** In-memory: satu baris per `group_id` raw (legacy). */
 export function dedupeDailyRowsByGroupId<T extends { group_id: string | null | undefined }>(
   rows: T[],
 ): T[] {
@@ -16,22 +18,34 @@ export function dedupeDailyRowsByGroupId<T extends { group_id: string | null | u
   return [...map.values()];
 }
 
+/** Satu baris per group_id normalisasi — selaras RPC rm_norm_group_id & ticket gap. */
+export function dedupeDailyRowsByNormalizedGroupId<
+  T extends { group_id: string | null | undefined },
+>(rows: T[]): T[] {
+  const map = new Map<string, T>();
+  for (const row of rows) {
+    const norm = normalizeGroupIdForMatch(String(row.group_id ?? '').trim());
+    if (!norm) continue;
+    map.set(norm, row);
+  }
+  return [...map.values()];
+}
+
 /** Satu baris daily per `group_id` per akun — hapus duplikat historis (keep terbaru). */
 export async function dedupeScrapeDailyRowsForAccount(accountId: string): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
 
-  const { data: rows, error } = await supabase
-    .from(TABLES.groupScrapeDaily)
-    .select('id, group_id, scrape_date, scraped_at')
-    .eq('account_id', accountId);
-
-  if (error) throw error;
-  if (!rows?.length) return;
+  const rows = await fetchAllSupabaseRows<DailyRowRef>(
+    TABLES.groupScrapeDaily,
+    'id, group_id, scrape_date, scraped_at',
+    [{ column: 'account_id', value: accountId }],
+  );
+  if (!rows.length) return;
 
   const bestByGid = new Map<string, DailyRowRef>();
 
-  for (const row of rows as DailyRowRef[]) {
+  for (const row of rows) {
     const gid = String(row.group_id ?? '').trim();
     if (!gid) continue;
 
@@ -65,15 +79,14 @@ export async function countDistinctDailyGroupsForAccount(accountId: string): Pro
   const supabase = getSupabase();
   if (!supabase) return 0;
 
-  const { data, error } = await supabase
-    .from(TABLES.groupScrapeDaily)
-    .select('group_id')
-    .eq('account_id', accountId);
-
-  if (error) throw error;
+  const data = await fetchAllSupabaseRows<{ group_id: string }>(
+    TABLES.groupScrapeDaily,
+    'group_id',
+    [{ column: 'account_id', value: accountId }],
+  );
 
   const gids = new Set<string>();
-  for (const row of data ?? []) {
+  for (const row of data) {
     const gid = String((row as { group_id?: string }).group_id ?? '').trim();
     if (gid) gids.add(gid);
   }

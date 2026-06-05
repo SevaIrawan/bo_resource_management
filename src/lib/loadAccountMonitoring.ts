@@ -184,8 +184,6 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
               masterTotal: master.joinedInMaster,
             });
           }
-        } else if (brandX > 0 && row.groupsTotal !== brandX) {
-          row = { ...row, groupsTotal: brandX, adminTotal: brandX };
         }
         return row;
       }),

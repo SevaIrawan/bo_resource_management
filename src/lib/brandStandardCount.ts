@@ -1,4 +1,5 @@
 import { TABLES } from '@/config/tables';
+import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import { getSupabase } from '@/lib/supabase';
 import type { Brand } from '@/types/database';
 import type { Platform } from '@/types/database';
@@ -30,14 +31,21 @@ export async function countBrandMasterGroups(
   const supabase = getSupabase();
   if (!supabase) return 0;
 
-  const { count, error } = await supabase
-    .from(TABLES.groupsMaster)
-    .select('id', { count: 'exact', head: true })
-    .eq('brand', brandName.trim())
-    .eq('platform', platform);
+  const rows = await fetchAllSupabaseRows<{ group_id: string }>(
+    TABLES.groupsMaster,
+    'group_id',
+    [
+      { column: 'brand', value: brandName.trim() },
+      { column: 'platform', value: platform },
+    ],
+  );
 
-  if (error) throw error;
-  return count ?? 0;
+  const gids = new Set<string>();
+  for (const row of rows) {
+    const gid = String(row.group_id ?? '').trim();
+    if (gid) gids.add(gid);
+  }
+  return gids.size;
 }
 
 export async function resolveBrandNameFromId(brandId: string): Promise<string | null> {

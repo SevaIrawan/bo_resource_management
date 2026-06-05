@@ -2427,6 +2427,63 @@
     cursor: not-allowed;
   }
 
+  .brand-modal-panel--group-links-picker {
+    width: min(28rem, calc(100vw - 2rem));
+  }
+
+  .group-links-picker-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 0.75rem 1rem 1rem;
+  }
+
+  .group-links-picker-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    width: 100%;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color 160ms ease,
+      background 160ms ease;
+  }
+
+  .group-links-picker-option:hover {
+    border-color: rgba(37, 211, 102, 0.45);
+    background: rgba(37, 211, 102, 0.06);
+  }
+
+  .group-links-picker-option-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  .group-links-picker-option-desc {
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+  }
+
+  .group-links-modal-title-block {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .group-links-modal-mode {
+    margin: 0.25rem 0 0;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
   .group-links-modal-footer {
     display: flex;
     flex-shrink: 0;

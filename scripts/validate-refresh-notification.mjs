@@ -26,7 +26,13 @@ const checks = [
       read('src/hooks/useAccountSyncFlow.ts').includes('await onTicketsReload?.(dbAccountId)') &&
       read('src/hooks/useAccountSyncFlow.ts').includes('brandIdAfterLogin'),
   },
-  { name: 'Load app: background reconcileOpenTicketsForUser', ok: read('src/providers/GroupMonitoringProvider.tsx').includes('scheduleTicketReconcile') && read('src/providers/GroupMonitoringProvider.tsx').includes('reconcileOpenTicketsForUser') },
+  {
+    name: 'Load app: ticket engine + reconcile saat refresh tab Ticket',
+    ok:
+      read('src/providers/GroupMonitoringProvider.tsx').includes('runTicketReconcile') &&
+      read('src/providers/GroupMonitoringProvider.tsx').includes('reconcileOpenTicketsForUser') &&
+      read('src/providers/GroupMonitoringProvider.tsx').includes('buildTicketSummariesForUser'),
+  },
 ];
 
 let failed = 0;

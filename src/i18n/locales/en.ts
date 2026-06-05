@@ -146,7 +146,7 @@ export const en = {
       groupsUnit: 'groups',
       groupsShort: 'short {{count}}',
       groupLink: 'Group link',
-      groupLinkHint: 'List of brand master groups with join/admin status from this account’s scrape (not raw device count only).',
+      groupLinkHint: 'Choose: all groups on this account, or admin status vs brand master list.',
       export: 'Export',
       addCardView: 'Add Card View',
       addBrandTitle: 'Add brand card',
@@ -195,6 +195,11 @@ export const en = {
       loadFailed: 'Could not load master detail.',
     },
     groupLinks: {
+      pickerTitle: 'Which group list?',
+      modeAccount: 'Groups on this account',
+      modeAccountDesc: 'Every group from the latest scrape on this account’s device.',
+      modeAdminMaster: 'Admin vs master list',
+      modeAdminMasterDesc: 'Brand master groups with join and admin status from this account.',
       colName: 'Group name',
       colId: 'Group ID',
       colLink: 'Invite link',
@@ -322,6 +327,7 @@ export const en = {
     },
     loadingAccounts: 'Loading accounts…',
     loadAccountsFailed: 'Unable to load accounts from database.',
+    ticketReconcileFailed: 'Ticket sync failed. Use Refresh on the Ticket tab.',
     ticketPanel: {
       bookmarksLabel: 'Issue workflow views',
       bookmarkInProgress: 'In Progress',

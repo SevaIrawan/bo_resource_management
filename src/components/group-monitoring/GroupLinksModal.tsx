@@ -7,7 +7,12 @@ import {
   GROUP_LINKS_VISIBLE_ROWS,
 } from '@/config/groupLinksTable';
 import { useLanguage } from '@/hooks/useLanguage';
-import { fetchAccountGroupLinks, type AccountGroupLinkRow } from '@/lib/accountGroupLinks';
+import {
+  fetchAccountDailyGroupLinks,
+  fetchAccountGroupLinks,
+  type AccountGroupLinkRow,
+} from '@/lib/accountGroupLinks';
+import type { GroupLinksViewMode } from '@/components/group-monitoring/GroupLinksPickerModal';
 import { exportGroupLinksExcel } from '@/lib/exportExcel';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +22,7 @@ interface GroupLinksModalProps {
   accountName: string;
   platform: 'whatsapp' | 'telegram';
   accountId?: string;
+  viewMode: GroupLinksViewMode;
   onClose: () => void;
 }
 
@@ -54,6 +60,7 @@ export function GroupLinksModal({
   accountName,
   platform,
   accountId,
+  viewMode,
   onClose,
 }: GroupLinksModalProps) {
   const { t } = useLanguage();
@@ -101,7 +108,12 @@ export function GroupLinksModal({
     setLoading(true);
     setError(null);
 
-    void fetchAccountGroupLinks(brandName, platform, accountId)
+    const load =
+      viewMode === 'account'
+        ? fetchAccountDailyGroupLinks(accountId)
+        : fetchAccountGroupLinks(brandName, platform, accountId);
+
+    void load
       .then((rows) => {
         if (!cancelled) setLinks(rows);
       })
@@ -117,7 +129,7 @@ export function GroupLinksModal({
     return () => {
       cancelled = true;
     };
-  }, [accountId, accountName, brandName, open, t]);
+  }, [accountId, accountName, brandName, open, platform, t, viewMode]);
 
   if (!open) return null;
 
@@ -136,9 +148,16 @@ export function GroupLinksModal({
         onClick={(event) => event.stopPropagation()}
       >
         <header className="brand-modal-header group-links-modal-header">
-          <h2 id="group-links-title" className="brand-modal-title group-links-modal-title">
-            {brandName} {accountName}
-          </h2>
+          <div className="group-links-modal-title-block">
+            <h2 id="group-links-title" className="brand-modal-title group-links-modal-title">
+              {brandName} {accountName}
+            </h2>
+            <p className="group-links-modal-mode">
+              {viewMode === 'account'
+                ? t('groupMonitoring.groupLinks.modeAccount')
+                : t('groupMonitoring.groupLinks.modeAdminMaster')}
+            </p>
+          </div>
           <div className="group-links-header-tools">
             <AdminFilterSlicer
               value={adminFilter}
@@ -233,7 +252,7 @@ export function GroupLinksModal({
                   </tbody>
                 </table>
               </div>
-              {tableNeedsScroll ? (
+              {viewMode === 'account' && tableNeedsScroll ? (
                 <p className="group-links-table-hint">
                   {t('groupMonitoring.groupLinks.viewportHint', {
                     max: GROUP_LINKS_VISIBLE_ROWS,

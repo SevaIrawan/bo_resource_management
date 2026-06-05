@@ -1,6 +1,7 @@
 import { TICKET_SELECT } from '@/config/dbColumns';
 import { TABLES } from '@/config/tables';
 import { dedupeOpenTicketItems } from '@/lib/ticketDedupe';
+import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import { getSupabase } from '@/lib/supabase';
 import type { Ticket } from '@/types/database';
 import type { TicketAccent, TicketItem } from '@/types/ticketMonitoringUi';
@@ -70,16 +71,16 @@ export async function loadOpenTicketsForUser(userId: string): Promise<TicketItem
   const accountIds = (accounts ?? []).map((a) => a.id as string);
   if (!accountIds.length) return [];
 
-  const { data, error } = await supabase
-    .from(TABLES.tickets)
-    .select(TICKET_SELECT)
-    .in('account_id', accountIds)
-    .eq('status', 'open')
-    .order('created_at', { ascending: false });
+  const chunks = await Promise.all(
+    accountIds.map((accountId) =>
+      fetchAllSupabaseRows<Record<string, unknown>>(TABLES.tickets, TICKET_SELECT, [
+        { column: 'account_id', value: accountId },
+        { column: 'status', value: 'open' },
+      ]),
+    ),
+  );
 
-  if (error) throw error;
-
-  const items = ((data ?? []) as TicketRow[])
+  const items = (chunks.flat() as unknown as TicketRow[])
     .filter((row) => (row.ticket_type as string) !== 'group_count_mismatch')
     .map(toTicketItem)
     .filter((t): t is TicketItem => t !== null);

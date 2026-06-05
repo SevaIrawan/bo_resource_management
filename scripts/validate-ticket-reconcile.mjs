@@ -9,6 +9,9 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const reconcile = read('src/lib/reconcileTickets.ts');
+const masterDaily = read('src/lib/masterDailyMatch.ts');
+const compare = read('src/lib/accountMasterDailyCompare.ts');
+const syncData = read('src/lib/accountSyncData.ts');
 const provider = read('src/providers/GroupMonitoringProvider.tsx');
 const groups = read('src/lib/ticketGroups.ts');
 const engine = read('src/lib/accountMonitoringEngine.ts');
@@ -16,11 +19,11 @@ const realtime = read('src/hooks/useRealtimeMonitoring.ts');
 
 const checks = [
   {
-    name: 'missing_group: bandingkan master vs daily (id + invite + nama)',
+    name: 'missing_group: master \\ daily by group_id saja',
     ok:
-      reconcile.includes("ticketType: 'missing_group'") &&
-      reconcile.includes('groupLink: m.invite_link') &&
-      reconcile.includes('findDailyRowForMaster'),
+      reconcile.includes("'missing_group'") &&
+      compare.includes('isMasterGroupIdInDaily') &&
+      !compare.includes('findDailyRowForMaster'),
   },
   {
     name: 'Tidak ada group_count_mismatch di reconcile',
@@ -35,9 +38,10 @@ const checks = [
   {
     name: 'Lima tipe ticket (tanpa group_count_mismatch)',
     ok:
-      reconcile.includes("ticketType: 'daily_junk_group'") &&
-      reconcile.includes("ticketType: 'missing_group'") &&
-      reconcile.includes("ticketType: 'not_admin'") &&
+      reconcile.includes("'daily_junk_group'") &&
+      reconcile.includes("'missing_group'") &&
+      reconcile.includes("'not_admin'") &&
+      reconcile.includes("'duplicate_group_id'") &&
       reconcile.includes('resolveLegacyCountMismatchTickets'),
   },
   {
@@ -45,10 +49,10 @@ const checks = [
     ok: reconcile.includes('export async function reconcileOpenTicketsForUser'),
   },
   {
-    name: 'Provider: reconcile saat load + refresh tab Ticket',
+    name: 'Provider: UI ticket dari engine + reconcile di refresh tab',
     ok:
+      provider.includes('buildTicketSummariesForUser') &&
       provider.includes('runTicketReconcile') &&
-      provider.includes('scheduleTicketReconcile') &&
       provider.includes('reconcileOpenTicketsForUser'),
   },
   {
@@ -62,11 +66,11 @@ const checks = [
       engine.includes('device.groupIds'),
   },
   {
-    name: 'Provider: reconcile dulu lalu reload ticket',
+    name: 'Provider: scrape/realtime refresh summary engine',
     ok:
       provider.includes('reconcileTicketsForAccountFromDb') &&
       provider.includes('applyAccountGroupsDailyPatch') &&
-      provider.includes('await reloadTickets()'),
+      provider.includes('reloadTicketSummaries'),
   },
   {
     name: 'Sync flow: await onTicketsReload(dbAccountId)',
@@ -93,10 +97,19 @@ const checks = [
       !reconcile.includes('keepIds.add(gid);\n    }\n  }\n\n  const toInsert'),
   },
   {
-    name: 'Match master↔daily: invite link + nama (masterDailyMatch)',
+    name: 'daily_junk_group: daily \\ master by group_id raw (selaras grid Y/X)',
     ok:
-      reconcile.includes('findDailyRowForMaster') &&
-      fs.existsSync(path.join(root, 'src/lib/masterDailyMatch.ts')),
+      compare.includes('isDailyGroupIdInMaster') &&
+      compare.includes('buildMasterGroupIdSet') &&
+      compare.includes('dedupeDailyRowsByGroupId') &&
+      masterDaily.includes('buildRawGroupIdSet'),
+  },
+  {
+    name: 'Brand reconcile: brands.name dulu (sama dengan grid monitoring)',
+    ok:
+      reconcile.includes('pickBrandNameForReconcile') &&
+      reconcile.includes('resolveBrandNameForReconcileAccount') &&
+      fs.existsSync(path.join(root, 'src/lib/reconcileBrandName.ts')),
   },
   {
     name: 'Realtime daily: reconcile akun lalu patch groups',
@@ -116,7 +129,7 @@ const checks = [
     ok:
       fs.existsSync(path.join(root, 'src/components/group-monitoring/TicketIssueDetailModal.tsx')) &&
       read('src/components/group-monitoring/TicketCard.tsx').includes('onDoubleClick') &&
-      read('src/components/group-monitoring/TicketCard.tsx').includes('exportTicketGroupExcel') &&
+      !read('src/components/group-monitoring/TicketCard.tsx').includes('exportTicketGroupExcel') &&
       read('src/lib/ticketExportRows.ts').includes('ticketGroupToExportRows'),
   },
   {
@@ -133,10 +146,66 @@ const checks = [
       reconcile.includes('await resolveTickets({'),
   },
   {
+    name: 'resolveTickets: keep group_id raw (selaras gap)',
+    ok:
+      reconcile.includes('input.keepGroupIds.has(gidTrim)') &&
+      !reconcile.includes('keepNormalized'),
+  },
+  {
+    name: 'not_admin: lookup daily by raw group_id saja',
+    ok: compare.includes('dailyByGid.get(gid)'),
+  },
+  {
+    name: 'Satu logic inti: accountMasterDailyCompare (grid = ticket)',
+    ok:
+      reconcile.includes('computeAccountTicketBreakdown') &&
+      reconcile.includes('loadMasterDailyForAccount') &&
+      syncData.includes('fetchAccountBookmarkMetrics') &&
+      compare.includes('fetchAccountBookmarkMetrics') &&
+      compare.includes('assertTicketGridInvariant'),
+  },
+  {
+    name: 'Stats akun: tidak pakai findDailyRowForMaster / RPC norm',
+    ok:
+      !syncData.includes('findDailyRowForMaster') &&
+      !syncData.includes('fetchMasterGroupStatsViaRpc'),
+  },
+  {
+    name: 'Card bookmark Groups/Admin = fetchAccountBookmarkMetrics (= ticket)',
+    ok:
+      syncData.includes('fetchAccountBookmarkMetrics') &&
+      syncData.includes('groupsCurrent: master.dailyTotal') &&
+      syncData.includes('adminCurrent: master.adminInMaster') &&
+      !syncData.includes('deviceGroupCount != null'),
+  },
+  {
     name: 'Realtime snapshot: trigger reconcile issue',
     ok:
       realtime.includes('patchAccountSnapshotInGroups') &&
       realtime.includes('onIssueReconcileRef'),
+  },
+  {
+    name: 'Modal Admin vs master: hanya baris master (X), dedupe group_id',
+    ok: (() => {
+      const links = read('src/lib/accountGroupLinks.ts');
+      const start = links.indexOf('export async function fetchAccountGroupLinks');
+      const fn = links.slice(start, start + 1200);
+      return (
+        links.includes('dedupeMasterRowsByGroupId') &&
+        fn.includes('inMaster: true') &&
+        !fn.includes('inMaster: false')
+      );
+    })(),
+  },
+  {
+    name: 'GroupLinksModal adminMaster: tanpa caption junk di bawah tabel',
+    ok: (() => {
+      const modal = read('src/components/group-monitoring/GroupLinksModal.tsx');
+      return (
+        modal.includes("viewMode === 'account' && tableNeedsScroll") &&
+        !modal.includes('extraDailyHint')
+      );
+    })(),
   },
 ];
 

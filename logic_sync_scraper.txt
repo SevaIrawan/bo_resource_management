@@ -25,5 +25,13 @@ BAGIAN 4: PERFORMA (3000 grup)
 - rm_account_master_stats (Supabase RPC): agregasi master↔daily di SQL, fallback loop JS jika RPC belum deploy.
 - reconcile ticket: setelah scrape selesai → `await refreshIssues(accountId)`; realtime daily/scrape_runs → reconcile per akun.
 
-Implementasi: useAccountSyncFlow.ts, accountMonitoringEngine.ts, accountMasterStatsRpc.ts,
+BAGIAN 5: METRIK GRID, TICKET & MODAL GROUP LINK (satu engine)
+- Y/X groups & admin: accountMasterDailyCompare.ts — dedupe group_id raw; X = master brand.
+- Tab Ticket: buildTicketSummariesFromEngine.ts — angka kartu dari engine (bukan hitung baris DB mentah).
+- Reconcile: reconcileTickets.ts memakai computeAccountTicketBreakdown yang sama dengan grid.
+- Modal Admin vs master list: fetchAccountGroupLinks — hanya baris master (X); junk device hanya di tab Ticket.
+- Modal Groups on account: fetchAccountDailyGroupLinks — semua grup daily akun (Y).
+
+Implementasi: useAccountSyncFlow.ts, accountMonitoringEngine.ts, accountMasterDailyCompare.ts,
+buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx,
 PlatformLoginModal.tsx, electron/main/scraper/countWhatsApp.ts, migrations/028_rm_account_master_stats_rpc.sql

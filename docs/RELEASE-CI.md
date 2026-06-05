@@ -1,6 +1,6 @@
 # Rilis GitHub Actions — panduan IT (wajib baca)
 
-**Versi acuan saat ini:** `1.0.10` (`package.json` + `scripts/validate-release-version.mjs` + `PROJECT.md`)
+**Versi acuan saat ini:** `1.0.11` (`package.json` + `scripts/validate-release-version.mjs` + `PROJECT.md`)
 
 ---
 
@@ -34,7 +34,7 @@ Kunci wajib di `.env`: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGR
    - `Resource.Management-x.y.z-arm64.dmg` + `.zip` (Mac auto-update)
    - `Resource.Management-x.y.z.AppImage` (Linux)
    - `latest.yml`, `latest-mac.yml`, `latest-linux.yml` (dari job publish + `sync-release-yml.mjs`)
-5. **Hotfix metadata rilis lama:** **Actions → Fix release yml** → isi tag (mis. `v1.0.10`) → Run.
+5. **Hotfix metadata rilis lama:** **Actions → Fix release yml** → isi tag (mis. `v1.0.11`) → Run.
 
 **Jangan** push berkali-kali kalau CI belum hijau.
 

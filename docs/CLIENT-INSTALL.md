@@ -4,7 +4,7 @@
 
 Release: https://github.com/SevaIrawan/bo_resource_management/releases
 
-**Versi terbaru:** `v1.0.10`
+**Versi terbaru:** `v1.0.11`
 
 ---
 
@@ -12,7 +12,7 @@ Release: https://github.com/SevaIrawan/bo_resource_management/releases
 
 | | |
 |---|---|
-| File | `Resource.Management.Setup.1.0.10.exe` |
+| File | `Resource.Management.Setup.1.0.11.exe` |
 | Jangan | Kirim `.dmg` ke Windows |
 
 Jalankan `.exe` → ikuti wizard → buka app.
@@ -23,7 +23,7 @@ Jalankan `.exe` → ikuti wizard → buka app.
 
 | | |
 |---|---|
-| File | `Resource.Management-1.0.10-arm64.dmg` |
+| File | `Resource.Management-1.0.11-arm64.dmg` |
 | Jangan | File `.exe`, jangan buka DMG di Windows |
 
 **Hanya di Mac:**
@@ -39,11 +39,11 @@ Jalankan `.exe` → ikuti wizard → buka app.
 
 | | |
 |---|---|
-| File | `Resource.Management-1.0.10.AppImage` |
+| File | `Resource.Management-1.0.11.AppImage` |
 
 ```bash
-chmod +x Resource.Management-1.0.10.AppImage
-./Resource.Management-1.0.10.AppImage
+chmod +x Resource.Management-1.0.11.AppImage
+./Resource.Management-1.0.11.AppImage
 ```
 
 ---

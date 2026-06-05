@@ -99,7 +99,7 @@ function wrapDocument({ lang, coverTitle, coverSubtitle, meta, bodyHtml, tocHtml
     ${bodyHtml}
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — ${coverTitle} v${meta['App version'] || meta['应用版本'] || '1.0.10'}</p>
+    <p>Internal use only — ${coverTitle} v${meta['App version'] || meta['应用版本'] || '1.0.11'}</p>
   </footer>
 </body>
 </html>`;

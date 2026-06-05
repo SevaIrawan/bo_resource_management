@@ -44,7 +44,7 @@
 </tr>
 <tr>
 <td><strong>应用版本</strong></td>
-<td>1.0.10</td>
+<td>1.0.11</td>
 </tr>
 <tr>
 <td><strong>适用对象</strong></td>
@@ -650,7 +650,23 @@
 </tbody></table>
 <p>登录成功后可能提示：<em>登录成功，设备群组与管理员数已更新。是否立即抓取并写入数据库？</em> → 选 <strong>抓取</strong> 或 <strong>稍后</strong>。</p>
 <h3 id="4-7-群链接-弹窗">4.7 **群链接** 弹窗</h3>
-<p>通过 <strong>操作 → 群链接</strong> 打开。</p>
+<p>通过 <strong>操作 → 群链接</strong> 打开。选择模式：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>列表内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>本账号全部群组</strong></td>
+<td>设备上全部群（Y）— daily 抓取快照</td>
+</tr>
+<tr>
+<td><strong>管理员 vs 主数据</strong></td>
+<td>仅 <strong>品牌主数据</strong> 群（X）+ 本账号加入/管理员状态</td>
+</tr>
+</tbody></table>
 <table>
 <thead>
 <tr>
@@ -670,11 +686,8 @@
 <td>分页</td>
 <td>群多时 <strong>上一页</strong> / <strong>下一页</strong></td>
 </tr>
-<tr>
-<td>滚动</td>
-<td>表格内滚动（大量行时有视口提示）</td>
-</tr>
 </tbody></table>
+<p><strong>管理员 vs 主数据</strong> 的总数与群组/管理员列分母（X）及卡片 <strong>WA x Group</strong> 徽章一致 — 不包含设备 junk 群（见工单 → Junk）。</p>
 <p>列表为空？先 <strong>运行抓取</strong>。提示：<em>无链接，请先抓取。</em></p>
 <h3 id="4-8-从槽位移除账号">4.8 从槽位移除账号</h3>
 <table>
@@ -751,6 +764,7 @@
 <h2 id="5-工单-标签-问题与修复">5. 「工单」标签 — 问题与修复</h2>
 <h3 id="5-1-何时出现工单">5.1 何时出现工单？</h3>
 <p>账号完成抓取/同步后，系统比对<strong>设备群（每日快照）<strong>与</strong>品牌主表</strong>。存在差异则自动生成工单。</p>
+<p>工单卡片数字与账号页的群组/管理员列使用 <strong>同一套引擎</strong> — 不是数据库原始行数。</p>
 <h3 id="5-2-工单类型-筛选-全部工单类型">5.2 工单类型（筛选：**全部工单类型**）</h3>
 <table>
 <thead>
@@ -1291,11 +1305,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>本手册对应应用版本 <strong>1.0.10</strong>。新功能发布后请同步更新文档。</em></p>
+<p><em>本手册对应应用版本 <strong>1.0.11</strong>。新功能发布后请同步更新文档。</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — 资源管理 v1.0.10</p>
+    <p>Internal use only — 资源管理 v1.0.11</p>
   </footer>
 </body>
 </html>

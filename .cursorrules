@@ -54,8 +54,8 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
 11. ISSUE / TICKET — KONTRAK BISNIS (Resource Management)
     Session login/logout TIDAK masuk Issue.
     Hanya 5 tipe ticket per akun (banding master vs daily akun):
-    - daily_junk_group — grup di device, tidak di master (MORE / sampah).
-    - missing_group — grup di master, belum di device akun (LESS / perlu invite).
+    - daily_junk_group (Group mismatch) — GAP daily>master: baris daily yang group_id tidak ada di master (sisi daily lebih besar).
+    - missing_group (Missing groups) — GAP master>daily: baris master yang belum ada di daily akun (kebalikan Group mismatch).
     - not_admin — sudah join, belum admin.
     - duplicate_group_id — group_id sama (HP & master), nama beda.
     - duplicate_group_name — group_id beda (HP vs master), nama sama.

@@ -5,16 +5,17 @@ import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
 import { isWhatsAppBrowserBusyMessage } from '@/lib/waLoginErrors';
 import { isRetryableNetworkError, NETWORK_RETRY_ATTEMPTS } from '@/lib/networkRetry';
 import { withTimeout } from '@/lib/withTimeout';
+import {
+  accountGroupEstimate,
+  waLoginConfirmingTimeoutMs,
+  waQrBootstrapDeadlineMs,
+  waQrScanWaitMs,
+} from '@/config/syncScraperPolicy';
 import type { Platform } from '@/types/database';
 
 const TG_LOGIN_RESTORE_TIMEOUT_MS = 15_000;
-const WA_QR_SCAN_TIMEOUT_MS = 240_000;
 const TG_QR_TIMEOUT_MS = 180_000;
-/** UI guard — selaras main (240s); timer mulai saat modal buka. */
-const WA_QR_MUST_APPEAR_MS = 240_000;
 const WA_PREPARE_SETTLE_MS = 3_500;
-/** Setelah scan: WA `authenticated` → `ready` bisa lama (~3000 grup). */
-const WA_CONFIRMING_TIMEOUT_MS = 600_000;
 const TG_CONFIRMING_TIMEOUT_MS = 180_000;
 const WA_QR_MAX_RETRIES = NETWORK_RETRY_ATTEMPTS;
 
@@ -49,12 +50,24 @@ export function usePlatformLogin(
     /** UUID `messaging_accounts` — restore DB / LocalAuth. */
     accountId?: string;
     attemptRestore?: boolean;
+    /** Tutup modal — login Chrome tetap jalan sampai sukses / cancel eksplisit. */
+    persistSession?: boolean;
+    groupsCurrent?: number | null;
+    groupsTotal?: number | null;
     t?: (key: string, vars?: Record<string, string | number>) => string;
   },
 ) {
   const dbAccountId = options?.accountId ?? sessionId;
   const attemptRestore = options?.attemptRestore !== false;
   const skipDiskRestore = options?.attemptRestore === false;
+  const persistSession = options?.persistSession === true;
+  const groupEstimate = accountGroupEstimate({
+    groupsCurrent: options?.groupsCurrent,
+    groupsTotal: options?.groupsTotal,
+  });
+  const waQrAppearMs = waQrBootstrapDeadlineMs(groupEstimate);
+  const waQrScanMs = waQrScanWaitMs(groupEstimate);
+  const waConfirmingMs = waLoginConfirmingTimeoutMs(groupEstimate);
   const t = options?.t ?? ((key: string) => key);
 
   const [view, setView] = useState<LoginView>('qr');
@@ -64,6 +77,7 @@ export function usePlatformLogin(
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [chromeSessionActive, setChromeSessionActive] = useState(false);
 
   const sessionReadyRef = useRef(false);
   const loginStartedRef = useRef(false);
@@ -110,15 +124,16 @@ export function usePlatformLogin(
           t('groupMonitoring.sync.qrAppearTimeout') ??
             'QR is still loading. Please wait, or close and tap Sync again.',
         );
-      }, WA_QR_MUST_APPEAR_MS);
+      }, waQrAppearMs);
     },
-    [clearQrAppearDeadline, clearQrTimeout, t],
+    [clearQrAppearDeadline, clearQrTimeout, t, waQrAppearMs],
   );
 
   const armQrTimeout = useCallback(
     (plat: Platform) => {
       clearQrTimeout();
-      const ms = plat === 'whatsapp' ? WA_QR_SCAN_TIMEOUT_MS : TG_QR_TIMEOUT_MS;
+      const ms =
+        plat === 'whatsapp' ? waQrScanMs : TG_QR_TIMEOUT_MS;
       qrTimeoutIdRef.current = window.setTimeout(() => {
         setStatus((current) => {
           if (
@@ -143,7 +158,7 @@ export function usePlatformLogin(
         });
       }, ms);
     },
-    [clearQrTimeout, t],
+    [clearQrTimeout, t, waQrScanMs],
   );
 
   // IPC listeners — tetap aktif saat persist setelah ready (modal bisa tutup nanti)
@@ -171,6 +186,8 @@ export function usePlatformLogin(
       if (!matchesSession(payload)) return;
       if (!acceptQrRef.current) return;
 
+      setChromeSessionActive(true);
+
       const gen =
         typeof payload.generation === 'number' && payload.generation > 0
           ? payload.generation
@@ -190,6 +207,7 @@ export function usePlatformLogin(
 
     const offPairing = api.onPairingCode((payload) => {
       if (!matchesSession(payload)) return;
+      setChromeSessionActive(true);
       clearQrTimeout();
       setPairingCode(payload.code);
       setView('phone');
@@ -218,6 +236,7 @@ export function usePlatformLogin(
         setError(null);
       }
       if (payload.phase === 'loading' && platform === 'whatsapp') {
+        setChromeSessionActive(true);
         clearQrAppearDeadline();
         setView('qr');
         setStatus('starting-qr');
@@ -230,6 +249,7 @@ export function usePlatformLogin(
       clearQrTimeout();
       sessionReadyRef.current = true;
       loginSucceededRef.current = true;
+      setChromeSessionActive(false);
       setView('qr');
       setStatus('ready');
       setError(null);
@@ -272,8 +292,8 @@ export function usePlatformLogin(
 
   // Setelah scan: fase confirming sampai event `ready` — jangan timeout terlalu cepat (akun besar).
   useEffect(() => {
-    if (!open || status !== 'confirming' || !platform) return;
-    const ms = platform === 'whatsapp' ? WA_CONFIRMING_TIMEOUT_MS : TG_CONFIRMING_TIMEOUT_MS;
+    if ((!open && !persistSession) || status !== 'confirming' || !platform) return;
+    const ms = platform === 'whatsapp' ? waConfirmingMs : TG_CONFIRMING_TIMEOUT_MS;
     const timeoutId = window.setTimeout(() => {
       if (sessionReadyRef.current || loginSucceededRef.current) return;
       setStatus('error');
@@ -285,18 +305,19 @@ export function usePlatformLogin(
       );
     }, ms);
     return () => window.clearTimeout(timeoutId);
-  }, [open, platform, status, t]);
+  }, [open, persistSession, platform, status, t, waConfirmingMs]);
 
   // Buka modal baru → reset state (hindari status `ready` lama memicu persist ulang)
   useEffect(() => {
     const justOpened = open && !prevOpenRef.current;
-    prevOpenRef.current = open;
+    prevOpenRef.current = open || persistSession;
 
     if (!justOpened || !platform || !sessionId) return;
 
     loginSucceededRef.current = false;
     sessionReadyRef.current = false;
     loginStartedRef.current = false;
+    setChromeSessionActive(false);
     setView('qr');
     setStatus('loading');
     setQrDataUrl(null);
@@ -304,11 +325,17 @@ export function usePlatformLogin(
     setPairingCode(null);
     setError(null);
     setSubmitting(false);
-  }, [open, platform, sessionId]);
+  }, [open, persistSession, platform, sessionId]);
 
-  // Tutup modal → cancel hanya jika login belum sukses (jangan matikan client untuk scrape)
+  // Tutup modal: background (persistSession) biarkan Chrome; selain itu cancel.
   useEffect(() => {
     if (open) return;
+
+    clearQrTimeout();
+    clearQrAppearDeadline();
+
+    if (persistSession) return;
+
     const api = window.electronAPI?.platformLogin;
     const hadSucceeded = loginSucceededRef.current;
     if (api && loginStartedRef.current && !hadSucceeded) {
@@ -317,10 +344,13 @@ export function usePlatformLogin(
     if (!hadSucceeded) {
       loginStartedRef.current = false;
       sessionReadyRef.current = false;
+      setChromeSessionActive(false);
     }
-    clearQrTimeout();
-    clearQrAppearDeadline();
-  }, [clearQrAppearDeadline, clearQrTimeout, open, platform]);
+  }, [clearQrAppearDeadline, clearQrTimeout, open, persistSession, platform]);
+
+  const markChromeSessionActive = useCallback(() => {
+    setChromeSessionActive(true);
+  }, []);
 
   const prepareWhatsAppForQr = useCallback(
     async (deviceSessionId: string, purgeDisk: boolean) => {
@@ -347,7 +377,9 @@ export function usePlatformLogin(
           platform: 'whatsapp',
           mode: 'qr',
           skipDiskRestore: purgeDisk,
+          groupEstimate,
         });
+        markChromeSessionActive();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const canRetry =
@@ -360,12 +392,12 @@ export function usePlatformLogin(
         throw error;
       }
     },
-    [prepareWhatsAppForQr],
+    [groupEstimate, markChromeSessionActive, prepareWhatsAppForQr],
   );
 
   // Start login (tanpa cancel saat StrictMode remount)
   useEffect(() => {
-    if (!open || !platform || !sessionId) return;
+    if ((!open && !persistSession) || !platform || !sessionId) return;
 
     const api = window.electronAPI?.platformLogin;
     if (!api) return;
@@ -383,7 +415,8 @@ export function usePlatformLogin(
     setError(null);
 
     void (async () => {
-      const isStale = () => loginRunIdRef.current !== runId || !open;
+      const isStale = () =>
+        loginRunIdRef.current !== runId || (!open && !persistSession);
 
       acceptQrRef.current = true;
       setQrDataUrl(null);
@@ -422,6 +455,7 @@ export function usePlatformLogin(
             mode: 'qr',
             skipDiskRestore,
           })
+          .then(() => markChromeSessionActive())
           .catch((err: unknown) => {
             if (isStale()) return;
             clearQrAppearDeadline();
@@ -521,9 +555,12 @@ export function usePlatformLogin(
     clearQrAppearDeadline,
     clearQrTimeout,
     dbAccountId,
+    groupEstimate,
     open,
+    persistSession,
     platform,
     prepareWhatsAppForQr,
+    markChromeSessionActive,
     sessionId,
     skipDiskRestore,
     startWhatsAppQr,
@@ -578,15 +615,18 @@ export function usePlatformLogin(
       armQrTimeout(platform);
       armQrAppearDeadline(platform);
       loginStartedRef.current = true;
+      markChromeSessionActive();
       if (platform === 'whatsapp') {
         void startWhatsAppQr(deviceSessionId, api, true, 0);
       } else {
-        void api.start({
-          sessionId: deviceSessionId,
-          platform,
-          mode: 'qr',
-          skipDiskRestore: false,
-        });
+        void api
+          .start({
+            sessionId: deviceSessionId,
+            platform,
+            mode: 'qr',
+            skipDiskRestore: false,
+          })
+          .then(() => markChromeSessionActive());
       }
     } catch (err) {
       setStatus('error');
@@ -594,7 +634,7 @@ export function usePlatformLogin(
     } finally {
       setSubmitting(false);
     }
-  }, [armQrAppearDeadline, armQrTimeout, dbAccountId, platform, prepareWhatsAppForQr, sessionId, startWhatsAppQr]);
+  }, [armQrAppearDeadline, armQrTimeout, dbAccountId, markChromeSessionActive, platform, prepareWhatsAppForQr, sessionId, startWhatsAppQr]);
 
   const startPhoneLogin = useCallback(
     async (phone: string) => {
@@ -617,6 +657,7 @@ export function usePlatformLogin(
         setQrDataUrl(null);
         setPairingCode(null);
         loginStartedRef.current = true;
+        markChromeSessionActive();
         await api.start({ sessionId: deviceSessionId, platform, mode: 'phone', phone });
       } catch (err) {
         setStatus('error');
@@ -625,7 +666,7 @@ export function usePlatformLogin(
         setSubmitting(false);
       }
     },
-    [dbAccountId, platform, sessionId],
+    [dbAccountId, markChromeSessionActive, platform, sessionId],
   );
 
   const submitCode = useCallback(
@@ -686,6 +727,7 @@ export function usePlatformLogin(
     pairingCode,
     error,
     submitting,
+    chromeSessionActive,
     defaultPhone,
     switchToQr,
     refreshQrManual,

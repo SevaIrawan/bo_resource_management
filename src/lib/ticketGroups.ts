@@ -97,14 +97,11 @@ export function groupOpenTickets(tickets: TicketItem[]): TicketSummaryGroup[] {
 
 export function ticketTypeExportLabel(type: TicketType): string {
   const labels: Record<TicketType, string> = {
-    missing_group: 'Missing groups (The account is missing some groups from the master list)',
-    not_admin: 'Not an Admin (Account is not an admin in master list groups)',
-    duplicate_group_id:
-      'Duplicate Group ID (Multiple group names are assigned to the same Group ID)',
-    duplicate_group_name:
-      'Duplicate Name (Multiple groups share the same name but have different Group IDs)',
-    daily_junk_group:
-      'Group mismatch (the number of groups in the account exceeds the master data)',
+    missing_group: 'Missing groups',
+    not_admin: 'Not an Admin',
+    duplicate_group_id: 'Duplicate Group ID',
+    duplicate_group_name: 'Duplicate Name',
+    daily_junk_group: 'Group mismatch',
   };
   return labels[type];
 }

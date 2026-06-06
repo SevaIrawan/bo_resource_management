@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.11 |
+| **Versi app** | 1.0.12 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Windows desktop (`.exe`) |
 | **Bahasa UI** | English / 中文 (Admin → Language) |
@@ -507,4 +507,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.11**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*
+*Handbook ini selaras dengan aplikasi versi **1.0.12**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*

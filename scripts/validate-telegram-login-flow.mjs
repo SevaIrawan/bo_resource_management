@@ -22,6 +22,7 @@ const indexTs = read('electron/main/index.ts');
 const loginTs = read('src/hooks/usePlatformLogin.ts');
 const loginModalTs = read('src/components/group-monitoring/PlatformLoginModal.tsx');
 const syncFlowTs = read('src/hooks/useAccountSyncFlow.ts');
+const loginFlowService = read('src/services/loginFlowService.ts');
 
 function fnBlock(source, name) {
   const re = new RegExp(`async def ${name}[\\s\\S]*?(?=\\nasync def |\\nexport )`);
@@ -117,8 +118,9 @@ const checks = [
   {
     name: 'Setelah persist login: tutup modal (sync lanjut di baris)',
     ok:
-      syncFlowTs.includes('persistLoginSessionAfterSuccess') &&
-      /setStep\('idle'\)[\s\S]*?fetchMasterGroupStats/.test(syncFlowTs),
+      syncFlowTs.includes('persistSessionAfterLogin') &&
+      syncFlowTs.includes("setStep('idle')") &&
+      loginFlowService.includes('fetchMasterGroupStatsForAccount'),
   },
 ];
 

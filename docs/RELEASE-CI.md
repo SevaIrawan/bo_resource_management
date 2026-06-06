@@ -1,6 +1,6 @@
 # Rilis GitHub Actions — panduan IT (wajib baca)
 
-**Versi acuan saat ini:** `1.0.11` (`package.json` + `scripts/validate-release-version.mjs` + `PROJECT.md`)
+**Versi acuan saat ini:** `1.0.12` (`package.json` + `scripts/validate-release-version.mjs` + `PROJECT.md`)
 
 ---
 

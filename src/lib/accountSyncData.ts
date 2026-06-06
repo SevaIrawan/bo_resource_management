@@ -4,7 +4,6 @@ import { computeIsMisaligned } from '@/lib/accountDisplayMetrics';
 import { fetchAccountBookmarkMetrics } from '@/lib/accountMasterDailyCompare';
 import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
 import { hasValidAccountPhone } from '@/lib/accountPhone';
-import { countBrandMasterGroups } from '@/lib/brandStandardCount';
 import { phonesMatch } from '@/lib/phoneNormalize';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
@@ -232,19 +231,4 @@ export async function fetchHasDailyData(
   if (!data?.length) return false;
 
   return filterRowsByPhone(data, phone).length > 0;
-}
-
-/** @deprecated Gunakan fetchMasterGroupStatsForAccount dengan brand+platform */
-export async function fetchMasterGroupStats(
-  brand: string,
-  _accName: string,
-  _phone: string,
-  platform: Platform,
-  accountId?: string,
-): Promise<MasterGroupStats> {
-  if (accountId) {
-    return fetchMasterGroupStatsForAccount({ accountId, brand, platform });
-  }
-  const brandMasterTotal = await countBrandMasterGroups(brand.trim(), platform);
-  return { dailyTotal: 0, brandMasterTotal, joinedInMaster: 0, adminInMaster: 0 };
 }

@@ -31,6 +31,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     onGroupsChange,
     userId: user?.id ?? null,
     canOperatePlatform,
+    translate: t,
     onTicketsReload: (dbAccountId) => refreshIssues(dbAccountId),
   });
 
@@ -45,6 +46,9 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
       ids.add(sync.processingDbAccountId);
     }
     if (sync.step === 'platform-login' && sync.target?.account.id) {
+      ids.add(sync.target.account.id);
+    }
+    if (sync.step === 'login-background' && sync.target?.account.id) {
       ids.add(sync.target.account.id);
     }
     if (sync.target?.dbAccountId) {
@@ -67,17 +71,17 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     setProbeSuspendAccountIds(probeSuspendIds);
   }, [probeSuspendIds, setProbeSuspendAccountIds]);
 
-  if (loading) {
-    return <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>;
-  }
-
   const hasFilteredBrands = filteredGroups.length > 0;
 
   return (
     <>
       <AccountMonitoringSyncModals sync={sync} />
 
-      {removeSlot.removeTarget ? (
+      {loading ? (
+        <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>
+      ) : null}
+
+      {!loading && removeSlot.removeTarget ? (
         <RemoveAccountModal
           open
           accountName={removeSlot.removeTarget.account.accountName}
@@ -90,27 +94,28 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
         />
       ) : null}
 
-      {viewMode === 'table' ? (
-        hasFilteredBrands ? (
-          <AccountBrandTableView
+      {!loading &&
+        (viewMode === 'table' ? (
+          hasFilteredBrands ? (
+            <AccountBrandTableView
+              groups={filteredGroups}
+              sync={sync}
+              onRemoveFromSlot={removeSlot.openRemoveModal}
+            />
+          ) : (
+            <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
+              <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
+              <p className="ticket-empty-desc">{t('groupMonitoring.noFilterMatchDesc')}</p>
+            </div>
+          )
+        ) : (
+          <AccountBrandCardList
             groups={filteredGroups}
+            onGroupsChange={onGroupsChange}
             sync={sync}
             onRemoveFromSlot={removeSlot.openRemoveModal}
           />
-        ) : (
-          <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
-            <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
-            <p className="ticket-empty-desc">{t('groupMonitoring.noFilterMatchDesc')}</p>
-          </div>
-        )
-      ) : (
-        <AccountBrandCardList
-          groups={filteredGroups}
-          onGroupsChange={onGroupsChange}
-          sync={sync}
-          onRemoveFromSlot={removeSlot.openRemoveModal}
-        />
-      )}
+        ))}
     </>
   );
 }

@@ -31,7 +31,7 @@ export function SyncAlertModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !message.trim()) return null;
 
   const headerLine =
     accountName && platform

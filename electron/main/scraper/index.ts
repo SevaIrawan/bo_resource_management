@@ -39,7 +39,14 @@ export interface ScrapedGroupRow {
 }
 
 export function registerScraperIpc() {
+  let scrapeRunInFlight: Promise<unknown> | null = null;
+
   ipcMain.handle('scraper:run', async (_event, payload: ScrapeRunPayload) => {
+    if (scrapeRunInFlight) {
+      throw new Error('SCRAPER_GLOBAL_BUSY: Another scrape is already running on this PC.');
+    }
+
+    const work = (async () => {
     const raw =
       payload.platform === 'telegram'
         ? await runTelegramScrape(payload.sessionId, payload.storedSessionString)
@@ -69,6 +76,14 @@ export function registerScraperIpc() {
     }
 
     return { ...raw, groups, count: groups.length };
+    })();
+
+    scrapeRunInFlight = work;
+    try {
+      return await work;
+    } finally {
+      if (scrapeRunInFlight === work) scrapeRunInFlight = null;
+    }
   });
 
   ipcMain.handle('scraper:count-groups', async (_event, payload: CountGroupsPayload) => {

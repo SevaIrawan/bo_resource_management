@@ -24,9 +24,13 @@ export function brandGroupId(brandName: string, dbBrandId?: string): string {
   return `brand-${slug || 'unknown'}`;
 }
 
-/** @deprecated gunakan brandGroupId — tetap untuk kompatibilitas validator */
-export function brandGroupIdFromName(brandName: string): string {
-  return brandGroupId(brandName);
+/** Patch satu kartu brand di state grid. */
+export function patchBrandGroup(
+  groups: AccountBrandGroup[],
+  groupId: string,
+  patcher: (group: AccountBrandGroup) => AccountBrandGroup,
+): AccountBrandGroup[] {
+  return groups.map((group) => (group.id === groupId ? patcher(group) : group));
 }
 
 export function createEmptyAccountSlots(

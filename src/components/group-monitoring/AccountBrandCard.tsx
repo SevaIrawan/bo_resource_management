@@ -4,6 +4,7 @@ import {
   countAccountsByPlatform,
   masterGroupCountsByPlatform,
 } from '@/lib/brandCardHeaderBadges';
+import { resolveMessagingAccountSaveErrorCode } from '@/lib/messagingAccounts';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { AddAccountHeaderMenu } from '@/components/group-monitoring/AddAccountHeaderMenu';
@@ -117,11 +118,13 @@ export function AccountBrandCard({
       setAddSlotId(undefined);
       setSaveError(null);
     } catch (error) {
-      const code = error instanceof Error ? error.message : 'SAVE_FAILED';
+      const code = resolveMessagingAccountSaveErrorCode(error);
       setSaveError(
         code === 'SUPABASE_NOT_CONFIGURED'
           ? t('login.supabaseNotConfigured')
-          : t('groupMonitoring.accountCard.saveAccountFailed'),
+          : code === 'ACCOUNT_LABEL_IN_USE'
+            ? t('groupMonitoring.accountCard.accountLabelInUse')
+            : t('groupMonitoring.accountCard.saveAccountFailed'),
       );
     } finally {
       setSaving(false);

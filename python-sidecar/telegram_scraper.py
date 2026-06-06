@@ -15,9 +15,45 @@ from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 
 DEVICE_GROUP_TARGET_MAX = 3000
 
+_scrape_progress: dict[str, dict] = {}
+
+
+def clear_scrape_progress(session_id: str) -> None:
+    _scrape_progress.pop(session_id, None)
+
+
+def set_scrape_progress(
+    session_id: str,
+    *,
+    phase: str,
+    current: int = 0,
+    total: int = 0,
+    label: str = "",
+) -> None:
+    _scrape_progress[session_id] = {
+        "phase": phase,
+        "current": current,
+        "total": total,
+        "label": label,
+    }
+
+
+def get_scrape_progress(session_id: str) -> dict:
+    return _scrape_progress.get(
+        session_id,
+        {"phase": "idle", "current": 0, "total": 0, "label": ""},
+    )
+
 
 def _admin_label(is_admin: bool) -> str:
     return "yes" if is_admin else "no"
+
+
+def _is_group_dialog(dialog) -> bool:
+    entity = dialog.entity
+    is_group = dialog.is_group
+    is_megagroup = isinstance(entity, Channel) and bool(getattr(entity, "megagroup", False))
+    return bool(is_group or is_megagroup)
 
 
 async def _is_me_listed_as_admin(client, entity, me) -> bool:
@@ -117,58 +153,107 @@ async def _collect_groups_locked(session_id: str) -> dict:
         return {"status": "error", "message": "Session is not authorized", "valid": False}
 
     me = await client.get_me()
-    groups: list[dict] = []
-
-    async for dialog in client.iter_dialogs():
-        entity = dialog.entity
-        is_group = dialog.is_group
-        is_megagroup = isinstance(entity, Channel) and bool(getattr(entity, "megagroup", False))
-        if not is_group and not is_megagroup:
-            continue
-
-        group_id = str(dialog.id)
-        group_name = dialog.title or dialog.name or group_id
-
-        try:
-            participants = await client.get_participants(entity, limit=0)
-            member_count = int(participants.total or 0)
-        except Exception:  # noqa: BLE001
-            member_count = 0
-
-        is_admin_flag = await _is_group_admin(client, entity, me)
-        owner_count, admin_count = await _count_admin_roles(client, entity)
-        username = getattr(entity, "username", None)
-        invite_link = await _resolve_invite_link(client, entity, username)
-
-        groups.append(
-            {
-                "group_id": group_id,
-                "group_name": group_name,
-                "invite_link": invite_link,
-                "is_admin": _admin_label(is_admin_flag),
-                "member_count": member_count,
-                "admin_count": admin_count,
-                "owner_count": owner_count,
-            }
-        )
-
-    admin_count = sum(1 for group in groups if group["is_admin"] == "yes")
     me_label = me.username or me.phone or str(me.id)
-    payload = {
-        "status": "ok",
-        "valid": True,
-        "groups": groups,
-        "count": len(groups),
-        "adminCount": admin_count,
-        "telegramUser": me_label,
-    }
-    if len(groups) == 0:
-        payload["hint"] = "ZERO_GROUPS_ON_ACCOUNT"
-        payload["message"] = (
-            f"Telegram @{me_label} tidak punya grup terdeteksi. "
-            "Login ulang jika ini bukan akun yang dimaksud."
+
+    clear_scrape_progress(session_id)
+    try:
+        set_scrape_progress(session_id, phase="discover", label="Discovering groups on Telegram")
+
+        targets: list = []
+        total_on_account = 0
+        async for dialog in client.iter_dialogs():
+            if not _is_group_dialog(dialog):
+                continue
+            total_on_account += 1
+            if len(targets) < DEVICE_GROUP_TARGET_MAX:
+                targets.append(dialog)
+
+        if total_on_account > DEVICE_GROUP_TARGET_MAX:
+            print(
+                f"[tg-scrape] sessionId={session_id} {total_on_account} groups; "
+                f"scraping first {DEVICE_GROUP_TARGET_MAX}",
+            )
+
+        total = len(targets)
+        set_scrape_progress(
+            session_id,
+            phase="discover",
+            current=total,
+            total=total,
+            label=f"{total} groups on device ({me_label})",
         )
-    return payload
+        set_scrape_progress(
+            session_id,
+            phase="group",
+            current=0,
+            total=total,
+            label=f"Reading groups (0/{total})",
+        )
+
+        groups: list[dict] = []
+        for index, dialog in enumerate(targets):
+            entity = dialog.entity
+            group_id = str(dialog.id)
+            group_name = dialog.title or dialog.name or group_id
+
+            set_scrape_progress(
+                session_id,
+                phase="group",
+                current=index,
+                total=total,
+                label=f"{group_name} ({index}/{total})",
+            )
+
+            try:
+                participants = await client.get_participants(entity, limit=0)
+                member_count = int(participants.total or 0)
+            except Exception:  # noqa: BLE001
+                member_count = 0
+
+            is_admin_flag = await _is_group_admin(client, entity, me)
+            owner_count, admin_count = await _count_admin_roles(client, entity)
+            username = getattr(entity, "username", None)
+            invite_link = await _resolve_invite_link(client, entity, username)
+
+            current = index + 1
+            set_scrape_progress(
+                session_id,
+                phase="group",
+                current=current,
+                total=total,
+                label=f"{group_name} ({current}/{total})",
+            )
+
+            groups.append(
+                {
+                    "group_id": group_id,
+                    "group_name": group_name,
+                    "invite_link": invite_link,
+                    "is_admin": _admin_label(is_admin_flag),
+                    "member_count": member_count,
+                    "admin_count": admin_count,
+                    "owner_count": owner_count,
+                }
+            )
+
+        admin_count = sum(1 for group in groups if group["is_admin"] == "yes")
+        payload = {
+            "status": "ok",
+            "valid": True,
+            "groups": groups,
+            "count": len(groups),
+            "adminCount": admin_count,
+            "telegramUser": me_label,
+        }
+        if len(groups) == 0:
+            payload["hint"] = "ZERO_GROUPS_ON_ACCOUNT"
+            payload["message"] = (
+                f"Telegram @{me_label} tidak punya grup terdeteksi. "
+                "Login ulang jika ini bukan akun yang dimaksud."
+            )
+        return payload
+    finally:
+        clear_scrape_progress(session_id)
 
 
 async def scrape_telegram_groups(
@@ -212,14 +297,11 @@ async def _count_groups_quick_locked(session_id: str) -> dict:
     admin_groups = 0
 
     async for dialog in client.iter_dialogs():
-        entity = dialog.entity
-        is_group = dialog.is_group
-        is_megagroup = isinstance(entity, Channel) and bool(getattr(entity, "megagroup", False))
-        if not is_group and not is_megagroup:
+        if not _is_group_dialog(dialog):
             continue
         total_groups += 1
         try:
-            if await _is_group_admin(client, entity, me):
+            if await _is_group_admin(client, dialog.entity, me):
                 admin_groups += 1
         except Exception:  # noqa: BLE001
             pass

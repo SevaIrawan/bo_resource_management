@@ -27,6 +27,8 @@ interface StartPayload {
   phone?: string;
   /** true = paksa QR baru (logout di HP), jangan restore disk/string DB */
   skipDiskRestore?: boolean;
+  /** Perkiraan jumlah grup — skala timeout bootstrap/scan QR (hingga ~3000). */
+  groupEstimate?: number;
 }
 
 interface SubmitPayload {
@@ -63,6 +65,7 @@ export function registerPlatformLoginIpc() {
       } else {
         await startWhatsAppQrLogin(payload.sessionId, win, {
           skipDiskRestore: Boolean(payload.skipDiskRestore),
+          groupEstimate: payload.groupEstimate ?? 0,
         });
       }
       return { ok: true };

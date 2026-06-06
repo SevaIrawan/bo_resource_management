@@ -40,7 +40,7 @@ export function ticketGroupToExportRows(
     'Group name': cell(line.groupName),
     'Group ID': cell(line.groupId),
     'Invite link': cell(line.groupLink),
-    Note: formatNote ? formatNote(line) : line.description.trim() || '—',
+    Note: formatNote ? formatNote(line) : '—',
   }));
 }
 
@@ -56,4 +56,12 @@ export const TICKET_EXPORT_COLUMNS: (keyof TicketExportRow)[] = [
   'Group ID',
   'Invite link',
   'Note',
+];
+
+/** Kolom tabel popup detail — tanpa Note / caption deskriptif. */
+export const TICKET_DETAIL_MODAL_COLUMNS: (keyof TicketExportRow)[] = [
+  '#',
+  'Group name',
+  'Group ID',
+  'Invite link',
 ];

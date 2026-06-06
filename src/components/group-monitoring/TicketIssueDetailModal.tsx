@@ -3,12 +3,11 @@ import { Download, X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { exportTicketGroupExcel } from '@/lib/exportExcel';
 import {
-  TICKET_EXPORT_COLUMNS,
+  TICKET_DETAIL_MODAL_COLUMNS,
   ticketGroupToExportRows,
   type TicketExportRow,
 } from '@/lib/ticketExportRows';
 import type { TicketSummaryGroup } from '@/lib/ticketGroups';
-import { ticketNoteForDisplay } from '@/lib/ticketNote';
 import { ticketTypeLabel } from '@/lib/ticketTypeLabel';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -33,10 +32,8 @@ export function TicketIssueDetailModal({ group, onClose }: TicketIssueDetailModa
 
   if (!group) return null;
 
-  const typeLabel = ticketTypeLabel(t, group.ticketType, 'export');
-  const formatNote = (line: (typeof group.lines)[number]) =>
-    ticketNoteForDisplay(t, group.ticketType, line.description, line);
-  const rows = ticketGroupToExportRows(group, typeLabel, formatNote);
+  const typeLabel = ticketTypeLabel(t, group.ticketType, 'badge');
+  const rows = ticketGroupToExportRows(group, typeLabel);
 
   return (
     <BrandModalRoot onBackdropClick={onClose}>
@@ -72,7 +69,7 @@ export function TicketIssueDetailModal({ group, onClose }: TicketIssueDetailModa
           <table className="ticket-detail-table">
             <thead>
               <tr>
-                {TICKET_EXPORT_COLUMNS.map((col) => (
+                {TICKET_DETAIL_MODAL_COLUMNS.map((col) => (
                   <th key={col}>{t(`groupMonitoring.ticketPanel.exportCol.${exportColKey(col)}`)}</th>
                 ))}
               </tr>
@@ -80,7 +77,7 @@ export function TicketIssueDetailModal({ group, onClose }: TicketIssueDetailModa
             <tbody>
               {rows.map((row) => (
                 <tr key={`${group.key}-${row['#']}`}>
-                  {TICKET_EXPORT_COLUMNS.map((col) => (
+                  {TICKET_DETAIL_MODAL_COLUMNS.map((col) => (
                     <TicketDetailCell key={col} column={col} row={row} />
                   ))}
                 </tr>
@@ -96,7 +93,7 @@ export function TicketIssueDetailModal({ group, onClose }: TicketIssueDetailModa
           <button
             type="button"
             className="brand-modal-btn brand-modal-btn--primary"
-            onClick={() => exportTicketGroupExcel(group, typeLabel, formatNote)}
+            onClick={() => exportTicketGroupExcel(group, typeLabel)}
           >
             <Download className="h-3.5 w-3.5" strokeWidth={2} />
             {t('groupMonitoring.ticketPanel.exportIssue')}

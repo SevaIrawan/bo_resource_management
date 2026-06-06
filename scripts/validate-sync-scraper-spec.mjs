@@ -14,7 +14,7 @@ const syncFlow = read('src/hooks/useAccountSyncFlow.ts');
 const uiFlow = read('src/lib/accountSyncUiFlow.ts');
 const cells = read('src/components/group-monitoring/AccountMonitoringCells.tsx');
 const loginHook = read('src/hooks/usePlatformLogin.ts');
-const manual = read('src/lib/manualSyncFlow.ts');
+const syncFlowService = read('src/services/syncFlowService.ts');
 
 const specChecks = [
   ['group + admin disebut di spec', /group.*admin|admin.*group/i.test(spec)],
@@ -31,11 +31,15 @@ const specChecks = [
 const implChecks = [
   {
     name: 'handleLoginSuccess tutup login (setStep idle) sebelum Now/Later',
-    ok: /Tutup modal login/.test(syncFlow) && syncFlow.includes("setStep('idle')"),
+    ok:
+      syncFlow.includes("setStep('idle')") &&
+      syncFlow.includes('resolvePostLoginModalStep'),
   },
   {
     name: 'postSyncModalStep resume-empty vs scrape-prompt',
-    ok: uiFlow.includes('shouldShowResumeOnlyEmpty') && syncFlow.includes('postSyncModalStep'),
+    ok:
+      uiFlow.includes('shouldShowResumeOnlyEmpty') &&
+      syncFlow.includes('resolvePostLoginModalStep'),
   },
   {
     name: 'RUN intent scraper auto-scrape tanpa prompt',
@@ -51,11 +55,11 @@ const implChecks = [
   },
   {
     name: 'scrape selesai set lastSyncAt',
-    ok: syncFlow.includes('lastSyncAt: scrapedAt'),
+    ok: syncFlow.includes('lastSyncAt: outcome.scrapedAt'),
   },
   {
     name: 'VALID+RUN device probe gagal → login',
-    ok: manual.includes('checkDeviceSessionForValidColumn') && syncFlow.includes('showLoginModal'),
+    ok: syncFlowService.includes('checkDeviceSessionForValidColumn') && syncFlow.includes('showLoginModal'),
   },
   {
     name: 'TG login error tanpa auto-loop (komentar produk)',
@@ -89,7 +93,7 @@ const implChecks = [
     name: 'ticket reconcile setelah sync/scrape (await refreshIssues)',
     ok:
       /await onTicketsReload\?\.\(dbAccountId\)/.test(syncFlow) &&
-      syncFlow.includes('scrapeSucceeded && dbAccountId'),
+      syncFlow.includes("outcome.kind === 'success'"),
   },
   {
     name: 'Modal Admin vs master: fetchAccountGroupLinks master-only + dedupe',

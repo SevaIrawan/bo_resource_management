@@ -12,7 +12,13 @@ import {
   waitForWhatsAppStoreReady,
 } from './whatsappGroupDiscovery';
 import { emitScrapeProgress } from './scrapeProgress';
-import { DEVICE_GROUP_TARGET_MAX, runPooled, WA_GROUP_PROCESS_CONCURRENCY } from './deviceGroupScale';
+import {
+  DEVICE_GROUP_TARGET_MAX,
+  runPooled,
+  scrapeGroupsTimeoutMs,
+  WA_GROUP_PROCESS_CONCURRENCY,
+  withScrapeTimeout,
+} from './deviceGroupScale';
 
 const { Client } = pkg;
 
@@ -33,7 +39,7 @@ async function resolveInviteLink(
   }
 }
 
-export async function runWhatsAppScrape(sessionId: string): Promise<{
+async function runWhatsAppScrapeInner(sessionId: string): Promise<{
   ok: boolean;
   groups: ScrapedGroupRow[];
   count: number;
@@ -85,7 +91,16 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
         );
       }
 
-      const scraped = await runPooled(scrapeIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId, index) => {
+      emitScrapeProgress({
+        sessionId,
+        phase: 'group',
+        current: 0,
+        total: scrapeIds.length,
+        label: `Reading groups (0/${scrapeIds.length})`,
+      });
+
+      let completed = 0;
+      const scraped = await runPooled(scrapeIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId) => {
         const chat = await client.getChatById(groupId);
         if (!chat || !isWhatsAppGroupChat(chat)) return null;
 
@@ -94,16 +109,14 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
         const stats = meParticipantStats(participants, meId);
         const inviteLink = await resolveInviteLink(chat);
 
-        const current = index + 1;
-        if (current % 20 === 0 || current === scrapeIds.length) {
-          emitScrapeProgress({
-            sessionId,
-            phase: 'group',
-            current,
-            total: scrapeIds.length,
-            label: `${groupName} (${current}/${scrapeIds.length})`,
-          });
-        }
+        completed += 1;
+        emitScrapeProgress({
+          sessionId,
+          phase: 'group',
+          current: completed,
+          total: scrapeIds.length,
+          label: `${groupName} (${completed}/${scrapeIds.length})`,
+        });
 
         return {
           group_id: chat.id._serialized,
@@ -135,4 +148,16 @@ export async function runWhatsAppScrape(sessionId: string): Promise<{
     emitScrapeProgress({ sessionId, phase: 'error', label: message });
     throw error;
   }
+}
+
+export async function runWhatsAppScrape(sessionId: string): Promise<{
+  ok: boolean;
+  groups: ScrapedGroupRow[];
+  count: number;
+}> {
+  return withScrapeTimeout(
+    runWhatsAppScrapeInner(sessionId),
+    scrapeGroupsTimeoutMs(DEVICE_GROUP_TARGET_MAX),
+    'WhatsApp scrape',
+  );
 }

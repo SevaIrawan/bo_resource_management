@@ -1,26 +1,19 @@
-/** Sinkron dengan `electron/main/scraper/deviceGroupScale.ts`. */
-export const DEVICE_GROUP_TARGET_MAX = 3000;
+/**
+ * @deprecated Import from `@/config/syncScraperPolicy` — re-export compat validator/Electron mirror.
+ */
+import {
+  manualSyncTimeoutMs,
+  postLoginSyncTimeoutMs,
+  SYNC_SCRAPER_POLICY,
+} from '@/config/syncScraperPolicy';
 
-const LOGIN_SYNC_BASE_MS = 180_000;
-const LOGIN_SYNC_PER_GROUP_MS = 15;
-const LOGIN_SYNC_MAX_MS = 900_000;
+export { manualSyncTimeoutMs, SYNC_SCRAPER_POLICY };
 
-const MANUAL_SYNC_BASE_MS = 180_000;
-const MANUAL_SYNC_PER_GROUP_MS = 20;
-const MANUAL_SYNC_MAX_MS = 1_200_000;
+export const DEVICE_GROUP_TARGET_MAX = SYNC_SCRAPER_POLICY.deviceGroupTargetMax;
 
+/** Alias legacy — sama dengan postLoginSyncTimeoutMs. */
 export function loginSyncAfterTimeoutMs(
-  estimate = DEVICE_GROUP_TARGET_MAX,
+  estimate: number = DEVICE_GROUP_TARGET_MAX,
 ): number {
-  return Math.min(
-    LOGIN_SYNC_MAX_MS,
-    LOGIN_SYNC_BASE_MS + estimate * LOGIN_SYNC_PER_GROUP_MS,
-  );
-}
-
-export function manualSyncTimeoutMs(estimate = DEVICE_GROUP_TARGET_MAX): number {
-  return Math.min(
-    MANUAL_SYNC_MAX_MS,
-    MANUAL_SYNC_BASE_MS + estimate * MANUAL_SYNC_PER_GROUP_MS,
-  );
+  return postLoginSyncTimeoutMs(estimate);
 }

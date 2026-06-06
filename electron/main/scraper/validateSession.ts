@@ -1,6 +1,7 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
 import { withNetworkRetry } from '../lib/networkRetry';
 import {
+  forceReleaseWhatsAppForLogin,
   getWhatsAppSessionClient,
   hasWhatsAppDiskAuth,
   withWhatsAppClient,
@@ -77,10 +78,16 @@ export async function validateWhatsAppSession(
       }
     }
 
-    return await withWhatsAppClient(sessionId, async (client) => {
+    const result = await withWhatsAppClient(sessionId, async (client) => {
       const state = await client.getState();
       return probeResultFromWaState(state);
     });
+
+    if (strict && !result.valid) {
+      await forceReleaseWhatsAppForLogin(sessionId);
+    }
+
+    return result;
   } catch (error) {
     return {
       valid: false,

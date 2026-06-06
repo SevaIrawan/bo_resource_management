@@ -1,6 +1,6 @@
 {
   "name": "resource-management",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "private": true,
   "description": "Resource Management Desktop — Group Monitoring Dashboard",
   "author": "Seva Irawan <tanjungbambangirawan85@gmail.com>",
@@ -49,6 +49,7 @@
     "validate:release-version": "node scripts/validate-release-version.mjs",
     "validate:brand-card-filter": "node scripts/validate-brand-card-filter.mjs",
     "validate:brand-remove-detail": "node scripts/validate-brand-remove-detail.mjs",
+    "validate:account-slot-lifecycle": "node scripts/validate-account-slot-lifecycle.mjs",
     "validate:ticket-reconcile": "node scripts/validate-ticket-reconcile.mjs",
     "validate:ticket-logic": "node scripts/verify-ticket-logic.mjs",
     "validate:ticket-live": "node scripts/validate-ticket-live.mjs",

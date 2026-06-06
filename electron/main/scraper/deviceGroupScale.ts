@@ -23,6 +23,51 @@ export function scrapeGroupsTimeoutMs(estimate = DEVICE_GROUP_TARGET_MAX): numbe
   return Math.min(SCRAPE_MAX_MS, SCRAPE_BASE_MS + estimate * SCRAPE_PER_GROUP_MS);
 }
 
+/** Deadline QR pertama muncul (Chrome + web.whatsapp.com) — akun besar butuh lebih lama. */
+export function waQrBootstrapDeadlineMs(estimate = 0): number {
+  const est = Math.max(500, Math.min(estimate || 500, DEVICE_GROUP_TARGET_MAX));
+  return Math.min(900_000, 240_000 + est * 60);
+}
+
+/** Setelah QR tampil: tunggu scan (jangan bunuh Puppeteer terlalu cepat). */
+export function waQrScanWaitMs(estimate = 0): number {
+  const est = Math.max(500, Math.min(estimate || 500, DEVICE_GROUP_TARGET_MAX));
+  return Math.min(1_200_000, 600_000 + est * 80);
+}
+
+/** Restore LocalAuth sebelum QR — akun ~3000 grup bisa butuh beberapa menit. */
+export function waDiskRestoreTimeoutMs(estimate = 0): number {
+  const est = Math.max(500, Math.min(estimate || 500, DEVICE_GROUP_TARGET_MAX));
+  return Math.min(600_000, 45_000 + est * 120);
+}
+
+export class ScrapeTimeoutError extends Error {
+  constructor(label: string, ms: number) {
+    super(`${label} timed out after ${Math.round(ms / 1000)}s`);
+    this.name = 'ScrapeTimeoutError';
+  }
+}
+
+export function withScrapeTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label = 'Scrape',
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new ScrapeTimeoutError(label, ms)), ms);
+    void promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 /** Jalankan promise per item dengan pool konkuren (urutan hasil = urutan items). */
 export async function runPooled<T, R>(
   items: readonly T[],

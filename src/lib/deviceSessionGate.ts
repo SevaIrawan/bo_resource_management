@@ -130,35 +130,6 @@ async function gateUserActionSession(
   return needLoginResult(msg, hasStored);
 }
 
-/** @deprecated Pakai gateUserActionSession — tetap diekspos untuk kompat. */
-async function gateSyncSession(
-  input: {
-    sessionId: string;
-    platform: Platform;
-    accountId: string;
-    uiSessionStatus?: SessionUiStatus;
-    skipWarmProbe?: boolean;
-  },
-  hasStored: boolean,
-): Promise<DeviceSessionGateResult> {
-  void input.uiSessionStatus;
-  return gateUserActionSession(input, hasStored, 'sync');
-}
-
-async function gateScrapeSession(
-  input: {
-    sessionId: string;
-    platform: Platform;
-    accountId: string;
-    uiSessionStatus: SessionUiStatus;
-    skipWarmProbe?: boolean;
-  },
-  hasStored: boolean,
-): Promise<DeviceSessionGateResult> {
-  void input.uiSessionStatus;
-  return gateUserActionSession(input, hasStored, 'scrape');
-}
-
 export async function gateDeviceSession(
   input: {
     sessionId: string;
@@ -171,10 +142,6 @@ export async function gateDeviceSession(
   mode: DeviceSessionGateMode = 'scrape',
 ): Promise<DeviceSessionGateResult> {
   const hasStored = await hasStoredPlatformSession(input.accountId, input.platform);
-
-  if (mode === 'sync') {
-    return gateSyncSession(input, hasStored);
-  }
-
-  return gateScrapeSession(input, hasStored);
+  void mode;
+  return gateUserActionSession(input, hasStored, mode);
 }

@@ -48,6 +48,12 @@ function resolveAlertMessage(
   if (code === 'SESSION_WARM_PENDING') {
     return t('groupMonitoring.sync.sessionWarmPending');
   }
+  if (code === 'OPERATION_GLOBAL_BUSY') {
+    return t('groupMonitoring.accountCard.operationGlobalBusy');
+  }
+  if (code === 'OPERATION_ALREADY_RUNNING') {
+    return t('groupMonitoring.accountCard.operationAlreadyRunning');
+  }
   if (code === 'SCRAPER_WRITE_FAILED' || code === 'SCRAPER_FAILED') {
     return t('groupMonitoring.sync.scraperFailed');
   }
@@ -76,10 +82,12 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
     confirmScrapePrompt,
     dismissScrapePrompt,
     handleLoginSuccess,
+    handleLoginModalClose,
     handleSavePhoneAndSync,
     closeFlow,
     phoneSaving,
     syncMessage,
+    loginHintCode,
     loginModalEpoch,
   } = sync;
 
@@ -98,7 +106,7 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
       />
 
       <SyncAlertModal
-        open={step === 'sync-error'}
+        open={step === 'sync-error' && alertMessage.trim().length > 0}
         message={alertMessage}
         accountName={target?.account.accountName}
         platform={target?.account.platform}
@@ -121,19 +129,25 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
         onConfirm={confirmScrapePrompt}
       />
 
-      <PlatformLoginModal
-        key={`login-${target?.account.id ?? 'none'}-${loginModalEpoch}`}
-        open={step === 'platform-login'}
-        platform={activePlatform}
-        accountName={target?.account.accountName ?? ''}
-        sessionId={target?.account.id ?? ''}
-        dbAccountId={target?.dbAccountId}
-        phoneNumber={target?.account.phoneNumber ?? ''}
-        loginHint={resolveSyncFlowMessage(syncMessage, activePlatform, t)}
-        attemptRestore={false}
-        onClose={closeFlow}
-        onLoginSuccess={handleLoginSuccess}
-      />
+      {activePlatform && (step === 'platform-login' || step === 'login-background') ? (
+        <PlatformLoginModal
+          key={`login-${target?.account.id ?? 'none'}-${loginModalEpoch}`}
+          open={step === 'platform-login'}
+          keepAlive={step === 'login-background'}
+          platform={activePlatform}
+          accountName={target?.account.accountName ?? ''}
+          sessionId={target?.account.id ?? ''}
+          dbAccountId={target?.dbAccountId}
+          phoneNumber={target?.account.phoneNumber ?? ''}
+          groupsCurrent={target?.account.groupsCurrent}
+          groupsTotal={target?.account.groupsTotal}
+          loginHint={resolveSyncFlowMessage(loginHintCode ?? syncMessage, activePlatform, t)}
+          attemptRestore={false}
+          onClose={handleLoginModalClose}
+          onAbort={closeFlow}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      ) : null}
     </>
   );
 }

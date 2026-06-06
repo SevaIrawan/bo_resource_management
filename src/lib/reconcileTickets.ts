@@ -289,17 +289,6 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
   await syncTicketType(input, 'duplicate_group_name', dupNameRows);
 }
 
-export async function reconcileTicketsAfterScrape(input: {
-  accountId: string;
-  platform: Platform;
-  brandName: string;
-}): Promise<void> {
-  await reconcileTicketsForAccountFromDb(input.accountId, {
-    brandName: input.brandName,
-    platform: input.platform,
-  });
-}
-
 /** Satu akun — dipakai setelah scrape/sync/realtime daily. */
 export async function reconcileTicketsForAccountFromDb(
   accountId: string,

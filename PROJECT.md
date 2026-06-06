@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-03  
-**Versi aplikasi:** `1.0.11` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.12` (lihat `package.json`)  
 **Status:** Produksi internal — desktop Windows untuk tim operasional perusahaan  
 **Rencana:** Installer macOS & Linux — [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) (prepare, belum rilis)
 
@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.11)
+## 4. Konfigurasi & installer (kondisi 1.0.12)
 
 ### 4.1 Variabel lingkungan
 
@@ -167,8 +167,8 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 - **Auto-close:** issue hilang setelah scrape/sync → `resolveTickets` menutup baris open; kartu hilang dari UI
 - Workflow: handle issue, modal proses ticket (migrasi 024–026)
 - Realtime: `group_scrape_daily` + `scrape_runs` completed → reconcile akun → reload ticket
-- **UI ticket (1.0.11):** angka kartu tab Ticket dari `buildTicketSummariesFromEngine` — sama engine dengan kolom Groups/Admin bookmark (`accountMasterDailyCompare`)
-- **Modal Admin vs master (1.0.11):** daftar hanya grup master brand (denominator **X**); grup junk di device tidak masuk modal (lihat tab Ticket → Junk)
+- **UI ticket (1.0.12):** angka kartu tab Ticket dari `buildTicketSummariesFromEngine` — sama engine dengan kolom Groups/Admin bookmark (`accountMasterDailyCompare`)
+- **Modal Admin vs master (1.0.12):** daftar hanya grup master brand (denominator **X**); grup junk di device tidak masuk modal (lihat tab Ticket → Junk)
 
 ### 6.3 Admin (`/admin`)
 
@@ -322,4 +322,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.11**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.12**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*

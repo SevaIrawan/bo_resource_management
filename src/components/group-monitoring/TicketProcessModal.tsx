@@ -6,7 +6,6 @@ import { DarkSelect } from '@/components/ui/DarkSelect';
 import { exportTicketGroupExcel } from '@/lib/exportExcel';
 import { getErrorMessage } from '@/lib/errorMessage';
 import type { TicketSummaryGroup } from '@/lib/ticketGroups';
-import { ticketNoteForDisplay } from '@/lib/ticketNote';
 import { upsertIssueHandle } from '@/lib/ticketWorkflowDb';
 import {
   DEFAULT_TICKET_PROCESS_RECORD,
@@ -53,14 +52,12 @@ export function TicketProcessModal({ group, open, onClose }: TicketProcessModalP
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
-  const issueName = ticketTypeLabel(t, group.ticketType, 'export');
+  const issueName = ticketTypeLabel(t, group.ticketType, 'badge');
   const platformLabel =
     group.platform === 'whatsapp'
       ? t('groupMonitoring.platform.whatsapp')
       : t('groupMonitoring.platform.telegram');
   const platformAsset = group.platform === 'whatsapp' ? 'whatsapp' : 'telegram';
-  const formatNote = (line: (typeof group.lines)[number]) =>
-    ticketNoteForDisplay(t, group.ticketType, line.description, line);
 
   const handleTaskStatusChange = (taskStatus: TicketTaskStatus) => {
     setDraft((prev) => {
@@ -88,7 +85,7 @@ export function TicketProcessModal({ group, open, onClose }: TicketProcessModalP
   };
 
   const handleExport = () => {
-    exportTicketGroupExcel(group, issueName, formatNote);
+    exportTicketGroupExcel(group, issueName);
   };
 
   if (!open) return null;

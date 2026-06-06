@@ -14,7 +14,12 @@ import {
   withNetworkRetry,
 } from '../lib/networkRetry';
 import { withWaBrowserSlot } from './waBrowserPool';
-import { resolveWaChromeExecutable } from './waPuppeteerChrome';
+import { waClientPuppeteerOptions } from './waPuppeteerChrome';
+import {
+  waDiskRestoreTimeoutMs,
+  waQrBootstrapDeadlineMs,
+  waQrScanWaitMs,
+} from '../scraper/deviceGroupScale';
 
 const { Client, LocalAuth } = pkg;
 
@@ -32,9 +37,6 @@ interface WaSession {
 const sessions = new Map<string, WaSession>();
 const sessionLocks = new Map<string, Promise<unknown>>();
 /** Lock per sessionId — multi-akun WA boleh paralel (folder LocalAuth terpisah). */
-const WA_INIT_TIMEOUT_MS = 240_000;
-/** Bundled Chrome + web.whatsapp.com — PC lambat; jangan bunuh client sebelum QR sempat emit. */
-const WA_QR_APPEAR_DEADLINE_MS = 240_000;
 const WA_DESTROY_SETTLE_MS = HUMAN_SETTLE_SHORT_MS;
 const WA_LOGIN_PREPARE_SETTLE_MS = HUMAN_SETTLE_LONG_MS;
 const WA_LOCK_WAIT_MS = 6_000;
@@ -247,6 +249,30 @@ function formatWhatsAppDisconnectMessage(reason: string): string {
   return reason;
 }
 
+async function closeWhatsAppPuppeteer(client: InstanceType<typeof Client>): Promise<void> {
+  try {
+    const pupBrowser = (
+      client as unknown as {
+        pupBrowser?: Promise<{ isConnected(): boolean; close(): Promise<void> } | null>;
+      }
+    ).pupBrowser;
+    if (pupBrowser) {
+      const browser = await pupBrowser.catch(() => null);
+      if (browser?.isConnected?.()) {
+        await browser.close().catch(() => undefined);
+      }
+    }
+  } catch {
+    // ignore — lanjut destroy client
+  }
+
+  try {
+    await client.destroy();
+  } catch {
+    // already destroyed
+  }
+}
+
 function createClient(sessionId: string, mode: WaMode, phone?: string) {
   /** LocalAuth → folder `wa-sessions/session-{sessionId}` per akun (clientId unik). */
   const options: ConstructorParameters<typeof Client>[0] = {
@@ -254,22 +280,13 @@ function createClient(sessionId: string, mode: WaMode, phone?: string) {
       clientId: sessionId,
       dataPath: waSessionsRoot(),
     }),
-    puppeteer: {
-      headless: true,
-      executablePath: resolveWaChromeExecutable(),
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    },
+    puppeteer: waClientPuppeteerOptions(),
   };
 
   if (mode === 'phone' && phone) {
     options.pairWithPhoneNumber = {
       phoneNumber: phone,
-      showNotification: true,
+      showNotification: false,
     };
   }
 
@@ -280,6 +297,7 @@ function waitForClientReady(
   sessionId: string,
   client: InstanceType<typeof Client>,
   mode: WaMode,
+  timeoutMs = waQrScanWaitMs(0),
 ): Promise<InstanceType<typeof Client>> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -288,7 +306,7 @@ function waitForClientReady(
           'WhatsApp session timed out. Use QR or phone linking in Linked Devices.',
         ),
       );
-    }, WA_INIT_TIMEOUT_MS);
+    }, timeoutMs);
 
     const onReady = () => {
       cleanup();
@@ -333,28 +351,28 @@ function armQrAppearDeadline(
   sessionId: string,
   client: InstanceType<typeof Client>,
   win: BrowserWindow,
+  groupEstimate = 0,
 ) {
   clearQrAppearDeadline(sessionId);
+  const deadlineMs = waQrBootstrapDeadlineMs(groupEstimate);
   const timer = setTimeout(() => {
     qrAppearTimers.delete(sessionId);
     const session = sessions.get(sessionId);
-    if (session?.loggedIn) return;
+    if (session?.loggedIn || (session?.qrGeneration ?? 0) > 0) return;
 
-    void (async () => {
-      console.warn(
-        `[whatsapp] QR not visible yet for ${sessionId} after ${WA_QR_APPEAR_DEADLINE_MS}ms — keeping browser alive`,
-      );
+    console.warn(
+      `[whatsapp] QR not visible yet for ${sessionId} after ${deadlineMs}ms — keeping browser alive`,
+    );
 
-      if (!win.isDestroyed()) {
-        win.webContents.send('platform-login:error', {
-          sessionId,
-          platform: 'whatsapp',
-          message:
-            'QR is still loading. Please wait, or close and tap Sync again.',
-        });
-      }
-    })();
-  }, WA_QR_APPEAR_DEADLINE_MS);
+    if (!win.isDestroyed()) {
+      win.webContents.send('platform-login:error', {
+        sessionId,
+        platform: 'whatsapp',
+        message:
+          'QR is still loading. Large accounts may take several minutes — wait or tap Refresh QR.',
+      });
+    }
+  }, deadlineMs);
 
   qrAppearTimers.set(sessionId, timer);
   client.once('qr', () => clearQrAppearDeadline(sessionId));
@@ -380,11 +398,7 @@ export async function forceReleaseWhatsAppForLogin(
   const session = sessions.get(sessionId);
   if (session) {
     sessions.delete(sessionId);
-    try {
-      await session.client.destroy();
-    } catch {
-      // already destroyed
-    }
+    await closeWhatsAppPuppeteer(session.client);
     await delayMs(WA_DESTROY_SETTLE_MS);
   }
 
@@ -442,11 +456,7 @@ async function destroyWhatsAppSession(
   const session = sessions.get(sessionId);
   if (session) {
     sessions.delete(sessionId);
-    try {
-      await session.client.destroy();
-    } catch {
-      // client may already be destroyed
-    }
+    await closeWhatsAppPuppeteer(session.client);
     await delayMs(WA_DESTROY_SETTLE_MS);
   }
 
@@ -475,9 +485,6 @@ async function emitWhatsAppReady(sessionId: string, win: BrowserWindow) {
   }
 }
 
-/** Restore disk saat buka modal login — gagal cepat, lanjut QR. */
-const WA_DISK_RESTORE_TIMEOUT_MS = 25_000;
-
 /** Client sudah hidup dari login QR — jangan buka Puppeteer kedua. */
 async function reuseConnectedWhatsAppSession(
   sessionId: string,
@@ -503,6 +510,7 @@ async function reuseConnectedWhatsAppSession(
 export async function restoreWhatsAppFromDisk(
   sessionId: string,
   win: BrowserWindow,
+  groupEstimate = 0,
 ): Promise<boolean> {
   if (await reuseConnectedWhatsAppSession(sessionId, win)) {
     return true;
@@ -524,7 +532,7 @@ export async function restoreWhatsAppFromDisk(
   })();
 
   const timedOut = new Promise<boolean>((resolve) => {
-    setTimeout(() => resolve(false), WA_DISK_RESTORE_TIMEOUT_MS);
+    setTimeout(() => resolve(false), waDiskRestoreTimeoutMs(groupEstimate));
   });
 
   try {
@@ -547,6 +555,7 @@ function runWhatsAppLoginOperation<T>(sessionId: string, fn: () => Promise<T>): 
 async function ensureWhatsAppClientInner(
   sessionId: string,
 ): Promise<InstanceType<typeof Client>> {
+  const readyTimeoutMs = waQrScanWaitMs(3000);
   const existing = sessions.get(sessionId);
   if (existing) {
     try {
@@ -557,9 +566,9 @@ async function ensureWhatsAppClientInner(
         return existing.client;
       }
       if (existing.loggedIn) {
-        return waitForClientReady(sessionId, existing.client, existing.mode);
+        return waitForClientReady(sessionId, existing.client, existing.mode, readyTimeoutMs);
       }
-      return waitForClientReady(sessionId, existing.client, existing.mode);
+      return waitForClientReady(sessionId, existing.client, existing.mode, readyTimeoutMs);
     } catch {
       await destroyWhatsAppSession(sessionId);
     }
@@ -567,7 +576,7 @@ async function ensureWhatsAppClientInner(
 
   const client = createClient(sessionId, 'qr');
   attachSessionIntegrityHandlers(sessionId, client);
-  const readyPromise = waitForClientReady(sessionId, client, 'qr');
+  const readyPromise = waitForClientReady(sessionId, client, 'qr', readyTimeoutMs);
   sessions.set(sessionId, { client, mode: 'qr' });
 
   try {
@@ -615,30 +624,55 @@ export async function ensureWhatsAppClient(sessionId: string): Promise<InstanceT
   return withWhatsAppClient(sessionId, (client) => Promise.resolve(client));
 }
 
+/** Jangan bunuh Puppeteer hanya karena belum CONNECTED — QR scan butuh waktu (khusus akun besar). */
 function armWhatsAppLoginTimeout(
   sessionId: string,
   client: InstanceType<typeof Client>,
   win: BrowserWindow,
+  groupEstimate = 0,
 ) {
-  const timeout = setTimeout(() => {
+  let preQrTimer: ReturnType<typeof setTimeout> | undefined;
+  let scanTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const clearAll = () => {
+    if (preQrTimer !== undefined) clearTimeout(preQrTimer);
+    if (scanTimer !== undefined) clearTimeout(scanTimer);
+    preQrTimer = undefined;
+    scanTimer = undefined;
+  };
+
+  preQrTimer = setTimeout(() => {
     const session = sessions.get(sessionId);
-    if (!session) return;
-
-    void session.client.getState().then((state) => {
-      if (state === 'CONNECTED' || win.isDestroyed()) return;
-
-      win.webContents.send('platform-login:error', {
-        sessionId,
-        platform: 'whatsapp',
-        message:
-          'WhatsApp login timed out. Scan again or use phone linking in Linked Devices.',
-      });
-      void stopWhatsAppLogin(sessionId);
+    if (!session || session.loggedIn || (session.qrGeneration ?? 0) > 0) return;
+    if (win.isDestroyed()) return;
+    win.webContents.send('platform-login:error', {
+      sessionId,
+      platform: 'whatsapp',
+      message:
+        'WhatsApp is still starting. Large accounts may take several minutes — wait or tap Refresh QR.',
     });
-  }, WA_INIT_TIMEOUT_MS);
+  }, waQrBootstrapDeadlineMs(groupEstimate));
 
-  client.once('ready', () => clearTimeout(timeout));
-  client.once('auth_failure', () => clearTimeout(timeout));
+  client.once('qr', () => {
+    if (preQrTimer !== undefined) clearTimeout(preQrTimer);
+    preQrTimer = undefined;
+    scanTimer = setTimeout(() => {
+      void client.getState().then((state) => {
+        if (state === 'CONNECTED' || win.isDestroyed()) return;
+        if (!win.isDestroyed()) {
+          win.webContents.send('platform-login:error', {
+            sessionId,
+            platform: 'whatsapp',
+            message:
+              'QR scan timed out. Tap Refresh QR or use phone linking — Chrome stays open until you cancel.',
+          });
+        }
+      });
+    }, waQrScanWaitMs(groupEstimate));
+  });
+
+  client.once('ready', clearAll);
+  client.once('auth_failure', clearAll);
 }
 
 function sendWhatsAppLoginError(
@@ -662,8 +696,9 @@ function sendWhatsAppLoginError(
 export async function startWhatsAppQrLogin(
   sessionId: string,
   win: BrowserWindow,
-  options?: { skipDiskRestore?: boolean },
+  options?: { skipDiskRestore?: boolean; groupEstimate?: number },
 ) {
+  const groupEstimate = options?.groupEstimate ?? 0;
   return runWhatsAppLoginOperation(sessionId, async () => {
     await forceReleaseWhatsAppForLogin(sessionId, {
       purgeDisk: Boolean(options?.skipDiskRestore),
@@ -674,7 +709,7 @@ export async function startWhatsAppQrLogin(
     }
 
     if (!options?.skipDiskRestore) {
-      if (await restoreWhatsAppFromDisk(sessionId, win)) {
+      if (await restoreWhatsAppFromDisk(sessionId, win, groupEstimate)) {
         return;
       }
       await forceReleaseWhatsAppForLogin(sessionId);
@@ -682,11 +717,11 @@ export async function startWhatsAppQrLogin(
 
     const client = createClient(sessionId, 'qr');
     attachCommonHandlers(sessionId, client, win);
-    armWhatsAppLoginTimeout(sessionId, client, win);
+    armWhatsAppLoginTimeout(sessionId, client, win, groupEstimate);
     sessions.set(sessionId, { client, mode: 'qr', forwardQrToUi: true, qrGeneration: 0 });
 
     try {
-      armQrAppearDeadline(sessionId, client, win);
+      armQrAppearDeadline(sessionId, client, win, groupEstimate);
       await initializeClientWithRetry(sessionId, client, win);
     } catch (error) {
       clearQrAppearDeadline(sessionId);

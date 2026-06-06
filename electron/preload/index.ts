@@ -64,6 +64,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       mode?: LoginMode;
       phone?: string;
       skipDiskRestore?: boolean;
+      groupEstimate?: number;
     }) => ipcRenderer.invoke('platform-login:start', payload),
     submit: (payload: {
       sessionId: string;

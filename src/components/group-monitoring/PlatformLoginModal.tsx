@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { BrandImage } from '@/components/brand/BrandImage';
@@ -25,7 +25,13 @@ interface PlatformLoginModalProps {
   phoneNumber?: string;
   loginHint?: string;
   attemptRestore?: boolean;
+  /** Modal ditutup — login Chrome tetap jalan di background. */
+  keepAlive?: boolean;
+  groupsCurrent?: number | null;
+  groupsTotal?: number | null;
   onClose: () => void;
+  /** Batalkan login sepenuhnya (Chrome + state) — dipakai jika modal ditutup sebelum sesi Chrome aktif. */
+  onAbort?: () => void;
   onLoginSuccess?: () => void;
 }
 
@@ -38,7 +44,11 @@ export function PlatformLoginModal({
   phoneNumber = '',
   loginHint = '',
   attemptRestore = true,
+  keepAlive = false,
+  groupsCurrent,
+  groupsTotal,
   onClose,
+  onAbort,
   onLoginSuccess,
 }: PlatformLoginModalProps) {
   const { t } = useLanguage();
@@ -51,6 +61,7 @@ export function PlatformLoginModal({
     pairingCode,
     error,
     submitting,
+    chromeSessionActive,
     refreshQrManual,
     switchToPhoneForm,
     startPhoneLogin,
@@ -59,6 +70,9 @@ export function PlatformLoginModal({
   } = usePlatformLogin(open, platform, sessionId, phoneNumber, {
     accountId: dbAccountId ?? sessionId,
     attemptRestore,
+    persistSession: keepAlive,
+    groupsCurrent,
+    groupsTotal,
     t,
   });
 
@@ -69,6 +83,14 @@ export function PlatformLoginModal({
   const [persisting, setPersisting] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
   const loginHandledRef = useRef(false);
+
+  const handleDismiss = useCallback(() => {
+    if (chromeSessionActive) {
+      onClose();
+      return;
+    }
+    (onAbort ?? onClose)();
+  }, [chromeSessionActive, onAbort, onClose]);
 
   useEffect(() => {
     if (!open) {
@@ -84,7 +106,7 @@ export function PlatformLoginModal({
   }, [open, phoneNumber, sessionId, platform]);
 
   useEffect(() => {
-    if (!open || status !== 'ready' || loginHandledRef.current) return;
+    if (status !== 'ready' || loginHandledRef.current) return;
     loginHandledRef.current = true;
     setPersisting(true);
     void Promise.resolve(onLoginSuccess?.())
@@ -96,20 +118,20 @@ export function PlatformLoginModal({
         );
       })
       .finally(() => setPersisting(false));
-  }, [onLoginSuccess, open, status]);
+  }, [onLoginSuccess, status]);
 
   useEffect(() => {
     if (!open) return;
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !submitting) onClose();
+      if (event.key === 'Escape' && !submitting) handleDismiss();
     }
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, submitting, onClose]);
+  }, [open, submitting, handleDismiss]);
 
-  if (!open || !platform) return null;
+  if ((!open && !keepAlive) || !platform) return null;
 
   const showQrPanel =
     (view === 'qr' || (view === 'phone' && Boolean(pairingCode))) &&
@@ -188,7 +210,7 @@ export function PlatformLoginModal({
                         : t('groupMonitoring.sync.loadingQr');
 
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot onBackdropClick={handleDismiss}>
       <div
         className={cn(
           'brand-modal-panel platform-login-panel',
@@ -222,7 +244,7 @@ export function PlatformLoginModal({
           <button
             type="button"
             className="brand-modal-close"
-            onClick={onClose}
+            onClick={handleDismiss}
             disabled={submitting || persisting}
             aria-label={t('groupMonitoring.accountCard.closeModal')}
           >

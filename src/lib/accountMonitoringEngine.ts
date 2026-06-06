@@ -3,7 +3,10 @@
  * Groups UI: Y/X (device / standar brand). Admin: admin master / X.
  */
 import { buildAccountSyncResult } from '@/lib/accountDisplayMetrics';
-import { fetchHasDailyData, fetchMasterGroupStats } from '@/lib/accountSyncData';
+import {
+  fetchHasDailyData,
+  fetchMasterGroupStatsForAccount,
+} from '@/lib/accountSyncData';
 import { mergeDeviceGroupIdsIntoDaily } from '@/lib/mergeDeviceGroupIdsIntoDaily';
 import { countDeviceGroups, type DeviceGroupCountResult } from '@/lib/runAccountCount';
 import { probePlatformSession } from '@/lib/sessionProbe';
@@ -56,15 +59,6 @@ export async function fetchDeviceGroupCounts(
   return countDeviceGroups(input);
 }
 
-/** @deprecated Gunakan buildAccountSyncResult — Y/X + admin/X. */
-export function buildSyncResultFromCounts(
-  master: MasterGroupStats,
-  device: DeviceGroupCountResult,
-  brandStandard = 0,
-): AccountSyncResult {
-  return buildAccountSyncResult({ master, device, brandStandard });
-}
-
 export interface RefreshAccountMetricsInput {
   account: AccountBrandRow;
   dbAccountId: string;
@@ -99,13 +93,11 @@ export async function refreshAccountMetrics(
     todayScrapeDate(),
   );
 
-  const master = await fetchMasterGroupStats(
-    account.brandName,
-    account.accountName,
-    account.phoneNumber,
-    account.platform,
-    dbAccountId,
-  );
+  const master = await fetchMasterGroupStatsForAccount({
+    accountId: dbAccountId,
+    brand: account.brandName,
+    platform: account.platform,
+  });
 
   const device = await fetchDeviceGroupCounts(
     {

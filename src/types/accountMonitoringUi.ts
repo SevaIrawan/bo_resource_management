@@ -15,7 +15,7 @@ export type AccountConnectionStatus = 'active' | 'logout';
 export type AccountSyncState = 'pending' | 'synced';
 
 export type SessionUiStatus = 'valid' | 'invalid';
-export type AccountProcessAction = 'sync' | 'scraper' | null;
+export type AccountProcessAction = 'sync' | 'scraper' | 'session_check' | null;
 
 export interface AccountBrandRow {
   id: string;

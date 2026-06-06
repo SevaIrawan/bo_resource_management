@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const EXPECTED = '1.0.11';
+const EXPECTED = '1.0.12';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const projectMd = fs.readFileSync(path.join(root, 'PROJECT.md'), 'utf8');

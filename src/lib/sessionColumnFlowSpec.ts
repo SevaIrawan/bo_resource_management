@@ -2,7 +2,7 @@ import type { SessionUiStatus } from '@/types/accountMonitoringUi';
 
 /**
  * Spesifikasi resmi — kolom Session di grid (`account.sessionStatus`).
- * Dipakai dokumentasi + audit; implementasi di `manualSyncFlow.ts` + `useAccountSyncFlow.ts`.
+ * Dipakai dokumentasi + audit; implementasi di `syncFlowService.ts` + `useAccountSyncFlow.ts`.
  *
  * UX (konfirmasi produk):
  * - "Modal utama" pada jalur INVALID = modal login; ditutup sebelum Now/Later (`setStep('idle')`).
@@ -36,7 +36,7 @@ export function expectedStepsFor(
   return SESSION_COLUMN_FLOW[sessionStatus][action];
 }
 
-/** Harus sama dengan `routeFromSessionColumn` di manualSyncFlow. */
+/** Harus sama dengan `routeFromSessionColumn` di syncFlowService. */
 export function sessionColumnRoute(sessionStatus: SessionUiStatus): 'open_login' | 'check_device' {
   return sessionStatus === 'invalid' ? 'open_login' : 'check_device';
 }

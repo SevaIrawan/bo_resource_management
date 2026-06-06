@@ -81,6 +81,7 @@ declare global {
           mode?: LoginMode;
           phone?: string;
           skipDiskRestore?: boolean;
+          groupEstimate?: number;
         }) => Promise<{ ok: boolean }>;
         submit: (payload: {
           sessionId: string;

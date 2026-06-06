@@ -1,8 +1,14 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
 import { withNetworkRetry } from '../lib/networkRetry';
 import { scrapeGroupsTimeoutMs } from './deviceGroupScale';
-import { emitScrapeProgress } from './scrapeProgress';
+import { emitScrapeProgress, type ScrapeProgressPhase } from './scrapeProgress';
 import type { ScrapedGroupRow } from './index';
+
+const PROGRESS_POLL_MS = 400;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export async function exportTelegramSession(sessionId: string): Promise<{
   sessionString: string;
@@ -56,6 +62,40 @@ export async function restoreTelegramSession(
   });
 }
 
+async function pollTelegramScrapeProgress(
+  sessionId: string,
+  until: { done: boolean },
+): Promise<void> {
+  while (!until.done) {
+    await sleep(PROGRESS_POLL_MS);
+    try {
+      const res = await fetch(
+        `${SIDECAR_URL}/telegram/scrape/progress/${encodeURIComponent(sessionId)}`,
+        { signal: AbortSignal.timeout(5_000) },
+      );
+      if (!res.ok) continue;
+
+      const json = (await res.json()) as {
+        phase?: string;
+        current?: number;
+        total?: number;
+        label?: string;
+      };
+      if (!json.phase || json.phase === 'idle') continue;
+
+      emitScrapeProgress({
+        sessionId,
+        phase: json.phase as ScrapeProgressPhase,
+        current: json.current,
+        total: json.total,
+        label: json.label,
+      });
+    } catch {
+      // sidecar busy or scrape finished
+    }
+  }
+}
+
 async function postTelegramScrape(
   sessionId: string,
   sessionString?: string | null,
@@ -106,16 +146,26 @@ export async function runTelegramScrape(
   }
 
   emitScrapeProgress({ sessionId, phase: 'discover', label: 'Reading groups from Telegram' });
-  let json = await postTelegramScrape(sessionId, sessionString);
 
-  const needsRestore =
-    json.status === 'error' &&
-    typeof json.message === 'string' &&
-    json.message.toLowerCase().includes('session');
+  const pollUntil = { done: false };
+  const pollTask = pollTelegramScrapeProgress(sessionId, pollUntil);
 
-  if (needsRestore && sessionString) {
-    await restoreTelegramSession(sessionId, sessionString);
+  let json: Awaited<ReturnType<typeof postTelegramScrape>>;
+  try {
     json = await postTelegramScrape(sessionId, sessionString);
+
+    const needsRestore =
+      json.status === 'error' &&
+      typeof json.message === 'string' &&
+      json.message.toLowerCase().includes('session');
+
+    if (needsRestore && sessionString) {
+      await restoreTelegramSession(sessionId, sessionString);
+      json = await postTelegramScrape(sessionId, sessionString);
+    }
+  } finally {
+    pollUntil.done = true;
+    await pollTask.catch(() => undefined);
   }
 
   if (json.status === 'error') {

@@ -53,6 +53,38 @@ function bundledChromeSearchRoot(): string {
   return devChromeSearchRoot();
 }
 
+/** Argumen launch WA — Chrome headless baru + off-screen (cegah kotak putih di Windows). */
+export function waClientPuppeteerOptions(): {
+  headless: boolean;
+  executablePath: string;
+  args: string[];
+} {
+  const args = [
+    '--headless=new',
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--hide-scrollbars',
+    '--mute-audio',
+    '--disable-background-networking',
+    '--disable-default-apps',
+    '--disable-extensions',
+    '--disable-sync',
+    '--no-first-run',
+  ];
+
+  if (process.platform === 'win32') {
+    args.push('--window-position=-24000,-24000', '--window-size=800,600');
+  }
+
+  return {
+    headless: true,
+    executablePath: resolveWaChromeExecutable(),
+    args,
+  };
+}
+
 /** Chrome headless untuk whatsapp-web.js — terbundel di installer, bukan cache user. */
 export function resolveWaChromeExecutable(): string {
   const bundled = findChromeExeUnder(bundledChromeSearchRoot());

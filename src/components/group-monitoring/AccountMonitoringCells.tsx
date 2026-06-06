@@ -13,6 +13,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { AccountBrandEmptySlot, AccountBrandRow } from '@/types/accountMonitoringUi';
 import { ScraperStatusMarquee } from '@/components/group-monitoring/ScraperStatusMarquee';
+import { resolveScrapeBarDisplay } from '@/lib/scrapeProgressDisplay';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 export function PlatformBadge({ platform }: { platform: AccountBrandRow['platform'] }) {
@@ -69,6 +70,32 @@ export function SessionBadge({ status }: { status: AccountBrandRow['sessionStatu
   );
 }
 
+function SessionColumnCell({
+  row,
+  isPending,
+}: {
+  row: AccountBrandRow;
+  isPending: boolean;
+}) {
+  const { t } = useLanguage();
+
+  if (isPending) {
+    return <span className="brand-account-slot-muted text-xs">—</span>;
+  }
+
+  if (row.actionProcess === 'session_check') {
+    const label = t('groupMonitoring.accountCard.sessionChecking');
+
+    return (
+      <div className="brand-session-cell-stack">
+        <ScraperStatusMarquee label={label} />
+      </div>
+    );
+  }
+
+  return <SessionBadge status={row.sessionStatus} />;
+}
+
 export function AdminProgress({ current, total }: { current: number; total: number }) {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
   const tone = pct >= 100 ? 'bg-wa' : pct >= 66 ? 'bg-amber-400' : 'bg-danger';
@@ -113,37 +140,33 @@ function ScraperColumnCell({
   }
 
   if (isRunning) {
-    const hasRealPercent =
-      scrapeProgress?.percent != null &&
-      scrapeProgress.total > 0 &&
-      scrapeProgress.phase === 'group';
+    const fallbackLabel = t('groupMonitoring.accountCard.scraperRunning');
+    const bar = resolveScrapeBarDisplay(row, scrapeProgress, fallbackLabel);
 
-    if (hasRealPercent) {
-      const pct = scrapeProgress.percent!;
-      return (
+    return (
+      <div className="brand-scraper-cell-stack">
         <div
           className="brand-scraper-progress"
           role="progressbar"
-          aria-valuenow={pct}
+          aria-valuenow={bar.percent}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-busy="true"
+          aria-label={bar.label}
         >
           <div className="brand-scraper-progress-bar">
             <div
               className="brand-scraper-progress-fill"
-              style={{ width: `${pct}%` }}
+              style={{ width: `${bar.percent}%` }}
             />
           </div>
           <span className="brand-scraper-progress-pct">
-            {scrapeProgress.current}/{scrapeProgress.total}
+            {bar.current}/{bar.total}
           </span>
         </div>
-      );
-    }
-
-    const statusLabel = scrapeProgress?.label ?? t('groupMonitoring.accountCard.scraperRunning');
-    return <ScraperStatusMarquee label={statusLabel} />;
+        <ScraperStatusMarquee label={bar.label} />
+      </div>
+    );
   }
 
   if (row.syncState === 'synced' && row.isMisaligned && (onRunScraper || operateLocked)) {
@@ -263,8 +286,11 @@ function AccountRemoveSlotIcon({
   );
 }
 
-function ProcessActionLabel({ action }: { action: 'sync' | 'scraper' }) {
+function ProcessActionLabel({ action }: { action: NonNullable<AccountBrandRow['actionProcess']> }) {
   const { t } = useLanguage();
+  if (action === 'session_check') {
+    return null;
+  }
   const label =
     action === 'sync'
       ? t('groupMonitoring.accountCard.procSync')
@@ -353,7 +379,7 @@ export function AccountTableRow({
         </td>
         <td className="brand-col-cell brand-col-cell--session">
           <div className="brand-col-cell-inner">
-            <SessionBadge status={row.sessionStatus} />
+            <SessionColumnCell row={row} isPending={isPending} />
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--groups">

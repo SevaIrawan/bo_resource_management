@@ -89,4 +89,4 @@ for (const s of STEPS) {
 }
 
 console.log('\nDevTools Autofill errors di terminal Electron = BUKAN penyebab loading macet.');
-console.log('Session device: INVALID→SYNC=login | VALID→SYNC/RUN=check device (manualSyncFlow).');
+console.log('Session device: INVALID→SYNC=login | VALID→SYNC/RUN=check device (syncFlowService).');

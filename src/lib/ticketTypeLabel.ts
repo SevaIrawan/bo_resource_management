@@ -5,23 +5,23 @@ type TranslateFn = (key: string, vars?: Record<string, string | number>) => stri
 const TYPE_KEYS: Record<TicketType, { badge: string; export: string }> = {
   missing_group: {
     badge: 'groupMonitoring.ticketPanel.badgeMissing',
-    export: 'groupMonitoring.ticketPanel.types.missingGroup',
+    export: 'groupMonitoring.ticketPanel.badgeMissing',
   },
   not_admin: {
     badge: 'groupMonitoring.ticketPanel.badgeNotAdmin',
-    export: 'groupMonitoring.ticketPanel.types.notAdmin',
+    export: 'groupMonitoring.ticketPanel.badgeNotAdmin',
   },
   duplicate_group_id: {
     badge: 'groupMonitoring.ticketPanel.badgeDuplicateGroupId',
-    export: 'groupMonitoring.ticketPanel.types.duplicateGroupId',
+    export: 'groupMonitoring.ticketPanel.badgeDuplicateGroupId',
   },
   duplicate_group_name: {
     badge: 'groupMonitoring.ticketPanel.badgeDuplicateGroupName',
-    export: 'groupMonitoring.ticketPanel.types.duplicateGroupName',
+    export: 'groupMonitoring.ticketPanel.badgeDuplicateGroupName',
   },
   daily_junk_group: {
     badge: 'groupMonitoring.ticketPanel.badgeDailyJunk',
-    export: 'groupMonitoring.ticketPanel.types.dailyJunk',
+    export: 'groupMonitoring.ticketPanel.badgeDailyJunk',
   },
 };
 

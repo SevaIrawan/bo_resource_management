@@ -22,9 +22,13 @@ const checks = [
   { name: 'i18n updateNow / dataUpdatesPending', ok: i18n.includes('updateNow') && i18n.includes('dataUpdatesPending') },
   {
     name: 'Post-login reconcile tickets',
-    ok:
-      read('src/hooks/useAccountSyncFlow.ts').includes('await onTicketsReload?.(dbAccountId)') &&
-      read('src/hooks/useAccountSyncFlow.ts').includes('brandIdAfterLogin'),
+    ok: (() => {
+      const syncFlow = read('src/hooks/useAccountSyncFlow.ts');
+      return (
+        syncFlow.includes('await onTicketsReload?.(dbAccountId)') &&
+        syncFlow.includes('fetchBrandIdForAccount(dbAccountId)')
+      );
+    })(),
   },
   {
     name: 'Load app: ticket engine + reconcile saat refresh tab Ticket',

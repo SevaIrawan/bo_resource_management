@@ -55,11 +55,18 @@ const waTs = fs.readFileSync(
   path.join(root, 'electron', 'main', 'platformLogin', 'whatsapp.ts'),
   'utf8',
 );
-if (!waTs.includes('resolveWaChromeExecutable()')) {
-  errors.push('whatsapp.ts tidak memanggil resolveWaChromeExecutable()');
+const chromeTs = fs.readFileSync(
+  path.join(root, 'electron', 'main', 'platformLogin', 'waPuppeteerChrome.ts'),
+  'utf8',
+);
+if (!waTs.includes('waClientPuppeteerOptions()')) {
+  errors.push('whatsapp.ts tidak memakai waClientPuppeteerOptions()');
 }
-if (!waTs.includes('executablePath:')) {
-  errors.push('whatsapp.ts tidak set puppeteer.executablePath');
+if (!chromeTs.includes('resolveWaChromeExecutable()')) {
+  errors.push('waPuppeteerChrome.ts tidak memuat resolveWaChromeExecutable()');
+}
+if (!chromeTs.includes('executablePath: resolveWaChromeExecutable()')) {
+  errors.push('waPuppeteerChrome.ts tidak set puppeteer.executablePath dari bundle');
 }
 
 if (errors.length) {

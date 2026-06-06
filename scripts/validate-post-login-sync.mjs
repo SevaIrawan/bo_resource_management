@@ -14,6 +14,7 @@ const syncFlow = read('src/services/syncFlowService.ts');
 const loginFlow = read('src/services/loginFlowService.ts');
 const loginHook = read('src/hooks/useAccountSyncFlow.ts');
 const platformLogin = read('src/hooks/usePlatformLogin.ts');
+const policy = read('src/config/syncScraperPolicy.ts');
 const en = read('src/i18n/locales/en.ts');
 
 const checks = [
@@ -43,7 +44,10 @@ const checks = [
   },
   {
     name: 'WA confirming timeout >= 10 menit (akun besar)',
-    ok: platformLogin.includes('WA_CONFIRMING_TIMEOUT_MS = 600_000'),
+    ok:
+      platformLogin.includes('waLoginConfirmingTimeoutMs') &&
+      platformLogin.includes('waConfirmingMs') &&
+      /waLoginConfirming[\s\S]*baseMs:\s*600_000/.test(policy),
   },
   {
     name: 'i18n loginConfirmingTimeout (en)',

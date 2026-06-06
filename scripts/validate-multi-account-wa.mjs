@@ -15,6 +15,10 @@ const poolTs = fs.readFileSync(
   path.join(root, 'electron/main/platformLogin/waBrowserPool.ts'),
   'utf8',
 );
+const chromeTs = fs.readFileSync(
+  path.join(root, 'electron/main/platformLogin/waPuppeteerChrome.ts'),
+  'utf8',
+);
 
 const checks = [
   {
@@ -49,8 +53,9 @@ const checks = [
   {
     name: 'Puppeteer executablePath terbundel',
     ok:
-      waTs.includes('resolveWaChromeExecutable()') &&
-      fs.existsSync(path.join(root, 'electron/main/platformLogin/waPuppeteerChrome.ts')),
+      waTs.includes('waClientPuppeteerOptions()') &&
+      chromeTs.includes('export function resolveWaChromeExecutable()') &&
+      chromeTs.includes('executablePath: resolveWaChromeExecutable()'),
   },
   {
     name: 'Renderer resolves device session id',

@@ -139,10 +139,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) => ipcRenderer.invoke('scraper:run', payload),
     cancel: (payload: { sessionId: string; platform: Platform }) =>
       ipcRenderer.invoke('scraper:cancel', payload),
+    cancelCount: (payload: { sessionId: string; platform: Platform }) =>
+      ipcRenderer.invoke('scraper:cancel-count', payload),
     countGroups: (payload: {
       sessionId: string;
       platform: Platform;
       storedSessionString?: string | null;
+      quick?: boolean;
+      reuseLiveLogin?: boolean;
     }) => ipcRenderer.invoke('scraper:count-groups', payload),
     validateSession: (payload: {
       sessionId: string;

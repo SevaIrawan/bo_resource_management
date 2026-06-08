@@ -1,30 +1,29 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
-import { withNetworkRetry } from '../lib/networkRetry';
 import {
   forceReleaseWhatsAppForLogin,
-  getWhatsAppSessionClient,
-  hasWhatsAppDiskAuth,
-  withWhatsAppClient,
+  probeWhatsAppSessionLinked,
 } from '../platformLogin/whatsapp';
-import {
-  classifyWaSocketState,
-  waLinkProbeMessage,
-  type WaLinkStatus,
-} from './whatsappLinkState';
+import { SESSION_CHECK_TIMEOUT_MS } from './deviceGroupScale';
 
-function probeResultFromWaState(state: string | null): { valid: boolean; message: string } {
-  const link: WaLinkStatus = classifyWaSocketState(state);
-  const message = waLinkProbeMessage(link, state);
-  return { valid: link === 'linked', message };
+function withSessionCheckTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(
+        () => reject(new Error('SESSION_CHECK_TIMEOUT')),
+        SESSION_CHECK_TIMEOUT_MS,
+      );
+    }),
+  ]);
 }
 
 export async function validateTelegramSession(
   sessionId: string,
   storedSessionString?: string | null,
 ): Promise<{ valid: boolean; message?: string }> {
-  await ensureSidecarRunning();
+  try {
+    await ensureSidecarRunning();
 
-  return withNetworkRetry('Validate Telegram session', async () => {
     const res = await fetch(`${SIDECAR_URL}/telegram/validate/${encodeURIComponent(sessionId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -32,7 +31,7 @@ export async function validateTelegramSession(
         sessionId,
         sessionString: storedSessionString ?? undefined,
       }),
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(SESSION_CHECK_TIMEOUT_MS),
     });
 
     const json = (await res.json()) as {
@@ -42,7 +41,7 @@ export async function validateTelegramSession(
     };
 
     if (!res.ok) {
-      throw new Error(json.message ?? `Telegram validate HTTP ${res.status}`);
+      return { valid: false, message: json.message ?? `Telegram validate HTTP ${res.status}` };
     }
 
     if (json.status === 'error') {
@@ -50,46 +49,28 @@ export async function validateTelegramSession(
     }
 
     return { valid: Boolean(json.valid), message: json.message };
-  });
+  } catch (error) {
+    return {
+      valid: false,
+      message: error instanceof Error ? error.message : 'Telegram validate failed',
+    };
+  }
 }
 
+/** WA: 1 akun, getState — tidak baca 1925 grup, timeout tetap 3s. */
 export async function validateWhatsAppSession(
   sessionId: string,
-  options?: { strict?: boolean },
+  _options?: { strict?: boolean },
 ): Promise<{
   valid: boolean;
   message?: string;
 }> {
-  const strict = options?.strict === true;
-
   try {
-    if (!strict) {
-      const live = getWhatsAppSessionClient(sessionId);
-      if (live) {
-        const state = await live.getState();
-        return probeResultFromWaState(state);
-      }
-
-      if (hasWhatsAppDiskAuth(sessionId)) {
-        return {
-          valid: true,
-          message: 'WA_LINKED',
-        };
-      }
-    }
-
-    const result = await withWhatsAppClient(sessionId, async (client) => {
-      const state = await client.getState();
-      return probeResultFromWaState(state);
-    });
-
-    if (strict && !result.valid) {
-      await forceReleaseWhatsAppForLogin(sessionId);
-    }
-
-    return result;
+    return await withSessionCheckTimeout(probeWhatsAppSessionLinked(sessionId));
   } catch (error) {
-    await forceReleaseWhatsAppForLogin(sessionId).catch(() => undefined);
+    await forceReleaseWhatsAppForLogin(sessionId, { urgent: true, fast: true }).catch(
+      () => undefined,
+    );
     return {
       valid: false,
       message: error instanceof Error ? error.message : 'WhatsApp validate failed',

@@ -11,6 +11,8 @@ interface SyncScrapeConfirmModalProps {
   platform?: Platform;
   rescrape?: boolean;
   postLogin?: boolean;
+  /** false = detect total gagal/timeout — jangan klaim counts sudah update. */
+  postLoginCountsReady?: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -21,6 +23,7 @@ export function SyncScrapeConfirmModal({
   platform = 'telegram',
   rescrape = false,
   postLogin = false,
+  postLoginCountsReady = true,
   onClose,
   onConfirm,
 }: SyncScrapeConfirmModalProps) {
@@ -40,7 +43,9 @@ export function SyncScrapeConfirmModal({
   if (!open) return null;
 
   const message = postLogin
-    ? t('groupMonitoring.sync.postLoginScrapeMessage')
+    ? postLoginCountsReady
+      ? t('groupMonitoring.sync.postLoginScrapeMessage')
+      : t('groupMonitoring.sync.postLoginScrapePendingMessage')
     : rescrape
       ? t('groupMonitoring.sync.rescrapeMessage', { account: accountName })
       : t('groupMonitoring.sync.noDataMessage');

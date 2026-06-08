@@ -19,8 +19,11 @@ async function isWWebJsReady(client: Client): Promise<boolean> {
 }
 
 /** Tunggu injeksi WWebJS (setelah event `ready` / sync WA Web). */
-export async function waitForWhatsAppStoreReady(client: Client): Promise<void> {
-  const deadline = Date.now() + WA_STORE_WAIT_MS;
+export async function waitForWhatsAppStoreReady(
+  client: Client,
+  maxMs: number = WA_STORE_WAIT_MS,
+): Promise<void> {
+  const deadline = Date.now() + maxMs;
 
   while (Date.now() < deadline) {
     if (await isWWebJsReady(client)) return;
@@ -61,10 +64,33 @@ export function assertWhatsAppScrapeClient(client: Client | null | undefined): a
   }
 }
 
-/** Daftar JID grup dari store WA Web — tanpa `client.getChats()`. */
-export async function listWhatsAppGroupIds(client: Client): Promise<string[]> {
+/** Hitung total grup di store — satu pass di browser, tanpa kirim ribuan JID ke Node. */
+export async function countWhatsAppGroupsOnDevice(
+  client: Client,
+  options?: { storeWaitMs?: number },
+): Promise<number> {
   assertWhatsAppScrapeClient(client);
-  await waitForWhatsAppStoreReady(client);
+  await waitForWhatsAppStoreReady(client, options?.storeWaitMs);
+
+  return client.pupPage.evaluate(() => {
+    const chats = window.require('WAWebCollections').Chat.getModelsArray();
+    const getters = window.require('WAWebContactGetters');
+    let total = 0;
+    for (const chat of chats) {
+      const isGroup = getters.getIsGroup(chat) || Boolean(chat.groupMetadata);
+      if (isGroup) total += 1;
+    }
+    return total;
+  });
+}
+
+/** Daftar JID grup dari store WA Web — tanpa `client.getChats()`. */
+export async function listWhatsAppGroupIds(
+  client: Client,
+  options?: { storeWaitMs?: number },
+): Promise<string[]> {
+  assertWhatsAppScrapeClient(client);
+  await waitForWhatsAppStoreReady(client, options?.storeWaitMs);
 
   const ids = await client.pupPage.evaluate(async () => {
     const chats = window.require('WAWebCollections').Chat.getModelsArray();

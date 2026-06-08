@@ -16,6 +16,11 @@ import {
   ScrapeCancelledError,
 } from './scrapeCancel';
 import { cancelTelegramScrape } from './telegramScrape';
+import {
+  cancelCountGroups,
+  clearCountAbort,
+  registerCountAbort,
+} from './countGroupsCancel';
 
 type Platform = 'whatsapp' | 'telegram';
 
@@ -33,6 +38,8 @@ export interface CountGroupsPayload {
   strict?: boolean;
   /** Setelah login QR WA — hitung grup cepat, admin diisi saat scraper penuh. */
   quick?: boolean;
+  /** Baru scan QR — pakai client login yang masih hidup, tanpa cold-boot. */
+  reuseLiveLogin?: boolean;
 }
 
 export interface ScrapedGroupRow {
@@ -113,15 +120,28 @@ export function registerScraperIpc() {
   );
 
   ipcMain.handle('scraper:count-groups', async (_event, payload: CountGroupsPayload) => {
-    if (payload.platform === 'telegram') {
-      return countTelegramGroups(payload.sessionId, payload.storedSessionString, {
-        quick: payload.quick,
-      });
+    registerCountAbort(payload.sessionId);
+    try {
+      if (payload.platform === 'telegram') {
+        return await countTelegramGroups(payload.sessionId, payload.storedSessionString, {
+          quick: payload.quick,
+        });
+      }
+      return payload.quick
+        ? await countWhatsAppGroupsQuick(payload.sessionId, {
+            reuseLiveLogin: payload.reuseLiveLogin,
+          })
+        : await countWhatsAppGroups(payload.sessionId);
+    } finally {
+      clearCountAbort(payload.sessionId);
     }
-    return payload.quick
-      ? countWhatsAppGroupsQuick(payload.sessionId)
-      : countWhatsAppGroups(payload.sessionId);
   });
+
+  ipcMain.handle(
+    'scraper:cancel-count',
+    async (_event, payload: { sessionId: string; platform: Platform }) =>
+      cancelCountGroups(payload.sessionId, payload.platform),
+  );
 
   ipcMain.handle('scraper:validate-session', async (_event, payload: CountGroupsPayload) => {
     try {

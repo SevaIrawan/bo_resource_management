@@ -21,7 +21,7 @@ export async function countTelegramGroups(
           sessionString: storedSessionString ?? undefined,
           quick,
         }),
-        signal: AbortSignal.timeout(countGroupsTimeoutMs()),
+        signal: AbortSignal.timeout(countGroupsTimeoutMs(0, quick)),
       });
 
       const body = (await res.json()) as {

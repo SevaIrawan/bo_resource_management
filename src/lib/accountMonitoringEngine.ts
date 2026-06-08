@@ -42,7 +42,7 @@ export async function fetchDeviceGroupCounts(
     platform: Platform;
     accountId: string;
   },
-  options?: { assumeSessionValid?: boolean; quick?: boolean },
+  options?: { assumeSessionValid?: boolean; quick?: boolean; reuseLiveLogin?: boolean },
 ): Promise<DeviceGroupCountResult> {
   if (!options?.assumeSessionValid) {
     const probe = await probeLivePlatformSession(input);
@@ -56,7 +56,10 @@ export async function fetchDeviceGroupCounts(
     }
   }
 
-  return countDeviceGroups(input);
+  return countDeviceGroups(input, {
+    quick: options?.quick,
+    reuseLiveLogin: options?.reuseLiveLogin,
+  });
 }
 
 export interface RefreshAccountMetricsInput {
@@ -68,6 +71,8 @@ export interface RefreshAccountMetricsInput {
   assumeSessionValid?: boolean;
   /** Setelah login QR WA — hitung grup cepat (tanpa loop admin per grup). */
   quickDeviceCount?: boolean;
+  /** Baru login QR — pakai client WA yang masih hidup. */
+  freshLogin?: boolean;
   /** Lewati merge ribuan group_id ke daily (cukup angka device; detail saat scrape). */
   skipMergeDeviceGroups?: boolean;
 }
@@ -108,6 +113,7 @@ export async function refreshAccountMetrics(
     {
       assumeSessionValid: input.assumeSessionValid,
       quick: input.quickDeviceCount,
+      reuseLiveLogin: input.freshLogin,
     },
   );
 

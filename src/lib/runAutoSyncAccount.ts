@@ -20,12 +20,13 @@ import { isDeviceBusyMessage, isDeviceSessionDeadMessage } from '@/lib/scrapeErr
 import { recordSessionActivityStatus } from '@/lib/recordSessionActivity';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
 import { probePlatformSession } from '@/lib/sessionProbe';
+import { sessionCheckTimeoutMs, syncDetectTimeoutMs } from '@/config/syncScraperPolicy';
+import { cancelDeviceGroupCount } from '@/lib/runAccountCount';
+import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import { getSupabase } from '@/lib/supabase';
 import { TABLES } from '@/config/tables';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { SyncActivitySource } from '@/lib/syncActivityLog';
-
-const AUTO_PROBE_TIMEOUT_MS = 45_000;
 
 export interface RunAccountSyncCheckInput {
   userId: string;
@@ -47,8 +48,57 @@ function sessionStatusForActivity(
   return 'logout';
 }
 
+async function probeAutoSyncSession(input: {
+  sessionId: string;
+  platform: AccountBrandRow['platform'];
+  accountId: string;
+}): Promise<{ valid: boolean; message?: string }> {
+  try {
+    return await withTimeout(
+      probePlatformSession({ ...input, strict: true }),
+      sessionCheckTimeoutMs(),
+      'Auto-sync session check',
+    );
+  } catch (error) {
+    if (error instanceof OperationTimeoutError) {
+      return { valid: false, message: 'Session check timed out' };
+    }
+    throw error;
+  }
+}
+
+async function detectAutoSyncMetrics(input: {
+  account: AccountBrandRow;
+  dbAccountId: string;
+  brandStandard: number;
+}): Promise<Awaited<ReturnType<typeof refreshAccountMetrics>>> {
+  try {
+    return await withTimeout(
+      refreshAccountMetrics({
+        account: input.account,
+        dbAccountId: input.dbAccountId,
+        brandStandard: input.brandStandard,
+        assumeSessionValid: true,
+        quickDeviceCount: true,
+        skipMergeDeviceGroups: true,
+      }),
+      syncDetectTimeoutMs(),
+      'Auto-sync detect',
+    );
+  } catch (error) {
+    if (error instanceof OperationTimeoutError) {
+      void cancelDeviceGroupCount({
+        sessionId: input.account.id,
+        platform: input.account.platform,
+        accountId: input.dbAccountId,
+      });
+    }
+    throw error;
+  }
+}
+
 /**
- * Satu putaran sync tanpa modal: cek session live + grup di device, catat DB, kembalikan metrik.
+ * Satu putaran sync tanpa modal: probe 3s + detect total cepat (sama kontrak manual sync).
  */
 export async function runAccountSyncCheck(
   input: RunAccountSyncCheckInput,
@@ -133,20 +183,11 @@ export async function runAccountSyncCheck(
 
   await backfillPlatformSessionIfNeeded({ userId, account, dbAccountId });
 
-  const probe = await Promise.race([
-    probePlatformSession({
-      sessionId: account.id,
-      platform: account.platform,
-      accountId: dbAccountId,
-      strict: true,
-    }),
-    new Promise<{ valid: false; message: string }>((resolve) =>
-      setTimeout(
-        () => resolve({ valid: false, message: 'Session check timed out' }),
-        AUTO_PROBE_TIMEOUT_MS,
-      ),
-    ),
-  ]);
+  const probe = await probeAutoSyncSession({
+    sessionId: account.id,
+    platform: account.platform,
+    accountId: dbAccountId,
+  });
 
   if (!probe.valid) {
     const probeMessage = probe.message ?? `${syncSource}: device not connected`;
@@ -163,7 +204,9 @@ export async function runAccountSyncCheck(
         account,
         dbAccountId,
         brandStandard,
-      });
+        quickDeviceCount: true,
+        skipMergeDeviceGroups: true,
+      }).catch(() => null);
       const result = await invalidSessionMetricsFromDaily({
         accountId: dbAccountId,
         brand: account.brandName,
@@ -171,7 +214,11 @@ export async function runAccountSyncCheck(
         brandStandard,
       });
       await logActivity(result, probeMessage);
-      return { dbAccountId, result, masterJoined: metrics.master.joinedInMaster };
+      return {
+        dbAccountId,
+        result,
+        masterJoined: metrics?.master.joinedInMaster,
+      };
     }
 
     if (isDeviceBusyMessage(probeMessage)) {
@@ -183,11 +230,12 @@ export async function runAccountSyncCheck(
 
   await markPlatformSessionSynced(dbAccountId);
 
-  const metrics = await refreshAccountMetrics({
-    account,
-    dbAccountId,
-    brandStandard,
-  });
+  let metrics: Awaited<ReturnType<typeof refreshAccountMetrics>>;
+  try {
+    metrics = await detectAutoSyncMetrics({ account, dbAccountId, brandStandard });
+  } catch {
+    return null;
+  }
 
   const result = metrics.result;
 

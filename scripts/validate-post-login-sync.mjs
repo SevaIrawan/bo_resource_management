@@ -31,8 +31,10 @@ const checks = [
     ok: /quickDeviceCount:\s*true/.test(loginFlow),
   },
   {
-    name: 'Timeout sync setelah login skala 3000 grup',
-    ok: loginFlow.includes('postLoginSyncTimeoutMs'),
+    name: 'Timeout detect setelah login tetap (tidak skala grup)',
+    ok:
+      loginFlow.includes('postLoginDetectTimeoutMs') &&
+      policy.includes('postLoginDetect'),
   },
   {
     name: 'Fallback scrape prompt jika persist OK tapi count gagal',
@@ -43,27 +45,21 @@ const checks = [
     ok: syncFlow.includes('quickDeviceCount'),
   },
   {
-    name: 'WA confirming timeout >= 10 menit (akun besar)',
-    ok: (() => {
-      if (!platformLogin.includes('waLoginConfirmingTimeoutMs')) return false;
-      if (!platformLogin.includes('waConfirmingMs')) return false;
-      const m = policy.match(
-        /waLoginConfirming:\s*\{[^}]*baseMs:\s*([\d_]+)[^}]*perGroupMs:\s*(\d+)/,
-      );
-      if (!m) return false;
-      const base = Number(m[1].replace(/_/g, ''));
-      const per = Number(m[2]);
-      const at3000 = Math.min(1_200_000, base + 3000 * per);
-      return at3000 >= 600_000;
-    })(),
+    name: 'WA confirming timeout tetap (tidak skala grup)',
+    ok:
+      policy.includes('waLoginConfirming') &&
+      policy.includes('timeoutMs') &&
+      platformLogin.includes('waLoginConfirmingTimeoutMs'),
   },
   {
     name: 'i18n loginConfirmingTimeout (en)',
     ok: en.includes('loginConfirmingTimeout'),
   },
   {
-    name: 'login sync timeout pakai estimasi grup',
-    ok: loginFlow.includes('accountGroupEstimate'),
+    name: 'Post-login pakai reuseLiveLogin (client WA masih hidup)',
+    ok:
+      waCount.includes('reuseLiveLogin') &&
+      loginFlow.includes('freshLogin: true'),
   },
 ];
 

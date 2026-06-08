@@ -2,17 +2,11 @@ import { gateDeviceSession } from '@/lib/deviceSessionGate';
 import { invalidSessionMetricsFromDaily } from '@/lib/accountSessionUi';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import { invalidatePlatformSessionEverywhere } from '@/lib/platformSessionSync';
-import {
-  hasStoredPlatformSession,
-} from '@/lib/sessionAvailability';
+import { hasStoredPlatformSession } from '@/lib/sessionAvailability';
 import { markPlatformSessionSynced } from '@/lib/platformSessions';
 import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
 import { isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
-import { NETWORK_RETRY_ATTEMPTS, NETWORK_RETRY_BASE_DELAY_MS } from '@/lib/networkRetry';
 import type { Platform } from '@/types/database';
-
-const USER_SESSION_GATE_RETRIES = NETWORK_RETRY_ATTEMPTS;
-const USER_SESSION_RETRY_BASE_MS = NETWORK_RETRY_BASE_DELAY_MS;
 
 export type UserSessionGateMode = 'sync' | 'scrape';
 
@@ -40,31 +34,8 @@ function reloginCodeForAccount(
     : 'SESSION_INVALID_FORCE_SCRAPER';
 }
 
-async function gateOnce(input: {
-  sessionId: string;
-  platform: Platform;
-  dbAccountId: string;
-  mode: UserSessionGateMode;
-  groupEstimate?: number;
-}) {
-  return gateDeviceSession(
-    {
-      sessionId: input.sessionId,
-      platform: input.platform,
-      accountId: input.dbAccountId,
-      uiSessionStatus: 'valid',
-      skipWarmProbe: false,
-      groupEstimate: input.groupEstimate,
-    },
-    input.mode,
-  );
-}
-
 /**
- * Wajib untuk Sync / Run (aksi user):
- * 1. Baca status session terbaru di DB
- * 2. Probe strict ke device (probe → warm → probe); retry sekali jika masih loading
- * 3. Gagal tautan → invalidasi DB; sukses → tandai synced di DB
+ * Sync / Run: DB → probe valid/invalid (≤3s) → valid lanjut / invalid login.
  */
 export async function checkUserActionDeviceSession(input: {
   sessionId: string;
@@ -72,7 +43,6 @@ export async function checkUserActionDeviceSession(input: {
   dbAccountId: string;
   mode: UserSessionGateMode;
   hasDaily?: boolean;
-  groupEstimate?: number;
 }): Promise<UserSessionCheckResult> {
   const dbSessionStatus = await readLatestSessionUiStatus(input.dbAccountId);
 
@@ -85,27 +55,16 @@ export async function checkUserActionDeviceSession(input: {
     };
   }
 
-  let gate = await gateOnce({
-    sessionId: input.sessionId,
-    platform: input.platform,
-    dbAccountId: input.dbAccountId,
-    mode: input.mode,
-    groupEstimate: input.groupEstimate,
-  });
-
-  for (let attempt = 0; attempt < USER_SESSION_GATE_RETRIES - 1; attempt += 1) {
-    if (gate.ok || gate.kind !== 'warm_pending') break;
-    await new Promise((resolve) =>
-      window.setTimeout(resolve, USER_SESSION_RETRY_BASE_MS * (attempt + 1)),
-    );
-    gate = await gateOnce({
+  const gate = await gateDeviceSession(
+    {
       sessionId: input.sessionId,
       platform: input.platform,
-      dbAccountId: input.dbAccountId,
-      mode: input.mode,
-      groupEstimate: input.groupEstimate,
-    });
-  }
+      accountId: input.dbAccountId,
+      uiSessionStatus: 'valid',
+      skipWarmProbe: false,
+    },
+    input.mode,
+  );
 
   if (gate.ok) {
     await markPlatformSessionSynced(input.dbAccountId);
@@ -114,16 +73,6 @@ export async function checkUserActionDeviceSession(input: {
 
   const hasStored = await hasStoredPlatformSession(input.dbAccountId, input.platform);
   const reloginCode = reloginCodeForAccount(input.hasDaily, hasStored);
-
-  if (gate.kind === 'warm_pending') {
-    return {
-      ok: false,
-      kind: 'device_failed',
-      message: 'SESSION_CHECK_UNAVAILABLE',
-      shouldInvalidate: true,
-      reloginCode,
-    };
-  }
 
   return {
     ok: false,

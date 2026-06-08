@@ -10,10 +10,21 @@ export const SYNC_SCRAPER_POLICY = {
     postLoginGraceMs: 120_000,
   },
 
+  /** Detect total grup (manual sync / post-login / auto) — satu pass store; tidak skala jumlah grup. */
+  syncDetect: {
+    timeoutMs: 90_000,
+  },
+
+  /** @deprecated Scrape/admin — bukan detect; scrape pakai scrapeGroupsTimeoutMs di main. */
   manualSync: {
     baseMs: 120_000,
     perGroupMs: 20,
     maxMs: 1_200_000,
+  },
+
+  /** Alias syncDetect — backward compat nama. */
+  postLoginDetect: {
+    timeoutMs: 90_000,
   },
 
   postLoginSync: {
@@ -33,10 +44,14 @@ export const SYNC_SCRAPER_POLICY = {
     perGroupMs: 40,
     maxMs: 1_200_000,
   },
+  /** Setelah scan QR — tunggu event ready; tidak skala jumlah grup. */
   waLoginConfirming: {
-    baseMs: 180_000,
-    perGroupMs: 150,
-    maxMs: 1_200_000,
+    timeoutMs: 180_000,
+  },
+
+  /** Cek session valid/invalid — tetap, tidak skala grup. */
+  sessionCheck: {
+    timeoutMs: 3_000,
   },
 
   deviceSessionProbe: {
@@ -50,6 +65,10 @@ export const SYNC_SCRAPER_POLICY = {
     maxMs: 600_000,
   },
 } as const;
+
+export function sessionCheckTimeoutMs(): number {
+  return SYNC_SCRAPER_POLICY.sessionCheck.timeoutMs;
+}
 
 /** Estimasi operasi dari metrik grid — tanpa floor buatan; 0 jika belum ada data. */
 export function accountGroupEstimate(metrics: {
@@ -73,16 +92,26 @@ function scaledPolicyMs(
   return Math.min(policy.maxMs, policy.baseMs + safe * policy.perGroupMs);
 }
 
-export function manualSyncTimeoutMs(
-  estimate: number = 0,
-): number {
-  return scaledPolicyMs(SYNC_SCRAPER_POLICY.manualSync, estimate);
+/** Detect total Y device + X master — tetap, bukan scraper. */
+export function syncDetectTimeoutMs(): number {
+  return SYNC_SCRAPER_POLICY.syncDetect.timeoutMs;
 }
 
+/** @deprecated Pakai syncDetectTimeoutMs — detect tidak skala grup. */
+export function manualSyncTimeoutMs(_estimate: number = 0): number {
+  return syncDetectTimeoutMs();
+}
+
+/** Detect total setelah login QR — sama dengan syncDetect. */
+export function postLoginDetectTimeoutMs(): number {
+  return syncDetectTimeoutMs();
+}
+
+/** @deprecated Pakai postLoginDetectTimeoutMs — detect total tidak skala grup. */
 export function postLoginSyncTimeoutMs(
-  estimate: number = 0,
+  _estimate: number = 0,
 ): number {
-  return scaledPolicyMs(SYNC_SCRAPER_POLICY.postLoginSync, estimate);
+  return postLoginDetectTimeoutMs();
 }
 
 /** Deadline QR pertama muncul (Chrome + web.whatsapp.com). */
@@ -95,9 +124,9 @@ export function waQrScanWaitMs(estimate = 0): number {
   return scaledPolicyMs(SYNC_SCRAPER_POLICY.waQrScan, estimate);
 }
 
-/** Setelah scan — tunggu event `ready` (akun besar). */
-export function waLoginConfirmingTimeoutMs(estimate = 0): number {
-  return scaledPolicyMs(SYNC_SCRAPER_POLICY.waLoginConfirming, estimate);
+/** Setelah scan — tunggu event `ready`; tetap, bukan detect/scrape per grup. */
+export function waLoginConfirmingTimeoutMs(_estimate = 0): number {
+  return SYNC_SCRAPER_POLICY.waLoginConfirming.timeoutMs;
 }
 
 export function deviceSessionProbeTimeoutMs(estimate = 0): number {

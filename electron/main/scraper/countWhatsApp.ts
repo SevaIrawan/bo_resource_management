@@ -1,20 +1,29 @@
-import { withWhatsAppClient } from '../platformLogin/whatsapp';
+import {
+  resolveLiveWhatsAppSessionId,
+  withLiveWhatsAppLoginClient,
+  withWhatsAppClient,
+} from '../platformLogin/whatsapp';
+import { isAnyCountAborted } from './countGroupsCancel';
 import { fetchGroupParticipants, meParticipantStats } from './whatsappParticipants';
 import { isWhatsAppGroupChat } from './whatsappGroupFilter';
 import {
   assertWhatsAppScrapeClient,
+  countWhatsAppGroupsOnDevice,
   listWhatsAppGroupIds,
 } from './whatsappGroupDiscovery';
 import {
   DEVICE_GROUP_TARGET_MAX,
+  QUICK_COUNT_STORE_WAIT_MS,
   runPooled,
   WA_GROUP_PROCESS_CONCURRENCY,
 } from './deviceGroupScale';
 import { emitScrapeProgress } from './scrapeProgress';
 
-async function countWhatsAppGroupsInner(
+async function countFromConnectedClient(
   sessionId: string,
+  client: Parameters<typeof assertWhatsAppScrapeClient>[0],
   mode: 'quick' | 'full',
+  options?: { reuseLiveLogin?: boolean },
 ): Promise<{
   valid: boolean;
   totalGroups: number;
@@ -22,28 +31,37 @@ async function countWhatsAppGroupsInner(
   groupIds?: string[];
   message?: string;
 }> {
-  return withWhatsAppClient(sessionId, async (client) => {
-    assertWhatsAppScrapeClient(client);
+  assertWhatsAppScrapeClient(client);
 
-    const state = await client.getState();
-    if (state !== 'CONNECTED') {
-      return {
-        valid: false,
-        totalGroups: 0,
-        adminGroups: 0,
-        message: 'WhatsApp session is not connected',
-      };
-    }
+  const state = await client.getState();
+  if (state !== 'CONNECTED') {
+    return {
+      valid: false,
+      totalGroups: 0,
+      adminGroups: 0,
+      message: 'WhatsApp session is not connected',
+    };
+  }
 
-    emitScrapeProgress({
-      sessionId,
-      phase: 'discover',
-      label: 'Reading group list from WhatsApp…',
-    });
+  emitScrapeProgress({
+    sessionId,
+    phase: 'discover',
+    label: 'Reading group list from WhatsApp…',
+  });
 
-    const groupIds = await listWhatsAppGroupIds(client);
-    const totalGroups = groupIds.length;
+  if (isAnyCountAborted()) {
+    return {
+      valid: false,
+      totalGroups: 0,
+      adminGroups: 0,
+      message: 'COUNT_CANCELLED',
+    };
+  }
 
+  const storeWaitMs = mode === 'quick' ? QUICK_COUNT_STORE_WAIT_MS : undefined;
+
+  if (mode === 'quick') {
+    const totalGroups = await countWhatsAppGroupsOnDevice(client, { storeWaitMs });
     emitScrapeProgress({
       sessionId,
       phase: 'discover',
@@ -51,51 +69,105 @@ async function countWhatsAppGroupsInner(
       total: totalGroups,
       label: `${totalGroups} groups on device`,
     });
-
-    if (mode === 'quick') {
-      return {
-        valid: true,
-        totalGroups,
-        adminGroups: 0,
-      };
-    }
-
-    const meId = client.info?.wid?._serialized;
-    const scanIds = groupIds.slice(0, DEVICE_GROUP_TARGET_MAX);
-
-    const adminFlags = await runPooled(scanIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId, index) => {
-      const chat = await client.getChatById(groupId);
-      if (!chat || !isWhatsAppGroupChat(chat)) return false;
-
-      const participants = await fetchGroupParticipants(client, chat);
-      const stats = meParticipantStats(participants, meId);
-
-      if ((index + 1) % 25 === 0 || index === scanIds.length - 1) {
-        emitScrapeProgress({
-          sessionId,
-          phase: 'group',
-          current: index + 1,
-          total: scanIds.length,
-          label: `Checking admin role (${index + 1}/${scanIds.length})…`,
-        });
-      }
-
-      return stats.isAdmin;
-    });
-
-    const adminGroups = adminFlags.filter(Boolean).length;
-
     return {
       valid: true,
       totalGroups,
-      adminGroups,
-      groupIds,
+      adminGroups: 0,
     };
+  }
+
+  const groupIds = await listWhatsAppGroupIds(client, { storeWaitMs });
+  const totalGroups = groupIds.length;
+
+  emitScrapeProgress({
+    sessionId,
+    phase: 'discover',
+    current: totalGroups,
+    total: totalGroups,
+    label: `${totalGroups} groups on device`,
   });
+
+  const meId = client.info?.wid?._serialized;
+  const scanIds = groupIds.slice(0, DEVICE_GROUP_TARGET_MAX);
+
+  const adminFlags = await runPooled(scanIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId, index) => {
+    const chat = await client.getChatById(groupId);
+    if (!chat || !isWhatsAppGroupChat(chat)) return false;
+
+    const participants = await fetchGroupParticipants(client, chat);
+    const stats = meParticipantStats(participants, meId);
+
+    if ((index + 1) % 25 === 0 || index === scanIds.length - 1) {
+      emitScrapeProgress({
+        sessionId,
+        phase: 'group',
+        current: index + 1,
+        total: scanIds.length,
+        label: `Checking admin role (${index + 1}/${scanIds.length})…`,
+      });
+    }
+
+    return stats.isAdmin;
+  });
+
+  const adminGroups = adminFlags.filter(Boolean).length;
+
+  return {
+    valid: true,
+    totalGroups,
+    adminGroups,
+    groupIds,
+  };
 }
 
-/** Setelah login / sync — hitung total grup dari store (skala ~2000 dalam hitungan detik). */
-export async function countWhatsAppGroupsQuick(sessionId: string): Promise<{
+async function countWhatsAppGroupsInner(
+  sessionId: string,
+  mode: 'quick' | 'full',
+  options?: { reuseLiveLogin?: boolean },
+): Promise<{
+  valid: boolean;
+  totalGroups: number;
+  adminGroups: number;
+  groupIds?: string[];
+  message?: string;
+}> {
+  if (mode === 'quick') {
+    const liveId = await resolveLiveWhatsAppSessionId(sessionId);
+    if (liveId) {
+      try {
+        return await withLiveWhatsAppLoginClient(liveId, (client) =>
+          countFromConnectedClient(liveId, client, mode, options),
+        );
+      } catch {
+        // fallback cold-boot di bawah
+      }
+    }
+  } else if (options?.reuseLiveLogin) {
+    const liveId = await resolveLiveWhatsAppSessionId(sessionId);
+    if (liveId) {
+      return withLiveWhatsAppLoginClient(liveId, (client) =>
+        countFromConnectedClient(liveId, client, mode, options),
+      );
+    }
+  }
+
+  const clientOpts =
+    mode === 'quick'
+      ? { storeWaitMs: QUICK_COUNT_STORE_WAIT_MS, readyTimeoutMs: 30_000 }
+      : undefined;
+
+  return withWhatsAppClient(
+    sessionId,
+    (client) => countFromConnectedClient(sessionId, client, mode, options),
+    clientOpts,
+  );
+}
+
+/** Setelah login / sync — hitung total grup dari store (satu pass, tidak skala scrape). */
+export async function countWhatsAppGroupsQuick(
+  sessionId: string,
+  options?: { reuseLiveLogin?: boolean },
+): Promise<{
   valid: boolean;
   totalGroups: number;
   adminGroups: number;
@@ -103,7 +175,7 @@ export async function countWhatsAppGroupsQuick(sessionId: string): Promise<{
   message?: string;
 }> {
   try {
-    return await countWhatsAppGroupsInner(sessionId, 'quick');
+    return await countWhatsAppGroupsInner(sessionId, 'quick', options);
   } catch (error) {
     return {
       valid: false,

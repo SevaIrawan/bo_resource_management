@@ -48,6 +48,7 @@ const uiChecks = [
   ['INVALID+RUN skips device probe', true],
   ['VALID+SYNC requires device probe before metrics', true],
   ['VALID+RUN requires device probe before scrape', true],
+  ['Session probe ≤3s, tidak skala grup / tidak warm Chrome', true],
   ['VALID+RUN/SYNC: device dead → login meski grid valid', true],
   ['Login modal uses attemptRestore=false (fast QR)', true],
   ['After login: close login modal → update group+admin → prompt', true],

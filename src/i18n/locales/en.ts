@@ -295,6 +295,8 @@ export const en = {
       rescrapeMessage: 'Scrape {{account}} again?',
       postLoginScrapeMessage:
         'Login OK. Device group & admin counts are updated. Save the full group list to the database now?',
+      postLoginScrapePendingMessage:
+        'Login OK. Device counts were not read in time — run scraper to refresh totals. Save the full group list to the database now?',
       scrapeProgressHint: 'Scraping in background. Counts update in the table.',
       syncFailed: 'Sync failed. Try again.',
       syncTimedOut:

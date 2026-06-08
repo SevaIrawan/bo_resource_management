@@ -37,7 +37,7 @@ function check(name, fn) {
 
 const pkg = JSON.parse(read('package.json'));
 check('package.json version', () => {
-  if (pkg.version !== '1.0.13') return fail(`version=${pkg.version}, doc claims 1.0.13 — update doc or version`);
+  if (pkg.version !== '1.0.14') return fail(`version=${pkg.version}, doc claims 1.0.14 — update doc or version`);
   return ok(`version ${pkg.version}`);
 });
 
@@ -132,6 +132,36 @@ check('accountGroupEstimate uses real metrics not floor 500', () => {
     /Math\.max\(y, x\)/.test(t)
     ? ok('syncScraperPolicy: real group estimate')
     : fail('floor 500 still present');
+});
+
+check('session check fixed 3s not group-scaled', () => {
+  const policy = read('src/config/syncScraperPolicy.ts');
+  const gate = read('src/lib/deviceSessionGate.ts');
+  const validate = read('electron/main/scraper/validateSession.ts');
+  if (!policy.includes('sessionCheck') || !policy.includes('timeoutMs: 3_000')) {
+    return fail('sessionCheck timeout missing in policy');
+  }
+  if (!gate.includes('sessionCheckTimeoutMs')) return fail('gate must use sessionCheckTimeoutMs');
+  if (gate.includes('probeThenWarm') || gate.includes('groupEstimate')) {
+    return fail('session gate still warm or group-scaled');
+  }
+  if (validate.includes('withWhatsAppClient') || validate.includes('waitForWhatsAppStoreReady')) {
+    return fail('validate must not use scrape-level WA client');
+  }
+  if (!validate.includes('probeWhatsAppSessionLinked')) {
+    return fail('WA session probe must use probeWhatsAppSessionLinked');
+  }
+  const wa = read('electron/main/platformLogin/whatsapp.ts');
+  if (wa.includes('waitForWhatsAppStoreReady') && /probeWhatsAppSessionLinkedInner/.test(wa)) {
+    const probeBlock = wa.slice(wa.indexOf('probeWhatsAppSessionLinkedInner'), wa.indexOf('export function getWhatsAppSessionClient'));
+    if (probeBlock.includes('waitForWhatsAppStoreReady')) {
+      return fail('session probe must not wait for WA store');
+    }
+  }
+  if (!read('electron/main/scraper/deviceGroupScale.ts').includes('SESSION_CHECK_TIMEOUT_MS = 3_000')) {
+    return fail('SESSION_CHECK_TIMEOUT_MS missing');
+  }
+  return ok('session check: 3s getState probe, no group read');
 });
 
 check('scraper cancel IPC', () => {

@@ -4,10 +4,11 @@
 import {
   manualSyncTimeoutMs,
   postLoginSyncTimeoutMs,
+  syncDetectTimeoutMs,
   SYNC_SCRAPER_POLICY,
 } from '@/config/syncScraperPolicy';
 
-export { manualSyncTimeoutMs, SYNC_SCRAPER_POLICY };
+export { manualSyncTimeoutMs, syncDetectTimeoutMs, SYNC_SCRAPER_POLICY };
 
 export const DEVICE_GROUP_TARGET_MAX = SYNC_SCRAPER_POLICY.deviceGroupTargetMax;
 

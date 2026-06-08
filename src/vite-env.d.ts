@@ -127,11 +127,16 @@ declare global {
           sessionId: string;
           platform: Platform;
         }) => Promise<{ ok: boolean }>;
+        cancelCount: (payload: {
+          sessionId: string;
+          platform: Platform;
+        }) => Promise<{ ok: boolean }>;
         countGroups: (payload: {
           sessionId: string;
           platform: Platform;
           storedSessionString?: string | null;
           quick?: boolean;
+          reuseLiveLogin?: boolean;
         }) => Promise<{
           valid: boolean;
           totalGroups: number;

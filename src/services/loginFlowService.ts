@@ -1,8 +1,6 @@
-import {
-  accountGroupEstimate,
-  postLoginSyncTimeoutMs,
-  SYNC_SCRAPER_POLICY,
-} from '@/config/syncScraperPolicy';
+import { postLoginDetectTimeoutMs, SYNC_SCRAPER_POLICY } from '@/config/syncScraperPolicy';
+import { cancelDeviceGroupCount } from '@/lib/runAccountCount';
+import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import {
   detectGroupsAndBuildSyncPayload,
   LOGIN_PERSIST_TIMEOUT_MS,
@@ -15,7 +13,6 @@ import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import { hasActivePlatformSession } from '@/lib/platformSessions';
 import { buildAccountSyncResult } from '@/lib/accountDisplayMetrics';
 import { withNetworkRetry } from '@/lib/networkRetry';
-import { withTimeout } from '@/lib/withTimeout';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
@@ -54,6 +51,7 @@ export async function applyDailyMetricsAfterLogin(input: {
   syncMessage: string;
   deviceGroupCount: number;
   hasDailyToday: boolean;
+  countsReady: boolean;
 }> {
   const master = await fetchMasterGroupStatsForAccount({
     accountId: input.dbAccountId,
@@ -61,38 +59,59 @@ export async function applyDailyMetricsAfterLogin(input: {
     platform: input.account.platform,
   });
 
-  const syncPayload = await withNetworkRetry('Post-login sync', () =>
-    withTimeout(
-      detectGroupsAndBuildSyncPayload({
-        userId: input.userId,
-        account: input.account,
-        dbAccountId: input.dbAccountId,
-        brandStandardHint: master.brandMasterTotal,
-        skipPersist: true,
-        quickDeviceCount: true,
-      }),
-      postLoginSyncTimeoutMs(accountGroupEstimate(input.account)),
-      'Sync after login',
-    ),
-  );
+  let syncPayload: Awaited<ReturnType<typeof detectGroupsAndBuildSyncPayload>>;
+  try {
+    syncPayload = await withNetworkRetry('Post-login sync', () =>
+      withTimeout(
+        detectGroupsAndBuildSyncPayload({
+          userId: input.userId,
+          account: input.account,
+          dbAccountId: input.dbAccountId,
+          brandStandardHint: master.brandMasterTotal,
+          skipPersist: true,
+          quickDeviceCount: true,
+          freshLogin: true,
+        }),
+        postLoginDetectTimeoutMs(),
+        'Sync after login',
+      ),
+    );
+  } catch (error) {
+    if (error instanceof OperationTimeoutError) {
+      void cancelDeviceGroupCount({
+        sessionId: input.account.id,
+        platform: input.account.platform,
+        accountId: input.dbAccountId,
+      });
+    }
+    throw error;
+  }
 
   const syncedAt = new Date().toISOString();
+  const result: AccountSyncResult = {
+    ...syncPayload.result,
+    sessionStatus: 'valid',
+  };
   const updatedAccount: AccountBrandRow = {
     ...input.account,
-    ...syncPayload.result,
+    ...result,
     status: 'active',
     sessionStatus: 'valid',
-    isMisaligned: isRowMisaligned(syncPayload.result),
+    isMisaligned: isRowMisaligned(result),
     lastSyncAt: syncedAt,
   };
 
+  const deviceGroupCount = syncPayload.deviceGroupCount;
+  const countsReady = deviceGroupCount > 0 || result.groupsCurrent > 0;
+
   return {
     updatedAccount,
-    result: syncPayload.result,
+    result,
     syncedAt,
     syncMessage: syncPayload.syncMessage,
-    deviceGroupCount: syncPayload.deviceGroupCount,
+    deviceGroupCount,
     hasDailyToday: syncPayload.hasDailyToday,
+    countsReady,
   };
 }
 

@@ -5,12 +5,15 @@ import {
   applySyncCheckToGroup,
   runAccountSyncCheck,
 } from '@/lib/runAutoSyncAccount';
+import { sessionCheckTimeoutMs, syncDetectTimeoutMs } from '@/config/syncScraperPolicy';
 import { withTimeout } from '@/lib/withTimeout';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 
 const DELAY_BETWEEN_ACCOUNTS_MS = 4_000;
 const INITIAL_DELAY_MS = 8_000;
-const AUTO_SYNC_ACCOUNT_TIMEOUT_MS = 120_000;
+/** Probe 3s + detect 90s + buffer DB. */
+const AUTO_SYNC_ACCOUNT_TIMEOUT_MS =
+  sessionCheckTimeoutMs() + syncDetectTimeoutMs() + 15_000;
 
 interface UseAutoAccountSyncOptions {
   userId: string | null | undefined;

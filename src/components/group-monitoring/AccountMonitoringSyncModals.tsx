@@ -93,6 +93,7 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
     syncMessage,
     loginHintCode,
     loginModalEpoch,
+    postLoginCountsReady,
   } = sync;
 
   const alertMessage = resolveAlertMessage(checkError, t);
@@ -129,6 +130,7 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
         accountName={target?.account.accountName ?? ''}
         platform={target?.account.platform}
         postLogin
+        postLoginCountsReady={postLoginCountsReady}
         onClose={dismissScrapePrompt}
         onConfirm={confirmScrapePrompt}
       />

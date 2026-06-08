@@ -291,6 +291,8 @@ export const zh: Messages = {
       whatsappPhoneStep3: '输入右侧显示的配对码',
       rescrapeMessage: '再次抓取 {{account}}？',
       postLoginScrapeMessage: '登录成功，设备群组与管理员数已更新。是否立即抓取并写入数据库？',
+      postLoginScrapePendingMessage:
+        '登录成功，但未能及时读取设备群组数 — 请运行抓取以刷新。是否立即抓取并写入数据库？',
       scrapeProgressHint: '后台抓取中，表格数字会更新。',
       scraperFailed: '抓取失败，请重试。',
       scraperNoGroups: '未找到群组。',

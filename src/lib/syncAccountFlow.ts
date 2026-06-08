@@ -48,6 +48,8 @@ export async function completeSyncAfterLiveSession(input: {
   assumeSessionValid?: boolean;
   /** Setelah login QR WA — count cepat lalu modal Scrape now / Later. */
   quickDeviceCount?: boolean;
+  /** Baru login QR — jangan invalidate session jika count gagal. */
+  freshLogin?: boolean;
 }): Promise<SyncSuccessPayload> {
   if (!input.skipPersist) {
     const hasSession = await hasActivePlatformSession(input.dbAccountId);
@@ -84,26 +86,36 @@ export async function completeSyncAfterLiveSession(input: {
     brandStandard,
     assumeSessionValid: input.assumeSessionValid,
     quickDeviceCount: input.quickDeviceCount,
+    freshLogin: input.freshLogin,
     skipMergeDeviceGroups: input.quickDeviceCount,
   });
 
   let result = metrics.result;
 
   if (!metrics.device.valid && isDeviceSessionDeadMessage(metrics.device.message)) {
-    const deviceMsg = metrics.device.message ?? 'device_not_connected';
-    await markPlatformSessionInvalid(input.dbAccountId, deviceMsg, input.account.platform);
-    await recordSessionActivityStatus({
-      accountId: input.dbAccountId,
-      platform: input.account.platform,
-      sessionStatus: 'logout',
-      message: deviceMsg,
-    });
-    result = await invalidSessionMetricsFromDaily({
-      accountId: input.dbAccountId,
-      brand: input.account.brandName,
-      platform: input.account.platform,
-      brandStandard,
-    });
+    if (input.freshLogin) {
+      result = {
+        ...result,
+        sessionStatus: 'valid',
+        groupsCurrent: input.account.groupsCurrent ?? result.groupsCurrent,
+        adminCurrent: input.account.adminCurrent ?? result.adminCurrent,
+      };
+    } else {
+      const deviceMsg = metrics.device.message ?? 'device_not_connected';
+      await markPlatformSessionInvalid(input.dbAccountId, deviceMsg, input.account.platform);
+      await recordSessionActivityStatus({
+        accountId: input.dbAccountId,
+        platform: input.account.platform,
+        sessionStatus: 'logout',
+        message: deviceMsg,
+      });
+      result = await invalidSessionMetricsFromDaily({
+        accountId: input.dbAccountId,
+        brand: input.account.brandName,
+        platform: input.account.platform,
+        brandStandard,
+      });
+    }
   }
 
   const activeRows = await fetchActivePlatformSessions(input.dbAccountId);

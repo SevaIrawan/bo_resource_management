@@ -11,15 +11,10 @@ export interface LiveSessionCheckInput {
   skipWarmProbe?: boolean;
 }
 
-/**
- * Session hidup di device — warm + probe (sama dengan Sync).
- */
+/** Session hidup di device — probe cepat valid/invalid (≤3s). */
 export async function requireLiveDeviceSession(
   input: LiveSessionCheckInput,
-): Promise<
-  | { ok: true }
-  | { ok: false; message: string; warmPending?: boolean; shouldInvalidate?: boolean }
-> {
+): Promise<{ ok: true } | { ok: false; message: string; shouldInvalidate?: boolean }> {
   if (!window.electronAPI?.isElectron) {
     return { ok: false, message: 'SCRAPER_DESKTOP_REQUIRED' };
   }
@@ -37,10 +32,6 @@ export async function requireLiveDeviceSession(
 
   if (gate.ok) {
     return { ok: true };
-  }
-
-  if (gate.kind === 'warm_pending') {
-    return { ok: false, message: 'SESSION_WARM_PENDING', warmPending: true, shouldInvalidate: false };
   }
 
   return {

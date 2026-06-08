@@ -151,7 +151,11 @@ export function applySyncResultToGroup(
   group: AccountBrandGroup,
   accountId: string,
   result: AccountSyncResult,
-  options?: { masterTotal?: number; lastSyncAt?: string | null },
+  options?: {
+    masterTotal?: number;
+    lastSyncAt?: string | null;
+    preserveActionProcess?: boolean;
+  },
 ): AccountBrandGroup {
   const accounts = group.accounts.map((account) => {
     if (account.id !== accountId) return account;
@@ -168,7 +172,7 @@ export function applySyncResultToGroup(
       adminCurrent: result.adminCurrent,
       adminTotal: result.adminTotal,
       sessionStatus: result.sessionStatus,
-      actionProcess: null,
+      actionProcess: options?.preserveActionProcess ? account.actionProcess : null,
       syncState: 'synced' as const,
       isMisaligned,
       lastSyncAt,

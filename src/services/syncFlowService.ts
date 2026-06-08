@@ -2,11 +2,7 @@
  * Sync / session-column routing — acuan logic_sync_scraper.txt + sessionColumnFlowSpec.
  * Satu modul: routing INVALID/VALID, probe device, payload sync.
  */
-import {
-  accountGroupEstimate,
-  manualSyncTimeoutMs,
-  SYNC_SCRAPER_POLICY,
-} from '@/config/syncScraperPolicy';
+import { syncDetectTimeoutMs, SYNC_SCRAPER_POLICY } from '@/config/syncScraperPolicy';
 import { todayScrapeDate } from '@/lib/accountMonitoringEngine';
 import {
   fetchHasDailyData,
@@ -24,6 +20,7 @@ import {
   buildLogoutMetricsForUserAction,
   invalidateUserSessionOnDeviceFailure,
 } from '@/lib/userActionSession';
+import { cancelDeviceGroupCount } from '@/lib/runAccountCount';
 import { withNetworkRetry } from '@/lib/networkRetry';
 import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
@@ -68,7 +65,6 @@ export async function checkDeviceSessionForValidColumn(input: {
   dbAccountId: string;
   action: SessionColumnAction;
   hasDailyToday?: boolean;
-  groupEstimate?: number;
 }): Promise<DeviceSessionCheckResult> {
   const gate = await verifyUserSessionForAction({
     sessionId: input.sessionId,
@@ -76,7 +72,6 @@ export async function checkDeviceSessionForValidColumn(input: {
     dbAccountId: input.dbAccountId,
     mode: input.action === 'run' ? 'scrape' : 'sync',
     hasDaily: input.hasDailyToday,
-    groupEstimate: input.groupEstimate,
   });
 
   if (gate.ok) {
@@ -111,6 +106,7 @@ export async function detectGroupsAndBuildSyncPayload(input: {
   brandStandardHint: number;
   skipPersist?: boolean;
   quickDeviceCount?: boolean;
+  freshLogin?: boolean;
 }): Promise<SyncSuccessPayload> {
   return completeSyncAfterLiveSession({
     userId: input.userId,
@@ -120,6 +116,7 @@ export async function detectGroupsAndBuildSyncPayload(input: {
     skipPersist: input.skipPersist,
     assumeSessionValid: true,
     quickDeviceCount: input.quickDeviceCount,
+    freshLogin: input.freshLogin,
   });
 }
 
@@ -228,15 +225,12 @@ export async function executeSyncCheck(input: {
 
   await backfillPlatformSessionIfNeeded({ userId, account, dbAccountId });
 
-  const groupEstimate = accountGroupEstimate(account);
-
   const deviceCheck = await checkDeviceSessionForValidColumn({
     sessionId: account.id,
     platform: account.platform,
     dbAccountId,
     action: 'sync',
     hasDailyToday: hasDaily,
-    groupEstimate,
   });
 
   if (!deviceCheck.ok) {
@@ -271,7 +265,7 @@ export async function executeSyncCheck(input: {
           brandStandardHint: brandX,
           quickDeviceCount: true,
         }),
-        manualSyncTimeoutMs(groupEstimate),
+        syncDetectTimeoutMs(),
         'Manual sync',
       ),
     );
@@ -300,8 +294,15 @@ export async function executeSyncCheck(input: {
       updatedAccount,
     };
   } catch (error) {
-    const code = error instanceof OperationTimeoutError ? 'SYNC_TIMED_OUT' : 'SYNC_FAILED';
-    return { kind: 'error', code };
+    if (error instanceof OperationTimeoutError) {
+      void cancelDeviceGroupCount({
+        sessionId: account.id,
+        platform: account.platform,
+        accountId: dbAccountId,
+      });
+      return { kind: 'error', code: 'SYNC_TIMED_OUT' };
+    }
+    return { kind: 'error', code: 'SYNC_FAILED' };
   }
 }
 

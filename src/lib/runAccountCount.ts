@@ -11,13 +11,30 @@ export interface DeviceGroupCountResult {
   message?: string;
 }
 
+export async function cancelDeviceGroupCount(input: {
+  sessionId: string;
+  platform: Platform;
+  accountId: string;
+}): Promise<void> {
+  const api = window.electronAPI?.scraper?.cancelCount;
+  if (!api) return;
+
+  const sessionId = await resolveDeviceSessionId({
+    sessionId: input.sessionId,
+    platform: input.platform,
+    accountId: input.accountId,
+  });
+
+  await api({ sessionId, platform: input.platform }).catch(() => undefined);
+}
+
 export async function countDeviceGroups(
   input: {
     sessionId: string;
     platform: Platform;
     accountId: string;
   },
-  options?: { quick?: boolean },
+  options?: { quick?: boolean; reuseLiveLogin?: boolean },
 ): Promise<DeviceGroupCountResult> {
   const api = window.electronAPI?.scraper?.countGroups;
   if (!api) {
@@ -42,6 +59,7 @@ export async function countDeviceGroups(
       platform: input.platform,
       storedSessionString,
       quick: options?.quick,
+      reuseLiveLogin: options?.reuseLiveLogin,
     });
   } catch (error) {
     return {

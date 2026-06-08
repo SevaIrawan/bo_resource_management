@@ -1,6 +1,15 @@
 /** Target operasional: akun dengan ribuan grup (hingga ~3000). */
 export const DEVICE_GROUP_TARGET_MAX = 3000;
 
+/** Cek session valid/invalid — 1 akun, getState saja; tidak baca daftar grup; tidak skala Y/X. */
+export const SESSION_CHECK_TIMEOUT_MS = 3_000;
+
+/** Post-login detect total grup — satu pass store; tidak skala jumlah grup. */
+export const POST_LOGIN_DETECT_TIMEOUT_MS = 90_000;
+
+/** Setelah QR ready — store biasanya sudah siap; tunggu pendek saja. */
+export const QUICK_COUNT_STORE_WAIT_MS = 20_000;
+
 /** Batas aman daftar grup dari store WA Web (satu pass di browser). */
 export const WA_STORE_GROUP_LIST_CAP = 6000;
 
@@ -30,7 +39,8 @@ function scaledMs(
   return Math.min(maxMs, baseMs + est * perGroupMs);
 }
 
-export function countGroupsTimeoutMs(estimate = 0): number {
+export function countGroupsTimeoutMs(estimate = 0, quick = false): number {
+  if (quick) return POST_LOGIN_DETECT_TIMEOUT_MS;
   return scaledMs(COUNT_BASE_MS, COUNT_PER_GROUP_MS, COUNT_MAX_MS, estimate);
 }
 
@@ -44,6 +54,10 @@ export function waQrBootstrapDeadlineMs(estimate = 0): number {
 
 export function waQrScanWaitMs(estimate = 0): number {
   return scaledMs(120_000, 40, 1_200_000, estimate);
+}
+
+export function waLoginConfirmingTimeoutMs(_estimate = 0): number {
+  return 180_000;
 }
 
 export function waDiskRestoreTimeoutMs(estimate = 0): number {

@@ -41,11 +41,11 @@ const checks = [
       tgPy.includes('get_scrape_progress'),
   },
   {
-    name: 'Timeout sync/login scale (renderer)',
+    name: 'Detect sync timeout tetap (bukan skala grup)',
     ok:
-      scalePolicy.includes('deviceGroupTargetMax: 3000') &&
-      scaleRenderer.includes('postLoginSyncTimeoutMs') &&
-      syncFlow.includes('manualSyncTimeoutMs'),
+      scalePolicy.includes('syncDetect') &&
+      syncFlow.includes('syncDetectTimeoutMs') &&
+      loginFlow.includes('postLoginDetectTimeoutMs'),
   },
   {
     name: 'WA quick count + runPooled full admin',

@@ -22,6 +22,9 @@ import {
   isAccountInLoginGrace,
   markAccountLoginGrace,
 } from '@/lib/sessionRealtimePolicy';
+import { postLoginDetectTimeoutMs } from '@/config/syncScraperPolicy';
+import { recordSessionActivityStatus } from '@/lib/recordSessionActivity';
+import { markPlatformSessionSynced } from '@/lib/platformSessions';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
 import {
@@ -33,7 +36,6 @@ import type { Platform } from '@/types/database';
 import {
   applyDailyMetricsAfterLogin,
   fetchBrandIdForAccount,
-  LOGIN_GRACE_MS,
   persistSessionAfterLogin,
   recoverLoginMetricsIfPersisted,
   resolvePostLoginModalStep,
@@ -120,6 +122,7 @@ export function useAccountSyncFlow({
   const [processingAccountId, setProcessingAccountId] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<'sync' | 'scraper' | null>(null);
   const [postLoginGraceAccountId, setPostLoginGraceAccountId] = useState<string | null>(null);
+  const [postLoginCountsReady, setPostLoginCountsReady] = useState(true);
   const [step, setStep] = useState<SyncFlowStep>('idle');
   const [target, setTarget] = useState<SyncTarget | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
@@ -268,7 +271,11 @@ export function useAccountSyncFlow({
       groupId: string,
       accountId: string,
       result: AccountSyncResult,
-      meta?: { masterTotal?: number; lastSyncAt?: string | null },
+      meta?: {
+        masterTotal?: number;
+        lastSyncAt?: string | null;
+        preserveActionProcess?: boolean;
+      },
     ) => {
       const snapshotPending: Array<{
         account: AccountBrandRow;
@@ -292,6 +299,7 @@ export function useAccountSyncFlow({
           const next = applySyncResultToGroup(g, accountId, result, {
             masterTotal: meta?.masterTotal,
             lastSyncAt: meta?.lastSyncAt,
+            preserveActionProcess: meta?.preserveActionProcess,
           });
           return rebuildGroupMetrics(next);
         });
@@ -498,6 +506,7 @@ export function useAccountSyncFlow({
           await applyResult(groupId, account.id, outcome.result, {
             masterTotal: outcome.masterJoined,
             lastSyncAt: outcome.syncedAt,
+            preserveActionProcess: true,
           });
           await recordSyncCheckActivity({ dbAccountId: outcome.dbAccountId, account, outcome });
 
@@ -673,6 +682,7 @@ export function useAccountSyncFlow({
         await applyResult(groupId, account.id, outcome.result, {
           masterTotal: outcome.masterJoined,
           lastSyncAt: outcome.scrapedAt,
+          preserveActionProcess: true,
         });
 
         if (outcome.brandX > 0) {
@@ -829,17 +839,17 @@ export function useAccountSyncFlow({
     const savedIntent = loginIntent;
     setLoginIntent(null);
     setRowProcessing(groupId, account.id, savedIntent === 'scraper' ? 'scraper' : 'sync');
+    markAccountLoginGrace(account.id, POST_LOGIN_GRACE_MS + postLoginDetectTimeoutMs());
+    setPostLoginGraceAccountId(account.id);
+    const postLoginGraceTotalMs = POST_LOGIN_GRACE_MS + postLoginDetectTimeoutMs();
+    window.setTimeout(() => {
+      setPostLoginGraceAccountId((current) => (current === account.id ? null : current));
+    }, postLoginGraceTotalMs);
+    updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'valid'));
+    setStep('idle');
 
     let persistedToDb = false;
     let dbAccountId = '';
-
-    const armPostLoginGrace = () => {
-      markAccountLoginGrace(account.id, POST_LOGIN_GRACE_MS);
-      setPostLoginGraceAccountId(account.id);
-      window.setTimeout(() => {
-        setPostLoginGraceAccountId((current) => (current === account.id ? null : current));
-      }, LOGIN_GRACE_MS);
-    };
 
     const startPostLoginScrape = (updatedAccount: AccountBrandRow) => {
       void runScrapeInBackground(
@@ -851,13 +861,20 @@ export function useAccountSyncFlow({
     try {
       dbAccountId = await persistSessionAfterLogin({ userId, account });
       persistedToDb = true;
-      armPostLoginGrace();
-      setStep('idle');
+      await markPlatformSessionSynced(dbAccountId);
+      await recordSessionActivityStatus({
+        accountId: dbAccountId,
+        platform: account.platform,
+        sessionStatus: 'valid',
+        eventType: 'login_success',
+        message: 'Login QR success',
+      });
 
       const metrics = await applyDailyMetricsAfterLogin({ userId, account, dbAccountId });
       await applyResult(groupId, account.id, metrics.result, {
         masterTotal: undefined,
         lastSyncAt: metrics.syncedAt,
+        preserveActionProcess: true,
       });
 
       const updatedAccount = metrics.updatedAccount;
@@ -870,6 +887,7 @@ export function useAccountSyncFlow({
       }
 
       clearRowProcessing(groupId, account.id);
+      setPostLoginCountsReady(metrics.countsReady);
       setStep(
         await resolvePostLoginModalStep({
           account,
@@ -895,6 +913,7 @@ export function useAccountSyncFlow({
         await applyResult(groupId, account.id, recovered.result, {
           masterTotal: recovered.masterJoined,
           lastSyncAt: recovered.syncedAt,
+          preserveActionProcess: true,
         });
         clearRowProcessing(groupId, account.id);
         setStep('idle');
@@ -904,6 +923,7 @@ export function useAccountSyncFlow({
           return;
         }
 
+        setPostLoginCountsReady(false);
         setStep(
           await resolvePostLoginModalStep({
             account,
@@ -928,6 +948,7 @@ export function useAccountSyncFlow({
     setRowProcessing,
     showSyncError,
     target,
+    updateGroups,
     userId,
   ]);
 
@@ -970,6 +991,7 @@ export function useAccountSyncFlow({
     processingDbAccountId,
     processingAction,
     postLoginGraceAccountId,
+    postLoginCountsReady,
     step,
     target,
     checkError,

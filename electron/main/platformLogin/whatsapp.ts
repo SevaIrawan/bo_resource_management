@@ -21,6 +21,10 @@ import {
   waQrScanWaitMs,
   waSessionLockWaitMs,
 } from '../scraper/deviceGroupScale';
+import {
+  classifyWaSocketState,
+  waLinkProbeMessage,
+} from '../scraper/whatsappLinkState';
 
 const { Client, LocalAuth } = pkg;
 
@@ -595,17 +599,24 @@ function runWhatsAppLoginOperation<T>(sessionId: string, fn: () => Promise<T>): 
   return withWaSessionLock(sessionId, fn);
 }
 
+interface WaClientOpenOptions {
+  storeWaitMs?: number;
+  readyTimeoutMs?: number;
+}
+
 async function ensureWhatsAppClientInner(
   sessionId: string,
+  options?: WaClientOpenOptions,
 ): Promise<InstanceType<typeof Client>> {
-  const readyTimeoutMs = waQrScanWaitMs(3000);
+  const readyTimeoutMs = options?.readyTimeoutMs ?? waQrScanWaitMs(3000);
+  const storeWaitMs = options?.storeWaitMs;
   const existing = sessions.get(sessionId);
   if (existing) {
     try {
       const state = await existing.client.getState();
       if (state === 'CONNECTED') {
         existing.loggedIn = true;
-        await waitForWhatsAppStoreReady(existing.client);
+        await waitForWhatsAppStoreReady(existing.client, storeWaitMs);
         return existing.client;
       }
       if (existing.loggedIn) {
@@ -633,7 +644,7 @@ async function ensureWhatsAppClientInner(
     const state = await client.getState();
     if (state === 'CONNECTED') {
       sessions.set(sessionId, { client, mode: 'qr', loggedIn: true });
-      await waitForWhatsAppStoreReady(client);
+      await waitForWhatsAppStoreReady(client, storeWaitMs);
       return client;
     }
   } catch {
@@ -641,7 +652,7 @@ async function ensureWhatsAppClientInner(
   }
 
   const readyClient = await readyPromise;
-  await waitForWhatsAppStoreReady(readyClient);
+  await waitForWhatsAppStoreReady(readyClient, storeWaitMs);
   return readyClient;
 }
 
@@ -652,9 +663,10 @@ async function ensureWhatsAppClientInner(
 export async function withWhatsAppClient<T>(
   sessionId: string,
   fn: (client: InstanceType<typeof Client>) => Promise<T>,
+  options?: WaClientOpenOptions,
 ): Promise<T> {
   return withWaSessionLock(sessionId, async () => {
-    const client = await ensureWhatsAppClientInner(sessionId);
+    const client = await ensureWhatsAppClientInner(sessionId, options);
     if (!client) {
       throw new Error('WA_CLIENT_NOT_READY: WhatsApp client could not be opened. Log in again.');
     }
@@ -806,13 +818,106 @@ export async function startWhatsAppPhoneLogin(
   });
 }
 
+function waStateProbeResult(state: string | null): { valid: boolean; message: string } {
+  const link = classifyWaSocketState(state);
+  const message = waLinkProbeMessage(link, state);
+  return { valid: link === 'linked', message };
+}
+
+/**
+ * Cek session WA — 1 akun, `getState()` saja.
+ * Boleh buka Chrome minimal; tidak baca daftar grup; tidak `waitForWhatsAppStoreReady`.
+ */
+async function probeWhatsAppSessionLinkedInner(
+  sessionId: string,
+): Promise<{ valid: boolean; message: string }> {
+  const existing = sessions.get(sessionId);
+  if (existing) {
+    try {
+      const state = await existing.client.getState();
+      return waStateProbeResult(state);
+    } catch {
+      await destroyWhatsAppSession(sessionId);
+    }
+  }
+
+  if (!hasWhatsAppDiskAuth(sessionId)) {
+    return { valid: false, message: 'WA_NOT_CONNECTED' };
+  }
+
+  const client = createClient(sessionId, 'qr');
+  attachSessionIntegrityHandlers(sessionId, client);
+  sessions.set(sessionId, { client, mode: 'qr', forwardQrToUi: false });
+  try {
+    await withWaBrowserSlot(() => client.initialize());
+    const state = await client.getState();
+    return waStateProbeResult(state);
+  } catch (error) {
+    return {
+      valid: false,
+      message: error instanceof Error ? error.message : 'WA session check failed',
+    };
+  } finally {
+    await destroyWhatsAppSession(sessionId);
+  }
+}
+
+export function probeWhatsAppSessionLinked(
+  sessionId: string,
+): Promise<{ valid: boolean; message: string }> {
+  return runWhatsAppLoginOperation(sessionId, () => probeWhatsAppSessionLinkedInner(sessionId));
+}
+
 export function getWhatsAppSessionClient(sessionId: string) {
   return sessions.get(sessionId)?.client ?? null;
+}
+
+/**
+ * Pakai client WA yang baru login (masih di memori) — tanpa cold-boot / initialize ulang.
+ */
+export async function withLiveWhatsAppLoginClient<T>(
+  sessionId: string,
+  fn: (client: InstanceType<typeof Client>) => Promise<T>,
+): Promise<T> {
+  return withWaSessionLock(sessionId, async () => {
+    const entry = sessions.get(sessionId);
+    if (!entry) {
+      throw new Error('WA_CLIENT_NOT_READY: No live WhatsApp session after login.');
+    }
+
+    const state = await entry.client.getState();
+    if (state !== 'CONNECTED') {
+      throw new Error(`WA_NOT_CONNECTED: WhatsApp is not connected (${state ?? 'unknown'}).`);
+    }
+
+    entry.loggedIn = true;
+    return fn(entry.client);
+  });
 }
 
 /** Debug / audit: akun WA yang sedang punya client di memori (satu client per sessionId). */
 export function listActiveWhatsAppSessionIds(): string[] {
   return [...sessions.keys()];
+}
+
+/** Cari client CONNECTED di memori — hindari mismatch sessionId UI vs LocalAuth. */
+export async function resolveLiveWhatsAppSessionId(preferredId: string): Promise<string | null> {
+  const candidates = [preferredId, ...listActiveWhatsAppSessionIds().filter((id) => id !== preferredId)];
+
+  for (const id of candidates) {
+    const entry = sessions.get(id);
+    if (!entry) continue;
+    try {
+      if ((await entry.client.getState()) === 'CONNECTED') {
+        entry.loggedIn = true;
+        return id;
+      }
+    } catch {
+      // coba kandidat berikutnya
+    }
+  }
+
+  return null;
 }
 
 export function restoreWhatsAppFromDiskForLogin(

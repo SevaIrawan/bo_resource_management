@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       phone?: string;
       skipDiskRestore?: boolean;
       groupEstimate?: number;
+      alreadyPrepared?: boolean;
     }) => ipcRenderer.invoke('platform-login:start', payload),
     submit: (payload: {
       sessionId: string;
@@ -74,8 +75,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) => ipcRenderer.invoke('platform-login:submit', payload),
     cancel: (sessionId: string, platform?: Platform) =>
       ipcRenderer.invoke('platform-login:cancel', sessionId, platform),
-    release: (sessionId: string, options?: { purgeWaDisk?: boolean }) =>
-      ipcRenderer.invoke('platform-login:release', sessionId, options),
+    release: (
+      sessionId: string,
+      options?: {
+        purgeWaDisk?: boolean;
+        groupEstimate?: number;
+        fast?: boolean;
+        urgent?: boolean;
+      },
+    ) => ipcRenderer.invoke('platform-login:release', sessionId, options),
     purgeWaAuth: (sessionId: string) =>
       ipcRenderer.invoke('platform-login:purge-wa-auth', sessionId),
     tryRestore: (payload: {
@@ -129,6 +137,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       platform: Platform;
       storedSessionString?: string | null;
     }) => ipcRenderer.invoke('scraper:run', payload),
+    cancel: (payload: { sessionId: string; platform: Platform }) =>
+      ipcRenderer.invoke('scraper:cancel', payload),
     countGroups: (payload: {
       sessionId: string;
       platform: Platform;

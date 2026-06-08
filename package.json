@@ -1,6 +1,6 @@
 {
   "name": "resource-management",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "private": true,
   "description": "Resource Management Desktop — Group Monitoring Dashboard",
   "author": "Seva Irawan <tanjungbambangirawan85@gmail.com>",
@@ -27,6 +27,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "validate:session-flow": "node scripts/validate-session-column-flow.mjs",
+    "validate:master-reference": "node scripts/audit-project-master-reference.mjs",
     "validate:sync-scraper-spec": "node scripts/validate-sync-scraper-spec.mjs",
     "validate:multi-account-wa": "node scripts/validate-multi-account-wa.mjs",
     "validate:telegram-login": "node scripts/validate-telegram-login-flow.mjs",

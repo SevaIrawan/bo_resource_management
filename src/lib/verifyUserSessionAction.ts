@@ -27,6 +27,7 @@ export async function verifyUserSessionForAction(input: {
   dbAccountId: string;
   mode: UserSessionGateMode;
   hasDaily?: boolean;
+  groupEstimate?: number;
 }): Promise<VerifyUserSessionResult> {
   const result = await checkUserActionDeviceSession(input);
 

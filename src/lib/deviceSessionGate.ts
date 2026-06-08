@@ -1,3 +1,7 @@
+import {
+  deviceSessionProbeTimeoutMs,
+  deviceSessionWarmTimeoutMs,
+} from '@/config/syncScraperPolicy';
 import { isProbeSkipMessage } from '@/lib/persistLoginSession';
 import { isDeviceBusyMessage, isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
 import { hasStoredPlatformSession } from '@/lib/sessionAvailability';
@@ -6,9 +10,6 @@ import { tryWarmPlatformSession } from '@/lib/warmPlatformSession';
 import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import type { Platform } from '@/types/database';
 import type { SessionUiStatus } from '@/types/accountMonitoringUi';
-
-export const DEVICE_WARM_MS = 45_000;
-export const DEVICE_PROBE_MS = 45_000;
 
 export type DeviceSessionGateMode = 'sync' | 'scrape';
 
@@ -27,11 +28,13 @@ async function warmDevice(input: {
   sessionId: string;
   platform: Platform;
   accountId: string;
+  groupEstimate?: number;
 }): Promise<boolean> {
   if (!window.electronAPI?.platformLogin?.tryRestore) return false;
+  const warmMs = deviceSessionWarmTimeoutMs(input.groupEstimate ?? 0);
   return withTimeout(
     tryWarmPlatformSession(input),
-    DEVICE_WARM_MS,
+    warmMs,
     'Restore device session',
   ).catch(() => false);
 }
@@ -40,14 +43,16 @@ async function probeDeviceStrict(input: {
   sessionId: string;
   platform: Platform;
   accountId: string;
+  groupEstimate?: number;
 }): Promise<{ valid: boolean; message?: string }> {
+  const probeMs = deviceSessionProbeTimeoutMs(input.groupEstimate ?? 0);
   try {
     return await withTimeout(
       probePlatformSession({
         ...input,
         strict: true,
       }),
-      DEVICE_PROBE_MS,
+      probeMs,
       'Session check',
     );
   } catch (error) {
@@ -76,6 +81,7 @@ async function probeThenWarm(input: {
   sessionId: string;
   platform: Platform;
   accountId: string;
+  groupEstimate?: number;
 }): Promise<{ valid: boolean; message?: string }> {
   let probe = await probeDeviceStrict(input);
   if (probe.valid) return probe;
@@ -104,6 +110,7 @@ async function gateUserActionSession(
     platform: Platform;
     accountId: string;
     skipWarmProbe?: boolean;
+    groupEstimate?: number;
   },
   hasStored: boolean,
   _mode: DeviceSessionGateMode,
@@ -138,6 +145,7 @@ export async function gateDeviceSession(
     uiSessionStatus: SessionUiStatus;
     hasDaily?: boolean;
     skipWarmProbe?: boolean;
+    groupEstimate?: number;
   },
   mode: DeviceSessionGateMode = 'scrape',
 ): Promise<DeviceSessionGateResult> {

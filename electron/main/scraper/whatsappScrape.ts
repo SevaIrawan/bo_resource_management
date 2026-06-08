@@ -19,6 +19,7 @@ import {
   WA_GROUP_PROCESS_CONCURRENCY,
   withScrapeTimeout,
 } from './deviceGroupScale';
+import { throwIfScrapeCancelled } from './scrapeCancel';
 
 const { Client } = pkg;
 
@@ -101,6 +102,7 @@ async function runWhatsAppScrapeInner(sessionId: string): Promise<{
 
       let completed = 0;
       const scraped = await runPooled(scrapeIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId) => {
+        throwIfScrapeCancelled(sessionId);
         const chat = await client.getChatById(groupId);
         if (!chat || !isWhatsAppGroupChat(chat)) return null;
 

@@ -1,4 +1,4 @@
-import { SYNC_SCRAPER_POLICY } from '@/config/syncScraperPolicy';
+import { accountGroupEstimate } from '@/config/syncScraperPolicy';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 export interface ScrapeBarDisplay {
@@ -12,11 +12,7 @@ export function scrapeProgressEstimateTotal(metrics: {
   groupsCurrent?: number | null;
   groupsTotal?: number | null;
 }): number {
-  return Math.max(
-    SYNC_SCRAPER_POLICY.accountGroupEstimateFloor,
-    metrics.groupsCurrent ?? 0,
-    metrics.groupsTotal ?? 0,
-  );
+  return accountGroupEstimate(metrics);
 }
 
 /** logic_sync_scraper.txt baris 16 — RUNNING: bar + X/Y + marquee. */

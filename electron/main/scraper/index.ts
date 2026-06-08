@@ -9,6 +9,13 @@ import {
 import { validateTelegramSession, validateWhatsAppSession } from './validateSession';
 import { normalizeScrapeResult } from './scrapeOutput';
 import { runWhatsAppScrape } from './whatsappScrape';
+import {
+  clearActiveScrape,
+  registerActiveScrape,
+  requestScrapeCancel,
+  ScrapeCancelledError,
+} from './scrapeCancel';
+import { cancelTelegramScrape } from './telegramScrape';
 
 type Platform = 'whatsapp' | 'telegram';
 
@@ -46,6 +53,8 @@ export function registerScraperIpc() {
       throw new Error('SCRAPER_GLOBAL_BUSY: Another scrape is already running on this PC.');
     }
 
+    registerActiveScrape(payload.sessionId);
+
     const work = (async () => {
     const raw =
       payload.platform === 'telegram'
@@ -81,10 +90,27 @@ export function registerScraperIpc() {
     scrapeRunInFlight = work;
     try {
       return await work;
+    } catch (error) {
+      if (error instanceof ScrapeCancelledError) {
+        throw new Error('SCRAPER_CANCELLED');
+      }
+      throw error;
     } finally {
+      clearActiveScrape(payload.sessionId);
       if (scrapeRunInFlight === work) scrapeRunInFlight = null;
     }
   });
+
+  ipcMain.handle(
+    'scraper:cancel',
+    async (_event, payload: { sessionId: string; platform: Platform }) => {
+      const signalled = requestScrapeCancel(payload.sessionId);
+      if (payload.platform === 'telegram') {
+        await cancelTelegramScrape(payload.sessionId).catch(() => undefined);
+      }
+      return { ok: signalled };
+    },
+  );
 
   ipcMain.handle('scraper:count-groups', async (_event, payload: CountGroupsPayload) => {
     if (payload.platform === 'telegram') {

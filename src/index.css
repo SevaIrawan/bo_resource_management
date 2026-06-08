@@ -2054,6 +2054,16 @@
     background: rgba(255, 255, 255, 0.05);
   }
 
+  .brand-card-action-btn--cancel-run {
+    color: var(--color-danger, #f87171);
+    border-color: color-mix(in srgb, var(--color-danger, #f87171) 35%, transparent);
+  }
+
+  .brand-card-action-btn--cancel-run:hover {
+    color: var(--color-danger, #f87171);
+    background: color-mix(in srgb, var(--color-danger, #f87171) 12%, transparent);
+  }
+
   .brand-card-action-btn--slot {
     border-style: dashed;
     color: var(--color-text-muted);

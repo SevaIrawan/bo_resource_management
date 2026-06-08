@@ -38,7 +38,7 @@ export function AccountBrandCardList({
   const [removeSaving, setRemoveSaving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
-  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, getScrapeProgress } =
+  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, requestCancelScrape, getScrapeProgress } =
     sync;
 
   async function handleAddBrand(brandName: string) {
@@ -150,6 +150,11 @@ export function AccountBrandCardList({
               if (!canOperatePlatform) return;
               const account = group.accounts.find((row) => row.id === accountId);
               if (account) void handleRunScraper(group.id, account);
+            }}
+            onCancelScrape={(accountId) => {
+              if (!canOperatePlatform) return;
+              const account = group.accounts.find((row) => row.id === accountId);
+              if (account) requestCancelScrape(group.id, account);
             }}
             checkingAccountId={
               processingAction === 'sync' ? processingAccountId : null

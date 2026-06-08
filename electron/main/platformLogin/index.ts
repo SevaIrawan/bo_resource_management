@@ -29,6 +29,8 @@ interface StartPayload {
   skipDiskRestore?: boolean;
   /** Perkiraan jumlah grup — skala timeout bootstrap/scan QR (hingga ~3000). */
   groupEstimate?: number;
+  /** Sudah lewat prepareDeviceForPlatformLogin — hindari release/settle ganda. */
+  alreadyPrepared?: boolean;
 }
 
 interface SubmitPayload {
@@ -66,6 +68,7 @@ export function registerPlatformLoginIpc() {
         await startWhatsAppQrLogin(payload.sessionId, win, {
           skipDiskRestore: Boolean(payload.skipDiskRestore),
           groupEstimate: payload.groupEstimate ?? 0,
+          alreadyPrepared: Boolean(payload.alreadyPrepared),
         });
       }
       return { ok: true };
@@ -119,9 +122,21 @@ export function registerPlatformLoginIpc() {
 
   ipcMain.handle(
     'platform-login:release',
-    async (_event, sessionId: string, options?: { purgeWaDisk?: boolean }) => {
+    async (
+      _event,
+      sessionId: string,
+      options?: {
+        purgeWaDisk?: boolean;
+        groupEstimate?: number;
+        fast?: boolean;
+        urgent?: boolean;
+      },
+    ) => {
       await forceReleaseWhatsAppForLogin(sessionId, {
         purgeDisk: Boolean(options?.purgeWaDisk),
+        groupEstimate: options?.groupEstimate ?? 0,
+        fast: options?.fast,
+        urgent: options?.urgent,
       });
       await stopTelegramLogin(sessionId);
       return { ok: true };

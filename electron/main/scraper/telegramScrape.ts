@@ -6,6 +6,14 @@ import type { ScrapedGroupRow } from './index';
 
 const PROGRESS_POLL_MS = 400;
 
+export async function cancelTelegramScrape(sessionId: string): Promise<void> {
+  await ensureSidecarRunning();
+  await fetch(`${SIDECAR_URL}/telegram/scrape/cancel/${encodeURIComponent(sessionId)}`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => undefined);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -166,6 +174,11 @@ export async function runTelegramScrape(
   } finally {
     pollUntil.done = true;
     await pollTask.catch(() => undefined);
+  }
+
+  if (json.status === 'cancelled') {
+    emitScrapeProgress({ sessionId, phase: 'error', label: 'SCRAPER_CANCELLED' });
+    throw new Error('SCRAPER_CANCELLED');
   }
 
   if (json.status === 'error') {

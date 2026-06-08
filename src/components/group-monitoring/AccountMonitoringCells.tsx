@@ -14,6 +14,7 @@ import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { AccountBrandEmptySlot, AccountBrandRow } from '@/types/accountMonitoringUi';
 import { ScraperStatusMarquee } from '@/components/group-monitoring/ScraperStatusMarquee';
 import { resolveScrapeBarDisplay } from '@/lib/scrapeProgressDisplay';
+import { resolveAccountActionColumn } from '@/lib/accountActionColumn';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 export function PlatformBadge({ platform }: { platform: AccountBrandRow['platform'] }) {
@@ -94,6 +95,85 @@ function SessionColumnCell({
   }
 
   return <SessionBadge status={row.sessionStatus} />;
+}
+
+function ActionColumnCell({
+  row,
+  isPending,
+  operateLocked,
+  activeProcessIntent = null,
+  onCancelScrape,
+  onOpenGroupLinks,
+}: {
+  row: AccountBrandRow;
+  isPending: boolean;
+  operateLocked: boolean;
+  activeProcessIntent?: 'sync' | 'scraper' | null;
+  onCancelScrape?: () => void;
+  onOpenGroupLinks: () => void;
+}) {
+  const { t } = useLanguage();
+  const kind = resolveAccountActionColumn(row, activeProcessIntent);
+
+  if (isPending) {
+    return <span className="brand-account-slot-muted text-xs">—</span>;
+  }
+
+  if (kind === 'none') {
+    return null;
+  }
+
+  if (kind === 'proc-sync') {
+    return (
+      <span className="brand-action-process" aria-live="polite">
+        {t('groupMonitoring.accountCard.procSync')}
+      </span>
+    );
+  }
+
+  if (kind === 'proc-scraper') {
+    return (
+      <span className="brand-action-process" aria-live="polite">
+        {t('groupMonitoring.accountCard.procScraper')}
+      </span>
+    );
+  }
+
+  if (kind === 'cancel-run') {
+    if (operateLocked) {
+      return (
+        <PermissionLockedButton
+          variant="text"
+          className="brand-card-action-btn brand-card-action-btn--nowrap brand-card-action-btn--cancel-run"
+        >
+          {t('groupMonitoring.accountCard.cancelRun')}
+        </PermissionLockedButton>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        className="brand-card-action-btn brand-card-action-btn--nowrap brand-card-action-btn--cancel-run"
+        title={t('groupMonitoring.accountCard.cancelRunHint')}
+        onClick={() => onCancelScrape?.()}
+      >
+        {t('groupMonitoring.accountCard.cancelRun')}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="brand-card-action-btn brand-card-action-btn--nowrap"
+      disabled={isPending}
+      title={t('groupMonitoring.accountCard.groupLinkHint')}
+      onClick={onOpenGroupLinks}
+    >
+      {t('groupMonitoring.accountCard.groupLink')}
+    </button>
+  );
 }
 
 export function AdminProgress({ current, total }: { current: number; total: number }) {
@@ -286,24 +366,12 @@ function AccountRemoveSlotIcon({
   );
 }
 
-function ProcessActionLabel({ action }: { action: NonNullable<AccountBrandRow['actionProcess']> }) {
-  const { t } = useLanguage();
-  if (action === 'session_check') {
-    return null;
-  }
-  const label =
-    action === 'sync'
-      ? t('groupMonitoring.accountCard.procSync')
-      : t('groupMonitoring.accountCard.procScraper');
-
-  return <span className="brand-action-process">{label}</span>;
-}
-
 export function AccountTableRow({
   row,
   showAction = true,
   onSync,
   onRunScraper,
+  onCancelScrape,
   onRemoveFromSlot,
   canOperatePlatform = true,
   canManageStructure = true,
@@ -315,6 +383,7 @@ export function AccountTableRow({
   showAction?: boolean;
   onSync?: () => void;
   onRunScraper?: () => void;
+  onCancelScrape?: () => void;
   onRemoveFromSlot?: () => void;
   canOperatePlatform?: boolean;
   canManageStructure?: boolean;
@@ -328,6 +397,7 @@ export function AccountTableRow({
   const [linksViewMode, setLinksViewMode] = useState<GroupLinksViewMode>('adminMaster');
   const isPending = row.syncState === 'pending';
   const isProcessing = row.actionProcess !== null;
+  const activeProcessIntent = syncLoading ? 'sync' : scraperLoading ? 'scraper' : null;
 
   const operateLocked = !canOperatePlatform;
   const structureLocked = !canManageStructure;
@@ -416,19 +486,14 @@ export function AccountTableRow({
         {showAction ? (
           <td className="brand-col-cell brand-col-cell--action">
             <div className="brand-col-cell-inner">
-              {isProcessing ? (
-                <ProcessActionLabel action={row.actionProcess!} />
-              ) : (
-                <button
-                  type="button"
-                  className="brand-card-action-btn brand-card-action-btn--nowrap"
-                  disabled={isPending}
-                  title={t('groupMonitoring.accountCard.groupLinkHint')}
-                  onClick={() => setPickerOpen(true)}
-                >
-                  {t('groupMonitoring.accountCard.groupLink')}
-                </button>
-              )}
+              <ActionColumnCell
+                row={row}
+                isPending={isPending}
+                operateLocked={operateLocked}
+                activeProcessIntent={activeProcessIntent}
+                onCancelScrape={onCancelScrape}
+                onOpenGroupLinks={() => setPickerOpen(true)}
+              />
             </div>
           </td>
         ) : null}

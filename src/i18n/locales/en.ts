@@ -152,6 +152,8 @@ export const en = {
       groupsShort: 'short {{count}}',
       groupLink: 'Group link',
       groupLinkHint: 'Choose: all groups on this account, or admin status vs brand master list.',
+      cancelRun: 'Cancel Run',
+      cancelRunHint: 'Stop reading groups on this device',
       export: 'Export',
       addCardView: 'Add Card View',
       addBrandTitle: 'Add brand card',
@@ -227,6 +229,11 @@ export const en = {
       noDataMessage: 'No scrape data yet. Run scraper?',
       notNow: 'Later',
       scrapeNow: 'Run scraper',
+      cancelRunConfirmMessage:
+        'Stop reading groups on this device? Progress will not be saved to the database.',
+      cancelRunKeep: 'Keep running',
+      cancelRunConfirm: 'Cancel scrape',
+      scrapeCancelledMessage: 'Scrape cancelled. No data was saved.',
       successMessage: 'Synced.',
       ok: 'OK',
       checkFailed: 'Check failed. Try again.',
@@ -242,6 +249,8 @@ export const en = {
         'Scan OK — loading account on this PC (large group lists may take several minutes)…',
       loginConfirmingTimeout:
         '{{platform}} is still loading after scan. Large accounts can take up to 10 minutes — keep waiting, or close and tap Sync again.',
+      loginBackgroundTimedOut:
+        'Login took too long in the background. Tap Sync to open login again.',
       loginSaving: 'Saving session…',
       whatsappStep1: 'Open WhatsApp on your phone',
       whatsappStep2: 'Linked devices → Link a device',

@@ -1,21 +1,21 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-03  
-**Versi aplikasi:** `1.0.12` (lihat `package.json`)  
-**Status:** Produksi internal — desktop Windows untuk tim operasional perusahaan  
-**Rencana:** Installer macOS & Linux — [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) (prepare, belum rilis)
+**Versi aplikasi:** `1.0.13` (lihat `package.json`)  
+**Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
+**Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
 ---
 
 ## 1. Ringkasan
 
-**Resource Management** (tampilan: *Backend Operation*) adalah aplikasi **desktop Windows (Electron)** untuk memantau dan mengoperasikan banyak akun **WhatsApp** dan **Telegram** per brand: login platform, sync grup, scraper, ticket/issue, dan export Excel.
+**Resource Management** (brand UI: *Backend Operation* — `src/config/navigation.ts`) adalah aplikasi **desktop Electron (Windows, macOS, Linux)** untuk memantau dan mengoperasikan banyak akun **WhatsApp** dan **Telegram** per brand: login platform, sync grup, scraper, ticket/issue, dan export Excel.
 
 | Aspek | Keterangan |
 |--------|------------|
 | **Pengguna** | Tim internal perusahaan saja — **bukan** produk dijual ke pihak luar |
 | **Database** | Supabase (cloud), satu project organisasi |
-| **Distribusi** | Satu file installer `.exe`; config organisasi **terbundel** |
+| **Distribusi** | Installer per OS (`.exe` / `.dmg`+`.zip` / `.AppImage`) — lihat `RELEASE-CI.md` |
 | **Pembaruan kode** | **Auto-update** dari GitHub Releases → user **Restart** (tanpa install ulang manual) |
 | **Pembaruan data** | **Supabase Realtime** → dashboard tim ikut berubah saat DB di-update |
 

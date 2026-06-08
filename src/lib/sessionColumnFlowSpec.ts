@@ -5,7 +5,7 @@ import type { SessionUiStatus } from '@/types/accountMonitoringUi';
  * Dipakai dokumentasi + audit; implementasi di `syncFlowService.ts` + `useAccountSyncFlow.ts`.
  *
  * UX (konfirmasi produk):
- * - "Modal utama" pada jalur INVALID = modal login; ditutup sebelum Now/Later (`setStep('idle')`).
+ * - "Modal utama" pada jalur INVALID = modal login; tutup (X/backdrop) = batalkan scan, kolom Session tidak berubah.
  * - Jalur VALID + SYNC: tidak ada modal login; langsung backend lalu Now/Later atau resume-empty.
  * - resume-empty hanya bila 0 grup (device/DB/brand); Now/Later bila ada data yang bisa di-scrape.
  * - VALID + RUN/SYNC: probe device tetap jalan; gagal → login meski badge grid masih valid.

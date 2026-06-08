@@ -89,6 +89,7 @@ export async function validateWhatsAppSession(
 
     return result;
   } catch (error) {
+    await forceReleaseWhatsAppForLogin(sessionId).catch(() => undefined);
     return {
       valid: false,
       message: error instanceof Error ? error.message : 'WhatsApp validate failed',

@@ -2,7 +2,11 @@
  * Sync / session-column routing — acuan logic_sync_scraper.txt + sessionColumnFlowSpec.
  * Satu modul: routing INVALID/VALID, probe device, payload sync.
  */
-import { manualSyncTimeoutMs, SYNC_SCRAPER_POLICY } from '@/config/syncScraperPolicy';
+import {
+  accountGroupEstimate,
+  manualSyncTimeoutMs,
+  SYNC_SCRAPER_POLICY,
+} from '@/config/syncScraperPolicy';
 import { todayScrapeDate } from '@/lib/accountMonitoringEngine';
 import {
   fetchHasDailyData,
@@ -64,6 +68,7 @@ export async function checkDeviceSessionForValidColumn(input: {
   dbAccountId: string;
   action: SessionColumnAction;
   hasDailyToday?: boolean;
+  groupEstimate?: number;
 }): Promise<DeviceSessionCheckResult> {
   const gate = await verifyUserSessionForAction({
     sessionId: input.sessionId,
@@ -71,6 +76,7 @@ export async function checkDeviceSessionForValidColumn(input: {
     dbAccountId: input.dbAccountId,
     mode: input.action === 'run' ? 'scrape' : 'sync',
     hasDaily: input.hasDailyToday,
+    groupEstimate: input.groupEstimate,
   });
 
   if (gate.ok) {
@@ -222,12 +228,15 @@ export async function executeSyncCheck(input: {
 
   await backfillPlatformSessionIfNeeded({ userId, account, dbAccountId });
 
+  const groupEstimate = accountGroupEstimate(account);
+
   const deviceCheck = await checkDeviceSessionForValidColumn({
     sessionId: account.id,
     platform: account.platform,
     dbAccountId,
     action: 'sync',
     hasDailyToday: hasDaily,
+    groupEstimate,
   });
 
   if (!deviceCheck.ok) {
@@ -262,7 +271,7 @@ export async function executeSyncCheck(input: {
           brandStandardHint: brandX,
           quickDeviceCount: true,
         }),
-        manualSyncTimeoutMs(),
+        manualSyncTimeoutMs(groupEstimate),
         'Manual sync',
       ),
     );

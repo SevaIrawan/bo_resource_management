@@ -25,14 +25,14 @@ interface PlatformLoginModalProps {
   phoneNumber?: string;
   loginHint?: string;
   attemptRestore?: boolean;
-  /** Modal ditutup — login Chrome tetap jalan di background. */
-  keepAlive?: boolean;
+  /** Sudah lewat prepareDeviceForPlatformLogin (sync/run modal). */
+  devicePrepared?: boolean;
   groupsCurrent?: number | null;
   groupsTotal?: number | null;
+  /** Modal ditutup (X / backdrop) → batalkan login; kolom Session tidak diubah. */
   onClose: () => void;
-  /** Batalkan login sepenuhnya (Chrome + state) — dipakai jika modal ditutup sebelum sesi Chrome aktif. */
-  onAbort?: () => void;
   onLoginSuccess?: () => void;
+  onLoginFatalError?: (message: string) => void;
 }
 
 export function PlatformLoginModal({
@@ -44,12 +44,12 @@ export function PlatformLoginModal({
   phoneNumber = '',
   loginHint = '',
   attemptRestore = true,
-  keepAlive = false,
+  devicePrepared = false,
   groupsCurrent,
   groupsTotal,
   onClose,
-  onAbort,
   onLoginSuccess,
+  onLoginFatalError,
 }: PlatformLoginModalProps) {
   const { t } = useLanguage();
   const isTelegram = platform === 'telegram';
@@ -61,7 +61,6 @@ export function PlatformLoginModal({
     pairingCode,
     error,
     submitting,
-    chromeSessionActive,
     refreshQrManual,
     switchToPhoneForm,
     startPhoneLogin,
@@ -70,10 +69,11 @@ export function PlatformLoginModal({
   } = usePlatformLogin(open, platform, sessionId, phoneNumber, {
     accountId: dbAccountId ?? sessionId,
     attemptRestore,
-    persistSession: keepAlive,
+    devicePrepared,
     groupsCurrent,
     groupsTotal,
     t,
+    onFatalError: onLoginFatalError,
   });
 
   const [phone, setPhone] = useState(phoneNumber);
@@ -85,12 +85,8 @@ export function PlatformLoginModal({
   const loginHandledRef = useRef(false);
 
   const handleDismiss = useCallback(() => {
-    if (chromeSessionActive) {
-      onClose();
-      return;
-    }
-    (onAbort ?? onClose)();
-  }, [chromeSessionActive, onAbort, onClose]);
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) {
@@ -131,7 +127,7 @@ export function PlatformLoginModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, submitting, handleDismiss]);
 
-  if ((!open && !keepAlive) || !platform) return null;
+  if (!platform || !open) return null;
 
   const showQrPanel =
     (view === 'qr' || (view === 'phone' && Boolean(pairingCode))) &&

@@ -45,6 +45,7 @@ async function gateOnce(input: {
   platform: Platform;
   dbAccountId: string;
   mode: UserSessionGateMode;
+  groupEstimate?: number;
 }) {
   return gateDeviceSession(
     {
@@ -53,6 +54,7 @@ async function gateOnce(input: {
       accountId: input.dbAccountId,
       uiSessionStatus: 'valid',
       skipWarmProbe: false,
+      groupEstimate: input.groupEstimate,
     },
     input.mode,
   );
@@ -70,6 +72,7 @@ export async function checkUserActionDeviceSession(input: {
   dbAccountId: string;
   mode: UserSessionGateMode;
   hasDaily?: boolean;
+  groupEstimate?: number;
 }): Promise<UserSessionCheckResult> {
   const dbSessionStatus = await readLatestSessionUiStatus(input.dbAccountId);
 
@@ -82,14 +85,26 @@ export async function checkUserActionDeviceSession(input: {
     };
   }
 
-  let gate = await gateOnce(input);
+  let gate = await gateOnce({
+    sessionId: input.sessionId,
+    platform: input.platform,
+    dbAccountId: input.dbAccountId,
+    mode: input.mode,
+    groupEstimate: input.groupEstimate,
+  });
 
   for (let attempt = 0; attempt < USER_SESSION_GATE_RETRIES - 1; attempt += 1) {
     if (gate.ok || gate.kind !== 'warm_pending') break;
     await new Promise((resolve) =>
       window.setTimeout(resolve, USER_SESSION_RETRY_BASE_MS * (attempt + 1)),
     );
-    gate = await gateOnce(input);
+    gate = await gateOnce({
+      sessionId: input.sessionId,
+      platform: input.platform,
+      dbAccountId: input.dbAccountId,
+      mode: input.mode,
+      groupEstimate: input.groupEstimate,
+    });
   }
 
   if (gate.ok) {

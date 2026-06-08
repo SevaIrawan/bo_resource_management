@@ -44,10 +44,18 @@ const checks = [
   },
   {
     name: 'WA confirming timeout >= 10 menit (akun besar)',
-    ok:
-      platformLogin.includes('waLoginConfirmingTimeoutMs') &&
-      platformLogin.includes('waConfirmingMs') &&
-      /waLoginConfirming[\s\S]*baseMs:\s*600_000/.test(policy),
+    ok: (() => {
+      if (!platformLogin.includes('waLoginConfirmingTimeoutMs')) return false;
+      if (!platformLogin.includes('waConfirmingMs')) return false;
+      const m = policy.match(
+        /waLoginConfirming:\s*\{[^}]*baseMs:\s*([\d_]+)[^}]*perGroupMs:\s*(\d+)/,
+      );
+      if (!m) return false;
+      const base = Number(m[1].replace(/_/g, ''));
+      const per = Number(m[2]);
+      const at3000 = Math.min(1_200_000, base + 3000 * per);
+      return at3000 >= 600_000;
+    })(),
   },
   {
     name: 'i18n loginConfirmingTimeout (en)',

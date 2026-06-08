@@ -11,6 +11,11 @@ import { upsertAccountSnapshot } from '@/lib/accountSnapshots';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
+import {
+  prepareDeviceForPlatformLogin,
+  type LoginPurgeWaDiskHint,
+} from '@/lib/prepareDeviceForLogin';
+import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { patchAccountSessionInGroups } from '@/lib/accountSessionPatch';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
 import {
@@ -58,7 +63,8 @@ export type SyncFlowStep =
   | 'resume-empty'
   | 'scrape-prompt'
   | 'platform-login'
-  | 'login-background';
+  | 'scrape-cancel-confirm'
+  | 'scrape-cancelled';
 
 interface SyncTarget {
   groupId: string;
@@ -90,6 +96,10 @@ function patchAccountPhone(
       ),
     };
   });
+}
+
+function isScrapeCancelledMessage(message: string): boolean {
+  return message.includes('SCRAPER_CANCELLED');
 }
 
 function normalizeSyncErrorMessage(message: string): string {
@@ -239,7 +249,7 @@ export function useAccountSyncFlow({
   );
 
   const closeFlow = useCallback(() => {
-    if (step === 'login-background' && target) {
+    if (step === 'platform-login' && target) {
       void window.electronAPI?.platformLogin
         ?.cancel(target.account.id, target.account.platform)
         .catch(() => undefined);
@@ -332,34 +342,30 @@ export function useAccountSyncFlow({
       intent: 'sync' | 'scraper',
       message: import('@/services/syncFlowService').SyncLoginReloginCode,
       knownDbAccountId?: string,
+      options?: { purgeHint?: LoginPurgeWaDiskHint },
     ) => {
-      setLoginModalEpoch((n) => n + 1);
-      setTarget({ groupId, account, dbAccountId: knownDbAccountId });
-      setLoginIntent(intent);
-      setLoginHintCode(message);
-      setSyncMessage(null);
-      setCheckError(null);
-      setStep('platform-login');
-      setRowProcessing(
-        groupId,
-        account.id,
-        'session_check',
-        intent === 'scraper' ? 'scraper' : 'sync',
-      );
-    },
-    [setRowProcessing],
-  );
+      void (async () => {
+        if (window.electronAPI?.isElectron) {
+          await prepareDeviceForPlatformLogin({
+            account,
+            dbAccountId: knownDbAccountId,
+            reloginCode: message,
+            purgeHint: options?.purgeHint,
+          });
+        }
 
-  const handleLoginModalClose = useCallback(() => {
-    if (!target) {
-      closeFlow();
-      return;
-    }
-    setStep('login-background');
-    setLoginHintCode(null);
-    setSyncMessage(null);
-    setCheckError(null);
-  }, [closeFlow, target]);
+        setLoginModalEpoch((n) => n + 1);
+        setTarget({ groupId, account, dbAccountId: knownDbAccountId });
+        setLoginIntent(intent);
+        setLoginHintCode(message);
+        setSyncMessage(null);
+        setCheckError(null);
+        setStep('platform-login');
+        /** Kolom Session tidak diubah — tetap badge Invalid/Valid; bukan "Checking Session". */
+      })();
+    },
+    [],
+  );
 
   const showSyncError = useCallback(
     (message: string, groupId?: string, account?: AccountBrandRow) => {
@@ -372,6 +378,19 @@ export function useAccountSyncFlow({
       setStep('sync-error');
     },
     [],
+  );
+
+  const handleLoginFatalError = useCallback(
+    (message: string) => {
+      if (!target) return;
+      void window.electronAPI?.platformLogin
+        ?.cancel(target.account.id, target.account.platform)
+        .catch(() => undefined);
+      clearRowProcessing(target.groupId, target.account.id);
+      setLoginIntent(null);
+      showSyncError(message, target.groupId, target.account);
+    },
+    [clearRowProcessing, showSyncError, target],
   );
 
   const reportBlockingError = useCallback(
@@ -411,7 +430,12 @@ export function useAccountSyncFlow({
       }
 
       const opensLogin = routeFromSessionColumn(account.sessionStatus) === 'open_login';
-      setRowProcessing(groupId, account.id, opensLogin ? 'sync' : 'session_check', 'sync');
+      setRowProcessing(
+        groupId,
+        account.id,
+        opensLogin ? 'sync' : 'session_check',
+        'sync',
+      );
 
       const stopLoading = () => {
         unlockUserAction(account.id);
@@ -430,8 +454,15 @@ export function useAccountSyncFlow({
         processingDbAccountIdRef.current = dbAccountId;
 
         if (outcome.kind === 'login') {
-          stopLoading();
-          showLoginModal(groupId, account, 'sync', outcome.reloginCode, outcome.dbAccountId);
+          unlockUserAction(account.id);
+          patchRowProcessAction(groupId, account.id, 'sync');
+          showLoginModal(
+            groupId,
+            account,
+            'sync',
+            outcome.reloginCode,
+            outcome.dbAccountId,
+          );
           return;
         }
 
@@ -450,8 +481,16 @@ export function useAccountSyncFlow({
           await applyResult(groupId, account.id, outcome.invalidResult, {
             masterTotal: outcome.masterJoined,
           });
-          stopLoading();
-          showLoginModal(groupId, account, 'sync', outcome.reloginCode, outcome.dbAccountId);
+          unlockUserAction(account.id);
+          patchRowProcessAction(groupId, account.id, 'sync');
+          showLoginModal(
+            groupId,
+            account,
+            'sync',
+            outcome.reloginCode,
+            outcome.dbAccountId,
+            { purgeHint: 'device_dead' },
+          );
           return;
         }
 
@@ -540,14 +579,23 @@ export function useAccountSyncFlow({
         }));
       };
 
+      let holdRowStateForLogin = false;
+
       try {
         dbAccountId = await resolveDbAccountId({ userId, account, knownDbAccountId: ctx.dbAccountId });
 
         const loginNeeded = await resolveScrapeLoginIfNeeded({ userId, account });
         if (loginNeeded) {
           unlockUserAction(account.id);
-          clearRowProcessing(groupId, account.id);
-          showLoginModal(groupId, account, 'scraper', loginNeeded.reloginCode, loginNeeded.dbAccountId);
+          patchRowProcessAction(groupId, account.id, 'sync');
+          holdRowStateForLogin = true;
+          showLoginModal(
+            groupId,
+            account,
+            'scraper',
+            loginNeeded.reloginCode,
+            loginNeeded.dbAccountId,
+          );
           return;
         }
 
@@ -584,12 +632,16 @@ export function useAccountSyncFlow({
         if (outcome.kind === 'invalidated-login') {
           updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
           await applyResult(groupId, account.id, outcome.invalidResult);
+          unlockUserAction(account.id);
+          patchRowProcessAction(groupId, account.id, 'sync');
+          holdRowStateForLogin = true;
           showLoginModal(
             groupId,
             account,
             'scraper',
             outcome.reloginCode,
             outcome.dbAccountId,
+            { purgeHint: 'device_dead' },
           );
           return;
         }
@@ -597,12 +649,16 @@ export function useAccountSyncFlow({
         if (outcome.kind === 'error') {
           if (outcome.needsLogin && outcome.dbAccountId) {
             updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
+            unlockUserAction(account.id);
+            patchRowProcessAction(groupId, account.id, 'sync');
+            holdRowStateForLogin = true;
             showLoginModal(
               groupId,
               account,
               'scraper',
               'SESSION_INVALID_RELOGIN',
               outcome.dbAccountId,
+              { purgeHint: 'device_dead' },
             );
             return;
           }
@@ -643,11 +699,19 @@ export function useAccountSyncFlow({
           await onTicketsReload?.(dbAccountId);
         }
       } catch (error) {
-        showSyncError(getErrorMessage(error, 'SCRAPER_FAILED'), groupId, account);
+        const message = getErrorMessage(error, 'SCRAPER_FAILED');
+        if (isScrapeCancelledMessage(message)) {
+          setTarget({ groupId, account, dbAccountId: dbAccountId || undefined });
+          setStep('scrape-cancelled');
+          return;
+        }
+        showSyncError(message, groupId, account);
       } finally {
         unlockUserAction(account.id);
-        clearScrapeProgress(account.id);
-        clearRowProcessing(groupId, account.id);
+        if (!holdRowStateForLogin) {
+          clearScrapeProgress(account.id);
+          clearRowProcessing(groupId, account.id);
+        }
       }
     },
     [
@@ -677,6 +741,59 @@ export function useAccountSyncFlow({
   const dismissScrapePrompt = useCallback(() => {
     dismissSyncModals();
   }, [dismissSyncModals]);
+
+  const requestCancelScrape = useCallback(
+    (groupId: string, account: AccountBrandRow) => {
+      setTarget({
+        groupId,
+        account,
+        dbAccountId: processingDbAccountIdRef.current ?? undefined,
+      });
+      setStep('scrape-cancel-confirm');
+    },
+    [],
+  );
+
+  const dismissCancelScrapeConfirm = useCallback(() => {
+    setStep('idle');
+  }, []);
+
+  const confirmCancelScrape = useCallback(async () => {
+    if (!target || !userId) return;
+
+    const { account } = target;
+    setStep('idle');
+
+    try {
+      let dbAccountId =
+        target.dbAccountId ?? processingDbAccountIdRef.current ?? '';
+      if (!dbAccountId) {
+        dbAccountId = await resolveDbAccountId({
+          userId,
+          account,
+          knownDbAccountId: target.dbAccountId,
+        });
+      }
+
+      const deviceSessionId = await resolveDeviceSessionId({
+        sessionId: account.id,
+        platform: account.platform,
+        accountId: dbAccountId,
+      });
+
+      await window.electronAPI?.scraper?.cancel({
+        sessionId: deviceSessionId,
+        platform: account.platform,
+      });
+    } catch {
+      // Scrape loop akan reject SCRAPER_CANCELLED; modal sukses dari catch runScrapeInBackground.
+    }
+  }, [target, userId]);
+
+  const dismissScrapeCancelled = useCallback(() => {
+    setStep('idle');
+    setTarget(null);
+  }, []);
 
   const handleRunScraper = useCallback(
     async (groupId: string, account: AccountBrandRow) => {
@@ -864,10 +981,14 @@ export function useAccountSyncFlow({
     activePlatform,
     handleSyncAccount,
     handleRunScraper,
+    requestCancelScrape,
+    confirmCancelScrape,
+    dismissCancelScrapeConfirm,
+    dismissScrapeCancelled,
     confirmScrapePrompt,
     dismissScrapePrompt,
     handleLoginSuccess,
-    handleLoginModalClose,
+    handleLoginFatalError,
     handleSavePhoneAndSync,
     reportBlockingError,
     closeFlow,

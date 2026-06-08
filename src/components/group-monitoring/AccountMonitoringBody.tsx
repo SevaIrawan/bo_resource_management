@@ -48,9 +48,6 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     if (sync.step === 'platform-login' && sync.target?.account.id) {
       ids.add(sync.target.account.id);
     }
-    if (sync.step === 'login-background' && sync.target?.account.id) {
-      ids.add(sync.target.account.id);
-    }
     if (sync.target?.dbAccountId) {
       ids.add(sync.target.dbAccountId);
     }

@@ -3,73 +3,74 @@ import { X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { useLanguage } from '@/hooks/useLanguage';
 import { accountPlatformSubtitle } from '@/lib/platformSyncCopy';
-import { cn } from '@/lib/utils';
 import type { Platform } from '@/types/database';
 
-interface SyncAlertModalProps {
+interface ScrapeCancelConfirmModalProps {
   open: boolean;
-  message: string;
-  accountName?: string;
+  accountName: string;
   platform?: Platform;
-  tone?: 'error' | 'neutral';
   onClose: () => void;
+  onConfirm: () => void;
 }
 
-export function SyncAlertModal({
+export function ScrapeCancelConfirmModal({
   open,
-  message,
   accountName,
-  platform,
-  tone = 'error',
+  platform = 'telegram',
   onClose,
-}: SyncAlertModalProps) {
+  onConfirm,
+}: ScrapeCancelConfirmModalProps) {
   const { t } = useLanguage();
 
   useEffect(() => {
     if (!open) return;
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
     }
+
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
-  if (!open || !message.trim()) return null;
-
-  const headerLine =
-    accountName && platform
-      ? accountPlatformSubtitle(accountName, platform)
-      : accountName ?? t('groupMonitoring.sync.errorTitle');
+  if (!open) return null;
 
   return (
     <BrandModalRoot onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--sync"
-        role="alertdialog"
+        role="dialog"
         aria-modal="true"
-        aria-labelledby="sync-alert-line"
+        aria-labelledby="scrape-cancel-title"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="brand-modal-header">
-          <h2 id="sync-alert-line" className="brand-modal-title">
-            {headerLine}
+          <h2 id="scrape-cancel-title" className="brand-modal-title">
+            {accountPlatformSubtitle(accountName, platform)}
           </h2>
-          <button type="button" className="brand-modal-close" onClick={onClose}>
+          <button
+            type="button"
+            className="brand-modal-close"
+            onClick={onClose}
+            aria-label={t('groupMonitoring.accountCard.closeModal')}
+          >
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
         </header>
+
         <div className="brand-modal-form">
-          <p
-            className={cn(
-              'sync-modal-message',
-              tone === 'error' && 'sync-modal-message--error',
-            )}
-          >
-            {message}
-          </p>
+          <p className="sync-modal-message">{t('groupMonitoring.sync.cancelRunConfirmMessage')}</p>
+
           <div className="brand-modal-actions">
-            <button type="button" className="brand-modal-btn brand-modal-btn--primary" onClick={onClose}>
-              {t('groupMonitoring.sync.ok')}
+            <button type="button" className="brand-modal-btn brand-modal-btn--ghost" onClick={onClose}>
+              {t('groupMonitoring.sync.cancelRunKeep')}
+            </button>
+            <button
+              type="button"
+              className="brand-modal-btn brand-modal-btn--danger"
+              onClick={onConfirm}
+            >
+              {t('groupMonitoring.sync.cancelRunConfirm')}
             </button>
           </div>
         </div>

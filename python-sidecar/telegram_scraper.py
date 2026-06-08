@@ -16,6 +16,25 @@ from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 DEVICE_GROUP_TARGET_MAX = 3000
 
 _scrape_progress: dict[str, dict] = {}
+_scrape_cancel_requests: set[str] = set()
+
+
+def request_scrape_cancel(session_id: str) -> None:
+    _scrape_cancel_requests.add(session_id)
+
+
+def clear_scrape_cancel(session_id: str) -> None:
+    _scrape_cancel_requests.discard(session_id)
+
+
+def is_scrape_cancelled(session_id: str) -> bool:
+    return session_id in _scrape_cancel_requests
+
+
+def _cancelled_payload(session_id: str) -> dict:
+    clear_scrape_cancel(session_id)
+    clear_scrape_progress(session_id)
+    return {"status": "cancelled", "message": "SCRAPER_CANCELLED", "groups": [], "count": 0}
 
 
 def clear_scrape_progress(session_id: str) -> None:
@@ -156,12 +175,15 @@ async def _collect_groups_locked(session_id: str) -> dict:
     me_label = me.username or me.phone or str(me.id)
 
     clear_scrape_progress(session_id)
+    clear_scrape_cancel(session_id)
     try:
         set_scrape_progress(session_id, phase="discover", label="Discovering groups on Telegram")
 
         targets: list = []
         total_on_account = 0
         async for dialog in client.iter_dialogs():
+            if is_scrape_cancelled(session_id):
+                return _cancelled_payload(session_id)
             if not _is_group_dialog(dialog):
                 continue
             total_on_account += 1
@@ -192,6 +214,9 @@ async def _collect_groups_locked(session_id: str) -> dict:
 
         groups: list[dict] = []
         for index, dialog in enumerate(targets):
+            if is_scrape_cancelled(session_id):
+                return _cancelled_payload(session_id)
+
             entity = dialog.entity
             group_id = str(dialog.id)
             group_name = dialog.title or dialog.name or group_id

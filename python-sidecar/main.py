@@ -20,7 +20,13 @@ from telegram_login import (
     submit_telegram_2fa,
     submit_telegram_code,
 )
-from telegram_scraper import count_telegram_groups, get_scrape_progress, scrape_telegram_groups, validate_telegram_session
+from telegram_scraper import (
+    count_telegram_groups,
+    get_scrape_progress,
+    request_scrape_cancel,
+    scrape_telegram_groups,
+    validate_telegram_session,
+)
 
 def _load_env() -> None:
     env_file = os.environ.get("RM_ENV_FILE", "").strip()
@@ -125,6 +131,11 @@ async def telegram_scrape(session_id: str, body: ScrapeBody | None = None) -> di
 @app.get("/telegram/scrape/progress/{session_id}")
 async def telegram_scrape_progress(session_id: str) -> dict:
     return get_scrape_progress(session_id)
+
+@app.post("/telegram/scrape/cancel/{session_id}")
+async def telegram_scrape_cancel(session_id: str) -> dict:
+    request_scrape_cancel(session_id)
+    return {"ok": True}
 
 @app.post("/telegram/count/{session_id}")
 async def telegram_count(session_id: str, body: CountBody | None = None) -> dict:

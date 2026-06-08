@@ -22,7 +22,7 @@ const syncModals = fs.readFileSync(
 const deadlineStart = waTs.indexOf('function armQrAppearDeadline');
 const deadlineBlock = waTs.slice(
   deadlineStart,
-  waTs.indexOf('async function waitForWaLockOrTimeout', deadlineStart),
+  waTs.indexOf('async function waitForWaSessionLock', deadlineStart),
 );
 const loginTimeoutStart = waTs.indexOf('function armWhatsAppLoginTimeout');
 const loginTimeoutBlock = waTs.slice(
@@ -72,10 +72,11 @@ const checks = [
         .includes('groupEstimate: payload.groupEstimate'),
   },
   {
-    name: 'Login background — modal bisa tutup tanpa unmount hook',
+    name: 'Tutup modal login membatalkan Chrome (bukan login background)',
     ok:
-      syncModals.includes("'login-background'") &&
-      syncModals.includes('keepAlive={step === \'login-background\'}'),
+      syncModals.includes("step === 'platform-login'") &&
+      syncModals.includes('onClose={closeFlow}') &&
+      !syncModals.includes("'login-background'"),
   },
   {
     name: 'withWaBrowserSlot import benar',

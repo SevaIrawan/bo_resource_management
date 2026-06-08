@@ -15,30 +15,43 @@ const SCRAPE_BASE_MS = 120_000;
 const SCRAPE_PER_GROUP_MS = 2_500;
 const SCRAPE_MAX_MS = 3_600_000;
 
-export function countGroupsTimeoutMs(estimate = DEVICE_GROUP_TARGET_MAX): number {
-  return Math.min(COUNT_MAX_MS, COUNT_BASE_MS + estimate * COUNT_PER_GROUP_MS);
+/** Mirror `src/config/syncScraperPolicy.ts` — angka nyata Y/X, cap 3000, tanpa floor 500. */
+function clampGroupEstimate(estimate: number): number {
+  return Math.max(0, Math.min(estimate || 0, DEVICE_GROUP_TARGET_MAX));
 }
 
-export function scrapeGroupsTimeoutMs(estimate = DEVICE_GROUP_TARGET_MAX): number {
-  return Math.min(SCRAPE_MAX_MS, SCRAPE_BASE_MS + estimate * SCRAPE_PER_GROUP_MS);
+function scaledMs(
+  baseMs: number,
+  perGroupMs: number,
+  maxMs: number,
+  estimate: number,
+): number {
+  const est = clampGroupEstimate(estimate);
+  return Math.min(maxMs, baseMs + est * perGroupMs);
 }
 
-/** Deadline QR pertama muncul (Chrome + web.whatsapp.com) — akun besar butuh lebih lama. */
+export function countGroupsTimeoutMs(estimate = 0): number {
+  return scaledMs(COUNT_BASE_MS, COUNT_PER_GROUP_MS, COUNT_MAX_MS, estimate);
+}
+
+export function scrapeGroupsTimeoutMs(estimate = 0): number {
+  return scaledMs(SCRAPE_BASE_MS, SCRAPE_PER_GROUP_MS, SCRAPE_MAX_MS, estimate);
+}
+
 export function waQrBootstrapDeadlineMs(estimate = 0): number {
-  const est = Math.max(500, Math.min(estimate || 500, DEVICE_GROUP_TARGET_MAX));
-  return Math.min(900_000, 240_000 + est * 60);
+  return scaledMs(45_000, 280, 900_000, estimate);
 }
 
-/** Setelah QR tampil: tunggu scan (jangan bunuh Puppeteer terlalu cepat). */
 export function waQrScanWaitMs(estimate = 0): number {
-  const est = Math.max(500, Math.min(estimate || 500, DEVICE_GROUP_TARGET_MAX));
-  return Math.min(1_200_000, 600_000 + est * 80);
+  return scaledMs(120_000, 40, 1_200_000, estimate);
 }
 
-/** Restore LocalAuth sebelum QR — akun ~3000 grup bisa butuh beberapa menit. */
 export function waDiskRestoreTimeoutMs(estimate = 0): number {
-  const est = Math.max(500, Math.min(estimate || 500, DEVICE_GROUP_TARGET_MAX));
-  return Math.min(600_000, 45_000 + est * 120);
+  return scaledMs(45_000, 120, 600_000, estimate);
+}
+
+export function waSessionLockWaitMs(estimate = 0): number {
+  return scaledMs(45_000, 120, 600_000, estimate);
 }
 
 export class ScrapeTimeoutError extends Error {

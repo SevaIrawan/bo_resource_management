@@ -15,9 +15,17 @@ import type { Platform } from '@/types/database';
 
 const TG_LOGIN_RESTORE_TIMEOUT_MS = 15_000;
 const TG_QR_TIMEOUT_MS = 180_000;
-const WA_PREPARE_SETTLE_MS = 3_500;
+/** Settle setelah release cepat — release IPC sudah punya fast settle di main. */
+const WA_PREPARE_SETTLE_MS = 400;
 const TG_CONFIRMING_TIMEOUT_MS = 180_000;
 const WA_QR_MAX_RETRIES = NETWORK_RETRY_ATTEMPTS;
+
+/** Pesan dari main/UI yang bukan kegagalan total — Chrome masih boleh lanjut. */
+function isTransientLoginErrorMessage(message: string): boolean {
+  return /still loading|wait|refresh qr|chrome stays|several minutes|large accounts/i.test(
+    message,
+  );
+}
 
 type PlatformLoginApi = NonNullable<NonNullable<Window['electronAPI']>['platformLogin']>;
 
@@ -52,19 +60,27 @@ export function usePlatformLogin(
     attemptRestore?: boolean;
     /** Tutup modal — login Chrome tetap jalan sampai sukses / cancel eksplisit. */
     persistSession?: boolean;
+    /** Error fatal (bukan peringatan QR) — dipakai saat login background. */
+    onFatalError?: (message: string) => void;
     groupsCurrent?: number | null;
     groupsTotal?: number | null;
+    /** Sudah lewat prepareDeviceForPlatformLogin sebelum modal dibuka. */
+    devicePrepared?: boolean;
     t?: (key: string, vars?: Record<string, string | number>) => string;
   },
 ) {
   const dbAccountId = options?.accountId ?? sessionId;
   const attemptRestore = options?.attemptRestore !== false;
   const skipDiskRestore = options?.attemptRestore === false;
+  const devicePrepared = options?.devicePrepared === true;
   const persistSession = options?.persistSession === true;
+  const onFatalError = options?.onFatalError;
   const groupEstimate = accountGroupEstimate({
     groupsCurrent: options?.groupsCurrent,
     groupsTotal: options?.groupsTotal,
   });
+  const groupEstimateRef = useRef(groupEstimate);
+  groupEstimateRef.current = groupEstimate;
   const waQrAppearMs = waQrBootstrapDeadlineMs(groupEstimate);
   const waQrScanMs = waQrScanWaitMs(groupEstimate);
   const waConfirmingMs = waLoginConfirmingTimeoutMs(groupEstimate);
@@ -279,6 +295,9 @@ export function usePlatformLogin(
       setQrDataUrl(null);
       setStatus('error');
       setError(message || 'Login failed');
+      if (onFatalError && message && !isTransientLoginErrorMessage(message)) {
+        onFatalError(message);
+      }
     });
 
     return () => {
@@ -288,7 +307,7 @@ export function usePlatformLogin(
       offReady();
       offError();
     };
-  }, [armQrTimeout, clearQrAppearDeadline, clearQrTimeout, dbAccountId, platform, sessionId]);
+  }, [armQrTimeout, clearQrAppearDeadline, clearQrTimeout, dbAccountId, onFatalError, platform, sessionId]);
 
   // Setelah scan: fase confirming sampai event `ready` — jangan timeout terlalu cepat (akun besar).
   useEffect(() => {
@@ -352,17 +371,21 @@ export function usePlatformLogin(
     setChromeSessionActive(true);
   }, []);
 
-  const prepareWhatsAppForQr = useCallback(
-    async (deviceSessionId: string, purgeDisk: boolean) => {
-      const api = window.electronAPI?.platformLogin;
-      if (!api) return;
+  const prepareWhatsAppForQr = useCallback(async (deviceSessionId: string, purgeDisk: boolean) => {
+    const api = window.electronAPI?.platformLogin;
+    if (!api) return;
 
-      await api.cancel(deviceSessionId, 'whatsapp').catch(() => undefined);
-      await api.release(deviceSessionId, { purgeWaDisk: purgeDisk }).catch(() => undefined);
-      await sleep(WA_PREPARE_SETTLE_MS);
-    },
-    [],
-  );
+    await api.cancel(deviceSessionId, 'whatsapp').catch(() => undefined);
+    await api
+      .release(deviceSessionId, {
+        purgeWaDisk: purgeDisk,
+        groupEstimate: groupEstimateRef.current,
+        fast: true,
+        urgent: true,
+      })
+      .catch(() => undefined);
+    await sleep(WA_PREPARE_SETTLE_MS);
+  }, []);
 
   const startWhatsAppQr = useCallback(
     async (
@@ -377,7 +400,8 @@ export function usePlatformLogin(
           platform: 'whatsapp',
           mode: 'qr',
           skipDiskRestore: purgeDisk,
-          groupEstimate,
+          groupEstimate: groupEstimateRef.current,
+          alreadyPrepared: devicePrepared && purgeDisk,
         });
         markChromeSessionActive();
       } catch (error) {
@@ -392,7 +416,7 @@ export function usePlatformLogin(
         throw error;
       }
     },
-    [groupEstimate, markChromeSessionActive, prepareWhatsAppForQr],
+    [devicePrepared, markChromeSessionActive, prepareWhatsAppForQr],
   );
 
   // Start login (tanpa cancel saat StrictMode remount)
@@ -403,6 +427,7 @@ export function usePlatformLogin(
     if (!api) return;
 
     const runId = ++loginRunIdRef.current;
+    let runDeviceSessionId: string | null = null;
     loginStartedRef.current = true;
     sessionReadyRef.current = false;
 
@@ -431,6 +456,7 @@ export function usePlatformLogin(
       });
       if (isStale()) return;
       electronSessionIdRef.current = deviceSessionId;
+      runDeviceSessionId = deviceSessionId;
 
       const startQrLogin = () => {
         if (isStale()) return;
@@ -466,14 +492,16 @@ export function usePlatformLogin(
       };
 
       if (platform === 'whatsapp') {
-        const api = window.electronAPI?.platformLogin;
-        await api?.cancel(deviceSessionId, 'whatsapp').catch(() => undefined);
-        if (!skipDiskRestore) {
-          await prepareWhatsAppForQr(deviceSessionId, false);
-        } else {
-          await sleep(400);
+        if (!devicePrepared) {
+          const api = window.electronAPI?.platformLogin;
+          await api?.cancel(deviceSessionId, 'whatsapp').catch(() => undefined);
+          if (!skipDiskRestore) {
+            await prepareWhatsAppForQr(deviceSessionId, false);
+          } else {
+            await sleep(WA_PREPARE_SETTLE_MS);
+          }
+          if (isStale()) return;
         }
-        if (isStale()) return;
 
         if (!skipDiskRestore && attemptRestore) {
           setStatus('restoring');
@@ -547,6 +575,11 @@ export function usePlatformLogin(
     return () => {
       clearQrTimeout();
       clearQrAppearDeadline();
+      if (loginRunIdRef.current !== runId && runDeviceSessionId && platform) {
+        void window.electronAPI?.platformLogin
+          ?.cancel(runDeviceSessionId, platform)
+          .catch(() => undefined);
+      }
     };
   }, [
     armQrAppearDeadline,
@@ -555,13 +588,13 @@ export function usePlatformLogin(
     clearQrAppearDeadline,
     clearQrTimeout,
     dbAccountId,
-    groupEstimate,
     open,
     persistSession,
     platform,
     prepareWhatsAppForQr,
     markChromeSessionActive,
     sessionId,
+    devicePrepared,
     skipDiskRestore,
     startWhatsAppQr,
   ]);
@@ -617,7 +650,10 @@ export function usePlatformLogin(
       loginStartedRef.current = true;
       markChromeSessionActive();
       if (platform === 'whatsapp') {
-        void startWhatsAppQr(deviceSessionId, api, true, 0);
+        void startWhatsAppQr(deviceSessionId, api, true, 0).catch((err: unknown) => {
+          setStatus('error');
+          setError(err instanceof Error ? err.message : 'Failed to refresh QR');
+        });
       } else {
         void api
           .start({

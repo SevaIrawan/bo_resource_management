@@ -133,15 +133,17 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
 
     return { deviceGroupCount, deviceAdminCount, masterCount };
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Scrape failed';
+    const cancelled = message.includes('SCRAPER_CANCELLED');
     if (runId) {
       await finishScrapeRun({
         runId,
         status: 'failed',
         groupsSuccess: 0,
-        errorMessage: error instanceof Error ? error.message : 'Scrape failed',
+        errorMessage: cancelled ? 'SCRAPER_CANCELLED' : message,
       });
     }
-    if (input.account.platform === 'telegram') {
+    if (!cancelled && input.account.platform === 'telegram') {
       try {
         await persistTelegramSession(accountId, deviceSessionId);
       } catch {

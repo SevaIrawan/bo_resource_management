@@ -22,7 +22,7 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
   const { t } = useLanguage();
   const { canManageStructure, canOperatePlatform } = usePermissions();
   const rows = flattenBrandAccounts(groups);
-  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, getScrapeProgress } =
+  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, requestCancelScrape, getScrapeProgress } =
     sync;
 
   function handleSyncRow(accountId: string) {
@@ -49,6 +49,14 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
     onRemoveFromSlot(group.id, account);
   }
 
+  function handleCancelScrapeRow(accountId: string) {
+    if (!canOperatePlatform) return;
+    const group = groups.find((item) => item.accounts.some((row) => row.id === accountId));
+    const account = group?.accounts.find((row) => row.id === accountId);
+    if (!group || !account) return;
+    requestCancelScrape(group.id, account);
+  }
+
   return (
     <div className="account-table-view">
       <div className="account-table-view-scroll">
@@ -65,6 +73,7 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
                   canManageStructure={canManageStructure}
                   onSync={() => handleSyncRow(row.id)}
                   onRunScraper={() => handleScraperRow(row.id)}
+                  onCancelScrape={() => handleCancelScrapeRow(row.id)}
                   syncLoading={
                     processingAction === 'sync' && processingAccountId === row.id
                   }

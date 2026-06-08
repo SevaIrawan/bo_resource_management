@@ -1,4 +1,5 @@
 import { PlatformLoginModal } from '@/components/group-monitoring/PlatformLoginModal';
+import { ScrapeCancelConfirmModal } from '@/components/group-monitoring/ScrapeCancelConfirmModal';
 import { SyncScrapeConfirmModal } from '@/components/group-monitoring/SyncScrapeConfirmModal';
 import { SyncResumeEmptyModal } from '@/components/group-monitoring/SyncResumeEmptyModal';
 import { MissingPhoneModal } from '@/components/group-monitoring/MissingPhoneModal';
@@ -81,8 +82,11 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
     activePlatform,
     confirmScrapePrompt,
     dismissScrapePrompt,
+    confirmCancelScrape,
+    dismissCancelScrapeConfirm,
+    dismissScrapeCancelled,
     handleLoginSuccess,
-    handleLoginModalClose,
+    handleLoginFatalError,
     handleSavePhoneAndSync,
     closeFlow,
     phoneSaving,
@@ -129,11 +133,27 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
         onConfirm={confirmScrapePrompt}
       />
 
-      {activePlatform && (step === 'platform-login' || step === 'login-background') ? (
+      <ScrapeCancelConfirmModal
+        open={step === 'scrape-cancel-confirm'}
+        accountName={target?.account.accountName ?? ''}
+        platform={target?.account.platform}
+        onClose={dismissCancelScrapeConfirm}
+        onConfirm={() => void confirmCancelScrape()}
+      />
+
+      <SyncAlertModal
+        open={step === 'scrape-cancelled'}
+        tone="neutral"
+        message={t('groupMonitoring.sync.scrapeCancelledMessage')}
+        accountName={target?.account.accountName}
+        platform={target?.account.platform}
+        onClose={dismissScrapeCancelled}
+      />
+
+      {activePlatform && step === 'platform-login' ? (
         <PlatformLoginModal
           key={`login-${target?.account.id ?? 'none'}-${loginModalEpoch}`}
-          open={step === 'platform-login'}
-          keepAlive={step === 'login-background'}
+          open
           platform={activePlatform}
           accountName={target?.account.accountName ?? ''}
           sessionId={target?.account.id ?? ''}
@@ -143,8 +163,9 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
           groupsTotal={target?.account.groupsTotal}
           loginHint={resolveSyncFlowMessage(loginHintCode ?? syncMessage, activePlatform, t)}
           attemptRestore={false}
-          onClose={handleLoginModalClose}
-          onAbort={closeFlow}
+          devicePrepared
+          onClose={closeFlow}
+          onLoginFatalError={handleLoginFatalError}
           onLoginSuccess={handleLoginSuccess}
         />
       ) : null}

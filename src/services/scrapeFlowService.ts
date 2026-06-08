@@ -1,3 +1,4 @@
+import { accountGroupEstimate } from '@/config/syncScraperPolicy';
 import { buildMetricsFromScrapeDaily } from '@/lib/accountSyncData';
 import { resolveBrandStandardTotal } from '@/lib/brandStandardCount';
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
@@ -86,6 +87,7 @@ export async function executeScrapeRun(input: {
       platform: account.platform,
       dbAccountId,
       action: 'run',
+      groupEstimate: accountGroupEstimate(account),
     });
 
     if (!deviceCheck.ok) {

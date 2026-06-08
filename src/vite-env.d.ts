@@ -82,6 +82,7 @@ declare global {
           phone?: string;
           skipDiskRestore?: boolean;
           groupEstimate?: number;
+          alreadyPrepared?: boolean;
         }) => Promise<{ ok: boolean }>;
         submit: (payload: {
           sessionId: string;
@@ -92,7 +93,12 @@ declare global {
         cancel: (sessionId: string, platform?: Platform) => Promise<{ ok: boolean }>;
         release: (
           sessionId: string,
-          options?: { purgeWaDisk?: boolean },
+          options?: {
+            purgeWaDisk?: boolean;
+            groupEstimate?: number;
+            fast?: boolean;
+            urgent?: boolean;
+          },
         ) => Promise<{ ok: boolean }>;
         purgeWaAuth?: (sessionId: string) => Promise<{ ok: boolean }>;
         tryRestore?: (payload: {
@@ -117,6 +123,10 @@ declare global {
           platform: Platform;
           storedSessionString?: string | null;
         }) => Promise<{ ok: boolean; groups: ScrapedGroupRow[]; count: number }>;
+        cancel: (payload: {
+          sessionId: string;
+          platform: Platform;
+        }) => Promise<{ ok: boolean }>;
         countGroups: (payload: {
           sessionId: string;
           platform: Platform;

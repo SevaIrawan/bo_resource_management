@@ -72,6 +72,10 @@ export function waClientPuppeteerOptions(): {
     '--disable-extensions',
     '--disable-sync',
     '--no-first-run',
+    '--disable-translate',
+    '--disable-features=TranslateUI',
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
   ];
 
   if (process.platform === 'win32') {

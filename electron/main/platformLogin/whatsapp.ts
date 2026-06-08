@@ -19,6 +19,7 @@ import {
   waDiskRestoreTimeoutMs,
   waQrBootstrapDeadlineMs,
   waQrScanWaitMs,
+  waSessionLockWaitMs,
 } from '../scraper/deviceGroupScale';
 
 const { Client, LocalAuth } = pkg;
@@ -39,7 +40,13 @@ const sessionLocks = new Map<string, Promise<unknown>>();
 /** Lock per sessionId — multi-akun WA boleh paralel (folder LocalAuth terpisah). */
 const WA_DESTROY_SETTLE_MS = HUMAN_SETTLE_SHORT_MS;
 const WA_LOGIN_PREPARE_SETTLE_MS = HUMAN_SETTLE_LONG_MS;
-const WA_LOCK_WAIT_MS = 6_000;
+const WA_LOGIN_FAST_PREPARE_MS = 400;
+/** Setelah abort probe — tunggu lock sebentar, jangan blok login menit-an. */
+const WA_LOGIN_URGENT_LOCK_MS = 5_000;
+
+/** Pin HTML WA Web — hindari resolve versi terbaru tiap `initialize()` (hemat 10–30s). */
+const WA_WEB_VERSION_REMOTE =
+  'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1020885143-alpha.html';
 
 const qrAppearTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function waSessionsRoot() {
@@ -281,6 +288,10 @@ function createClient(sessionId: string, mode: WaMode, phone?: string) {
       dataPath: waSessionsRoot(),
     }),
     puppeteer: waClientPuppeteerOptions(),
+    webVersionCache: {
+      type: 'remote',
+      remotePath: WA_WEB_VERSION_REMOTE,
+    },
   };
 
   if (mode === 'phone' && phone) {
@@ -379,33 +390,65 @@ function armQrAppearDeadline(
   client.once('ready', () => clearQrAppearDeadline(sessionId));
 }
 
-async function waitForWaLockOrTimeout(sessionId: string): Promise<void> {
+async function waitForWaSessionLock(
+  sessionId: string,
+  groupEstimate = 0,
+  lockOptions?: { maxMs?: number },
+): Promise<void> {
   const prev = sessionLocks.get(sessionId);
   if (!prev) return;
-  await Promise.race([prev.catch(() => undefined), delayMs(WA_LOCK_WAIT_MS)]);
+  const maxMs = lockOptions?.maxMs ?? waSessionLockWaitMs(groupEstimate);
+  await Promise.race([prev.catch(() => undefined), delayMs(maxMs)]);
+}
+
+/** Cabut Puppeteer tanpa menunggu lock — probe/sync yang masih jalan akan gagal & lepas lock. */
+async function abortWhatsAppSessionForLogin(sessionId: string): Promise<void> {
+  clearQrAppearDeadline(sessionId);
+  const session = sessions.get(sessionId);
+  if (!session) return;
+  sessions.delete(sessionId);
+  await closeWhatsAppPuppeteer(session.client);
+  await delayMs(WA_LOGIN_FAST_PREPARE_MS);
 }
 
 /** Lepas client scrape/probe + lock supaya login QR tidak macet "browser already running". */
 export async function forceReleaseWhatsAppForLogin(
   sessionId: string,
-  options?: { purgeDisk?: boolean },
+  options?: {
+    purgeDisk?: boolean;
+    groupEstimate?: number;
+    /** Setelah prepareDeviceForPlatformLogin — lewati settle panjang. */
+    fast?: boolean;
+    /** Batalkan probe/sync yang masih jalan sebelum login QR. */
+    urgent?: boolean;
+    skipPrepareSettle?: boolean;
+  },
 ): Promise<void> {
   clearQrAppearDeadline(sessionId);
 
-  /** Tunggu operasi lain pada akun yang sama selesai — jangan cabut lock (bisa double Chrome). */
-  await waitForWaLockOrTimeout(sessionId);
+  if (options?.urgent) {
+    await abortWhatsAppSessionForLogin(sessionId);
+    await waitForWaSessionLock(sessionId, options?.groupEstimate ?? 0, {
+      maxMs: WA_LOGIN_URGENT_LOCK_MS,
+    });
+  } else {
+    await waitForWaSessionLock(sessionId, options?.groupEstimate ?? 0);
+  }
 
   const session = sessions.get(sessionId);
   if (session) {
     sessions.delete(sessionId);
     await closeWhatsAppPuppeteer(session.client);
-    await delayMs(WA_DESTROY_SETTLE_MS);
+    await delayMs(options?.fast ? WA_LOGIN_FAST_PREPARE_MS : WA_DESTROY_SETTLE_MS);
   }
 
   if (options?.purgeDisk) {
     clearWhatsAppLocalAuth(sessionId);
   }
-  await delayMs(WA_LOGIN_PREPARE_SETTLE_MS);
+
+  if (!options?.skipPrepareSettle) {
+    await delayMs(options?.fast ? WA_LOGIN_FAST_PREPARE_MS : WA_LOGIN_PREPARE_SETTLE_MS);
+  }
 }
 
 async function initializeClientWithRetry(
@@ -696,13 +739,21 @@ function sendWhatsAppLoginError(
 export async function startWhatsAppQrLogin(
   sessionId: string,
   win: BrowserWindow,
-  options?: { skipDiskRestore?: boolean; groupEstimate?: number },
+  options?: {
+    skipDiskRestore?: boolean;
+    groupEstimate?: number;
+    /** Renderer sudah panggil prepareDeviceForPlatformLogin — lewati release ganda. */
+    alreadyPrepared?: boolean;
+  },
 ) {
   const groupEstimate = options?.groupEstimate ?? 0;
   return runWhatsAppLoginOperation(sessionId, async () => {
-    await forceReleaseWhatsAppForLogin(sessionId, {
-      purgeDisk: Boolean(options?.skipDiskRestore),
-    });
+    if (!options?.alreadyPrepared) {
+      await forceReleaseWhatsAppForLogin(sessionId, {
+        purgeDisk: Boolean(options?.skipDiskRestore),
+        groupEstimate,
+      });
+    }
 
     if (await reuseConnectedWhatsAppSession(sessionId, win)) {
       return;
@@ -712,7 +763,7 @@ export async function startWhatsAppQrLogin(
       if (await restoreWhatsAppFromDisk(sessionId, win, groupEstimate)) {
         return;
       }
-      await forceReleaseWhatsAppForLogin(sessionId);
+      await forceReleaseWhatsAppForLogin(sessionId, { groupEstimate, fast: true });
     }
 
     const client = createClient(sessionId, 'qr');

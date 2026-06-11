@@ -25,13 +25,19 @@ BAGIAN 4: PERFORMA (3000 grup)
 - rm_account_master_stats (Supabase RPC): agregasi master↔daily di SQL, fallback loop JS jika RPC belum deploy.
 - reconcile ticket: setelah scrape selesai → `await refreshIssues(accountId)`; realtime daily/scrape_runs → reconcile per akun.
 
-BAGIAN 5: METRIK GRID, TICKET & MODAL GROUP LINK (satu engine)
+BAGIAN 5: CLEAR SESSION (tombol X di kolom Session Valid, hover baris)
+Purge session lokal (WA: wa-sessions) + platform_sessions is_active=false + UI Invalid.
+Sync berikutnya → open_login (QR bersih). Bukan remove slot. File: clearAccountSession.ts, useAccountSyncFlow.handleClearSession.
+
+BAGIAN 6: METRIK GRID, TICKET & MODAL GROUP LINK (satu engine)
 - Y/X groups & admin: accountMasterDailyCompare.ts — dedupe group_id raw; X = master brand.
 - Tab Ticket: buildTicketSummariesFromEngine.ts — angka kartu dari engine (bukan hitung baris DB mentah).
 - Reconcile: reconcileTickets.ts memakai computeAccountTicketBreakdown yang sama dengan grid.
 - Modal Admin vs master list: fetchAccountGroupLinks — hanya baris master (X); junk device hanya di tab Ticket.
-- Modal Groups on account: fetchAccountDailyGroupLinks — semua grup daily akun (Y).
+- Modal Groups on account: fetchAccountDailyGroupLinks — 7 kolom (member/admin count, invite link).
+- Grid: kolom On device (groupsCurrent), In brand (joinedInMaster/groupsTotal).
+- Export group link: RM-[nama akun]-YYYYMMDD.xlsx.
 
-Implementasi: useAccountSyncFlow.ts, accountMonitoringEngine.ts, accountMasterDailyCompare.ts,
+Implementasi: useAccountSyncFlow.ts, clearAccountSession.ts, accountMonitoringEngine.ts, accountMasterDailyCompare.ts,
 buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx,
 PlatformLoginModal.tsx, electron/main/scraper/countWhatsApp.ts, migrations/028_rm_account_master_stats_rpc.sql

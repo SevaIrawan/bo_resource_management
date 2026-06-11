@@ -139,6 +139,8 @@ export const zh: Messages = {
       sessionValid: '有效',
       sessionInvalid: '无效',
       sessionChecking: '正在设备上检查会话',
+      clearSessionAria: '清除会话 — 在本机与数据库中登出',
+      clearSessionFailed: '清除会话失败，请重试。',
       procSync: '同步中',
       procScraper: '抓取中',
       run: '运行',

@@ -2,17 +2,17 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.12` (lihat `package.json`)
+**Versi saat ini:** `1.0.14` (lihat `package.json`)
 
 **Dokumen resmi (kondisi proyek terkini):** **[PROJECT.md](./PROJECT.md)** — arsitektur, installer, auto-update, Supabase realtime, kontrak internal.
 
-**Rencana installer macOS & Linux:** [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) (prepare — produksi saat ini Windows only).
+**Installer multi-platform:** Windows `.exe`, macOS `.dmg`/`.zip`, Linux `.AppImage` — lihat [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) dan [docs/RELEASE-CI.md](./docs/RELEASE-CI.md).
 
 **Panduan user (PDF / Word, bukan Markdown):** [docs/guides/documents/](./docs/guides/documents/) · rebuild: `npm run build:handbook-docs`
 
 ## Stack
 
-- **Electron** — desktop app (Windows)
+- **Electron** — desktop app (Windows, macOS, Linux)
 - **React 19 + TypeScript + Vite**
 - **Tailwind CSS v4** — dark theme, WhatsApp & Telegram accents
 - **Supabase** — database, auth, session tracking
@@ -73,8 +73,8 @@ Ringkas: tim internal install `.exe` sekali → login → SYNC WA/TG. Config ter
 ## Export (Excel)
 
 - Library: **xlsx** (SheetJS) — `src/lib/exportExcel.ts`
-- **Brand card** → `RM-{brand}-group-links-YYYYMMDD.xlsx`
-- **Table view** → `RM-all-accounts-YYYYMMDD.xlsx`
+- **Group link / akun** → `RM-[nama akun]-YYYYMMDD.xlsx` (nama akun sudah berisi prefix brand)
+- **Table view (semua akun)** → `RM-all-accounts-YYYYMMDD.xlsx`
 - **Tickets** → `RM-tickets-YYYYMMDD.xlsx`
 - Python sidecar also has **openpyxl** for server-side export later.
 

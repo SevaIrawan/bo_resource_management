@@ -71,12 +71,61 @@ export function SessionBadge({ status }: { status: AccountBrandRow['sessionStatu
   );
 }
 
+function SessionClearButton({
+  onClear,
+  loading = false,
+  operateLocked = false,
+}: {
+  onClear?: () => void;
+  loading?: boolean;
+  operateLocked?: boolean;
+}) {
+  const { t } = useLanguage();
+  const visibleClass = loading ? 'brand-session-clear-btn--visible' : '';
+
+  if (operateLocked) {
+    return (
+      <PermissionLockedButton
+        className={cn('brand-session-clear-btn permission-locked-btn--clear-session', visibleClass)}
+        title={t('groupMonitoring.accountCard.clearSessionAria')}
+      />
+    );
+  }
+
+  if (!onClear) return null;
+
+  return (
+    <button
+      type="button"
+      className={cn('brand-session-clear-btn', visibleClass)}
+      title={t('groupMonitoring.accountCard.clearSessionAria')}
+      aria-label={t('groupMonitoring.accountCard.clearSessionAria')}
+      disabled={loading}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClear();
+      }}
+    >
+      <X
+        className={cn('h-3 w-3', loading && 'brand-session-clear-btn--spin')}
+        strokeWidth={2.5}
+      />
+    </button>
+  );
+}
+
 function SessionColumnCell({
   row,
   isPending,
+  onClearSession,
+  clearSessionLoading = false,
+  operateLocked = false,
 }: {
   row: AccountBrandRow;
   isPending: boolean;
+  onClearSession?: () => void;
+  clearSessionLoading?: boolean;
+  operateLocked?: boolean;
 }) {
   const { t } = useLanguage();
 
@@ -94,7 +143,23 @@ function SessionColumnCell({
     );
   }
 
-  return <SessionBadge status={row.sessionStatus} />;
+  const showClear =
+    row.sessionStatus === 'valid' &&
+    !row.actionProcess &&
+    Boolean(onClearSession || operateLocked);
+
+  return (
+    <div className="brand-session-cell-inline">
+      <SessionBadge status={row.sessionStatus} />
+      {showClear ? (
+        <SessionClearButton
+          onClear={onClearSession}
+          loading={clearSessionLoading}
+          operateLocked={operateLocked}
+        />
+      ) : null}
+    </div>
+  );
 }
 
 function ActionColumnCell({
@@ -176,6 +241,22 @@ function ActionColumnCell({
   );
 }
 
+/** Y/X label: Y kurang dari X → Y merah; Y sama X → seluruh ratio hijau. */
+function MetricRatioLabel({ current: y, total: x }: { current: number; total: number }) {
+  const aligned = x > 0 && y === x;
+  const short = x > 0 && y < x;
+
+  return (
+    <span className="brand-metric-ratio text-xs tabular-nums">
+      <span className={cn(aligned && 'text-wa', short && 'text-danger', !aligned && !short && 'text-text-primary')}>
+        {y}
+      </span>
+      <span className={cn(aligned ? 'text-wa' : 'text-text-primary')}>/</span>
+      <span className={cn(aligned ? 'text-wa' : 'text-text-primary')}>{x}</span>
+    </span>
+  );
+}
+
 export function AdminProgress({ current, total }: { current: number; total: number }) {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
   const tone = pct >= 100 ? 'bg-wa' : pct >= 66 ? 'bg-amber-400' : 'bg-danger';
@@ -185,9 +266,7 @@ export function AdminProgress({ current, total }: { current: number; total: numb
       <div className="brand-admin-progress-bar">
         <div className={cn('brand-admin-progress-fill', tone)} style={{ width: `${pct}%` }} />
       </div>
-      <span className="brand-admin-progress-label">
-        {current}/{total}
-      </span>
+      <MetricRatioLabel current={current} total={total} />
     </div>
   );
 }
@@ -373,10 +452,12 @@ export function AccountTableRow({
   onRunScraper,
   onCancelScrape,
   onRemoveFromSlot,
+  onClearSession,
   canOperatePlatform = true,
   canManageStructure = true,
   syncLoading = false,
   scraperLoading = false,
+  clearSessionLoading = false,
   scrapeProgress = null,
 }: {
   row: AccountBrandRow;
@@ -385,10 +466,12 @@ export function AccountTableRow({
   onRunScraper?: () => void;
   onCancelScrape?: () => void;
   onRemoveFromSlot?: () => void;
+  onClearSession?: () => void;
   canOperatePlatform?: boolean;
   canManageStructure?: boolean;
   syncLoading?: boolean;
   scraperLoading?: boolean;
+  clearSessionLoading?: boolean;
   scrapeProgress?: UiScrapeProgress | null;
 }) {
   const { t } = useLanguage();
@@ -403,10 +486,21 @@ export function AccountTableRow({
   const structureLocked = !canManageStructure;
   const showRemoveHover =
     (Boolean(onRemoveFromSlot) || structureLocked) && !isPending && !isProcessing;
+  const showClearSessionHover =
+    (Boolean(onClearSession) || operateLocked) &&
+    !isPending &&
+    !isProcessing &&
+    row.sessionStatus === 'valid';
 
   return (
     <>
-      <tr className={cn('brand-account-row', showRemoveHover && 'brand-account-row--removable')}>
+      <tr
+        className={cn(
+          'brand-account-row',
+          showRemoveHover && 'brand-account-row--removable',
+          showClearSessionHover && 'brand-account-row--clearable-session',
+        )}
+      >
         <td className="brand-col-cell brand-col-cell--account">
           <div className="brand-account-cell">
             <PlatformBadge platform={row.platform} />
@@ -449,9 +543,20 @@ export function AccountTableRow({
             )}
           </div>
         </td>
-        <td className="brand-col-cell brand-col-cell--session">
+        <td
+          className={cn(
+            'brand-col-cell brand-col-cell--session',
+            showClearSessionHover && 'brand-col-cell--session-clearable',
+          )}
+        >
           <div className="brand-col-cell-inner">
-            <SessionColumnCell row={row} isPending={isPending} />
+            <SessionColumnCell
+              row={row}
+              isPending={isPending}
+              onClearSession={onClearSession}
+              clearSessionLoading={clearSessionLoading}
+              operateLocked={operateLocked}
+            />
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--on-device">
@@ -468,9 +573,7 @@ export function AccountTableRow({
             {isPending ? (
               <span className="brand-account-slot-muted text-xs tabular-nums">—/—</span>
             ) : (
-              <span className="text-xs tabular-nums text-text-primary">
-                {row.joinedInMaster}/{row.groupsTotal}
-              </span>
+              <MetricRatioLabel current={row.joinedInMaster} total={row.groupsTotal} />
             )}
           </div>
         </td>

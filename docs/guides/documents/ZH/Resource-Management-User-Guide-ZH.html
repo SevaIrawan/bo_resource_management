@@ -11,7 +11,7 @@
     <p class="doc-cover-logo">Backend Operation</p>
     <h1>资源管理</h1>
     <p class="doc-cover-subtitle">官方用户手册</p>
-    <table class="doc-meta-table"></table>
+    <table class="doc-meta-table"><tr><th>产品</th><td>后端运营 — 资源管理（Backend Operation — Resource Management）</td></tr><tr><th>应用版本</th><td>1.0.14</td></tr><tr><th>适用对象</th><td>内部运营团队（营销 / WhatsApp 与 Telegram 群组监控）</td></tr><tr><th>平台</th><td>Windows / macOS / Linux 桌面安装包</td></tr><tr><th>界面语言</th><td>English / 中文（管理 → 语言）</td></tr></table>
   </header>
   
 <section class="doc-toc">
@@ -30,36 +30,7 @@
 <li><a href="#附录-功能速览图">附录 — 功能速览图</a></li></ol>
 </section>
   <main class="doc-body">
-    <h1 id="资源管理-官方用户手册-中文">资源管理 — 官方用户手册（中文）</h1>
-<table>
-<thead>
-<tr>
-<th></th>
-<th></th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>产品</strong></td>
-<td>后端运营 — 资源管理（Backend Operation — Resource Management）</td>
-</tr>
-<tr>
-<td><strong>应用版本</strong></td>
-<td>1.0.11</td>
-</tr>
-<tr>
-<td><strong>适用对象</strong></td>
-<td>内部运营团队（营销 / WhatsApp 与 Telegram 群组监控）</td>
-</tr>
-<tr>
-<td><strong>平台</strong></td>
-<td>Windows 桌面端（<code>.exe</code>）</td>
-</tr>
-<tr>
-<td><strong>界面语言</strong></td>
-<td>English / 中文（<strong>管理</strong> → <strong>语言</strong>）</td>
-</tr>
-</tbody></table>
-<p>本文档为当前应用中<strong>全部功能的官方使用说明</strong>。架构与 IT 发布说明请参阅 <a href="../../PROJECT.md">PROJECT.md</a>。</p>
+    <p>本文档为当前应用中<strong>全部功能的官方使用说明</strong>。架构与 IT 发布说明请参阅 <a href="../../PROJECT.md">PROJECT.md</a>。</p>
 <hr>
 <h2 id="目录">目录</h2>
 <ol>
@@ -434,7 +405,7 @@
 </tr>
 <tr>
 <td><strong>X（从列表移除此卡片）</strong></td>
-<td>仅<strong>本次会话</strong>隐藏卡片 — 不删除数据库</td>
+<td>确认后从数据库删除品牌及相关数据</td>
 </tr>
 </tbody></table>
 <h4 id="添加账号-添加">添加账号（+ 添加）</h4>
@@ -494,12 +465,22 @@
 <tr>
 <td><strong>会话</strong></td>
 <td><strong>有效</strong> / <strong>无效</strong></td>
-<td>无效时需先完成平台登录</td>
+<td>无效时需先登录；<strong>有效时悬停 X</strong> = <strong>清除会话</strong></td>
 </tr>
 <tr>
 <td><strong>群组</strong></td>
 <td><code>Y/X</code></td>
 <td>Y = 当日设备群数；X = 该平台品牌标准群数</td>
+</tr>
+<tr>
+<td><strong>设备上</strong></td>
+<td>单个数字</td>
+<td>手机/本机群总数（daily）</td>
+</tr>
+<tr>
+<td><strong>品牌内</strong></td>
+<td><code>y/x</code></td>
+<td>已加入品牌主表的群数 / 主表总数</td>
 </tr>
 <tr>
 <td><strong>管理员</strong></td>
@@ -532,11 +513,15 @@
 </tr>
 <tr>
 <td><strong>X（悬停于名称右侧）</strong></td>
-<td><strong>移出槽位</strong> — 从槽位移除账号（确认弹窗）</td>
+<td><strong>移出槽位</strong> — 删除账号并重建品牌主表（确认弹窗）</td>
+</tr>
+<tr>
+<td><strong>X（悬停于会话列，仅有效）</strong></td>
+<td><strong>清除会话</strong> — 本机与数据库登出；下次同步打开全新二维码</td>
 </tr>
 <tr>
 <td><strong>群链接</strong></td>
-<td>弹窗：群名称、群 ID、邀请链接、是否管理员 — 需先有抓取数据</td>
+<td>弹窗：daily 七列或管理员对比主表 — 需先有抓取数据</td>
 </tr>
 </tbody></table>
 <p>提示文字：<strong>同步账号</strong>。</p>
@@ -675,8 +660,12 @@
 </tr>
 </thead>
 <tbody><tr>
-<td>表格</td>
-<td>群名称、群 ID、邀请链接、管理员（是/否）</td>
+<td>表格（daily 模式）</td>
+<td>序号、群名称、群 ID、成员数、管理员数、是否管理员、邀请链接</td>
+</tr>
+<tr>
+<td>Excel 导出</td>
+<td><code>RM-[账号名称]-YYYYMMDD.xlsx</code></td>
 </tr>
 <tr>
 <td>管理员筛选</td>
@@ -1254,7 +1243,9 @@
 <p><strong>仪表板登录失败？</strong><br>联系 IT — 需在 <code>users</code> 表中开通账号。</p>
 <p><strong>Telegram 二维码或登录报错？</strong><br>联系 IT — 检查 Telegram API 配置与数据库迁移 <code>023</code>。</p>
 <p><strong>卡片视图和表格视图有何区别？</strong><br>数据相同；卡片按品牌分组，表格为扁平列表。</p>
-<p><strong>从列表移除此卡片会删除品牌吗？</strong><br>不会 — 仅隐藏至重新加载或调整筛选。</p>
+<p><strong>从列表移除此卡片会删除品牌吗？</strong><br>会 — 确认后从数据库删除品牌及相关数据。</p>
+<p><strong>二维码报错「still starting from previous attempt」？</strong><br>本机 WhatsApp 会话卡住 — 等待数秒，或对<strong>有效</strong>会话列使用 <strong>清除会话 (X)</strong> 后重新同步。</p>
+<p><strong>其他同事能否同步我登录的账号？</strong><br>WhatsApp 不行 — 授权在本机。需 <strong>清除会话</strong> 后由对方在本机扫码。</p>
 <p><strong>在哪里改界面语言？</strong><br><strong>管理</strong> → <strong>偏好设置</strong> → <strong>语言</strong> → English 或 <strong>中文</strong>。</p>
 <hr>
 <h2 id="附录-功能速览图">附录 — 功能速览图</h2>
@@ -1265,7 +1256,7 @@
         │     ├─ 切片栏：搜索、品牌、平台、状态、卡片|表格、导出
         │     └─ 每张品牌卡片
         │           ├─ + 添加账号（WhatsApp / Telegram）
-        │           ├─ 行：同步 ↻ | 移除 X | 群链接
+        │           ├─ 行：同步 ↻ | 移除 X（账号）| 清除 X（会话）| 群链接
         │           └─ 抓取：运行
         └─ [标签：工单]
               ├─ KPI：待处理、缺标准群、非管理员、待处理群组数…
@@ -1305,11 +1296,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>本手册对应应用版本 <strong>1.0.11</strong>。新功能发布后请同步更新文档。</em></p>
+<p><em>本手册对应应用版本 <strong>1.0.14</strong>。新功能发布后请同步更新文档。</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — 资源管理 v1.0.11</p>
+    <p>Internal use only — 资源管理 v1.0.14</p>
   </footer>
 </body>
 </html>

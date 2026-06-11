@@ -26,7 +26,7 @@
     "build:web": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "validate:session-flow": "node scripts/validate-session-column-flow.mjs",
+    "validate:session-flow": "node scripts/validate-session-column-flow.mjs && node scripts/validate-clear-session.mjs",
     "validate:master-reference": "node scripts/audit-project-master-reference.mjs",
     "validate:sync-scraper-spec": "node scripts/validate-sync-scraper-spec.mjs",
     "validate:multi-account-wa": "node scripts/validate-multi-account-wa.mjs",

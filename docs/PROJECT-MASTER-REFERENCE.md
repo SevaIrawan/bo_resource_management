@@ -1,6 +1,6 @@
 # Resource Management — Referensi Master Proyek
 
-**Versi dokumen:** 2026-06-06  
+**Versi dokumen:** 2026-06-11  
 **Versi aplikasi:** 1.0.14 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
@@ -46,20 +46,21 @@ Dokumen ini melengkapi (bukan mengganti):
 1. [Ringkasan produk](#1-ringkasan-produk)
 2. [Navigasi & halaman](#2-navigasi--halaman)
 3. [Brand Card & slot akun](#3-brand-card--slot-akun)
-4. [Grid 8 kolom — tampilan & data](#4-grid-8-kolom--tampilan--data)
-5. [Kolom Action — state machine](#5-kolom-action--state-machine)
-6. [Metrik Y/X (Groups & Admin)](#6-metrik-yx-groups--admin)
-7. [Alur Sync (tombol ↻)](#7-alur-sync-tombol-)
-8. [Alur Scraper / Run](#8-alur-scraper--run)
-9. [Cancel Run](#9-cancel-run)
-10. [Modal login platform](#10-modal-login-platform)
-11. [Tab Ticket & reconcile](#11-tab-ticket--reconcile)
-12. [Realtime & auto-sync](#12-realtime--auto-sync)
-13. [Database Supabase](#13-database-supabase)
-14. [Electron & sidecar](#14-electron--sidecar)
-15. [Hak akses (Admin vs Operator)](#15-hak-akses-admin-vs-operator)
-16. [Peta file penting](#16-peta-file-penting)
-17. [Validator & script QA](#17-validator--script-qa)
+4. [Grid 9 kolom — tampilan & data](#4-grid-9-kolom--tampilan--data)
+5. [Clear Session](#5-clear-session)
+6. [Kolom Action — state machine](#6-kolom-action--state-machine)
+7. [Metrik Y/X (Groups & Admin)](#7-metrik-yx-groups--admin)
+8. [Alur Sync (tombol ↻)](#8-alur-sync-tombol-)
+9. [Alur Scraper / Run](#9-alur-scraper--run)
+10. [Cancel Run](#10-cancel-run)
+11. [Modal login platform](#11-modal-login-platform)
+12. [Tab Ticket & reconcile](#12-tab-ticket--reconcile)
+13. [Realtime & auto-sync](#13-realtime--auto-sync)
+14. [Database Supabase](#14-database-supabase)
+15. [Electron & sidecar](#15-electron--sidecar)
+16. [Hak akses (Admin vs Operator)](#16-hak-akses-admin-vs-operator)
+17. [Peta file penting](#17-peta-file-penting)
+18. [Validator & script QA](#18-validator--script-qa)
 
 ---
 
@@ -130,7 +131,7 @@ Satu **Brand Card** = satu brand bisnis (`AccountBrandGroup`).
 - Menu **+ Add account** (WA atau TG)
 - Tombol dismiss brand (admin)
 
-**Body kartu (expanded):** tabel 8 kolom — lihat [§4](#4-grid-8-kolom--tampilan--data).
+**Body kartu (expanded):** tabel 9 kolom — lihat [§4](#4-grid-9-kolom--tampilan--data).
 
 **File:** `AccountBrandCard.tsx`, `AccountBrandCardList.tsx`, `AccountBrandTableView.tsx`
 
@@ -144,7 +145,7 @@ Satu **Brand Card** = satu brand bisnis (`AccountBrandGroup`).
 | Baris slot kosong | `AccountEmptySlotRow` | `AccountMonitoringCells.tsx` |
 | Action slot kosong | Tombol **Add account** | `AccountEmptySlotRow` |
 | Tambah akun | Konsumsi 1 slot | `addAccountToGroup()` — `accountBrandUtils.ts` |
-| Hapus akun | Kembalikan 1 slot | `removeAccountFromGroup()` — `accountBrandUtils.ts` |
+| Hapus akun | Kembalikan 1 slot + rebuild master | `removeMessagingAccountFromSlot()` → DELETE akun, purge WA, `rebuildBrandGroupsMaster()` — `messagingAccounts.ts` |
 
 ### 3.3 Baris akun vs pending
 
@@ -155,13 +156,15 @@ Satu **Brand Card** = satu brand bisnis (`AccountBrandGroup`).
 
 ---
 
-## 4. Grid 8 kolom — tampilan & data
+## 4. Grid 9 kolom — tampilan & data
 
-Definisi kolom: `AccountMonitoringTableParts.tsx` (`ACCOUNT_TABLE_COLUMN_COUNT = 8`)
+Definisi kolom: `AccountMonitoringTableParts.tsx` (`ACCOUNT_TABLE_COLUMN_COUNT = 9`)
 
 ```
-| Account | Brand | Status | Session | Groups | Admin | Scraper | Action |
+| Account | Brand | Status | Session | Groups | On device | In brand | Admin | Scraper | Action |
 ```
+
+Lebar default (user-resizable): **Account 20%**, kolom lain **10%** masing-masing — `index.css` + `AccountMonitoringTableColGroup`.
 
 Implementasi sel: `AccountMonitoringCells.tsx`  
 Type baris: `AccountBrandRow` di `types/accountMonitoringUi.ts`
@@ -218,6 +221,18 @@ Kolom **Session** (VALID/INVALID) terpisah; badge Status mengikuti `sessionStatu
 
 Spesifikasi: `sessionColumnFlowSpec.ts`, `useAccountSyncFlow.ts` → `showLoginModal`
 
+**Clear Session (tombol X di kolom Session):**
+
+| Aturan | Detail |
+|--------|--------|
+| Tampil | Hanya saat `sessionStatus === 'valid'`, hover baris atau kolom Session (`brand-account-row--clearable-session`) |
+| Sembunyi | Invalid, pending, `session_check`, sync/scrape berjalan |
+| Aksi | `clearAccountSession.ts` → cancel scrape/count → `prepareDeviceForPlatformLogin` (purge WA) → `invalidatePlatformSessionEverywhere` → patch UI Invalid |
+| Setelah clear | Sync/Run → routing `open_login` (modal QR bersih, hindari stuck *still starting*) |
+| Multi-PC | Invalidate DB → realtime badge Invalid di client lain; purge disk hanya di PC yang menekan X |
+
+File: `clearAccountSession.ts`, `useAccountSyncFlow.ts` → `handleClearSession`, `AccountMonitoringCells.tsx` → `SessionClearButton`
+
 ### 4.5 Kolom Groups — format **Y/X**
 
 | Simbol | Field | Arti |
@@ -227,7 +242,21 @@ Spesifikasi: `sessionColumnFlowSpec.ts`, `useAccountSyncFlow.ts` → `showLoginM
 
 Engine: `accountMonitoringEngine.ts`, `accountMasterDailyCompare.ts`, `accountDisplayMetrics.ts`
 
-### 4.6 Kolom Admin — format **Y/X** + progress bar
+### 4.6 Kolom On device
+
+| Field | Arti |
+|-------|------|
+| `groupsCurrent` | Total grup di device / baris daily hari ini (angka tunggal, bukan Y/X) |
+
+### 4.7 Kolom In brand
+
+| Field | Arti |
+|-------|------|
+| `joinedInMaster` / `groupsTotal` | Format `y/x` — berapa grup master brand yang sudah join di akun ini vs total master (X) |
+
+Sumber: `loadAccountMonitoring.ts`, `accountSyncData.ts`, `mergeMonitoringGroups.ts`
+
+### 4.8 Kolom Admin — format **Y/X** + progress bar
 
 | Simbol | Field | Arti |
 |--------|-------|------|
@@ -236,7 +265,7 @@ Engine: `accountMonitoringEngine.ts`, `accountMasterDailyCompare.ts`, `accountDi
 
 Komponen: `AdminProgress` — bar warna (merah / amber / hijau) + label `current/total`
 
-### 4.7 Kolom Scraper
+### 4.9 Kolom Scraper
 
 Prioritas tampilan (`ScraperColumnCell`):
 
@@ -261,13 +290,35 @@ Progress real-time: IPC `scraper:progress` → `useAccountSyncFlow` → `resolve
 
 Spec: `logic_sync_scraper.txt` BAGIAN 2
 
-### 4.8 Kolom Action
+### 4.10 Kolom Action
 
-Lihat [§5](#5-kolom-action--state-machine) — logic terpusat di `accountActionColumn.ts`
+Lihat [§6](#6-kolom-action--state-machine) — logic terpusat di `accountActionColumn.ts`
 
 ---
 
-## 5. Kolom Action — state machine
+## 5. Clear Session
+
+**Tujuan produk:** putus rantai session WA lokal per PC + flag DB, agar operator lain bisa Sync → QR tanpa error restore / manual delete di Supabase.
+
+```
+[Hover baris Valid → klik X di Session]
+  → cancelActiveDeviceWork (scraper + count)
+  → prepareDeviceForPlatformLogin (purgeWaDisk + release Chrome)
+  → markPlatformSessionInvalid (reason: user_cleared)
+  → logSessionLogoutActivity
+  → applyResult → status logout, session invalid (metrik daily tetap)
+```
+
+| Platform | Perilaku |
+|----------|----------|
+| WhatsApp | Hapus folder `wa-sessions/session-{clientId}` di PC ini |
+| Telegram | Release sidecar + invalidate string session di DB |
+
+**Bukan** remove slot: `messaging_accounts` dan daily **tetap**.
+
+---
+
+## 6. Kolom Action — state machine
 
 Resolver: `resolveAccountActionColumn(row)` — **prioritas dari atas ke bawah**
 
@@ -280,19 +331,19 @@ Resolver: `resolveAccountActionColumn(row)` — **prioritas dari atas ke bawah**
 
 **Slot kosong:** bukan baris akun — tombol **Add account** di `AccountEmptySlotRow`
 
-### 5.1 Group link → modal
+### 6.1 Group link → modal
 
 1. Klik **Group link**
 2. `GroupLinksPickerModal` — pilih mode:
-   - **Groups on account** — semua grup daily akun (Y)
+   - **Groups on account** — tabel **7 kolom**: No, Group Name, Group ID, Member Count, Admin Count, Is Admin, Invite Link (`fetchAccountDailyGroupLinks`)
    - **Admin vs master** — bandingkan admin status vs master brand (X)
-3. `GroupLinksModal` — tabel + filter + export Excel
+3. `GroupLinksModal` — tabel + filter + export Excel → `RM-[nama akun]-YYYYMMDD.xlsx`
 
-Data: `accountGroupLinks.ts` → `fetchAccountDailyGroupLinks` / `fetchAccountGroupLinks`
+Data: `accountGroupLinks.ts`, `dedupeScrapeDaily.ts`, `exportExcel.ts`
 
 ---
 
-## 6. Metrik Y/X (Groups & Admin)
+## 7. Metrik Y/X (Groups & Admin)
 
 ### 6.1 Definisi
 
@@ -317,7 +368,7 @@ Data: `accountGroupLinks.ts` → `fetchAccountDailyGroupLinks` / `fetchAccountGr
 
 ---
 
-## 7. Alur Sync (tombol ↻)
+## 8. Alur Sync (tombol ↻)
 
 Orchestrator: `useAccountSyncFlow.ts` → `runSyncCheck`  
 Routing: `syncFlowService.ts` → `routeFromSessionColumn`
@@ -376,7 +427,7 @@ Now → `runScrapeInBackground({ skipDeviceCheck: true })`
 
 ---
 
-## 8. Alur Scraper / Run
+## 9. Alur Scraper / Run
 
 Orchestrator: `runScrapeInBackground` / `handleRunScraper`  
 Service: `scrapeFlowService.ts` → `executeScrapeRun`  
@@ -418,7 +469,7 @@ Write DB: **hanya setelah scrape selesai** — `writeScrapeDailyRows` (cancel se
 
 ---
 
-## 9. Cancel Run
+## 10. Cancel Run
 
 **Trigger UI:** tombol Cancel Run saat `actionProcess === 'scraper'` (Reading groups — bukan saat `session_check`)
 
@@ -447,7 +498,7 @@ Write DB: **hanya setelah scrape selesai** — `writeScrapeDailyRows` (cancel se
 
 ---
 
-## 10. Modal login platform
+## 11. Modal login platform
 
 Komponen: `PlatformLoginModal.tsx`  
 Hook: `usePlatformLogin.ts`  
@@ -484,7 +535,7 @@ Main TG: `electron/main/platformLogin/telegramSidecar.ts` → Python `telegram_l
 
 ---
 
-## 11. Tab Ticket & reconcile
+## 12. Tab Ticket & reconcile
 
 ### 11.1 Tipe issue
 
@@ -514,7 +565,7 @@ reconcileTickets.ts  →  upsert/delete baris tickets DB
 
 ---
 
-## 12. Realtime & auto-sync
+## 13. Realtime & auto-sync
 
 | Fitur | File |
 |-------|------|
@@ -525,7 +576,7 @@ reconcileTickets.ts  →  upsert/delete baris tickets DB
 
 ---
 
-## 13. Database Supabase
+## 14. Database Supabase
 
 Sumber nama: `src/config/tables.ts`
 
@@ -548,7 +599,7 @@ Sumber nama: `src/config/tables.ts`
 
 ---
 
-## 14. Electron & sidecar
+## 15. Electron & sidecar
 
 ### 14.1 Bootstrap
 
@@ -603,7 +654,7 @@ Build sidecar: `npm run build:sidecar` → `resources/sidecar/` + nama dari `sid
 
 ---
 
-## 15. Hak akses (Admin vs Operator)
+## 16. Hak akses (Admin vs Operator)
 
 Model: `src/lib/userRole.ts` — role dari **username login**, bukan kolom `users.role` DB.
 
@@ -625,7 +676,7 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 
 ---
 
-## 16. Peta file penting
+## 17. Peta file penting
 
 ### UI Group Monitoring
 
@@ -661,6 +712,8 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | `sessionColumnFlowSpec.ts` | Spec matrix session column |
 | `accountMasterDailyCompare.ts` | Engine Y/X + ticket breakdown |
 | `reconcileTickets.ts` | Upsert tickets DB |
+| `clearAccountSession.ts` | Clear Session — purge lokal + invalidate DB |
+| `messagingAccounts.ts` | Remove slot + rebuild master |
 
 ### Electron main
 
@@ -683,7 +736,7 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 
 ---
 
-## 17. Validator & script QA
+## 18. Validator & script QA
 
 **Audit doc ini:**
 
@@ -697,7 +750,8 @@ Jalankan sebelum release: `npm run validate:pre-release`
 |--------|-------|
 | `validate:master-reference` | **Fakta doc vs repo** (`audit-project-master-reference.mjs`) |
 | `validate:sync-scraper-spec` | Spec vs implementasi sync/scraper |
-| `validate:session-flow` | Routing kolom session |
+| `validate:session-flow` | Routing kolom session + `validate-clear-session` |
+| `validate:account-slot-lifecycle` | Remove slot + rebuild master + purge WA |
 | `validate:account-slot-lifecycle` | Slot min 3, add/remove |
 | `validate:wa-qr-login` | Timeout QR WA, modal close |
 | `validate:telegram-login` | Alur login TG |
@@ -749,6 +803,7 @@ flowchart TD
 |---------|-----------|
 | 2026-06-06 | Dokumen master awal |
 | 2026-06-06 | Audit script `validate:master-reference`; perbaiki endpoint sidecar; hierarki kebenaran; hak akses Sync admin-only |
+| 2026-06-11 | Grid 9 kolom (On device, In brand); Clear Session; remove slot rebuild master; group link 7 kolom |
 
 ---
 

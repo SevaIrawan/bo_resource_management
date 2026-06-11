@@ -11,7 +11,7 @@
     <p class="doc-cover-logo">Backend Operation</p>
     <h1>Resource Management</h1>
     <p class="doc-cover-subtitle">Official User Guide</p>
-    <table class="doc-meta-table"></table>
+    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.14</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Admin → Language)</td></tr></table>
   </header>
   
 <section class="doc-toc">
@@ -30,36 +30,7 @@
 <li><a href="#appendix-quick-feature-map">Appendix — Quick feature map</a></li></ol>
 </section>
   <main class="doc-body">
-    <h1 id="resource-management-official-user-guide-english">Resource Management — Official User Guide (English)</h1>
-<table>
-<thead>
-<tr>
-<th></th>
-<th></th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Product</strong></td>
-<td>Backend Operation — Resource Management</td>
-</tr>
-<tr>
-<td><strong>App version</strong></td>
-<td>1.0.11</td>
-</tr>
-<tr>
-<td><strong>Audience</strong></td>
-<td>Internal operations team (marketing / monitoring of WhatsApp &amp; Telegram groups)</td>
-</tr>
-<tr>
-<td><strong>Platform</strong></td>
-<td>Windows desktop (<code>.exe</code>)</td>
-</tr>
-<tr>
-<td><strong>UI languages</strong></td>
-<td>English / 中文 (Admin → Language)</td>
-</tr>
-</tbody></table>
-<p>This document is the <strong>official guide to every feature</strong> in the current application. For architecture and IT release notes, see <a href="../../PROJECT.md">PROJECT.md</a>.</p>
+    <p>This document is the <strong>official guide to every feature</strong> in the current application. For architecture and IT release notes, see <a href="../../PROJECT.md">PROJECT.md</a>.</p>
 <hr>
 <h2 id="table-of-contents">Table of contents</h2>
 <ol>
@@ -434,7 +405,7 @@
 </tr>
 <tr>
 <td><strong>X (Dismiss)</strong></td>
-<td>Hide card for <strong>this session only</strong> — does not delete database data</td>
+<td>Remove brand from database (confirmation modal)</td>
 </tr>
 </tbody></table>
 <h4 id="add-account-add">Add account (+Add)</h4>
@@ -494,12 +465,22 @@
 <tr>
 <td><strong>Session</strong></td>
 <td><strong>Valid</strong> / <strong>Invalid</strong></td>
-<td>Invalid → platform login required first</td>
+<td>Invalid → login first; <strong>X on hover</strong> when Valid = <strong>Clear Session</strong></td>
 </tr>
 <tr>
 <td><strong>Groups</strong></td>
 <td><code>Y/X</code></td>
 <td>Y = groups on device today; X = brand standard for same platform</td>
+</tr>
+<tr>
+<td><strong>On device</strong></td>
+<td>Single number</td>
+<td>Total groups on phone/PC (daily)</td>
+</tr>
+<tr>
+<td><strong>In brand</strong></td>
+<td><code>y/x</code></td>
+<td>Master groups joined on this account / total master</td>
 </tr>
 <tr>
 <td><strong>Admin</strong></td>
@@ -532,11 +513,15 @@
 </tr>
 <tr>
 <td><strong>X (hover, right of name)</strong></td>
-<td><strong>Remove from slot</strong> — detach account from slot (confirmation modal)</td>
+<td><strong>Remove from slot</strong> — delete account row + rebuild brand master (confirmation)</td>
+</tr>
+<tr>
+<td><strong>X (hover, Session column, Valid only)</strong></td>
+<td><strong>Clear Session</strong> — log out on this PC + database; next Sync opens clean QR</td>
 </tr>
 <tr>
 <td><strong>Group link</strong></td>
-<td>Modal: group name, ID, invite link, admin flag — needs scrape data</td>
+<td>Modal: daily 7-column table or admin vs master — needs scrape data</td>
 </tr>
 </tbody></table>
 <p>Tooltip: <strong>Sync account</strong>.</p>
@@ -675,8 +660,12 @@
 </tr>
 </thead>
 <tbody><tr>
-<td>Table</td>
-<td>Group name, Group ID, Invite link, Admin (Yes/No)</td>
+<td>Table (daily mode)</td>
+<td>No, Group Name, Group ID, Member Count, Admin Count, Is Admin, Invite Link</td>
+</tr>
+<tr>
+<td>Excel export</td>
+<td><code>RM-[account name]-YYYYMMDD.xlsx</code></td>
 </tr>
 <tr>
 <td>Admin filter</td>
@@ -783,11 +772,6 @@
 <td><strong>Not admin</strong></td>
 <td>In group but not admin</td>
 <td>Request admin rights</td>
-</tr>
-<tr>
-<td><strong>Group count mismatch</strong></td>
-<td>Device count ≠ brand standard</td>
-<td>Audit and align</td>
 </tr>
 <tr>
 <td><strong>Duplicate group ID</strong></td>
@@ -1254,7 +1238,9 @@
 <p><strong>Dashboard login fails?</strong><br>Contact IT — account required in <code>users</code> table.</p>
 <p><strong>Telegram QR or login errors?</strong><br>Contact IT — verify Telegram API credentials and database migration <code>023</code>.</p>
 <p><strong>What is the difference between Card view and Table view?</strong><br>Same data; Card view groups by brand, Table view is one flat list.</p>
-<p><strong>Does Dismiss (X on brand card) delete the brand?</strong><br>No — it only hides the card until you reload or refilter.</p>
+<p><strong>Does Dismiss (X on brand card) delete the brand?</strong><br>Yes — after confirmation it removes the brand and related data from the database.</p>
+<p><strong>Why QR error &quot;still starting from previous attempt&quot;?</strong><br>Stuck WA session on this PC — wait a few seconds, or use <strong>Clear Session</strong> (X on Session when Valid) then Sync again.</p>
+<p><strong>Can another operator Sync an account I logged in on my PC?</strong><br>For WhatsApp, no — auth stays on your PC until they <strong>Clear Session</strong> (or you do) and they scan QR on their PC.</p>
 <p><strong>Where is UI language changed?</strong><br><strong>Admin</strong> → <strong>Preferences</strong> → <strong>Language</strong> → English or 中文.</p>
 <hr>
 <h2 id="appendix-quick-feature-map">Appendix — Quick feature map</h2>
@@ -1265,7 +1251,7 @@
         │     ├─ Slicer: Search, Brand, Platform, Status, Card|Table, Export
         │     └─ Per Brand Card
         │           ├─ +Add account (WhatsApp / Telegram)
-        │           ├─ Row: Sync ↻ | Remove X | Group link
+        │           ├─ Row: Sync ↻ | Remove X (account) | Clear X (session) | Group link
         │           └─ Scraper: Run
         └─ [Tab Ticket]
               ├─ KPI: Open, Missing, Not admin, Groups to handle, …
@@ -1305,11 +1291,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>This guide matches application version <strong>1.0.11</strong>. Update this document when new features ship.</em></p>
+<p><em>This guide matches application version <strong>1.0.14</strong>. Update this document when new features ship.</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — Resource Management v1.0.11</p>
+    <p>Internal use only — Resource Management v1.0.14</p>
   </footer>
 </body>
 </html>

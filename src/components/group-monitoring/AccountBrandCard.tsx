@@ -32,11 +32,13 @@ interface AccountBrandCardProps {
   canOperatePlatform?: boolean;
   onAddAccount: (input: AddAccountInput) => Promise<void>;
   onSyncAccount?: (accountId: string) => void;
+  onClearSession?: (accountId: string) => void;
   onRemoveFromSlot?: (account: import('@/types/accountMonitoringUi').AccountBrandRow) => void;
   onRunScraper?: (accountId: string) => void;
   onCancelScrape?: (accountId: string) => void;
   checkingAccountId?: string | null;
   scraperAccountId?: string | null;
+  clearingSessionAccountId?: string | null;
   getScrapeProgress?: (accountId: string) => UiScrapeProgress | null;
   defaultExpanded?: boolean;
   onDismiss?: () => void;
@@ -48,11 +50,13 @@ export function AccountBrandCard({
   canOperatePlatform = true,
   onAddAccount,
   onSyncAccount,
+  onClearSession,
   onRemoveFromSlot,
   onRunScraper,
   onCancelScrape,
   checkingAccountId = null,
   scraperAccountId = null,
+  clearingSessionAccountId = null,
   getScrapeProgress,
   defaultExpanded = true,
   onDismiss,
@@ -215,6 +219,10 @@ export function AccountBrandCard({
                       onRemoveFromSlot={
                         onRemoveFromSlot ? () => onRemoveFromSlot(row) : undefined
                       }
+                      onClearSession={
+                        onClearSession ? () => onClearSession(row.id) : undefined
+                      }
+                      clearSessionLoading={clearingSessionAccountId === row.id}
                     />
                   ))}
                   {group.emptySlots.map((slot) => (

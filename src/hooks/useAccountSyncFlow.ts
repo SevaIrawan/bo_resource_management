@@ -57,6 +57,7 @@ import {
   unlockUserAction,
   userActionLockErrorCode,
 } from '@/lib/userActionGate';
+import { CLEAR_SESSION_REASON, clearAccountSession } from '@/lib/clearAccountSession';
 
 export type SyncFlowStep =
   | 'idle'
@@ -139,6 +140,7 @@ export function useAccountSyncFlow({
   const [scrapeProgressBySession, setScrapeProgressBySession] = useState<
     Record<string, UiScrapeProgress>
   >({});
+  const [clearingSessionAccountId, setClearingSessionAccountId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = window.electronAPI?.scraper?.onProgress?.((payload) => {
@@ -555,6 +557,73 @@ export function useAccountSyncFlow({
       void runSyncCheck(groupId, account);
     },
     [runSyncCheck],
+  );
+
+  const handleClearSession = useCallback(
+    async (groupId: string, account: AccountBrandRow) => {
+      if (!canOperatePlatform || !userId) return;
+      if (account.sessionStatus !== 'valid') return;
+      if (account.actionProcess) return;
+
+      if (processingAccountId && processingAccountId !== account.id) {
+        reportBlockingError(t('groupMonitoring.accountCard.operationGlobalBusy'));
+        return;
+      }
+      if (processingAccountId === account.id) return;
+
+      const lock = tryLockUserAction(account.id, 'sync');
+      if (!lock.ok) return;
+
+      setClearingSessionAccountId(account.id);
+
+      if (step === 'platform-login' && target?.account.id === account.id) {
+        await window.electronAPI?.platformLogin
+          ?.cancel(target.account.id, target.account.platform)
+          .catch(() => undefined);
+        dismissSyncModals();
+        clearRowProcessing(target.groupId, target.account.id);
+        setTarget(null);
+        setProcessingAccountId(null);
+        setProcessingDbAccountId(null);
+        processingDbAccountIdRef.current = null;
+        setProcessingAction(null);
+      }
+
+      try {
+        const { dbAccountId, result } = await clearAccountSession({ userId, account });
+
+        await applyResult(groupId, account.id, result);
+        await recordSyncActivity({
+          accountId: dbAccountId,
+          platform: account.platform,
+          syncSource: 'manual',
+          sessionStatus: 'logout',
+          deviceGroups: result.groupsCurrent,
+          brandGroups: result.groupsTotal,
+          adminGroups: result.adminCurrent,
+          message: CLEAR_SESSION_REASON,
+        });
+      } catch (error) {
+        reportBlockingError(
+          getErrorMessage(error, t('groupMonitoring.accountCard.clearSessionFailed')),
+        );
+      } finally {
+        unlockUserAction(account.id);
+        setClearingSessionAccountId(null);
+      }
+    },
+    [
+      applyResult,
+      canOperatePlatform,
+      clearRowProcessing,
+      dismissSyncModals,
+      processingAccountId,
+      reportBlockingError,
+      step,
+      t,
+      target,
+      userId,
+    ],
   );
 
   const runScrapeInBackground = useCallback(
@@ -1002,6 +1071,8 @@ export function useAccountSyncFlow({
     phoneSaving,
     activePlatform,
     handleSyncAccount,
+    handleClearSession,
+    clearingSessionAccountId,
     handleRunScraper,
     requestCancelScrape,
     confirmCancelScrape,

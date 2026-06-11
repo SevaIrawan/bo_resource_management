@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.12 |
+| **App version** | 1.0.14 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
-| **Platform** | Windows desktop (`.exe`) |
+| **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (Admin → Language) |
 
 This document is the **official guide to every feature** in the current application. For architecture and IT release notes, see [PROJECT.md](../../PROJECT.md).
@@ -191,7 +191,7 @@ Each brand (e.g. **Brand : SBMY**) has one card.
 | **WA x std / TG x std** | Standard (master) group count per platform |
 | **All aligned** / **N accounts not aligned** | Health summary for this brand |
 | **+Add** | Add new account (choose WA or TG) |
-| **X (Dismiss)** | Hide card for **this session only** — does not delete database data |
+| **X (Dismiss)** | Remove brand from database (confirmation modal) |
 
 #### Add account (+Add)
 
@@ -212,8 +212,10 @@ Each brand (e.g. **Brand : SBMY**) has one card.
 | **Account** | Platform + name + phone | WA/TG icon, name, number below |
 | **Brand** | Brand name | Same for all rows in the card |
 | **Status** | **Active** = valid session; **Logout** = invalid | Green / red indicator |
-| **Session** | **Valid** / **Invalid** | Invalid → platform login required first |
+| **Session** | **Valid** / **Invalid** | Invalid → login first; **X on hover** when Valid = **Clear Session** |
 | **Groups** | `Y/X` | Y = groups on device today; X = brand standard for same platform |
+| **On device** | Single number | Total groups on phone/PC (daily) |
+| **In brand** | `y/x` | Master groups joined on this account / total master |
 | **Admin** | Bar + `a/X` | How many groups you are admin of vs standard |
 | **Scraper** | **Run** + time / progress | Full group read into database |
 | **Action** | **Group link** | Open group list + invite links |
@@ -225,8 +227,9 @@ Each brand (e.g. **Brand : SBMY**) has one card.
 | Control | Function |
 |---------|--------|
 | **↻ (Sync)** | Primary flow: platform login or live session check + count update |
-| **X (hover, right of name)** | **Remove from slot** — detach account from slot (confirmation modal) |
-| **Group link** | Modal: group name, ID, invite link, admin flag — needs scrape data |
+| **X (hover, right of name)** | **Remove from slot** — delete account row + rebuild brand master (confirmation) |
+| **X (hover, Session column, Valid only)** | **Clear Session** — log out on this PC + database; next Sync opens clean QR |
+| **Group link** | Modal: daily 7-column table or admin vs master — needs scrape data |
 
 Tooltip: **Sync account**.
 
@@ -286,7 +289,8 @@ Open via **Action → Group link**. Choose a mode:
 
 | Feature | Function |
 |---------|----------|
-| Table | Group name, Group ID, Invite link, Admin (Yes/No) |
+| Table (daily mode) | No, Group Name, Group ID, Member Count, Admin Count, Is Admin, Invite Link |
+| Excel export | `RM-[account name]-YYYYMMDD.xlsx` |
 | Admin filter | All / admin only / non-admin |
 | Pagination | Previous / Next when many groups |
 
@@ -343,7 +347,6 @@ Ticket card counts use the **same engine** as the Groups/Admin columns on the Ac
 |-----------|---------------|----------------------|
 | **Missing group** | In brand master but not on this account | Join group (use export invite links) |
 | **Not admin** | In group but not admin | Request admin rights |
-| **Group count mismatch** | Device count ≠ brand standard | Audit and align |
 | **Duplicate group ID** | Same ID, conflicting names | Audit master data |
 | **Duplicate group name** | Same name, different IDs in master | Audit master data |
 | **Device junk group** | On phone but not in master | Leave/clean junk groups on phone |
@@ -580,7 +583,13 @@ Contact IT — verify Telegram API credentials and database migration `023`.
 Same data; Card view groups by brand, Table view is one flat list.
 
 **Does Dismiss (X on brand card) delete the brand?**  
-No — it only hides the card until you reload or refilter.
+Yes — after confirmation it removes the brand and related data from the database.
+
+**Why QR error "still starting from previous attempt"?**  
+Stuck WA session on this PC — wait a few seconds, or use **Clear Session** (X on Session when Valid) then Sync again.
+
+**Can another operator Sync an account I logged in on my PC?**  
+For WhatsApp, no — auth stays on your PC until they **Clear Session** (or you do) and they scan QR on their PC.
 
 **Where is UI language changed?**  
 **Admin** → **Preferences** → **Language** → English or 中文.
@@ -597,7 +606,7 @@ Login (Username / Password)
         │     ├─ Slicer: Search, Brand, Platform, Status, Card|Table, Export
         │     └─ Per Brand Card
         │           ├─ +Add account (WhatsApp / Telegram)
-        │           ├─ Row: Sync ↻ | Remove X | Group link
+        │           ├─ Row: Sync ↻ | Remove X (account) | Clear X (session) | Group link
         │           └─ Scraper: Run
         └─ [Tab Ticket]
               ├─ KPI: Open, Missing, Not admin, Groups to handle, …
@@ -625,4 +634,4 @@ Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type,
 
 ---
 
-*This guide matches application version **1.0.12**. Update this document when new features ship.*
+*This guide matches application version **1.0.14**. Update this document when new features ship.*

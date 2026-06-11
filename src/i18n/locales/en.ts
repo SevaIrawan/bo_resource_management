@@ -138,6 +138,8 @@ export const en = {
       sessionValid: 'Valid',
       sessionInvalid: 'Invalid',
       sessionChecking: 'Checking Session on Device',
+      clearSessionAria: 'Clear session — log out on this PC and in database',
+      clearSessionFailed: 'Failed to clear session. Try again.',
       procSync: 'PROC SYNC',
       procScraper: 'PROC SCRAPER',
       run: 'Run',

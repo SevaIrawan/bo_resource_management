@@ -1,6 +1,6 @@
 # Install Resource Management (Linux) — Tim Internal
 
-> **Status:** Skrip build & konfigurasi electron-builder **sudah ada** (v1.0.4+). Versi produksi terbaru: **1.0.12**.  
+> **Status:** Skrip build & konfigurasi electron-builder **sudah ada** (v1.0.4+). Versi produksi terbaru: **1.0.14**.  
 > Installer Linux harus di-build di **mesin Linux** (atau GitHub Actions). Lihat [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md).
 
 Dokumen resmi lengkap: **[PROJECT.md](./PROJECT.md)**

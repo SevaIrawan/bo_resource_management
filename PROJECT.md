@@ -1,6 +1,6 @@
 # Resource Management — Dokumen Resmi Proyek
 
-**Versi dokumen:** 2026-06-03  
+**Versi dokumen:** 2026-06-11  
 **Versi aplikasi:** `1.0.14` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
@@ -61,11 +61,11 @@
               Supabase (PostgreSQL + Realtime)
 ```
 
-**Prinsip data:** Semua data bisnis (brand, akun, grup, ticket, session flag) di **Supabase**. Sesi device WA/TG: string/session di DB + file auth WA di `%APPDATA%\Resource Management\wa-sessions\`.
+**Prinsip data:** Semua data bisnis (brand, akun, grup, ticket, session flag) di **Supabase**. **WhatsApp:** auth asli hanya di folder lokal `%APPDATA%\Resource Management\wa-sessions\` per PC; DB hanya flag `platform_sessions` + `localAuthClientId`. **Telegram:** session string di DB + sidecar di PC. Handoff operator/PC lain: **Clear Session** (tombol X di kolom Session Valid) → purge lokal + invalidate DB.
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.12)
+## 4. Konfigurasi & installer (kondisi 1.0.14)
 
 ### 4.1 Variabel lingkungan
 
@@ -147,11 +147,16 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 
 ### 6.1 Group Monitoring (`/`)
 
-- Brand card + tabel akun (WA hijau / TG biru)
-- Kolom: Account, Brand, Status, Session, Groups, Admin, Scraper, Action
-- **Session:** INVALID → login modal; VALID → probe device / SYNC / RUN
+- Brand card + tabel akun (WA hijau / TG biru) — **9 kolom data**
+- Kolom: Account, Brand, Status, Session, Groups, **On device**, **In brand**, Admin, Scraper, Action
+- **Groups / Admin:** format `Y/X` (device vs standar brand)
+- **On device:** total grup di device/daily (`groupsCurrent`)
+- **In brand:** join di master brand (`joinedInMaster` / `groupsTotal`)
+- **Session:** INVALID → Sync/Run langsung modal login; VALID → probe device lalu SYNC / RUN
+- **Clear Session (X):** hover baris/kolom Session saat **Valid** → purge session lokal + `platform_sessions` invalid → badge Logout/Invalid; Sync berikutnya QR bersih (bukan stuck restore)
 - Multi-akun per brand (slot kosong + Add)
-- Remove akun dari slot → nonaktifkan DB + cabut sesi device (WA: `purgeWaDisk`)
+- Remove akun dari slot → DELETE `messaging_accounts` (CASCADE) + purge WA lokal + **rebuild `groups_master`** dari daily akun tersisa
+- **Group link:** modal 7 kolom (daily akun) atau admin vs master; export `RM-[nama akun]-YYYYMMDD.xlsx`
 - Export: group links, semua akun, tickets (Excel)
 - Auto-sync terjadwal (`useAutoAccountSync`)
 
@@ -322,4 +327,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.12**. Jika version atau alur berubah, perbarui bagian 4, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.14**. Jika version atau alur berubah, perbarui bagian 4, 6, 9, dan nomor versi di header.*

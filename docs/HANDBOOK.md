@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.12 |
+| **Versi app** | 1.0.14 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
-| **Platform** | Windows desktop (`.exe`) |
+| **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Admin → Language) |
 
 Dokumen ini adalah **referensi internal (Bahasa Indonesia)**.  
@@ -163,7 +163,7 @@ Setiap brand (mis. **Brand : SBMY**) punya satu kartu.
 | **WA x std / TG x std** | Jumlah grup **standar** master per platform |
 | **All aligned** / **N accounts not aligned** | Ringkasan kesehatan data |
 | **+Add** | Tambah akun baru (pilih WA atau TG) |
-| **X (Dismiss)** | Sembunyikan card dari tampilan **sesi ini saja** (tidak hapus database) |
+| **X (Dismiss)** | Hapus brand dari database (modal konfirmasi) — bukan sekadar sembunyikan UI |
 
 **Tombol + Add:**
 
@@ -182,8 +182,10 @@ Setiap brand (mis. **Brand : SBMY**) punya satu kartu.
 | **Account** | Platform + nama + nomor | Ikon WA/TG, nama, nomor di bawah |
 | **Brand** | Nama brand | Sama untuk semua baris di card |
 | **Status** | **Active** = session valid; **Logout** = tidak valid | Titik hijau / merah |
-| **Session** | **VALID** / **INVALID** | INVALID = harus login platform dulu |
+| **Session** | **VALID** / **INVALID** | INVALID = harus login platform dulu; **X (hover)** saat Valid = **Clear Session** |
 | **Groups** | `Y/X` | Y = grup di device hari ini; X = standar brand (platform sama) |
+| **On device** | Angka tunggal | Total grup di HP/PC (daily) |
+| **In brand** | `y/x` | Grup master brand yang sudah join di akun ini / total master |
 | **Admin** | Bar + `a/X` | Berapa grup Anda admin vs standar |
 | **Scraper** | **Run** + waktu / progress | Jalankan baca ulang grup ke database |
 | **Action** | **Group link** | Buka daftar grup + link invite |
@@ -193,8 +195,9 @@ Setiap brand (mis. **Brand : SBMY**) punya satu kartu.
 | Kontrol | Fungsi |
 |---------|--------|
 | **↻ (Sync)** | Alur utama: login platform atau cek session + update angka |
-| **X (hover, kanan nama)** | **Remove from slot** — lepas akun dari slot (konfirmasi modal) |
-| **Group link** | Modal daftar grup (nama, ID, link, admin) — perlu data scrape |
+| **X (hover, kanan nama)** | **Remove from slot** — hapus akun dari slot + rebuild master brand (konfirmasi modal) |
+| **X (hover, kolom Session, hanya Valid)** | **Clear Session** — logout di PC ini + database; Sync berikutnya buka QR bersih |
+| **Group link** | Modal daftar grup — mode daily 7 kolom atau admin vs master — perlu data scrape |
 
 ### 4.5 Alur **Sync (↻)** — sangat penting
 
@@ -239,7 +242,8 @@ Buka dari **Action → Group link**. Pilih mode:
 
 | Fitur | Fungsi |
 |-------|--------|
-| Tabel grup | Nama, Group ID, invite link, Admin (Yes/No) |
+| Tabel grup (mode daily) | No, Group Name, Group ID, Member Count, Admin Count, Is Admin, Invite Link |
+| Export Excel | `RM-[nama akun]-YYYYMMDD.xlsx` |
 | Filter Admin | All / hanya admin / non-admin |
 | Pagination | Navigasi halaman jika grup banyak |
 
@@ -251,7 +255,7 @@ Kosong? Jalankan **Run** scraper dulu.
 
 1. Arahkan mouse ke baris akun → ikon **X**
 2. Konfirmasi **Remove**
-3. Efek: akun nonaktif di database, session device dicabut (WA: hapus auth disk di PC ini)
+3. Efek: baris akun dihapus (CASCADE daily/ticket/session), purge WA di PC ini, **master brand** dihitung ulang dari akun tersisa
 
 Gunakan ini sebelum ganti akun test ke akun marketing — atau biarkan IT hapus dari database (lihat [§7](#7-sinkronisasi-data-realtime)).
 
@@ -290,7 +294,6 @@ Angka di kartu tab Ticket memakai **engine yang sama** dengan kolom Groups/Admin
 |------|--------------|------------------------|
 | **Missing group** | Grup ada di master brand tapi tidak ada di akun ini | Join grup (pakai link export) |
 | **Not admin** | Sudah di grup tapi belum admin | Minta jadi admin |
-| **Group count mismatch** | Jumlah grup device ≠ standar brand | Audit & selaraskan |
 | **Duplicate group ID** | ID grup bentrok antar nama | Audit data master |
 | **Duplicate group name** | Nama sama, ID beda | Audit data master |
 | **Device junk group** | Grup di HP tidak ada di master | Bersihkan di HP / keluar grup sampah |
@@ -405,7 +408,9 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 | Lokasi | Isi |
 |--------|-----|
 | **Cloud (Supabase)** | Brand, akun, grup, ticket, session flag |
-| **PC (AppData)** | Auth WhatsApp per akun, preferensi auto-sync, bahasa |
+| **PC (AppData)** | Auth WhatsApp per akun (**hanya di PC yang scan QR**), preferensi auto-sync, bahasa |
+
+**WhatsApp multi-PC:** Session WA tidak pindah antar PC. Serah akun ke operator lain → **Clear Session** di PC lama (opsional) → operator baru **Sync** + scan QR di PC-nya.
 
 ---
 
@@ -464,7 +469,13 @@ Tidak. Restart saja setelah notifikasi update (jika IT sudah publish ke GitHub).
 Tidak. Hanya data di dashboard.
 
 **Kenapa Session VALID tapi Run tetap minta login?**  
-Device di PC ini mungkin sudah logout — klik Sync untuk cek ulang.
+Device di PC ini mungkin sudah logout — klik Sync untuk cek ulang, atau **Clear Session** lalu Sync lagi.
+
+**Kenapa QR error "still starting from previous attempt"?**  
+Session WA stuck di PC ini — tunggu beberapa detik, atau **Clear Session** (X di kolom Session saat Valid) lalu Sync.
+
+**Operator lain tidak bisa Sync akun yang saya login?**  
+Normal untuk WA — auth ada di PC Anda. Clear Session + mereka scan QR di PC mereka.
 
 **Kenapa Groups 12/21?**  
 12 grup terdeteksi di device; 21 = standar brand untuk platform itu (WA terpisah dari TG).
@@ -493,7 +504,7 @@ Login
         │     ├─ Filter / Search / Export / Card|Table
         │     └─ Per Brand Card
         │           ├─ +Add account (WA/TG)
-        │           ├─ Row: Sync ↻ | Remove X | Group link
+        │           ├─ Row: Sync ↻ | Remove X (akun) | Clear X (session) | Group link
         │           └─ Scraper: Run
         └─ [Tab Ticket]
               ├─ KPI
@@ -507,4 +518,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.12**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*
+*Handbook ini selaras dengan aplikasi versi **1.0.14**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*

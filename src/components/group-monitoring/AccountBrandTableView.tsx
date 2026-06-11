@@ -22,8 +22,16 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
   const { t } = useLanguage();
   const { canManageStructure, canOperatePlatform } = usePermissions();
   const rows = flattenBrandAccounts(groups);
-  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, requestCancelScrape, getScrapeProgress } =
-    sync;
+  const {
+    processingAccountId,
+    processingAction,
+    clearingSessionAccountId,
+    handleSyncAccount,
+    handleClearSession,
+    handleRunScraper,
+    requestCancelScrape,
+    getScrapeProgress,
+  } = sync;
 
   function handleSyncRow(accountId: string) {
     if (!canOperatePlatform) return;
@@ -39,6 +47,14 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
     const account = group?.accounts.find((row) => row.id === accountId);
     if (!group || !account) return;
     void handleRunScraper(group.id, account);
+  }
+
+  function handleClearSessionRow(accountId: string) {
+    if (!canOperatePlatform) return;
+    const group = groups.find((item) => item.accounts.some((row) => row.id === accountId));
+    const account = group?.accounts.find((row) => row.id === accountId);
+    if (!group || !account) return;
+    void handleClearSession(group.id, account);
   }
 
   function handleRemoveRow(accountId: string) {
@@ -82,6 +98,8 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
                   }
                   scrapeProgress={getScrapeProgress(row.id)}
                   onRemoveFromSlot={() => handleRemoveRow(row.id)}
+                  onClearSession={() => handleClearSessionRow(row.id)}
+                  clearSessionLoading={clearingSessionAccountId === row.id}
                 />
               ))
             ) : (

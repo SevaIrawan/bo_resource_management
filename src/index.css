@@ -1783,6 +1783,65 @@
     justify-content: center;
   }
 
+  .brand-session-cell-inline {
+    display: inline-flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  .brand-session-clear-btn {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    padding: 0.1875rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity 160ms ease,
+      background-color 160ms ease,
+      color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .brand-account-row--clearable-session:hover .brand-session-clear-btn,
+  .brand-account-row--clearable-session:focus-within .brand-session-clear-btn,
+  .brand-col-cell--session-clearable:hover .brand-session-clear-btn,
+  .brand-session-clear-btn:focus-visible,
+  .brand-session-clear-btn--visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .brand-session-clear-btn:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.14);
+    color: var(--color-danger);
+  }
+
+  .brand-session-clear-btn:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  .brand-session-clear-btn:disabled {
+    cursor: not-allowed;
+  }
+
+  .brand-card-table tbody tr.brand-account-row--clearable-session:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .brand-session-clear-btn--spin {
+    animation: brand-sync-spin 0.85s linear infinite;
+  }
+
   .brand-scraper-run-link {
     border: 0;
     padding: 0;

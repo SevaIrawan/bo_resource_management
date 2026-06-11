@@ -38,8 +38,16 @@ export function AccountBrandCardList({
   const [removeSaving, setRemoveSaving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
-  const { processingAccountId, processingAction, handleSyncAccount, handleRunScraper, requestCancelScrape, getScrapeProgress } =
-    sync;
+  const {
+    processingAccountId,
+    processingAction,
+    clearingSessionAccountId,
+    handleSyncAccount,
+    handleClearSession,
+    handleRunScraper,
+    requestCancelScrape,
+    getScrapeProgress,
+  } = sync;
 
   async function handleAddBrand(brandName: string) {
     if (!canManageStructure) return;
@@ -145,7 +153,13 @@ export function AccountBrandCardList({
               const account = group.accounts.find((row) => row.id === accountId);
               if (account) handleSyncAccountForGroup(group, account);
             }}
+            onClearSession={(accountId) => {
+              if (!canOperatePlatform) return;
+              const account = group.accounts.find((row) => row.id === accountId);
+              if (account) void handleClearSession(group.id, account);
+            }}
             onRemoveFromSlot={(account) => onRemoveFromSlot(group.id, account)}
+            clearingSessionAccountId={clearingSessionAccountId}
             onRunScraper={(accountId) => {
               if (!canOperatePlatform) return;
               const account = group.accounts.find((row) => row.id === accountId);

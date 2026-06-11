@@ -65,11 +65,18 @@ check('DEFAULT_EMPTY_SLOT_COUNT = 3', () => {
     : fail('DEFAULT_EMPTY_SLOT_COUNT not 3');
 });
 
-check('grid 8 columns', () => {
+check('grid 9 columns', () => {
   const t = read('src/components/group-monitoring/AccountMonitoringTableParts.tsx');
-  return /ACCOUNT_TABLE_COLUMN_COUNT = 8/.test(t)
-    ? ok('ACCOUNT_TABLE_COLUMN_COUNT = 8')
-    : fail('column count not 8');
+  return /ACCOUNT_TABLE_COLUMN_COUNT = 9/.test(t)
+    ? ok('ACCOUNT_TABLE_COLUMN_COUNT = 9')
+    : fail('column count not 9');
+});
+
+check('clear session module', () => {
+  const t = read('src/lib/clearAccountSession.ts');
+  if (!t.includes('CLEAR_SESSION_REASON')) return fail('CLEAR_SESSION_REASON missing');
+  if (!t.includes('invalidatePlatformSessionEverywhere')) return fail('clear session must invalidate DB');
+  return ok('clearAccountSession.ts present');
 });
 
 check('accountActionColumn resolver', () => {

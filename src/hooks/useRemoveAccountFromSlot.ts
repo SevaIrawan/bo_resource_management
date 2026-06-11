@@ -3,6 +3,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { removeAccountFromGroup } from '@/lib/accountBrandUtils';
 import { deactivateMessagingAccount } from '@/lib/messagingAccounts';
 import { getErrorMessage } from '@/lib/errorMessage';
+import { patchBrandPlatformMasterInGroups } from '@/lib/patchAccountMasterInGroups';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 
@@ -48,11 +49,24 @@ export function useRemoveAccountFromSlot(
         await deactivateMessagingAccount(account.id, account.platform);
       }
 
-      onGroupsChange((prev) =>
-        prev.map((item) =>
+      let groupsAfterRemove: AccountBrandGroup[] = [];
+      onGroupsChange((prev) => {
+        groupsAfterRemove = prev.map((item) =>
           item.id === groupId ? removeAccountFromGroup(item, account.id) : item,
-        ),
-      );
+        );
+        return groupsAfterRemove;
+      });
+
+      if (userId && groupsAfterRemove.length > 0) {
+        const patched = await patchBrandPlatformMasterInGroups(
+          groupsAfterRemove,
+          account.brandName,
+          account.platform,
+        );
+        if (patched !== groupsAfterRemove) {
+          onGroupsChange(() => patched);
+        }
+      }
 
       setRemoveTarget(null);
     } catch (error) {

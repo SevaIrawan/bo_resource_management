@@ -1,6 +1,7 @@
 import { ensureBrand } from '@/lib/brands';
 import { markPlatformSessionInvalid } from '@/lib/platformSessions';
 import { invalidatePlatformSessionEverywhere } from '@/lib/platformSessionSync';
+import { rebuildBrandGroupsMaster } from '@/lib/syncMasterAfterScrape';
 import { getSupabase } from '@/lib/supabase';
 import { TABLES } from '@/config/tables';
 import type { Platform } from '@/types/database';
@@ -126,9 +127,39 @@ export async function createMessagingAccount(
   return data.id as string;
 }
 
+async function fetchBrandNameForAccount(accountId: string): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from(TABLES.messagingAccounts)
+    .select('brand_id, metadata')
+    .eq('id', accountId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const metaBrand = String((data.metadata as { brand?: string } | null)?.brand ?? '').trim();
+  if (metaBrand) return metaBrand;
+
+  const brandId = data.brand_id as string | undefined;
+  if (!brandId) return null;
+
+  const { data: brandRow, error: brandError } = await supabase
+    .from(TABLES.brands)
+    .select('name')
+    .eq('id', brandId)
+    .maybeSingle();
+
+  if (brandError) throw brandError;
+  const name = String(brandRow?.name ?? '').trim();
+  return name || null;
+}
+
 /**
- * Lepas akun dari slot: cabut session device, hapus baris akun di DB (CASCADE daily/session/ticket).
- * Re-add nama+platform sama → INSERT baru atau reactivate baris legacy is_active=false.
+ * Lepas akun dari slot: cabut session device (+ purge WA local), hapus akun DB (CASCADE daily),
+ * lalu rebuild groups_master dari daily tersisa (kecuali brand_card_removed).
  */
 export async function removeMessagingAccountFromSlot(
   accountId: string,
@@ -139,6 +170,8 @@ export async function removeMessagingAccountFromSlot(
   if (!supabase) {
     throw new Error('SUPABASE_NOT_CONFIGURED');
   }
+
+  const brandName = await fetchBrandNameForAccount(accountId);
 
   if (window.electronAPI?.isElectron) {
     await invalidatePlatformSessionEverywhere(accountId, reason, platform, {
@@ -151,6 +184,10 @@ export async function removeMessagingAccountFromSlot(
   const { error } = await supabase.from(TABLES.messagingAccounts).delete().eq('id', accountId);
 
   if (error) throw error;
+
+  if (reason !== 'brand_card_removed' && brandName) {
+    await rebuildBrandGroupsMaster({ brand: brandName, platform });
+  }
 }
 
 /** Alias — bundle hapus brand & hook remove slot. */

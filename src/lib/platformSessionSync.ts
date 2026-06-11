@@ -1,7 +1,7 @@
 import {
   findAccountIdBySessionData,
   hasActivePlatformSession,
-  loadWhatsAppLocalAuthClientId,
+  loadWhatsAppLocalAuthClientIdForAccount,
   markPlatformSessionInvalid,
   savePlatformSession,
 } from '@/lib/platformSessions';
@@ -42,15 +42,22 @@ export async function invalidatePlatformSessionEverywhere(
   platform: Platform = 'telegram',
   options?: { purgeWaDisk?: boolean },
 ): Promise<void> {
-  await markPlatformSessionInvalid(accountId, reason, platform);
   let deviceSessionId = accountId;
+  let waLocalAuthId: string | null = null;
   if (platform === 'whatsapp') {
-    const localAuthId = await loadWhatsAppLocalAuthClientId(accountId);
-    if (localAuthId) deviceSessionId = localAuthId;
+    waLocalAuthId = await loadWhatsAppLocalAuthClientIdForAccount(accountId);
+    if (waLocalAuthId) deviceSessionId = waLocalAuthId;
   }
+
+  await markPlatformSessionInvalid(accountId, reason, platform);
+
   await releasePlatformSessionOnDevice(deviceSessionId, {
     purgeWaDisk: options?.purgeWaDisk,
   });
+
+  if (platform === 'whatsapp' && options?.purgeWaDisk && accountId !== deviceSessionId) {
+    await purgeWhatsAppAuthOnDevice(accountId);
+  }
 }
 
 /** Simpan session aktif ke DB (TG string / WA local auth client id). */

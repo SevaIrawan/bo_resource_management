@@ -32,6 +32,17 @@ const checks = [
       removeHook.includes('deactivateMessagingAccount'),
   },
   {
+    name: 'Remove slot: purge WA local + rebuild groups_master dari daily tersisa',
+    ok:
+      messagingTs.includes('rebuildBrandGroupsMaster') &&
+      messagingTs.includes('brand_card_removed') &&
+      read('src/lib/platformSessionSync.ts').includes('loadWhatsAppLocalAuthClientIdForAccount'),
+  },
+  {
+    name: 'Remove slot UI: patch master metrics akun tersisa',
+    ok: removeHook.includes('patchBrandPlatformMasterInGroups'),
+  },
+  {
     name: 'Re-add: reactivate baris legacy is_active=false',
     ok: messagingTs.includes('reactivateInactiveMessagingAccount'),
   },

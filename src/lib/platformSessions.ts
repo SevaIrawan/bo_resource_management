@@ -200,6 +200,27 @@ export async function loadWhatsAppLocalAuthClientId(accountId: string): Promise<
   return String(data).trim() || null;
 }
 
+/** LocalAuth clientId terbaru — termasuk baris sudah non-aktif (untuk purge disk saat remove slot). */
+export async function loadWhatsAppLocalAuthClientIdForAccount(
+  accountId: string,
+): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from(TABLES.platformSessions)
+    .select('session_data')
+    .eq('account_id', accountId)
+    .eq('session_type', 'whatsapp_local_auth')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data?.session_data) return null;
+  const id = String(data.session_data).trim();
+  return id || null;
+}
+
 export async function loadTelegramPlatformSession(accountId: string): Promise<string | null> {
   const rows = await fetchActivePlatformSessions(accountId);
   const telethon = rows.find((r) => r.session_type === 'telethon_string') ?? rows[0];

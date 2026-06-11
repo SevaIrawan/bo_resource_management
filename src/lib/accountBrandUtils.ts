@@ -88,6 +88,7 @@ export function addAccountToGroup(
     status: 'logout' as const,
     groupsCurrent: 0,
     groupsTotal: 0,
+    joinedInMaster: 0,
     adminCurrent: 0,
     adminTotal: 0,
     sessionStatus: 'invalid' as const,
@@ -169,6 +170,10 @@ export function applySyncResultToGroup(
       status: result.sessionStatus === 'valid' ? ('active' as const) : ('logout' as const),
       groupsCurrent: result.groupsCurrent,
       groupsTotal: result.groupsTotal,
+      joinedInMaster:
+        options?.masterTotal != null && options.masterTotal >= 0
+          ? options.masterTotal
+          : account.joinedInMaster,
       adminCurrent: result.adminCurrent,
       adminTotal: result.adminTotal,
       sessionStatus: result.sessionStatus,

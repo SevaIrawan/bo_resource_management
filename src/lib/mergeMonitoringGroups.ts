@@ -5,6 +5,7 @@ function metricFieldsFromRow(row: AccountBrandRow): Partial<AccountBrandRow> {
   return {
     groupsCurrent: row.groupsCurrent,
     groupsTotal: row.groupsTotal,
+    joinedInMaster: row.joinedInMaster,
     adminCurrent: row.adminCurrent,
     adminTotal: row.adminTotal,
     isMisaligned: row.isMisaligned,

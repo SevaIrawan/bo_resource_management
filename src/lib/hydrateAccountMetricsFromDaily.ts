@@ -11,7 +11,7 @@ export async function patchGroupsFromDailyInState(
   const found = findAccountInGroups(groups, accountId);
   if (!found) return groups;
 
-  const { result } = await buildMetricsFromScrapeDaily({
+  const { result, master } = await buildMetricsFromScrapeDaily({
     accountId: found.account.id,
     brand: found.account.brandName,
     platform: found.account.platform,
@@ -20,7 +20,9 @@ export async function patchGroupsFromDailyInState(
 
   return groups.map((group) =>
     group.id === found.group.id
-      ? applySyncResultToGroup(group, accountId, result)
+      ? applySyncResultToGroup(group, accountId, result, {
+          masterTotal: master.joinedInMaster,
+        })
       : group,
   );
 }

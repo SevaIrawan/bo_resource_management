@@ -193,6 +193,7 @@ export function applyMasterStatsToAccountRow(
     ...row,
     groupsCurrent: master.dailyTotal,
     groupsTotal: x,
+    joinedInMaster: master.joinedInMaster,
     adminCurrent: master.adminInMaster,
     adminTotal: x,
     syncState: row.syncState === 'pending' ? 'synced' : row.syncState,

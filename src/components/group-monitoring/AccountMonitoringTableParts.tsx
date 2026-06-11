@@ -1,7 +1,7 @@
 import { useLanguage } from '@/hooks/useLanguage';
 
-/** 8 kolom — lebar via CSS % (total 100%). */
-export const ACCOUNT_TABLE_COLUMN_COUNT = 8;
+/** 9 kolom — lebar via CSS % (total 100%). */
+export const ACCOUNT_TABLE_COLUMN_COUNT = 9;
 
 export function AccountMonitoringTableColGroup() {
   return (
@@ -10,7 +10,8 @@ export function AccountMonitoringTableColGroup() {
       <col className="brand-col brand-col--brand" />
       <col className="brand-col brand-col--status" />
       <col className="brand-col brand-col--session" />
-      <col className="brand-col brand-col--groups" />
+      <col className="brand-col brand-col--on-device" />
+      <col className="brand-col brand-col--in-brand" />
       <col className="brand-col brand-col--admin" />
       <col className="brand-col brand-col--scraper" />
       <col className="brand-col brand-col--action" />
@@ -36,8 +37,11 @@ export function AccountMonitoringTableHead() {
         <th className="brand-col-head brand-col-head--session">
           {t('groupMonitoring.accountCard.colSession')}
         </th>
-        <th className="brand-col-head brand-col-head--groups">
-          {t('groupMonitoring.accountCard.colGroups')}
+        <th className="brand-col-head brand-col-head--on-device">
+          {t('groupMonitoring.accountCard.colOnDevice')}
+        </th>
+        <th className="brand-col-head brand-col-head--in-brand">
+          {t('groupMonitoring.accountCard.colInBrand')}
         </th>
         <th className="brand-col-head brand-col-head--admin">
           {t('groupMonitoring.accountCard.colAdmin')}

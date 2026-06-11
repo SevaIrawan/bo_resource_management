@@ -24,7 +24,8 @@ function accountRowsForExport(rows: AccountBrandRow[]) {
     Platform: row.platform === 'whatsapp' ? 'WhatsApp' : 'Telegram',
     Phone: row.phoneNumber || '',
     Status: row.syncState === 'pending' ? 'Pending sync' : row.status,
-    Groups: row.syncState === 'pending' ? '' : `${row.groupsCurrent}/${row.groupsTotal}`,
+    'On device': row.syncState === 'pending' ? '' : row.groupsCurrent,
+    'In brand': row.syncState === 'pending' ? '' : `${row.joinedInMaster}/${row.groupsTotal}`,
     Admin: row.syncState === 'pending' ? '' : `${row.adminCurrent}/${row.adminTotal}`,
     'Group link': '',
   }));

@@ -274,6 +274,7 @@ export async function executeSyncCheck(input: {
     const updatedAccount: AccountBrandRow = {
       ...account,
       ...syncPayload.result,
+      joinedInMaster: syncPayload.masterJoined,
       status: 'active',
       sessionStatus: 'valid',
       isMisaligned: isRowMisaligned(syncPayload.result),

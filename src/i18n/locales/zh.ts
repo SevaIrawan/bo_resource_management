@@ -127,6 +127,8 @@ export const zh: Messages = {
       colStatus: '状态',
       colSession: '会话',
       colGroups: '群组',
+      colOnDevice: '设备群',
+      colInBrand: '品牌群',
       colAdmin: '管理员',
       colScraper: '抓取',
       colLastUpdate: '最后更新',

@@ -420,17 +420,19 @@ export function AccountTableRow({
                 )}
               </p>
             </div>
-            {showRemoveHover ? (
-              <AccountRemoveSlotIcon
-                onRemove={onRemoveFromSlot}
-                structureLocked={structureLocked}
+            <div className="brand-account-cell-tools">
+              {showRemoveHover ? (
+                <AccountRemoveSlotIcon
+                  onRemove={onRemoveFromSlot}
+                  structureLocked={structureLocked}
+                />
+              ) : null}
+              <AccountSyncIcon
+                onSync={onSync}
+                loading={syncLoading}
+                operateLocked={operateLocked}
               />
-            ) : null}
-            <AccountSyncIcon
-              onSync={onSync}
-              loading={syncLoading}
-              operateLocked={operateLocked}
-            />
+            </div>
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--brand">
@@ -452,13 +454,22 @@ export function AccountTableRow({
             <SessionColumnCell row={row} isPending={isPending} />
           </div>
         </td>
-        <td className="brand-col-cell brand-col-cell--groups">
+        <td className="brand-col-cell brand-col-cell--on-device">
+          <div className="brand-col-cell-inner">
+            {isPending ? (
+              <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
+            ) : (
+              <span className="text-xs tabular-nums text-text-primary">{row.groupsCurrent}</span>
+            )}
+          </div>
+        </td>
+        <td className="brand-col-cell brand-col-cell--in-brand">
           <div className="brand-col-cell-inner">
             {isPending ? (
               <span className="brand-account-slot-muted text-xs tabular-nums">—/—</span>
             ) : (
               <span className="text-xs tabular-nums text-text-primary">
-                {row.groupsCurrent}/{row.groupsTotal}
+                {row.joinedInMaster}/{row.groupsTotal}
               </span>
             )}
           </div>
@@ -559,7 +570,12 @@ export function AccountEmptySlotRow({
           <span className="brand-account-slot-muted text-xs">—</span>
         </div>
       </td>
-      <td className="brand-col-cell brand-col-cell--groups">
+      <td className="brand-col-cell brand-col-cell--on-device">
+        <div className="brand-col-cell-inner">
+          <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
+        </div>
+      </td>
+      <td className="brand-col-cell brand-col-cell--in-brand">
         <div className="brand-col-cell-inner">
           <span className="brand-account-slot-muted text-xs tabular-nums">—/—</span>
         </div>

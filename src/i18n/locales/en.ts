@@ -126,6 +126,8 @@ export const en = {
       colStatus: 'Status',
       colSession: 'Session',
       colGroups: 'Groups',
+      colOnDevice: 'On device',
+      colInBrand: 'In brand',
       colAdmin: 'Admin',
       colScraper: 'Scraper',
       colLastUpdate: 'Last update',

@@ -24,10 +24,12 @@ export interface AccountBrandRow {
   phoneNumber: string;
   brandName: string;
   status: AccountConnectionStatus;
-  /** Y — jumlah grup di device (realtime) */
+  /** Y — jumlah grup di device / daily (semua grup di akun). */
   groupsCurrent: number;
-  /** X — total grup standar brand (dinamis) */
+  /** X — total grup standar brand (dinamis). */
   groupsTotal: number;
+  /** Grup master yang sudah join di akun (In Brand numerator). */
+  joinedInMaster: number;
   /** Admin di master untuk akun ini */
   adminCurrent: number;
   /** X — denominator admin (standar brand) */

@@ -2114,8 +2114,15 @@
     white-space: nowrap;
   }
 
-  .group-links-table-wrap--master-detail {
+  .group-links-table-wrap--master-detail,
+  .group-links-table-wrap--account-daily {
     overflow-x: auto;
+  }
+
+  .group-links-table--account-daily .group-links-table__num,
+  .group-links-table--account-daily .group-links-table__count {
+    text-align: right;
+    white-space: nowrap;
   }
 
   .brand-modal-panel--ticket-detail {

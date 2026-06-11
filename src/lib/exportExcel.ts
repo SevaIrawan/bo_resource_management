@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { AccountGroupLinkRow } from '@/lib/accountGroupLinks';
+import type { GroupLinksViewMode } from '@/components/group-monitoring/GroupLinksPickerModal';
 import type { TicketDetailLine } from '@/lib/ticketGroups';
 import { ticketGroupToExportRows } from '@/lib/ticketExportRows';
 import { ticketTypeExportLabel, type TicketSummaryGroup } from '@/lib/ticketGroups';
@@ -33,25 +34,42 @@ function safeFilePart(value: string) {
   return value.replace(/[^\w.-]+/g, '_') || 'x';
 }
 
+/** Konvensi nama file export: RM-[acc name]-YYYYMMDD.xlsx (acc name sudah mengandung brand). */
+function rmExportFileName(name: string): string {
+  return `RM-${safeFilePart(name)}-${stamp()}.xlsx`;
+}
+
 export function exportGroupLinksExcel(input: {
   brandName: string;
   accountName: string;
   rows: AccountGroupLinkRow[];
+  viewMode?: GroupLinksViewMode;
 }) {
-  const safeBrand = safeFilePart(input.brandName);
-  const safeAcc = safeFilePart(input.accountName);
-  const sheet = XLSX.utils.json_to_sheet(
-    input.rows.map((row) => ({
-      'Group Name': row.groupName,
-      'Group ID': row.groupId,
-      'Group/Invite Link': row.inviteLink ?? '',
-      'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
-      'In master': row.inMaster ? 'Yes' : 'No',
-    })),
-  );
+  const sheet =
+    input.viewMode === 'account'
+      ? XLSX.utils.json_to_sheet(
+          input.rows.map((row, index) => ({
+            No: index + 1,
+            'Group Name': row.groupName,
+            'Group ID': row.groupId,
+            'Member Count': row.memberCount,
+            'Admin Count': row.adminCount,
+            'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
+            'Invite Link': row.inviteLink ?? '',
+          })),
+        )
+      : XLSX.utils.json_to_sheet(
+          input.rows.map((row) => ({
+            'Group Name': row.groupName,
+            'Group ID': row.groupId,
+            'Group/Invite Link': row.inviteLink ?? '',
+            'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
+            'In master': row.inMaster ? 'Yes' : 'No',
+          })),
+        );
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Group links');
-  saveWorkbook(workbook, `RM-${safeBrand}-${safeAcc}-groups-${stamp()}.xlsx`);
+  saveWorkbook(workbook, rmExportFileName(input.accountName));
 }
 
 export function exportBrandMasterGroupsExcel(input: {
@@ -59,7 +77,6 @@ export function exportBrandMasterGroupsExcel(input: {
   platform: 'whatsapp' | 'telegram';
   rows: { groupName: string; groupId: string; inviteLink: string | null; lastSync: string | null }[];
 }) {
-  const safeBrand = safeFilePart(input.brandName);
   const plat = input.platform === 'whatsapp' ? 'WA' : 'TG';
   const sheet = XLSX.utils.json_to_sheet(
     input.rows.map((row) => ({
@@ -71,7 +88,7 @@ export function exportBrandMasterGroupsExcel(input: {
   );
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Master groups');
-  saveWorkbook(workbook, `RM-${safeBrand}-${plat}-master-${stamp()}.xlsx`);
+  saveWorkbook(workbook, rmExportFileName(`${input.brandName}_master-${plat}`));
 }
 
 export function exportAllAccountsExcel(groups: AccountBrandGroup[]) {
@@ -79,7 +96,7 @@ export function exportAllAccountsExcel(groups: AccountBrandGroup[]) {
   const sheet = XLSX.utils.json_to_sheet(accountRowsForExport(rows));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'All accounts');
-  saveWorkbook(workbook, `RM-all-accounts-${stamp()}.xlsx`);
+  saveWorkbook(workbook, rmExportFileName('all-accounts'));
 }
 
 /** Export satu issue (semua baris detail dalam kelompok acc+brand+jenis). */
@@ -88,18 +105,12 @@ export function exportTicketGroupExcel(
   typeLabel = ticketTypeExportLabel(group.ticketType),
   formatNote?: (line: TicketDetailLine) => string,
 ) {
-  const safeBrand = safeFilePart(group.brandName);
-  const safeAcc = safeFilePart(group.accountName);
-  const type = safeFilePart(typeLabel);
   const sheet = XLSX.utils.json_to_sheet(
     ticketGroupToExportRows(group, typeLabel, formatNote),
   );
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Issue detail');
-  saveWorkbook(
-    workbook,
-    `RM-${safeBrand}-${safeAcc}-${type}-${stamp()}.xlsx`,
-  );
+  saveWorkbook(workbook, rmExportFileName(group.accountName));
 }
 
 /** Export semua issue terbuka (detail per baris, dengan kolom jenis issue). */
@@ -119,5 +130,5 @@ export function exportAllTicketGroupsExcel(
   const sheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'All issues');
-  saveWorkbook(workbook, `RM-all-tickets-${stamp()}.xlsx`);
+  saveWorkbook(workbook, rmExportFileName('all-tickets'));
 }

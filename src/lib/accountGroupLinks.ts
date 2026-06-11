@@ -1,5 +1,8 @@
 import { dedupeMasterRowsByGroupId } from '@/lib/accountMasterDailyCompare';
-import { dedupeDailyRowsByGroupId } from '@/lib/dedupeScrapeDaily';
+import {
+  dedupeDailyRowsByGroupId,
+  dedupeDailyRowsByGroupIdKeepLatest,
+} from '@/lib/dedupeScrapeDaily';
 import { TABLES } from '@/config/tables';
 import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import type { AdminYesNo, Platform } from '@/types/database';
@@ -10,6 +13,8 @@ export interface AccountGroupLinkRow {
   inviteLink: string | null;
   isAdmin: AdminYesNo;
   inMaster: boolean;
+  memberCount: number;
+  adminCount: number;
 }
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
@@ -25,23 +30,23 @@ function normalizeDbAccountId(accountId: string | undefined): string | null {
   return null;
 }
 
-async function fetchDailyForAccount(accountId: string): Promise<
-  {
-    group_id: string;
-    group_name: string | null;
-    invite_link: string | null;
-    is_admin: AdminYesNo;
-  }[]
-> {
-  const rows = await fetchAllSupabaseRows<{
-    group_id: string;
-    group_name: string | null;
-    invite_link: string | null;
-    is_admin: AdminYesNo;
-  }>(TABLES.groupScrapeDaily, 'group_id, group_name, invite_link, is_admin', [
-    { column: 'account_id', value: accountId },
-  ]);
-  return dedupeDailyRowsByGroupId(rows);
+type DailyGroupRow = {
+  group_id: string;
+  group_name: string | null;
+  invite_link: string | null;
+  is_admin: AdminYesNo;
+  member_count: number;
+  admin_count: number;
+  scraped_at: string;
+};
+
+async function fetchDailyForAccount(accountId: string, keepLatest = false): Promise<DailyGroupRow[]> {
+  const rows = await fetchAllSupabaseRows<DailyGroupRow>(
+    TABLES.groupScrapeDaily,
+    'group_id, group_name, invite_link, is_admin, member_count, admin_count, scraped_at',
+    [{ column: 'account_id', value: accountId }],
+  );
+  return keepLatest ? dedupeDailyRowsByGroupIdKeepLatest(rows) : dedupeDailyRowsByGroupId(rows);
 }
 
 async function fetchMasterForBrand(
@@ -76,7 +81,7 @@ export async function fetchAccountDailyGroupLinks(
   const dbId = normalizeDbAccountId(accountId);
   if (!dbId) return [];
 
-  const daily = await fetchDailyForAccount(dbId);
+  const daily = await fetchDailyForAccount(dbId, true);
   const rows: AccountGroupLinkRow[] = [];
   for (const d of daily) {
     const gid = String(d.group_id).trim();
@@ -87,6 +92,8 @@ export async function fetchAccountDailyGroupLinks(
       inviteLink: d.invite_link?.trim() || null,
       isAdmin: d.is_admin === 'yes' ? 'yes' : 'no',
       inMaster: false,
+      memberCount: Math.max(0, Number(d.member_count) || 0),
+      adminCount: Math.max(0, Number(d.admin_count) || 0),
     });
   }
   return rows.sort((a, b) => a.groupName.localeCompare(b.groupName));
@@ -118,6 +125,8 @@ export async function fetchAccountGroupLinks(
       inviteLink: m.invite_link?.trim() || null,
       isAdmin: d?.is_admin === 'yes' ? 'yes' : 'no',
       inMaster: true,
+      memberCount: Math.max(0, Number(d?.member_count) || 0),
+      adminCount: Math.max(0, Number(d?.admin_count) || 0),
     });
   }
 

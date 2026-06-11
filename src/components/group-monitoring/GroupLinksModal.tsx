@@ -135,7 +135,12 @@ export function GroupLinksModal({
 
   function handleExport() {
     if (!filteredLinks.length) return;
-    exportGroupLinksExcel({ brandName, accountName, rows: filteredLinks });
+    exportGroupLinksExcel({
+      brandName,
+      accountName,
+      rows: filteredLinks,
+      viewMode,
+    });
   }
 
   return (
@@ -194,6 +199,7 @@ export function GroupLinksModal({
               <div
                 className={cn(
                   'group-links-table-wrap',
+                  viewMode === 'account' && 'group-links-table-wrap--account-daily',
                   tableNeedsScroll && 'group-links-table-wrap--scroll',
                 )}
                 style={
@@ -202,51 +208,119 @@ export function GroupLinksModal({
                   } as CSSProperties
                 }
               >
-                <table className="group-links-table">
+                <table
+                  className={cn(
+                    'group-links-table',
+                    viewMode === 'account' && 'group-links-table--account-daily',
+                  )}
+                >
                   <thead>
                     <tr>
-                      <th>{t('groupMonitoring.groupLinks.colName')}</th>
-                      <th>{t('groupMonitoring.groupLinks.colId')}</th>
-                      <th>{t('groupMonitoring.groupLinks.colLink')}</th>
-                      <th>{t('groupMonitoring.groupLinks.colAdmin')}</th>
+                      {viewMode === 'account' ? (
+                        <>
+                          <th>{t('groupMonitoring.groupLinks.colNo')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colName')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colId')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colMemberCount')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colAdminCount')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colIsAdmin')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colLink')}</th>
+                        </>
+                      ) : (
+                        <>
+                          <th>{t('groupMonitoring.groupLinks.colName')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colId')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colLink')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colAdmin')}</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {pageRows.map((row) => (
+                    {pageRows.map((row, index) => (
                       <tr key={`${row.groupId}-${row.groupName}`}>
-                        <td className="group-links-table__name" title={row.groupName}>
-                          {row.groupName}
-                        </td>
-                        <td className="group-links-table__id" title={row.groupId}>
-                          {row.groupId || '—'}
-                        </td>
-                        <td className="group-links-table__link">
-                          {row.inviteLink ? (
-                            <a
-                              href={row.inviteLink}
-                              target="_blank"
-                              rel="noreferrer"
-                              title={row.inviteLink}
-                            >
-                              {row.inviteLink}
-                            </a>
-                          ) : (
-                            <span className="group-links-table__muted">—</span>
-                          )}
-                        </td>
-                        <td className="group-links-table__admin">
-                          <span
-                            className={
-                              row.isAdmin === 'yes'
-                                ? 'group-links-admin-badge group-links-admin-badge--yes'
-                                : 'group-links-admin-badge group-links-admin-badge--no'
-                            }
-                          >
-                            {row.isAdmin === 'yes'
-                              ? t('groupMonitoring.groupLinks.adminYes')
-                              : t('groupMonitoring.groupLinks.adminNo')}
-                          </span>
-                        </td>
+                        {viewMode === 'account' ? (
+                          <>
+                            <td className="group-links-table__num tabular-nums">
+                              {pageOffset + index + 1}
+                            </td>
+                            <td className="group-links-table__name" title={row.groupName}>
+                              {row.groupName}
+                            </td>
+                            <td className="group-links-table__id" title={row.groupId}>
+                              {row.groupId || '—'}
+                            </td>
+                            <td className="group-links-table__count tabular-nums">
+                              {row.memberCount}
+                            </td>
+                            <td className="group-links-table__count tabular-nums">
+                              {row.adminCount}
+                            </td>
+                            <td className="group-links-table__admin">
+                              <span
+                                className={
+                                  row.isAdmin === 'yes'
+                                    ? 'group-links-admin-badge group-links-admin-badge--yes'
+                                    : 'group-links-admin-badge group-links-admin-badge--no'
+                                }
+                              >
+                                {row.isAdmin === 'yes'
+                                  ? t('groupMonitoring.groupLinks.adminYes')
+                                  : t('groupMonitoring.groupLinks.adminNo')}
+                              </span>
+                            </td>
+                            <td className="group-links-table__link">
+                              {row.inviteLink ? (
+                                <a
+                                  href={row.inviteLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title={row.inviteLink}
+                                >
+                                  {row.inviteLink}
+                                </a>
+                              ) : (
+                                <span className="group-links-table__muted">—</span>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="group-links-table__name" title={row.groupName}>
+                              {row.groupName}
+                            </td>
+                            <td className="group-links-table__id" title={row.groupId}>
+                              {row.groupId || '—'}
+                            </td>
+                            <td className="group-links-table__link">
+                              {row.inviteLink ? (
+                                <a
+                                  href={row.inviteLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title={row.inviteLink}
+                                >
+                                  {row.inviteLink}
+                                </a>
+                              ) : (
+                                <span className="group-links-table__muted">—</span>
+                              )}
+                            </td>
+                            <td className="group-links-table__admin">
+                              <span
+                                className={
+                                  row.isAdmin === 'yes'
+                                    ? 'group-links-admin-badge group-links-admin-badge--yes'
+                                    : 'group-links-admin-badge group-links-admin-badge--no'
+                                }
+                              >
+                                {row.isAdmin === 'yes'
+                                  ? t('groupMonitoring.groupLinks.adminYes')
+                                  : t('groupMonitoring.groupLinks.adminNo')}
+                              </span>
+                            </td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>

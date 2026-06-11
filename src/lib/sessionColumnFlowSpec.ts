@@ -10,7 +10,7 @@ import type { SessionUiStatus } from '@/types/accountMonitoringUi';
  * - resume-empty hanya bila 0 grup (device/DB/brand); Now/Later bila ada data yang bisa di-scrape.
  * - VALID + RUN/SYNC: probe device tetap jalan; gagal → login meski badge grid masih valid.
  * - Login FAIL: WA auto-QR; TG error + pesan (tanpa auto-loop QR).
- * - VALID + tombol X (Clear Session, hover row/kolom): purge lokal + DB invalid → badge Invalid; Sync berikutnya `open_login`.
+ * - VALID + tombol X (Clear Session, hover row/kolom): WA purge disk + TG stop sidecar + DB invalid → badge Invalid; Sync berikutnya `open_login`.
  */
 export const SESSION_COLUMN_FLOW = {
   invalid: {

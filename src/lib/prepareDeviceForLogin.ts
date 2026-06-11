@@ -19,6 +19,24 @@ export function shouldPurgeWaDiskForLogin(input: {
   return false;
 }
 
+/** Batalkan login sidecar/Puppeteer — pakai device session id (TG: UUID akun; WA: LocalAuth id). */
+export async function cancelPlatformLoginForAccount(input: {
+  account: AccountBrandRow;
+  dbAccountId?: string;
+}): Promise<void> {
+  const api = window.electronAPI?.platformLogin;
+  if (!api) return;
+
+  const accountId = input.dbAccountId ?? input.account.id;
+  const deviceSessionId = await resolveDeviceSessionId({
+    sessionId: input.account.id,
+    platform: input.account.platform,
+    accountId,
+  });
+
+  await api.cancel(deviceSessionId, input.account.platform).catch(() => undefined);
+}
+
 /**
  * Lepas client probe/sync/scrape sebelum modal login — satu release cepat (urgent),
  * hindari overlap Puppeteer dan release ganda saat QR start.
@@ -49,7 +67,10 @@ export async function prepareDeviceForPlatformLogin(input: {
     accountId,
   });
 
-  await api.cancel(deviceSessionId, input.account.platform).catch(() => undefined);
+  await cancelPlatformLoginForAccount({
+    account: input.account,
+    dbAccountId: accountId,
+  });
   await api
     .release(deviceSessionId, {
       purgeWaDisk: purgeWaDisk,

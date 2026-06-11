@@ -12,6 +12,7 @@ import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import {
+  cancelPlatformLoginForAccount,
   prepareDeviceForPlatformLogin,
   type LoginPurgeWaDiskHint,
 } from '@/lib/prepareDeviceForLogin';
@@ -255,9 +256,10 @@ export function useAccountSyncFlow({
 
   const closeFlow = useCallback(() => {
     if (step === 'platform-login' && target) {
-      void window.electronAPI?.platformLogin
-        ?.cancel(target.account.id, target.account.platform)
-        .catch(() => undefined);
+      void cancelPlatformLoginForAccount({
+        account: target.account,
+        dbAccountId: processingDbAccountIdRef.current ?? undefined,
+      });
       clearRowProcessing(target.groupId, target.account.id);
     }
     dismissSyncModals();
@@ -393,9 +395,10 @@ export function useAccountSyncFlow({
   const handleLoginFatalError = useCallback(
     (message: string) => {
       if (!target) return;
-      void window.electronAPI?.platformLogin
-        ?.cancel(target.account.id, target.account.platform)
-        .catch(() => undefined);
+      void cancelPlatformLoginForAccount({
+        account: target.account,
+        dbAccountId: processingDbAccountIdRef.current ?? undefined,
+      });
       clearRowProcessing(target.groupId, target.account.id);
       setLoginIntent(null);
       showSyncError(message, target.groupId, target.account);
@@ -577,9 +580,10 @@ export function useAccountSyncFlow({
       setClearingSessionAccountId(account.id);
 
       if (step === 'platform-login' && target?.account.id === account.id) {
-        await window.electronAPI?.platformLogin
-          ?.cancel(target.account.id, target.account.platform)
-          .catch(() => undefined);
+        await cancelPlatformLoginForAccount({
+          account: target.account,
+          dbAccountId: processingDbAccountIdRef.current ?? undefined,
+        });
         dismissSyncModals();
         clearRowProcessing(target.groupId, target.account.id);
         setTarget(null);

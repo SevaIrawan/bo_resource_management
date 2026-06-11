@@ -34,6 +34,32 @@ const checks = [
     ok: read('src/lib/clearAccountSession.ts').includes('purgeWaDisk: input.account.platform === \'whatsapp\''),
   },
   {
+    name: 'TG/WA cancel scraper with platform',
+    ok: read('src/lib/clearAccountSession.ts').includes('platform: input.account.platform'),
+  },
+  {
+    name: 'prepareDevice uses reloginCode not forced purgeWaDisk',
+    ok:
+      read('src/lib/clearAccountSession.ts').includes("reloginCode: 'SESSION_INVALID_FORCE_SCRAPER'") &&
+      !/prepareDeviceForPlatformLogin\(\{[\s\S]*?purgeWaDisk:\s*true/.test(
+        read('src/lib/clearAccountSession.ts'),
+      ),
+  },
+  {
+    name: 'cancelPlatformLoginForAccount resolves device session id',
+    ok:
+      read('src/lib/prepareDeviceForLogin.ts').includes('cancelPlatformLoginForAccount') &&
+      read('src/lib/prepareDeviceForLogin.ts').includes('resolveDeviceSessionId'),
+  },
+  {
+    name: 'electron release stops Telegram sidecar',
+    ok: read('electron/main/platformLogin/index.ts').includes('stopTelegramLogin(sessionId)'),
+  },
+  {
+    name: 'sync flow cancel uses cancelPlatformLoginForAccount',
+    ok: read('src/hooks/useAccountSyncFlow.ts').includes('cancelPlatformLoginForAccount'),
+  },
+  {
     name: 'handleClearSession in sync flow',
     ok: read('src/hooks/useAccountSyncFlow.ts').includes('handleClearSession'),
   },

@@ -35,7 +35,9 @@ async function cancelActiveDeviceWork(input: {
 }
 
 /**
- * Clear Session — putus rantai login lokal + invalidate DB.
+ * Clear Session — putus rantai device + invalidate DB.
+ * WA: purge folder LocalAuth + DB invalid (auth hanya di PC ini).
+ * TG: stop sidecar + DB invalid (session string Supabase; tidak ada folder lokal).
  * Setelah ini, Sync/Run masuk jalur `open_login` (modal QR bersih, bukan stuck restore).
  */
 export async function clearAccountSession(input: {
@@ -61,7 +63,6 @@ export async function clearAccountSession(input: {
   await prepareDeviceForPlatformLogin({
     account: input.account,
     dbAccountId,
-    purgeWaDisk: true,
     reloginCode: 'SESSION_INVALID_FORCE_SCRAPER',
   });
 

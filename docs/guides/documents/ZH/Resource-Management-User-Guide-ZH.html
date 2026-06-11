@@ -11,7 +11,7 @@
     <p class="doc-cover-logo">Backend Operation</p>
     <h1>资源管理</h1>
     <p class="doc-cover-subtitle">官方用户手册</p>
-    <table class="doc-meta-table"><tr><th>产品</th><td>后端运营 — 资源管理（Backend Operation — Resource Management）</td></tr><tr><th>应用版本</th><td>1.0.14</td></tr><tr><th>适用对象</th><td>内部运营团队（营销 / WhatsApp 与 Telegram 群组监控）</td></tr><tr><th>平台</th><td>Windows / macOS / Linux 桌面安装包</td></tr><tr><th>界面语言</th><td>English / 中文（管理 → 语言）</td></tr></table>
+    <table class="doc-meta-table"><tr><th>产品</th><td>后端运营 — 资源管理（Backend Operation — Resource Management）</td></tr><tr><th>应用版本</th><td>1.0.15</td></tr><tr><th>适用对象</th><td>内部运营团队（营销 / WhatsApp 与 Telegram 群组监控）</td></tr><tr><th>平台</th><td>Windows / macOS / Linux 桌面安装包</td></tr><tr><th>界面语言</th><td>English / 中文（管理 → 语言）</td></tr></table>
   </header>
   
 <section class="doc-toc">
@@ -24,7 +24,6 @@
 <li><a href="#5-工单-标签-问题与修复">5. 「工单」标签 — 问题与修复</a></li>
 <li><a href="#6-管理-页面">6. 「管理」页面</a></li>
 <li><a href="#7-数据同步-实时">7. 数据同步（实时）</a></li>
-<li><a href="#8-推荐日常工作流">8. 推荐日常工作流</a></li>
 <li><a href="#9-术语表">9. 术语表</a></li>
 <li><a href="#10-常见问题">10. 常见问题</a></li>
 <li><a href="#附录-功能速览图">附录 — 功能速览图</a></li></ol>
@@ -1075,11 +1074,12 @@
 </tr>
 <tr>
 <td><strong>本机（AppData）</strong></td>
-<td>每账号 WhatsApp 认证、自动同步偏好、语言</td>
+<td>每账号 WhatsApp 认证（<strong>仅在本机扫码的 PC</strong>）、自动同步偏好、语言</td>
 </tr>
 </tbody></table>
+<p><strong>WhatsApp 多 PC：</strong> 会话不能跨 PC 迁移。交接 → 旧 PC <strong>清除会话</strong>（可选）→ 新操作员在本机 <strong>同步</strong> 并扫码。</p>
+<p><strong>Telegram 多 PC：</strong> 会话字符串在云端 — 会话<strong>有效</strong>时其他 PC 可 <strong>同步</strong>/<strong>运行抓取</strong>。交接 → 必须 <strong>清除会话</strong>，由新操作员在本机扫码。</p>
 <hr>
-<h2 id="8-推荐日常工作流">8. 推荐日常工作流</h2>
 <h3 id="8-1-新营销账号上线-测试数据清理后">8.1 新营销账号上线（测试数据清理后）</h3>
 <table>
 <thead>
@@ -1245,7 +1245,7 @@
 <p><strong>卡片视图和表格视图有何区别？</strong><br>数据相同；卡片按品牌分组，表格为扁平列表。</p>
 <p><strong>从列表移除此卡片会删除品牌吗？</strong><br>会 — 确认后从数据库删除品牌及相关数据。</p>
 <p><strong>二维码报错「still starting from previous attempt」？</strong><br>本机 WhatsApp 会话卡住 — 等待数秒，或对<strong>有效</strong>会话列使用 <strong>清除会话 (X)</strong> 后重新同步。</p>
-<p><strong>其他同事能否同步我登录的账号？</strong><br>WhatsApp 不行 — 授权在本机。需 <strong>清除会话</strong> 后由对方在本机扫码。</p>
+<p><strong>其他同事能否同步我登录的账号？</strong><br>WhatsApp 不行 — 授权在本机。需 <strong>清除会话</strong> 后由对方在本机扫码。<br>Telegram 在会话<strong>有效</strong>时其他 PC 可用（会话在云端）。交接请 <strong>清除会话</strong>，由对方在本机扫码。</p>
 <p><strong>在哪里改界面语言？</strong><br><strong>管理</strong> → <strong>偏好设置</strong> → <strong>语言</strong> → English 或 <strong>中文</strong>。</p>
 <hr>
 <h2 id="附录-功能速览图">附录 — 功能速览图</h2>
@@ -1296,11 +1296,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>本手册对应应用版本 <strong>1.0.14</strong>。新功能发布后请同步更新文档。</em></p>
+<p><em>本手册对应应用版本 <strong>1.0.15</strong>。新功能发布后请同步更新文档。</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — 资源管理 v1.0.14</p>
+    <p>Internal use only — 资源管理 v1.0.15</p>
   </footer>
 </body>
 </html>

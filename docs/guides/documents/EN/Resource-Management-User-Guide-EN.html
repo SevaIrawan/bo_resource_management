@@ -11,7 +11,7 @@
     <p class="doc-cover-logo">Backend Operation</p>
     <h1>Resource Management</h1>
     <p class="doc-cover-subtitle">Official User Guide</p>
-    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.14</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Admin → Language)</td></tr></table>
+    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.15</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Admin → Language)</td></tr></table>
   </header>
   
 <section class="doc-toc">
@@ -1070,9 +1070,11 @@
 </tr>
 <tr>
 <td><strong>PC (AppData)</strong></td>
-<td>WhatsApp auth per account, auto-sync preference, language</td>
+<td>WhatsApp auth per account (<strong>only on the PC that scanned QR</strong>), auto-sync preference, language</td>
 </tr>
 </tbody></table>
+<p><strong>WhatsApp multi-PC:</strong> Session does not move between PCs. Hand off → <strong>Clear Session</strong> on the old PC (optional) → new operator <strong>Sync</strong> + scan QR on their PC.</p>
+<p><strong>Telegram multi-PC:</strong> Session string is in the cloud — another PC can <strong>Sync</strong>/<strong>Run</strong> while Session is <strong>Valid</strong>. Hand off → <strong>Clear Session</strong> (required) so the new operator scans QR on their PC.</p>
 <hr>
 <h2 id="8-recommended-daily-workflows">8. Recommended daily workflows</h2>
 <h3 id="8-1-onboard-a-new-marketing-account-after-test-data-cleanup">8.1 Onboard a new marketing account (after test data cleanup)</h3>
@@ -1240,7 +1242,7 @@
 <p><strong>What is the difference between Card view and Table view?</strong><br>Same data; Card view groups by brand, Table view is one flat list.</p>
 <p><strong>Does Dismiss (X on brand card) delete the brand?</strong><br>Yes — after confirmation it removes the brand and related data from the database.</p>
 <p><strong>Why QR error &quot;still starting from previous attempt&quot;?</strong><br>Stuck WA session on this PC — wait a few seconds, or use <strong>Clear Session</strong> (X on Session when Valid) then Sync again.</p>
-<p><strong>Can another operator Sync an account I logged in on my PC?</strong><br>For WhatsApp, no — auth stays on your PC until they <strong>Clear Session</strong> (or you do) and they scan QR on their PC.</p>
+<p><strong>Can another operator Sync an account I logged in on my PC?</strong><br>For WhatsApp, no — auth stays on your PC until they <strong>Clear Session</strong> (or you do) and they scan QR on their PC.<br>For Telegram, another PC can use the account while Session is <strong>Valid</strong> (session string is in the cloud). Hand off to a new operator with <strong>Clear Session</strong> so they scan QR on their PC.</p>
 <p><strong>Where is UI language changed?</strong><br><strong>Admin</strong> → <strong>Preferences</strong> → <strong>Language</strong> → English or 中文.</p>
 <hr>
 <h2 id="appendix-quick-feature-map">Appendix — Quick feature map</h2>
@@ -1291,11 +1293,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>This guide matches application version <strong>1.0.14</strong>. Update this document when new features ship.</em></p>
+<p><em>This guide matches application version <strong>1.0.15</strong>. Update this document when new features ship.</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — Resource Management v1.0.14</p>
+    <p>Internal use only — Resource Management v1.0.15</p>
   </footer>
 </body>
 </html>

@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-11  
-**Versi aplikasi:** `1.0.14` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.15` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
@@ -61,11 +61,11 @@
               Supabase (PostgreSQL + Realtime)
 ```
 
-**Prinsip data:** Semua data bisnis (brand, akun, grup, ticket, session flag) di **Supabase**. **WhatsApp:** auth asli hanya di folder lokal `%APPDATA%\Resource Management\wa-sessions\` per PC; DB hanya flag `platform_sessions` + `localAuthClientId`. **Telegram:** session string di DB + sidecar di PC. Handoff operator/PC lain: **Clear Session** (tombol X di kolom Session Valid) → purge lokal + invalidate DB.
+**Prinsip data:** Semua data bisnis (brand, akun, grup, ticket, session flag) di **Supabase**. **WhatsApp:** auth asli hanya di folder lokal `%APPDATA%\Resource Management\wa-sessions\` per PC; DB hanya flag `platform_sessions` + `localAuthClientId`. **Telegram:** session string di DB + sidecar di PC (bisa dipakai PC lain selama DB masih valid). Handoff operator: **Clear Session** (tombol X saat Valid) → WA purge disk + TG stop sidecar + invalidate DB.
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.14)
+## 4. Konfigurasi & installer (kondisi 1.0.15)
 
 ### 4.1 Variabel lingkungan
 
@@ -327,4 +327,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.14**. Jika version atau alur berubah, perbarui bagian 4, 6, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.15**. Jika version atau alur berubah, perbarui bagian 4, 6, 9, dan nomor versi di header.*

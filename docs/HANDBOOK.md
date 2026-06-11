@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.14 |
+| **Versi app** | 1.0.15 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Admin → Language) |
@@ -412,6 +412,8 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 
 **WhatsApp multi-PC:** Session WA tidak pindah antar PC. Serah akun ke operator lain → **Clear Session** di PC lama (opsional) → operator baru **Sync** + scan QR di PC-nya.
 
+**Telegram multi-PC:** Session string tersimpan di cloud — PC lain bisa Sync/Run selama badge masih **Valid**. Serah akun ke operator lain → **Clear Session** (wajib) supaya mereka scan QR sendiri.
+
 ---
 
 ## 8. Alur kerja harian (disarankan)
@@ -518,4 +520,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.14**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*
+*Handbook ini selaras dengan aplikasi versi **1.0.15**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*

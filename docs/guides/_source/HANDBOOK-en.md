@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.14 |
+| **App version** | 1.0.15 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (Admin → Language) |
@@ -489,7 +489,11 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 | Location | Contents |
 |----------|----------|
 | **Cloud (Supabase)** | Brands, accounts, groups, tickets, session flags |
-| **PC (AppData)** | WhatsApp auth per account, auto-sync preference, language |
+| **PC (AppData)** | WhatsApp auth per account (**only on the PC that scanned QR**), auto-sync preference, language |
+
+**WhatsApp multi-PC:** Session does not move between PCs. Hand off → **Clear Session** on the old PC (optional) → new operator **Sync** + scan QR on their PC.
+
+**Telegram multi-PC:** Session string is in the cloud — another PC can **Sync**/**Run** while Session is **Valid**. Hand off → **Clear Session** (required) so the new operator scans QR on their PC.
 
 ---
 
@@ -589,7 +593,8 @@ Yes — after confirmation it removes the brand and related data from the databa
 Stuck WA session on this PC — wait a few seconds, or use **Clear Session** (X on Session when Valid) then Sync again.
 
 **Can another operator Sync an account I logged in on my PC?**  
-For WhatsApp, no — auth stays on your PC until they **Clear Session** (or you do) and they scan QR on their PC.
+For WhatsApp, no — auth stays on your PC until they **Clear Session** (or you do) and they scan QR on their PC.  
+For Telegram, another PC can use the account while Session is **Valid** (session string is in the cloud). Hand off to a new operator with **Clear Session** so they scan QR on their PC.
 
 **Where is UI language changed?**  
 **Admin** → **Preferences** → **Language** → English or 中文.
@@ -634,4 +639,4 @@ Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type,
 
 ---
 
-*This guide matches application version **1.0.14**. Update this document when new features ship.*
+*This guide matches application version **1.0.15**. Update this document when new features ship.*

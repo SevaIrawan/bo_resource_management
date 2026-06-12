@@ -29,8 +29,8 @@ export function ReportingCardFooter({
   return (
     <footer className="reporting-card-footer">
       {showPagination ? (
-        <nav
-          className="group-links-pagination reporting-card-pagination"
+        <div
+          className="reporting-card-footer-meta"
           aria-label={t('groupMonitoring.groupLinks.pageLabel', {
             page: currentPage,
             pages: pageCount,
@@ -49,7 +49,14 @@ export function ReportingCardFooter({
               pages: pageCount,
             })}
           </span>
-          <div className="group-links-pagination-actions">
+        </div>
+      ) : (
+        <span className="reporting-card-footer-spacer" aria-hidden />
+      )}
+
+      <div className="reporting-card-footer-actions">
+        {showPagination ? (
+          <>
             <button
               type="button"
               className="group-links-page-btn"
@@ -70,21 +77,18 @@ export function ReportingCardFooter({
               {t('groupMonitoring.groupLinks.nextPage')}
               <ChevronRight className="h-3.5 w-3.5" aria-hidden />
             </button>
-          </div>
-        </nav>
-      ) : (
-        <span className="reporting-card-footer-spacer" aria-hidden />
-      )}
-
-      <button
-        type="button"
-        className="group-links-export-btn"
-        onClick={onExport}
-        disabled={exportDisabled || totalRows === 0}
-      >
-        <Download className="h-3 w-3" strokeWidth={2} aria-hidden />
-        {t('groupMonitoring.accountCard.export')}
-      </button>
+          </>
+        ) : null}
+        <button
+          type="button"
+          className="group-links-export-btn"
+          onClick={onExport}
+          disabled={exportDisabled || totalRows === 0}
+        >
+          <Download className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+          {t('groupMonitoring.accountCard.export')}
+        </button>
+      </div>
     </footer>
   );
 }

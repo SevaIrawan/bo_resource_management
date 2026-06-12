@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AccountMonitoringBody } from '@/components/group-monitoring/AccountMonitoringBody';
+import { ReportingMonitoringPanel } from '@/components/group-monitoring/ReportingMonitoringPanel';
 import { TicketMonitoringBody } from '@/components/group-monitoring/TicketMonitoringBody';
 import { ContentAreaCard } from '@/components/group-monitoring/ContentAreaCard';
 import { KpiGrid } from '@/components/group-monitoring/KpiGrid';
@@ -12,6 +13,14 @@ function GroupMonitoringContent() {
   const { tab } = useMonitoringTab();
   const { accountKpis, ticketKpis } = useGroupMonitoring();
   const [accountViewMode, setAccountViewMode] = useState<AccountViewMode>('card');
+
+  if (tab === 'reporting') {
+    return (
+      <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">
+        <ReportingMonitoringPanel />
+      </div>
+    );
+  }
 
   return (
     <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">

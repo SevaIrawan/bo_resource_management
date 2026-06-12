@@ -64,9 +64,18 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   /** Blok realtime ticket reload saat reconcile — cegah UI angka sementara (11,5,5,4). */
   const ticketSyncLockedRef = useRef(false);
   const ticketReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reportingReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reportError = useCallback((message: string) => {
     setError(message);
+  }, []);
+
+  const scheduleReportingReload = useCallback(() => {
+    if (reportingReloadDebounceRef.current) clearTimeout(reportingReloadDebounceRef.current);
+    reportingReloadDebounceRef.current = setTimeout(() => {
+      reportingReloadDebounceRef.current = null;
+      window.dispatchEvent(new Event('rm-reporting-reload'));
+    }, 500);
   }, []);
 
   const reloadTicketHandles = useCallback(async (summaries: TicketSummaryGroup[]) => {
@@ -145,16 +154,18 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
           await reloadTicketSummaries();
         } finally {
           ticketSyncLockedRef.current = false;
+          scheduleReportingReload();
         }
       })();
     },
-    [notifyPendingDataUpdate, reloadTicketSummaries],
+    [notifyPendingDataUpdate, reloadTicketSummaries, scheduleReportingReload],
   );
 
   /** Realtime master/daily — refresh kartu dari engine (tanpa reconcile DB). */
   const scheduleIssueRefreshFromData = useCallback(() => {
+    scheduleReportingReload();
     void reloadTicketSummaries();
-  }, [reloadTicketSummaries]);
+  }, [reloadTicketSummaries, scheduleReportingReload]);
 
   const reloadAll = useCallback(async () => {
     if (!user?.id) {
@@ -210,6 +221,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     registerRefreshHandler(async (activeTab) => {
       if (activeTab === 'ticket') {
         await runTicketReconcile();
+      } else if (activeTab === 'reporting') {
+        window.dispatchEvent(new Event('rm-reporting-reload'));
       } else {
         await reloadAll();
       }
@@ -220,6 +233,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   useEffect(() => {
     registerFullRefreshHandler(async () => {
       await reloadAll();
+      window.dispatchEvent(new Event('rm-reporting-reload'));
     });
     return () => registerFullRefreshHandler(null);
   }, [registerFullRefreshHandler, reloadAll]);
@@ -269,7 +283,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const handleRegistryRealtime = useCallback(() => {
     void reloadGroupsOnly();
     notifyPendingDataUpdate();
-  }, [notifyPendingDataUpdate, reloadGroupsOnly]);
+    scheduleReportingReload();
+  }, [notifyPendingDataUpdate, reloadGroupsOnly, scheduleReportingReload]);
 
   const autoSyncState = useAutoAccountSync({
     userId: user?.id,

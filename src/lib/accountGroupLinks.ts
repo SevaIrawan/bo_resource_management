@@ -109,7 +109,7 @@ export async function fetchAccountGroupLinks(
   accountId?: string,
 ): Promise<AccountGroupLinkRow[]> {
   const dbId = normalizeDbAccountId(accountId);
-  const daily = dbId ? await fetchDailyForAccount(dbId) : [];
+  const daily = dbId ? await fetchDailyForAccount(dbId, true) : [];
   const dailyByGid = new Map(daily.map((d) => [String(d.group_id).trim(), d]));
 
   const master = await fetchMasterForBrand(brand, platform);

@@ -10,11 +10,12 @@ interface MonitoringTabsProps {
   ticketCount?: number;
 }
 
-const TAB_IDS: MonitoringTab[] = ['account', 'ticket'];
+const TAB_IDS: MonitoringTab[] = ['account', 'ticket', 'reporting'];
 
 const TAB_LABEL_KEYS: Record<MonitoringTab, string> = {
   account: 'tabs.account',
   ticket: 'tabs.ticket',
+  reporting: 'tabs.reporting',
 };
 
 export function MonitoringTabs({
@@ -40,6 +41,7 @@ export function MonitoringTabs({
               'monitoring-tab-btn inline-flex items-center gap-0.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
               id === 'account' && 'monitoring-tab-btn--account',
               id === 'ticket' && 'monitoring-tab-btn--ticket',
+              id === 'reporting' && 'monitoring-tab-btn--reporting',
               isActive
                 ? 'bg-bg-shell text-text-primary shadow-sm'
                 : 'text-text-muted hover:text-text-secondary',

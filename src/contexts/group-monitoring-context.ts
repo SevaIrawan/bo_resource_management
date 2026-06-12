@@ -26,7 +26,10 @@ export interface GroupMonitoringContextValue {
   refreshIssues: (dbAccountId?: string) => Promise<void>;
   accountKpis: KpiItem[];
   ticketKpis: KpiItem[];
+  /** Tab Account — muat registry + metrik total per akun. */
   loading: boolean;
+  /** Tab Ticket — engine issue; tidak memblokir Account. */
+  ticketsLoading: boolean;
   reportError: (message: string) => void;
   setProbeSuspendAccountIds: Dispatch<SetStateAction<string[]>>;
 }

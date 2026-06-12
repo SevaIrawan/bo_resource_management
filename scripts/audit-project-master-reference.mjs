@@ -37,7 +37,7 @@ function check(name, fn) {
 
 const pkg = JSON.parse(read('package.json'));
 check('package.json version', () => {
-  if (pkg.version !== '1.0.15') return fail(`version=${pkg.version}, doc claims 1.0.15 — update doc or version`);
+  if (pkg.version !== '1.0.16') return fail(`version=${pkg.version}, doc claims 1.0.16 — update doc or version`);
   return ok(`version ${pkg.version}`);
 });
 

@@ -7,7 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 
 export function TicketMonitoringBody() {
   const { t } = useLanguage();
-  const { filteredTicketSummaries, ticketSummaries, loading, ticketFilters } =
+  const { filteredTicketSummaries, ticketSummaries, ticketsLoading, ticketFilters } =
     useGroupMonitoring();
   const [detailGroup, setDetailGroup] = useState<TicketSummaryGroup | null>(null);
 
@@ -18,8 +18,8 @@ export function TicketMonitoringBody() {
     });
   }, [ticketSummaries]);
 
-  if (loading) {
-    return <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>;
+  if (ticketsLoading && ticketSummaries.length === 0) {
+    return <p className="account-sync-loading">{t('groupMonitoring.loadingTickets')}</p>;
   }
 
   const hasAnyTickets = ticketSummaries.length > 0;

@@ -18,9 +18,9 @@ Dokumen lengkap: **[PROJECT.md](./PROJECT.md)** · Panduan client: **[docs/CLIEN
 ## Unduh untuk Mac (M-series / Apple Silicon)
 
 1. Buka: **https://github.com/SevaIrawan/bo_resource_management/releases**
-2. Pilih release terbaru (**v1.0.15**)
+2. Pilih release terbaru (**v1.0.16**)
 3. Unduh **hanya** file **`arm64.dmg`** — contoh:  
-   **`Resource.Management-1.0.15-arm64.dmg`** (pakai **titik**, bukan strip `Resource-Management-…`)
+   **`Resource.Management-1.0.16-arm64.dmg`** (pakai **titik**, bukan strip `Resource-Management-…`)
 4. **Jangan** pakai tombol **Check for app updates** di app versi lama (bisa unduh file `.exe` Windows salah). Pasang dari DMG dulu.
 5. **Jangan** unduh `.exe`, `latest.yml`, atau source code zip
 
@@ -45,7 +45,7 @@ Build internal belum notarized Apple — langkah "Open" di atas normal untuk pil
 ## Update app (setelah terpasang)
 
 - App cek GitHub otomatis → **Restart** setelah notifikasi update  
-- Jika unduh macet: minta IT jalankan **Fix release yml** untuk tag rilis terbaru, atau install manual **v1.0.15** `.dmg`
+- Jika unduh macet: minta IT jalankan **Fix release yml** untuk tag rilis terbaru, atau install manual **v1.0.16** `.dmg`
 
 ---
 
@@ -75,4 +75,4 @@ Output: `release/Resource Management-x.x.x-arm64.dmg` + `release/*.zip` (untuk a
 | File .exe tidak buka | File Windows dikirim ke Mac | Unduh **.dmg** dari GitHub **di Mac** |
 | "App is damaged" | Unsigned build | Klik kanan → Open, atau `xattr -cr` |
 | DMG tidak mount | Download corrupt | Unduh ulang .dmg |
-| Auto-update macet | Metadata yml / rilis lama | Install manual **v1.0.15** `.dmg` atau IT: Fix release yml |
+| Auto-update macet | Metadata yml / rilis lama | Install manual **v1.0.16** `.dmg` atau IT: Fix release yml |

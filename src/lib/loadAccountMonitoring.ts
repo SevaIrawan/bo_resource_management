@@ -7,8 +7,8 @@ import {
 import {
   brandPlatformCacheKey,
   buildStandardCountByPlatformFromRows,
-  fetchBrandStandardTotalsByPlatform,
 } from '@/lib/brandStandardCount';
+import { countCachedMasterDistinct, warmMasterDailyLoadCache } from '@/lib/masterDailyLoadCache';
 import {
   applyMasterStatsToAccountRow,
   buildMetricsFromScrapeDaily,
@@ -28,6 +28,21 @@ import { fetchActiveSessionAccountIdSet } from '@/lib/platformSessions';
 import { getSupabase } from '@/lib/supabase';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { AccountSnapshot, MessagingAccount, Platform } from '@/types/database';
+
+function buildBrandStandardFromCache(
+  brands: { id: string; name: string }[],
+  platformsByBrand: Map<string, Platform[]>,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const brand of brands) {
+    const platforms = platformsByBrand.get(brand.id) ?? [];
+    for (const platform of platforms) {
+      const count = countCachedMasterDistinct(brand.name, platform) ?? 0;
+      map.set(brandPlatformCacheKey(brand.id, platform), count);
+    }
+  }
+  return map;
+}
 
 function accountRowFromDb(
   account: MessagingAccount,
@@ -96,32 +111,39 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
     accountsByBrand.set(account.brand_id, list);
   }
 
-  const masterByAccount = await fetchMasterGroupStatsBatch(
-    accounts.map((a) => {
-      const brand = brandById.get(a.brand_id);
-      return {
-        id: a.id,
-        brandName: brand?.name ?? String((a.metadata as { brand?: string })?.brand ?? ''),
-        platform: a.platform,
-      };
-    }),
-  );
+  const accountRefs = accounts.map((a) => {
+    const brand = brandById.get(a.brand_id);
+    return {
+      id: a.id,
+      brandName: brand?.name ?? String((a.metadata as { brand?: string })?.brand ?? ''),
+      platform: a.platform,
+      brandId: a.brand_id,
+    };
+  });
+
+  await warmMasterDailyLoadCache(accountRefs);
 
   const accountIds = accounts.map((a) => a.id);
-  const [activeSessionIds, lastActivityAtByAccount] = await Promise.all([
+  const [masterByAccount, activeSessionIds, lastActivityAtByAccount] = await Promise.all([
+    fetchMasterGroupStatsBatch(
+      accountRefs.map((a) => ({
+        id: a.id,
+        brandName: a.brandName,
+        platform: a.platform,
+      })),
+    ),
     fetchActiveSessionAccountIdSet(accountIds),
     fetchLastActivityAtByAccount(accountIds),
   ]);
+
   const platformsByBrand = new Map<string, Platform[]>();
   for (const account of accounts) {
     const list = platformsByBrand.get(account.brand_id) ?? [];
     if (!list.includes(account.platform)) list.push(account.platform);
     platformsByBrand.set(account.brand_id, list);
   }
-  const brandStandardByPlatform = await fetchBrandStandardTotalsByPlatform(
-    brands,
-    platformsByBrand,
-  );
+
+  const brandStandardByPlatform = buildBrandStandardFromCache(brands, platformsByBrand);
 
   const groups: AccountBrandGroup[] = [];
 

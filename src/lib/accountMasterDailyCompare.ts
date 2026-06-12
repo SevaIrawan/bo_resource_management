@@ -1,5 +1,9 @@
 import { dedupeDailyRowsByGroupId } from '@/lib/dedupeScrapeDaily';
 import {
+  getCachedDailyRows,
+  getCachedMasterRows,
+} from '@/lib/masterDailyLoadCache';
+import {
   buildDailyGroupIdSet,
   buildMasterGroupIdSet,
   isDailyGroupIdInMaster,
@@ -193,6 +197,12 @@ export async function loadMasterDailyForAccount(input: {
 }): Promise<{ masterRows: CompareMasterRow[]; dailyRows: CompareDailyRow[] }> {
   const brand = input.brandName.trim();
   if (!brand) return { masterRows: [], dailyRows: [] };
+
+  const cachedMaster = getCachedMasterRows(brand, input.platform);
+  const cachedDaily = getCachedDailyRows(input.accountId);
+  if (cachedMaster !== undefined && cachedDaily !== undefined) {
+    return { masterRows: cachedMaster, dailyRows: cachedDaily };
+  }
 
   const [master, daily] = await Promise.all([
     fetchAllSupabaseRows<CompareMasterRow>(TABLES.groupsMaster, 'group_id, group_name, invite_link', [

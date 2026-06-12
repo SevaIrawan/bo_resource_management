@@ -377,6 +377,7 @@ export const zh: Messages = {
       groupLinksFailed: '无法加载链接。',
     },
     loadingAccounts: '正在加载账号…',
+    loadingTickets: '正在加载问题…',
     loadAccountsFailed: '无法从数据库加载账号。',
     ticketReconcileFailed: '工单同步失败，请在 Ticket 页点击刷新。',
     ticketPanel: {

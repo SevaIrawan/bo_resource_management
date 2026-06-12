@@ -11,6 +11,7 @@ import { useMonitoringPending } from '@/hooks/useMonitoringPending';
 import { assertRmSchema } from '@/lib/assertRmSchema';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { loadAccountMonitoringGroups } from '@/lib/loadAccountMonitoring';
+import { clearMasterDailyLoadCache } from '@/lib/masterDailyLoadCache';
 import { buildTicketSummariesForUser } from '@/lib/buildTicketSummariesFromEngine';
 import { resolveMonitoringUserId } from '@/lib/monitoringDataUser';
 import {
@@ -46,13 +47,16 @@ interface GroupMonitoringProviderProps {
 export function GroupMonitoringProvider({ children }: GroupMonitoringProviderProps) {
   const { user } = useAuth();
   const { canAutoSync } = usePermissions();
-  const { registerRefreshHandler, registerFullRefreshHandler } = useMonitoringTab();
+  const { registerRefreshHandler, registerFullRefreshHandler, tab } = useMonitoringTab();
   const { notifyPendingDataUpdate } = useMonitoringPending();
   const { t } = useLanguage();
   const { setTicketCount } = useMonitoringTab();
   const [groups, setGroups] = useState<AccountBrandGroup[]>([]);
   const [ticketSummaries, setTicketSummaries] = useState<TicketSummaryGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const ticketsLoadGenRef = useRef(0);
+  const ticketsLoadBusyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [probeSuspendAccountIds, setProbeSuspendAccountIds] = useState<string[]>([]);
   const [accountFilters, setAccountFilters] = useState(ACCOUNT_FILTER_DEFAULT);
@@ -167,11 +171,44 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     void reloadTicketSummaries();
   }, [reloadTicketSummaries, scheduleReportingReload]);
 
+  const loadTicketsStaged = useCallback(
+    async (options?: { force?: boolean }) => {
+      if (!user?.id) {
+        setTicketSummaries([]);
+        hydrateTicketProcessCache({});
+        return;
+      }
+      if (ticketsLoadBusyRef.current && !options?.force) return;
+
+      const gen = ++ticketsLoadGenRef.current;
+      ticketsLoadBusyRef.current = true;
+      setTicketsLoading(true);
+
+      try {
+        const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+        const summaries = await buildTicketSummariesForUser(dataUserId);
+        if (gen !== ticketsLoadGenRef.current) return;
+        setTicketSummaries(summaries);
+        await reloadTicketHandles(summaries);
+      } catch {
+        if (gen !== ticketsLoadGenRef.current) return;
+        /* kartu ticket tetap data terakhir */
+      } finally {
+        if (gen === ticketsLoadGenRef.current) {
+          ticketsLoadBusyRef.current = false;
+          setTicketsLoading(false);
+        }
+      }
+    },
+    [user?.id, user?.userName, reloadTicketHandles],
+  );
+
   const reloadAll = useCallback(async () => {
     if (!user?.id) {
       setGroups([]);
       setTicketSummaries([]);
       setLoading(false);
+      setTicketsLoading(false);
       return;
     }
     if (reloadAllBusyRef.current) return;
@@ -180,6 +217,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     reloadAllBusyRef.current = true;
     setLoading(true);
     setError(null);
+    ticketsLoadGenRef.current += 1;
+    setTicketsLoading(false);
 
     try {
       try {
@@ -188,34 +227,41 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         /* private mode */
       }
 
+      clearMasterDailyLoadCache();
       await assertRmSchema();
       const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
 
-      const [loadedGroups, summaries] = await Promise.all([
-        loadAccountMonitoringGroups(dataUserId),
-        buildTicketSummariesForUser(dataUserId),
-      ]);
+      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
       if (seq !== reloadAllSeqRef.current) return;
       setGroups(loadedGroups);
-      setTicketSummaries(summaries);
-      await reloadTicketHandles(summaries);
     } catch (e) {
       if (seq !== reloadAllSeqRef.current) return;
       setError(getErrorMessage(e, t('groupMonitoring.loadAccountsFailed')));
       setGroups([]);
       setTicketSummaries([]);
       hydrateTicketProcessCache({});
+      clearMasterDailyLoadCache();
     } finally {
       if (seq === reloadAllSeqRef.current) {
         setLoading(false);
       }
       reloadAllBusyRef.current = false;
     }
-  }, [user?.id, user?.userName, t, reloadTicketHandles]);
+
+    if (seq === reloadAllSeqRef.current) {
+      void loadTicketsStaged();
+    }
+  }, [user?.id, user?.userName, t, loadTicketsStaged]);
 
   useEffect(() => {
     void reloadAll();
   }, [reloadAll]);
+
+  useEffect(() => {
+    if (tab === 'ticket' && !loading) {
+      void loadTicketsStaged();
+    }
+  }, [tab, loading, loadTicketsStaged]);
 
   useEffect(() => {
     registerRefreshHandler(async (activeTab) => {
@@ -360,6 +406,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       accountKpis,
       ticketKpis,
       loading,
+      ticketsLoading,
       reportError,
       setProbeSuspendAccountIds,
     }),
@@ -373,6 +420,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       accountKpis,
       ticketKpis,
       loading,
+      ticketsLoading,
       reportError,
       reloadTicketSummaries,
       refreshIssues,

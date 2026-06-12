@@ -387,6 +387,7 @@ export const en = {
       groupLinksFailed: 'Could not load links.',
     },
     loadingAccounts: 'Loading accounts…',
+    loadingTickets: 'Loading issues…',
     loadAccountsFailed: 'Unable to load accounts from database.',
     ticketReconcileFailed: 'Ticket sync failed. Use Refresh on the Ticket tab.',
     ticketPanel: {

@@ -31,13 +31,14 @@ import {
   TICKET_WORKFLOW_CHANGED_EVENT,
 } from '@/lib/ticketWorkflowLocal';
 import type { TicketSummaryGroup } from '@/lib/ticketGroups';
-import { applyAccountGroupsDailyPatch } from '@/lib/patchAccountGroupsFromDaily';
+import { patchAccountGridAfterDailyWrite } from '@/lib/patchAccountGridAfterDailyWrite';
+import { mergeGroupsAccountMetrics } from '@/lib/mergeMonitoringGroups';
 import { reconcileOpenTicketsForUser, reconcileTicketsForAccountFromDb } from '@/lib/reconcileTickets';
 import { computeAccountKpis, computeTicketKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 /** Bump saat logic ticket berubah — paksa reload (HMR tidak remount provider). */
-const TICKET_SYNC_VERSION = '6';
+const TICKET_SYNC_VERSION = '7';
 const TICKET_SYNC_STORAGE_KEY = 'rm-ticket-sync-version';
 
 interface GroupMonitoringProviderProps {
@@ -69,6 +70,9 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const ticketSyncLockedRef = useRef(false);
   const ticketReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportingReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dailyChangeDebounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const accountRefreshBusyRef = useRef<Set<string>>(new Set());
+  const pendingAccountRefreshRef = useRef<Set<string>>(new Set());
 
   const reportError = useCallback((message: string) => {
     setError(message);
@@ -93,9 +97,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     }
   }, []);
 
-  /** UI ticket = engine master↔daily (sama bookmark), bukan hitung baris load DB. */
-  const reloadTicketSummaries = useCallback(async () => {
-    if (ticketSyncLockedRef.current) return;
+  /** Muat ulang kartu Issue dari engine — boleh dipanggil saat ticketSyncLocked (post-scrape). */
+  const setTicketSummariesFromEngine = useCallback(async () => {
     if (!user?.id) {
       setTicketSummaries([]);
       hydrateTicketProcessCache({});
@@ -106,6 +109,12 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     setTicketSummaries(summaries);
     await reloadTicketHandles(summaries);
   }, [user?.id, user?.userName, reloadTicketHandles]);
+
+  /** UI ticket = engine master↔daily (sama bookmark), bukan hitung baris load DB. */
+  const reloadTicketSummaries = useCallback(async () => {
+    if (ticketSyncLockedRef.current) return;
+    await setTicketSummariesFromEngine();
+  }, [setTicketSummariesFromEngine]);
 
   const runTicketReconcile = useCallback(async () => {
     if (!user?.id || ticketReconcileBusyRef.current) return;
@@ -128,51 +137,79 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     }
   }, [user?.id, user?.userName, reloadTicketHandles, reportError, scheduleReportingReload, t]);
 
+  const patchAccountGridFromDb = useCallback(async (dbAccountId: string) => {
+    const snapshot = await new Promise<AccountBrandGroup[]>((resolve) => {
+      setGroups((current) => {
+        resolve(current);
+        return current;
+      });
+    });
+    const patched = await patchAccountGridAfterDailyWrite(snapshot, dbAccountId);
+    setGroups((prev) => mergeGroupsAccountMetrics(prev, patched));
+  }, []);
+
+  /** Reconcile + grid + ticket + reporting setelah daily/master berubah (scrape/realtime). */
+  const refreshAccountAfterDailyWrite = useCallback(
+    async (dbAccountId: string) => {
+      if (accountRefreshBusyRef.current.has(dbAccountId)) {
+        pendingAccountRefreshRef.current.add(dbAccountId);
+        return;
+      }
+      accountRefreshBusyRef.current.add(dbAccountId);
+      ticketSyncLockedRef.current = true;
+      try {
+        await reconcileTicketsForAccountFromDb(dbAccountId);
+        await patchAccountGridFromDb(dbAccountId);
+        await setTicketSummariesFromEngine();
+        scheduleReportingReload();
+      } finally {
+        accountRefreshBusyRef.current.delete(dbAccountId);
+        ticketSyncLockedRef.current = false;
+        if (pendingAccountRefreshRef.current.has(dbAccountId)) {
+          pendingAccountRefreshRef.current.delete(dbAccountId);
+          void refreshAccountAfterDailyWrite(dbAccountId);
+        }
+      }
+    },
+    [patchAccountGridFromDb, scheduleReportingReload, setTicketSummariesFromEngine],
+  );
+
   /** Reconcile DB dulu, lalu reload kartu Issue + reporting (kontrak 150−146=4 ticket). */
   const refreshIssues = useCallback(
     async (dbAccountId?: string) => {
-      ticketSyncLockedRef.current = true;
-      try {
-        if (dbAccountId) {
-          await reconcileTicketsForAccountFromDb(dbAccountId);
-          await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
-        } else if (user?.id) {
-          await runTicketReconcile();
-          scheduleReportingReload();
-          return;
-        }
-        await reloadTicketSummaries();
+      if (dbAccountId) {
+        await refreshAccountAfterDailyWrite(dbAccountId);
+        return;
+      }
+      if (user?.id) {
+        await runTicketReconcile();
         scheduleReportingReload();
-      } finally {
-        ticketSyncLockedRef.current = false;
       }
     },
-    [user?.id, runTicketReconcile, reloadTicketSummaries, scheduleReportingReload],
+    [user?.id, runTicketReconcile, refreshAccountAfterDailyWrite, scheduleReportingReload],
   );
 
   const handleAccountDailyChanged = useCallback(
     (dbAccountId: string) => {
       notifyPendingDataUpdate();
-      void (async () => {
-        ticketSyncLockedRef.current = true;
-        try {
-          await reconcileTicketsForAccountFromDb(dbAccountId);
-          await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
-          await reloadTicketSummaries();
-        } finally {
-          ticketSyncLockedRef.current = false;
-          scheduleReportingReload();
-        }
-      })();
+      const pending = dailyChangeDebounceRef.current.get(dbAccountId);
+      if (pending) clearTimeout(pending);
+      dailyChangeDebounceRef.current.set(
+        dbAccountId,
+        setTimeout(() => {
+          dailyChangeDebounceRef.current.delete(dbAccountId);
+          void refreshAccountAfterDailyWrite(dbAccountId);
+        }, 400),
+      );
     },
-    [notifyPendingDataUpdate, reloadTicketSummaries, scheduleReportingReload],
+    [notifyPendingDataUpdate, refreshAccountAfterDailyWrite],
   );
 
   /** Realtime master/daily — reload kartu Issue dari engine DB terbaru + reporting. */
   const scheduleIssueRefreshFromData = useCallback(() => {
     scheduleReportingReload();
-    void reloadTicketSummaries();
-  }, [reloadTicketSummaries, scheduleReportingReload]);
+    void setTicketSummariesFromEngine();
+  }, [scheduleReportingReload, setTicketSummariesFromEngine]);
 
   const loadTicketsStaged = useCallback(
     async (options?: { force?: boolean }) => {

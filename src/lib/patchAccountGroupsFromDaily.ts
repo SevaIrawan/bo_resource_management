@@ -11,17 +11,22 @@ export async function patchAccountGroupsFromDailyInState(
   return patchGroupsFromDailyInState(groups, dbAccountId);
 }
 
-export function applyAccountGroupsDailyPatch(
+function readGroupsState(
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>,
-  dbAccountId: string,
-): Promise<void> {
+): Promise<AccountBrandGroup[]> {
   return new Promise((resolve) => {
     onGroupsChange((current) => {
-      void patchGroupsFromDailyInState(current, dbAccountId).then((patched) => {
-        onGroupsChange((prev) => mergeGroupsAccountMetrics(prev, patched));
-        resolve();
-      });
+      resolve(current);
       return current;
     });
   });
+}
+
+export async function applyAccountGroupsDailyPatch(
+  onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>,
+  dbAccountId: string,
+): Promise<void> {
+  const snapshot = await readGroupsState(onGroupsChange);
+  const patched = await patchGroupsFromDailyInState(snapshot, dbAccountId);
+  onGroupsChange((prev) => mergeGroupsAccountMetrics(prev, patched));
 }

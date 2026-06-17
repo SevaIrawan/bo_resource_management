@@ -69,8 +69,8 @@ const checks = [
     name: 'Provider: scrape/realtime refresh summary engine',
     ok:
       provider.includes('reconcileTicketsForAccountFromDb') &&
-      provider.includes('applyAccountGroupsDailyPatch') &&
-      provider.includes('reloadTicketSummaries'),
+      provider.includes('patchAccountGridAfterDailyWrite') &&
+      provider.includes('setTicketSummariesFromEngine'),
   },
   {
     name: 'Sync flow: await onTicketsReload(dbAccountId)',
@@ -224,7 +224,31 @@ const checks = [
     name: 'Provider: refreshIssues + realtime daily → scheduleReportingReload',
     ok:
       provider.includes('scheduleReportingReload') &&
-      /handleAccountDailyChanged[\s\S]*scheduleReportingReload/.test(provider),
+      /refreshAccountAfterDailyWrite[\s\S]*setTicketSummariesFromEngine/.test(provider),
+  },
+  {
+    name: 'Post-scrape: ticket reload tidak skip saat ticketSyncLocked',
+    ok:
+      provider.includes('setTicketSummariesFromEngine') &&
+      !/ticketSyncLockedRef\.current = true[\s\S]{0,200}await reloadTicketSummaries/.test(
+        provider,
+      ),
+  },
+  {
+    name: 'Post-scrape: grid patch atomik (daily + brand master satu pass)',
+    ok:
+      fs.existsSync(path.join(root, 'src/lib/patchAccountGridAfterDailyWrite.ts')) &&
+      provider.includes('patchAccountGridFromDb') &&
+      read('src/lib/patchAccountGridAfterDailyWrite.ts').includes('patchGroupsFromDailyInState') &&
+      read('src/lib/patchAccountGridAfterDailyWrite.ts').includes('patchBrandPlatformMasterInGroups'),
+  },
+  {
+    name: 'Post-scrape: refresh busy coalesce (pending rerun)',
+    ok:
+      provider.includes('pendingAccountRefreshRef') &&
+      /pendingAccountRefreshRef\.current\.has\(dbAccountId\)[\s\S]*void refreshAccountAfterDailyWrite/.test(
+        provider,
+      ),
   },
 ];
 

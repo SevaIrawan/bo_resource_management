@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-17  
-**Versi aplikasi:** `1.0.17` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.18` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.17)
+## 4. Konfigurasi & installer (kondisi 1.0.18)
 
 ### 4.1 Variabel lingkungan
 
@@ -172,7 +172,8 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 - **Auto-close:** issue hilang setelah scrape/sync → `resolveTickets` menutup baris open; kartu hilang dari UI
 - Workflow: handle issue, modal proses ticket (migrasi 024–026)
 - Realtime: `group_scrape_daily` + `scrape_runs` completed → reconcile akun → reload ticket
-- **Data fresh (1.0.17):** setelah scrape/sync, `invalidateMasterDailyCacheForScrape` + `forceFresh: true` di reconcile & kartu UI — tidak pakai cache master/daily lama
+- **Data fresh (1.0.17+):** setelah scrape/sync, `invalidateMasterDailyCacheForScrape` + `forceFresh: true` di reconcile & kartu UI — tidak pakai cache master/daily lama
+- **UI realtime post-scrape (1.0.18):** `refreshAccountAfterDailyWrite` — reconcile → patch grid atomik (`patchAccountGridAfterDailyWrite`) → `setTicketSummariesFromEngine` (bypass `ticketSyncLocked`) → `scheduleReportingReload`; modal Full Group/Admin ikut reload via `rm-reporting-reload`
 - **UI ticket:** angka kartu tab Ticket dari `buildTicketSummariesForUser` — sama engine dengan kolom Groups/Admin bookmark (`accountMasterDailyCompare`)
 - **Modal Admin vs master:** daftar hanya grup master brand (denominator **X**); grup junk di device tidak masuk modal (lihat tab Ticket → Junk)
 
@@ -338,4 +339,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.17**. Jika version atau alur berubah, perbarui bagian 4, 6, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.18**. Jika version atau alur berubah, perbarui bagian 4, 6, 9, dan nomor versi di header.*

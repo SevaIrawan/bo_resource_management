@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.17` (lihat `package.json`)
+**Versi saat ini:** `1.0.18` (lihat `package.json`)
+
+**Rilis 1.0.18:** perbaikan UI ticket/grid/reporting realtime setelah Run Scraper (bypass ticket lock, patch grid atomik).
 
 **Rilis 1.0.17:** session probe 20s + resolve akun per baris grid; ticket/reporting data fresh setelah scrape; tab Reporting matrix dengan filter back.
 

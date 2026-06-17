@@ -113,21 +113,31 @@ export function GroupLinksModal({
         ? fetchAccountDailyGroupLinks(accountId)
         : fetchAccountGroupLinks(brandName, platform, accountId);
 
-    void load
-      .then((rows) => {
-        if (!cancelled) setLinks(rows);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : t('groupMonitoring.sync.groupLinksFailed'));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const runLoad = () => {
+      void load
+        .then((rows) => {
+          if (!cancelled) setLinks(rows);
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : t('groupMonitoring.sync.groupLinksFailed'));
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    };
+
+    runLoad();
+
+    const onDataRefresh = () => {
+      if (!cancelled) runLoad();
+    };
+    window.addEventListener('rm-reporting-reload', onDataRefresh);
 
     return () => {
       cancelled = true;
+      window.removeEventListener('rm-reporting-reload', onDataRefresh);
     };
   }, [accountId, accountName, brandName, open, platform, t, viewMode]);
 

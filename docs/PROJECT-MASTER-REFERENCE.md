@@ -1,7 +1,7 @@
 # Resource Management — Referensi Master Proyek
 
 **Versi dokumen:** 2026-06-17  
-**Versi aplikasi:** 1.0.17 (`package.json`)  
+**Versi aplikasi:** 1.0.18 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
 ## Prinsip dokumen ini

@@ -2525,6 +2525,52 @@
     text-align: left;
   }
 
+  .join-report-table__filter-empty-row td {
+    padding: 0;
+    border-bottom: none;
+    vertical-align: middle;
+  }
+
+  .join-report-table__filter-empty {
+    display: flex;
+    min-height: 12rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem 1.25rem;
+    text-align: center;
+  }
+
+  .join-report-table__filter-empty-text {
+    margin: 0;
+    max-width: 28rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  .join-report-table__filter-empty-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.375rem;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.4375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .join-report-table__filter-empty-btn:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
   .brand-modal-panel--ticket-detail {
     display: flex;
     flex-direction: column;

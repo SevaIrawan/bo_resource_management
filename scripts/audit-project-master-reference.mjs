@@ -37,7 +37,10 @@ function check(name, fn) {
 
 const pkg = JSON.parse(read('package.json'));
 check('package.json version', () => {
-  if (pkg.version !== '1.0.16') return fail(`version=${pkg.version}, doc claims 1.0.16 — update doc or version`);
+  const projectMd = read('PROJECT.md');
+  if (!projectMd.includes(pkg.version)) {
+    return fail(`PROJECT.md must mention version ${pkg.version}`);
+  }
   return ok(`version ${pkg.version}`);
 });
 
@@ -141,11 +144,11 @@ check('accountGroupEstimate uses real metrics not floor 500', () => {
     : fail('floor 500 still present');
 });
 
-check('session check fixed 3s not group-scaled', () => {
+check('session check fixed 20s not group-scaled', () => {
   const policy = read('src/config/syncScraperPolicy.ts');
   const gate = read('src/lib/deviceSessionGate.ts');
   const validate = read('electron/main/scraper/validateSession.ts');
-  if (!policy.includes('sessionCheck') || !policy.includes('timeoutMs: 3_000')) {
+  if (!policy.includes('sessionCheck') || !policy.includes('timeoutMs: 20_000')) {
     return fail('sessionCheck timeout missing in policy');
   }
   if (!gate.includes('sessionCheckTimeoutMs')) return fail('gate must use sessionCheckTimeoutMs');
@@ -165,10 +168,10 @@ check('session check fixed 3s not group-scaled', () => {
       return fail('session probe must not wait for WA store');
     }
   }
-  if (!read('electron/main/scraper/deviceGroupScale.ts').includes('SESSION_CHECK_TIMEOUT_MS = 3_000')) {
+  if (!read('electron/main/scraper/deviceGroupScale.ts').includes('SESSION_CHECK_TIMEOUT_MS = 20_000')) {
     return fail('SESSION_CHECK_TIMEOUT_MS missing');
   }
-  return ok('session check: 3s getState probe, no group read');
+    return ok('session check: 20s getState probe, no group read');
 });
 
 check('scraper cancel IPC', () => {

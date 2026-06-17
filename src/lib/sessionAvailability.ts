@@ -1,4 +1,3 @@
-import { findMessagingAccountWithActiveSession } from '@/lib/accountSessionResolve';
 import { ensurePlatformSessionInDatabase } from '@/lib/ensureWaSessionInDb';
 import { persistLoginSessionAfterSuccess } from '@/lib/persistLoginSession';
 import {
@@ -24,8 +23,7 @@ export async function hasStoredPlatformSession(
 }
 
 /**
- * Boleh lanjut Sync/Scraper tanpa QR.
- * DB aktif = cukup (device warm opsional, jangan paksa scan).
+ * Boleh lanjut Sync/Scraper tanpa QR — cek session baris akun ini saja (bukan label global).
  */
 export async function hasUsableLoginSession(input: {
   sessionId: string;
@@ -33,16 +31,9 @@ export async function hasUsableLoginSession(input: {
   accountId: string;
   accountName?: string;
 }): Promise<boolean> {
+  void input.accountName;
   if ((await resolveLatestSessionUiStatus(input.accountId)) === 'valid') {
     return true;
-  }
-
-  if (input.accountName?.trim()) {
-    const byLabel = await findMessagingAccountWithActiveSession(
-      input.accountName,
-      input.platform,
-    );
-    if (byLabel) return true;
   }
 
   if (await hasStoredPlatformSession(input.accountId, input.platform)) {

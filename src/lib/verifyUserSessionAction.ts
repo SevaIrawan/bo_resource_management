@@ -14,6 +14,11 @@ export type VerifyUserSessionResult =
     }
   | {
       ok: false;
+      kind: 'device_busy';
+      message: string;
+    }
+  | {
+      ok: false;
       kind: 'device_failed';
       message: string;
       shouldInvalidate: boolean;
@@ -39,6 +44,14 @@ export async function verifyUserSessionForAction(input: {
       ok: false,
       kind: 'db_invalid',
       reloginCode: result.reloginCode,
+    };
+  }
+
+  if (result.kind === 'device_busy') {
+    return {
+      ok: false,
+      kind: 'device_busy',
+      message: result.message,
     };
   }
 

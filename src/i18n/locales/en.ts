@@ -111,6 +111,9 @@ export const en = {
       matrixFilterColumn: 'Filter column {{name}}',
       matrixFilterAll: 'All',
       matrixFilterEmpty: 'No rows match this column filter.',
+      matrixFilterClear: 'Back to all groups',
+      matrixSearchEmpty: 'No groups match this search.',
+      matrixSearchClear: 'Back — clear search',
       colNo: 'No',
       colGroupName: 'Group Name',
       colGroupId: 'Group ID',
@@ -362,6 +365,8 @@ export const en = {
         'No groups on this account and none in the database for this brand. Nothing to scrape. Tap OK to continue.',
       sessionWarmPending:
         'Device session is still starting on this PC (up to ~2 min). Tap Sync again — your Telegram/WhatsApp link on the phone is unchanged.',
+      sessionCheckBusy:
+        'Session is still connecting on this PC. Wait a few seconds and tap Sync or Run again — your WhatsApp/Telegram link on the phone is unchanged.',
       sessionValidMessageTg: 'Telegram OK. Counts updated.',
       sessionValidMessageWa: 'WhatsApp OK. Counts updated.',
       sessionValidDetail:

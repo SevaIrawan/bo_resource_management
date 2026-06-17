@@ -16,6 +16,7 @@ export async function patchGroupsFromDailyInState(
     brand: found.account.brandName,
     platform: found.account.platform,
     sessionValid: found.account.sessionStatus === 'valid',
+    forceFresh: true,
   });
 
   return groups.map((group) =>

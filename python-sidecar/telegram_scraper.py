@@ -394,14 +394,24 @@ async def validate_telegram_session(session_id: str, session_string: str | None 
     if not session and session_string:
         restored = await restore_telegram_session(session_id, session_string)
         if restored.get("status") == "error":
+            msg = restored.get("message", "Session restore failed")
+            lower = str(msg).lower()
+            if "not ready" in lower or "connect" in lower or "timeout" in lower:
+                return {"status": "ok", "valid": False, "message": f"SESSION_WARM_PENDING: {msg}"}
             return {
                 "status": "ok",
                 "valid": False,
-                "message": restored.get("message", "Session restore failed"),
+                "message": msg,
             }
 
     session = SESSIONS.get(session_id)
     if not session:
+        if session_string:
+            return {
+                "status": "ok",
+                "valid": False,
+                "message": "SESSION_WARM_PENDING: Telegram client still starting on this PC.",
+            }
         return {
             "status": "ok",
             "valid": False,
@@ -412,8 +422,16 @@ async def validate_telegram_session(session_id: str, session_string: str | None 
     if ok:
         session.status = "ready"
         return {"status": "ok", "valid": True}
+
+    err_msg = err or f"Session not ready (status={session.status})"
+    if session.status in ("pending", "confirming") or "not ready" in err_msg.lower():
+        return {
+            "status": "ok",
+            "valid": False,
+            "message": f"SESSION_WARM_PENDING: {err_msg}",
+        }
     return {
         "status": "ok",
         "valid": False,
-        "message": err or f"Session not ready (status={session.status})",
+        "message": err_msg,
     }

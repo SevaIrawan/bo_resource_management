@@ -52,8 +52,10 @@ export function reloginCodeForSync(input: {
 
 export type DeviceSessionCheckResult =
   | { ok: true }
+  | { ok: false; busy: true; message: string }
   | {
       ok: false;
+      busy?: false;
       reloginCode: SyncLoginReloginCode;
       message: string;
       shouldInvalidate: boolean;
@@ -76,6 +78,10 @@ export async function checkDeviceSessionForValidColumn(input: {
 
   if (gate.ok) {
     return { ok: true };
+  }
+
+  if (gate.kind === 'device_busy') {
+    return { ok: false, busy: true, message: gate.message };
   }
 
   if (gate.kind === 'db_invalid') {
@@ -178,6 +184,7 @@ export type SyncCheckOutcome =
       modalStep: PostSyncModalStep;
       updatedAccount: AccountBrandRow;
     }
+  | { kind: 'device_busy'; message: string; dbAccountId: string }
   | { kind: 'error'; code: 'SYNC_TIMED_OUT' | 'SYNC_FAILED' };
 
 export async function executeSyncCheck(input: {
@@ -234,6 +241,14 @@ export async function executeSyncCheck(input: {
   });
 
   if (!deviceCheck.ok) {
+    if (deviceCheck.busy) {
+      return {
+        kind: 'device_busy',
+        message: deviceCheck.message,
+        dbAccountId,
+      };
+    }
+
     const invalidResult = await buildLogoutRowAfterDeviceFailure({
       dbAccountId,
       brand: account.brandName,

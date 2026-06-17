@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.16 |
+| **Versi app** | 1.0.17 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Admin → Language) |
@@ -23,11 +23,12 @@ Untuk arsitektur & rilis IT, lihat [PROJECT.md](../PROJECT.md).
 3. [Navigasi & tata letak](#3-navigasi--tata-letak)
 4. [Tab Account — monitoring akun](#4-tab-account--monitoring-akun)
 5. [Tab Ticket — issue & perbaikan](#5-tab-ticket--issue--perbaikan)
-6. [Halaman Admin](#6-halaman-admin)
-7. [Sinkronisasi data (realtime)](#7-sinkronisasi-data-realtime)
-8. [Alur kerja harian (disarankan)](#8-alur-kerja-harian-disarankan)
-9. [Glosarium](#9-glosarium)
-10. [FAQ](#10-faq)
+6. [Tab Reporting — matrix join/admin](#6-tab-reporting--matrix-joinadmin)
+7. [Halaman Admin](#7-halaman-admin)
+8. [Sinkronisasi data (realtime)](#8-sinkronisasi-data-realtime)
+9. [Alur kerja harian (disarankan)](#9-alur-kerja-harian-disarankan)
+10. [Glosarium](#10-glosarium)
+11. [FAQ](#11-faq)
 
 ---
 
@@ -106,6 +107,7 @@ Anda langsung masuk ke **Group Monitoring** (halaman utama).
 |-----|--------|
 | **Account** | Daftar brand & akun WA/TG |
 | **Ticket** | Daftar issue yang harus ditangani (angka = jumlah issue terbuka) |
+| **Reporting** | Laporan read-only join/admin grup per brand (matrix atau per akun) |
 
 ### 3.4 KPI (kartu angka di atas)
 
@@ -194,7 +196,7 @@ Setiap brand (mis. **Brand : SBMY**) punya satu kartu.
 
 | Kontrol | Fungsi |
 |---------|--------|
-| **↻ (Sync)** | Alur utama: login platform atau cek session + update angka |
+| **↻ (Sync)** | Cek session device (timeout ~20 detik) + update angka; busy → alert, bukan modal login |
 | **X (hover, kanan nama)** | **Remove from slot** — hapus akun dari slot + rebuild master brand (konfirmasi modal) |
 | **X (hover, kolom Session, hanya Valid)** | **Clear Session** — logout di PC ini + database; Sync berikutnya buka QR bersih |
 | **Group link** | Modal daftar grup — mode daily 7 kolom atau admin vs master — perlu data scrape |
@@ -346,10 +348,40 @@ Bookmark **In Progress** / **Completed** mengikuti status yang Anda simpan.
 - Perbaiki grup di lapangan (join, admin, bersihkan sampah)
 - Di akun terkait: **Sync** atau **Run** ulang
 - Ticket hilang/berkurang ketika data sudah selaras (realtime setelah DB update)
+- Setelah **Run Scraper**, angka ticket & kolom Groups **langsung** dari DB terbaru (bukan cache lama)
 
 ---
 
-## 6. Halaman Admin
+## 6. Tab Reporting — matrix join/admin
+
+Tab **Reporting** hanya **baca data** — tidak mengubah session, scraper, atau ticket.
+
+### 6.1 Filter atas
+
+| Filter | Fungsi |
+|--------|--------|
+| **Platform** | WhatsApp atau Telegram |
+| **Brand** | Brand yang punya akun |
+| **Acc Name** | **All** = matrix semua akun; pilih satu = laporan akun itu saja |
+| **Full Group / Full Admin** | Join status atau admin status vs master |
+| **Search group name** | Filter nama grup |
+
+### 6.2 Matrix (Acc Name = All)
+
+- Baris = grup master brand; kolom = akun (Yes/No join atau admin)
+- Klik panah di header kolom akun → filter **Yes** / **No** / **All**
+- Jika filter tidak punya baris: header tabel tetap ada → klik **Back to all groups** atau pilih **All** di dropdown
+
+### 6.3 Per akun (Acc Name = satu akun)
+
+- **Full Group:** semua grup daily akun (7 kolom)
+- **Full Admin:** daftar master brand + status admin akun
+
+Data diperbarui otomatis setelah scrape atau perubahan di Supabase (realtime).
+
+---
+
+## 7. Halaman Admin
 
 Buka dari sidebar: **Admin**.
 
@@ -388,7 +420,7 @@ Mencatat aktivitas ke database. Tidak menggantikan **Run** scraper penuh saat da
 
 ---
 
-## 7. Sinkronisasi data (realtime)
+## 8. Sinkronisasi data (realtime)
 
 ### 7.1 Perubahan di database → app tim
 
@@ -416,7 +448,7 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 
 ---
 
-## 8. Alur kerja harian (disarankan)
+## 9. Alur kerja harian (disarankan)
 
 ### 8.1 Setup akun marketing baru (setelah data test dibersihkan)
 
@@ -444,7 +476,7 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 
 ---
 
-## 9. Glosarium
+## 10. Glosarium
 
 | Istilah | Arti |
 |---------|------|
@@ -462,7 +494,7 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 
 ---
 
-## 10. FAQ
+## 11. FAQ
 
 **Apakah saya perlu install ulang saat ada update app?**  
 Tidak. Restart saja setelah notifikasi update (jika IT sudah publish ke GitHub).
@@ -520,4 +552,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.16**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*
+*Handbook ini selaras dengan aplikasi versi **1.0.17**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*

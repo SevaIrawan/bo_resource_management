@@ -112,6 +112,9 @@ export const zh: Messages = {
       matrixFilterColumn: '筛选列 {{name}}',
       matrixFilterAll: '全部',
       matrixFilterEmpty: '没有符合该列筛选条件的行。',
+      matrixFilterClear: '返回全部群组',
+      matrixSearchEmpty: '没有符合搜索条件的群组。',
+      matrixSearchClear: '返回 — 清除搜索',
       colNo: '序号',
       colGroupName: '群名称',
       colGroupId: '群 ID',
@@ -352,6 +355,8 @@ export const zh: Messages = {
       resumeEmptyGroups: '该账号与数据库均无群组，无需抓取。点击确定继续。',
       sessionWarmPending:
         '本机正在恢复设备会话（约 2 分钟）。请稍后再点同步；手机端关联未断开。',
+      sessionCheckBusy:
+        '本机会话仍在连接中。请稍等几秒后再次点击同步或运行；手机端关联未断开。',
       sessionValidMessageTg: 'Telegram 正常，计数已更新。',
       sessionValidMessageWa: 'WhatsApp 正常，计数已更新。',
       sessionValidDetail:

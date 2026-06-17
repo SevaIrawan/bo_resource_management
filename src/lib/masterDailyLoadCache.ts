@@ -1,4 +1,4 @@
-import { dedupeDailyRowsByGroupId } from '@/lib/dedupeScrapeDaily';
+import { dedupeDailyRowsByGroupIdKeepLatest } from '@/lib/dedupeScrapeDaily';
 import type { CompareDailyRow, CompareMasterRow } from '@/lib/accountMasterDailyCompare';
 import { TABLES } from '@/config/tables';
 import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
@@ -17,6 +17,31 @@ const dailyByAccountId = new Map<string, CompareDailyRow[]>();
 export function clearMasterDailyLoadCache(): void {
   masterByBrandPlatform.clear();
   dailyByAccountId.clear();
+}
+
+/** Setelah scrape/sync tulis daily + rebuild master — cache lama bikin UI/ticket stuck. */
+export function invalidateMasterDailyCacheForScrape(input: {
+  accountId: string;
+  brand: string;
+  platform: Platform;
+}): void {
+  dailyByAccountId.delete(input.accountId);
+  masterByBrandPlatform.delete(brandPlatformCacheKey(input.brand.trim(), input.platform));
+}
+
+/** Setelah fetch DB — isi cache dengan snapshot terbaru (ticket/reporting/grid). */
+export function setCachedMasterDailyForAccount(input: {
+  accountId: string;
+  brand: string;
+  platform: Platform;
+  masterRows: CompareMasterRow[];
+  dailyRows: CompareDailyRow[];
+}): void {
+  masterByBrandPlatform.set(
+    brandPlatformCacheKey(input.brand.trim(), input.platform),
+    input.masterRows,
+  );
+  dailyByAccountId.set(input.accountId, input.dailyRows);
 }
 
 export function getCachedMasterRows(
@@ -105,6 +130,6 @@ async function partitionDailyBatch(accountIds: string[]): Promise<void> {
 
   for (const accountId of accountIds) {
     const raw = rawByAccount.get(accountId) ?? [];
-    dailyByAccountId.set(accountId, dedupeDailyRowsByGroupId(raw));
+    dailyByAccountId.set(accountId, dedupeDailyRowsByGroupIdKeepLatest(raw));
   }
 }

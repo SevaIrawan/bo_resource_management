@@ -1,7 +1,7 @@
 # Resource Management — Referensi Master Proyek
 
-**Versi dokumen:** 2026-06-11  
-**Versi aplikasi:** 1.0.16 (`package.json`)  
+**Versi dokumen:** 2026-06-17  
+**Versi aplikasi:** 1.0.17 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
 ## Prinsip dokumen ini
@@ -55,12 +55,13 @@ Dokumen ini melengkapi (bukan mengganti):
 10. [Cancel Run](#10-cancel-run)
 11. [Modal login platform](#11-modal-login-platform)
 12. [Tab Ticket & reconcile](#12-tab-ticket--reconcile)
-13. [Realtime & auto-sync](#13-realtime--auto-sync)
-14. [Database Supabase](#14-database-supabase)
-15. [Electron & sidecar](#15-electron--sidecar)
-16. [Hak akses (Admin vs Operator)](#16-hak-akses-admin-vs-operator)
-17. [Peta file penting](#17-peta-file-penting)
-18. [Validator & script QA](#18-validator--script-qa)
+13. [Tab Reporting](#13-tab-reporting)
+14. [Realtime & auto-sync](#14-realtime--auto-sync)
+15. [Database Supabase](#15-database-supabase)
+16. [Electron & sidecar](#16-electron--sidecar)
+17. [Hak akses (Admin vs Operator)](#17-hak-akses-admin-vs-operator)
+18. [Peta file penting](#18-peta-file-penting)
+19. [Validator & script QA](#19-validator--script-qa)
 
 ---
 
@@ -101,7 +102,7 @@ Routing: `src/App.tsx` (HashRouter)
 | Path | Halaman | Akses | Sumber |
 |------|---------|-------|--------|
 | `/login` | Login app (`loginWithCredentials` → tabel `users`) | Guest | `src/lib/auth.ts`, `src/App.tsx` |
-| `/` | Group Monitoring — tab Account + Ticket | Login required | `GroupMonitoringPage.tsx` |
+| `/` | Group Monitoring — tab Account + Ticket + **Reporting** | Login required | `GroupMonitoringPage.tsx` |
 | `/admin` | Admin settings | `AdminRoute` — username `admin` | `AdminRoute.tsx` |
 | `/settings` | Redirect → `/admin` jika admin, else `/` | Login required | `SettingsRedirect.tsx` |
 
@@ -111,6 +112,7 @@ Routing: `src/App.tsx` (HashRouter)
 
 - **Account** — brand card, grid akun, sync/scrape
 - **Ticket** — issue per akun (missing group, not admin, duplicate, dll.)
+- **Reporting** — matrix join/admin read-only per brand+platform (`ReportingMonitoringPanel.tsx`)
 
 View mode Account: **Card** (satu kartu per brand) atau **Table** (semua baris flat). State di slicer header.
 
@@ -215,7 +217,9 @@ Kolom **Session** (VALID/INVALID) terpisah; badge Status mengikuti `sessionStatu
 | Situasi | Kolom Session |
 |---------|---------------|
 | INVALID + Sync/Run → modal login | Tetap badge **INVALID** (bukan Checking Session) |
-| VALID + Sync/Run → probe device | **Checking Session** |
+| VALID + Sync/Run → probe device | **Checking Session** (timeout **20s**, retry busy — `deviceSessionGate.ts`) |
+| Device busy (Chrome/scrape lain) | Alert **SESSION_CHECK_BUSY** — **bukan** modal login |
+| Resolve session / scrape | **`messaging_accounts.id` baris grid** — `accountSessionResolve.ts`, `accountDbId.ts` |
 | Tutup modal login (X / backdrop) | **Tidak berubah** — scan dibatalkan |
 | Login sukses | Langsung **VALID** (via `applyResult`) |
 
@@ -559,13 +563,39 @@ reconcileTickets.ts  →  upsert/delete baris tickets DB
 
 ### 11.3 Kapan reconcile jalan
 
-- Setelah sync/scrape sukses → `onTicketsReload(dbAccountId)`
+- Setelah sync/scrape sukses → `onTicketsReload(dbAccountId)` → `refreshIssues` (reconcile + reload kartu + **Reporting reload**)
 - Realtime Supabase pada `group_scrape_daily`, `scrape_runs`, `tickets`
 - Hook: `useRealtimeMonitoring.ts`
 
+### 11.4 Data fresh (anti cache lama)
+
+| Langkah | File |
+|---------|------|
+| Scrape tulis daily + rebuild master | `accountScraper.ts` → `invalidateMasterDailyCacheForScrape` |
+| Reconcile DB | `reconcileTickets.ts` → `loadMasterDailyForAccount({ forceFresh: true })` |
+| Kartu Issue UI | `buildTicketSummariesFromEngine.ts` → `forceFresh: true` |
+| Patch grid bookmark | `hydrateAccountMetricsFromDaily.ts`, `patchAccountMasterInGroups.ts` |
+
 ---
 
-## 13. Realtime & auto-sync
+## 13. Tab Reporting
+
+**Read-only** — tidak ubah session, scraper, sync, atau ticket DB dari tab ini.
+
+| Komponen | File |
+|----------|------|
+| Panel + slicer | `ReportingMonitoringPanel.tsx`, `ReportingSlicerHeader.tsx` |
+| Matrix Acc=All | `ReportingJoinMatrixTable.tsx`, `loadJoinGroupReport.ts` |
+| Full Group/Admin per akun | `ReportingDailyTable.tsx`, `ReportingAdminDailyTable.tsx` |
+| Reload realtime | `GroupMonitoringProvider.scheduleReportingReload` → event `rm-reporting-reload` |
+
+**Sumber data:** `fetchAllSupabaseRows` + `dedupeDailyRowsByGroupIdKeepLatest` — bukan cache `masterDailyLoadCache`.
+
+**Filter kolom akun (Yes/No):** jika tidak ada baris, header tabel + dropdown filter tetap tampil; tombol **Back to all groups** reset filter.
+
+---
+
+## 14. Realtime & auto-sync
 
 | Fitur | File |
 |-------|------|
@@ -576,7 +606,7 @@ reconcileTickets.ts  →  upsert/delete baris tickets DB
 
 ---
 
-## 14. Database Supabase
+## 15. Database Supabase
 
 Sumber nama: `src/config/tables.ts`
 
@@ -599,7 +629,7 @@ Sumber nama: `src/config/tables.ts`
 
 ---
 
-## 15. Electron & sidecar
+## 16. Electron & sidecar
 
 ### 14.1 Bootstrap
 
@@ -654,7 +684,7 @@ Build sidecar: `npm run build:sidecar` → `resources/sidecar/` + nama dari `sid
 
 ---
 
-## 16. Hak akses (Admin vs Operator)
+## 17. Hak akses (Admin vs Operator)
 
 Model: `src/lib/userRole.ts` — role dari **username login**, bukan kolom `users.role` DB.
 
@@ -676,7 +706,7 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 
 ---
 
-## 17. Peta file penting
+## 18. Peta file penting
 
 ### UI Group Monitoring
 
@@ -688,6 +718,13 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | `PlatformLoginModal.tsx` | Modal QR/phone login |
 | `GroupLinksModal.tsx` | Modal group link |
 | `ScrapeCancelConfirmModal.tsx` | Konfirmasi cancel scrape |
+| `ReportingMonitoringPanel.tsx` | Tab Reporting — slicer + reload |
+| `ReportingJoinMatrixTable.tsx` | Matrix join/admin + filter kolom |
+| `loadJoinGroupReport.ts` | Fetch matrix/daily reporting |
+| `masterDailyLoadCache.ts` | Cache warm load awal; **invalidate** setelah scrape |
+| `accountSessionResolve.ts` | Resolve UUID akun per baris grid |
+| `accountDbId.ts` | Normalisasi `messaging_accounts.id` |
+| `deviceSessionGate.ts` | Probe session 20s + retry busy |
 
 ### Hooks & state
 
@@ -736,7 +773,7 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 
 ---
 
-## 18. Validator & script QA
+## 19. Validator & script QA
 
 **Audit doc ini:**
 
@@ -756,8 +793,9 @@ Jalankan sebelum release: `npm run validate:pre-release`
 | `validate:wa-qr-login` | Timeout QR WA, modal close |
 | `validate:telegram-login` | Alur login TG |
 | `validate:multi-account-wa` | Multi-akun WA |
-| `validate:ticket-reconcile` | Reconcile ticket |
+| `validate:ticket-reconcile` | Reconcile ticket + forceFresh + reporting reload |
 | `validate:ticket-logic` | Engine ticket |
+| `validate-reporting-matrix.mjs` | Tab Reporting matrix + filter back |
 | `validate:device-group-scale` | Skala 3000 grup |
 | `validate:post-login-sync` | Sync setelah login |
 | `validate:desktop` | Gabungan validator desktop |

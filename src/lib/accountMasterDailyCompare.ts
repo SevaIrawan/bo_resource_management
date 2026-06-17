@@ -1,7 +1,12 @@
-import { dedupeDailyRowsByGroupId } from '@/lib/dedupeScrapeDaily';
+import {
+  dedupeDailyRowsByGroupId,
+  dedupeDailyRowsByGroupIdKeepLatest,
+} from '@/lib/dedupeScrapeDaily';
 import {
   getCachedDailyRows,
   getCachedMasterRows,
+  invalidateMasterDailyCacheForScrape,
+  setCachedMasterDailyForAccount,
 } from '@/lib/masterDailyLoadCache';
 import {
   buildDailyGroupIdSet,
@@ -194,14 +199,24 @@ export async function loadMasterDailyForAccount(input: {
   accountId: string;
   brandName: string;
   platform: Platform;
+  /** Ticket/reconcile/reporting — selalu baca Supabase, jangan cache lama. */
+  forceFresh?: boolean;
 }): Promise<{ masterRows: CompareMasterRow[]; dailyRows: CompareDailyRow[] }> {
   const brand = input.brandName.trim();
   if (!brand) return { masterRows: [], dailyRows: [] };
 
-  const cachedMaster = getCachedMasterRows(brand, input.platform);
-  const cachedDaily = getCachedDailyRows(input.accountId);
-  if (cachedMaster !== undefined && cachedDaily !== undefined) {
-    return { masterRows: cachedMaster, dailyRows: cachedDaily };
+  if (input.forceFresh) {
+    invalidateMasterDailyCacheForScrape({
+      accountId: input.accountId,
+      brand,
+      platform: input.platform,
+    });
+  } else {
+    const cachedMaster = getCachedMasterRows(brand, input.platform);
+    const cachedDaily = getCachedDailyRows(input.accountId);
+    if (cachedMaster !== undefined && cachedDaily !== undefined) {
+      return { masterRows: cachedMaster, dailyRows: cachedDaily };
+    }
   }
 
   const [master, daily] = await Promise.all([
@@ -209,16 +224,25 @@ export async function loadMasterDailyForAccount(input: {
       { column: 'brand', value: brand },
       { column: 'platform', value: input.platform },
     ]),
-    fetchAllSupabaseRows<CompareDailyRow>(
+    fetchAllSupabaseRows<CompareDailyRow & { scraped_at?: string | null }>(
       TABLES.groupScrapeDaily,
-      'group_id, group_name, invite_link, is_admin',
+      'group_id, group_name, invite_link, is_admin, scraped_at',
       [{ column: 'account_id', value: input.accountId }],
     ),
   ]);
 
+  const dailyRows = dedupeDailyRowsByGroupIdKeepLatest(daily);
+  setCachedMasterDailyForAccount({
+    accountId: input.accountId,
+    brand,
+    platform: input.platform,
+    masterRows: master,
+    dailyRows,
+  });
+
   return {
     masterRows: master,
-    dailyRows: dedupeDailyRowsByGroupId(daily),
+    dailyRows,
   };
 }
 
@@ -250,7 +274,13 @@ export async function fetchAccountBookmarkMetrics(input: {
   accountId: string;
   brandName: string;
   platform: Platform;
+  forceFresh?: boolean;
 }): Promise<AccountBookmarkMetrics> {
-  const { masterRows, dailyRows } = await loadMasterDailyForAccount(input);
+  const { masterRows, dailyRows } = await loadMasterDailyForAccount({
+    accountId: input.accountId,
+    brandName: input.brandName,
+    platform: input.platform,
+    forceFresh: input.forceFresh,
+  });
   return bookmarkMetricsFromBreakdown(computeAccountTicketBreakdown(masterRows, dailyRows));
 }

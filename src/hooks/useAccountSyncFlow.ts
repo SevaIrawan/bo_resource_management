@@ -479,6 +479,12 @@ export function useAccountSyncFlow({
           return;
         }
 
+        if (outcome.kind === 'device_busy') {
+          stopLoading();
+          showSyncError('SESSION_CHECK_BUSY', groupId, account);
+          return;
+        }
+
         if (outcome.kind === 'invalidated-login') {
           updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
           await recordSyncActivity({
@@ -725,6 +731,13 @@ export function useAccountSyncFlow({
             outcome.dbAccountId,
             { purgeHint: 'device_dead' },
           );
+          return;
+        }
+
+        if (outcome.kind === 'device_busy') {
+          unlockUserAction(account.id);
+          clearRowProcessing(groupId, account.id);
+          showSyncError('SESSION_CHECK_BUSY', groupId, account);
           return;
         }
 

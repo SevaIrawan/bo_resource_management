@@ -16,6 +16,7 @@ import {
 } from '@/lib/platformSessions';
 import { dedupeScrapedGroupsByGroupId } from '@/lib/dedupeScrapedGroups';
 import type { ScrapedGroupPayload } from '@/lib/dedupeScrapedGroups';
+import { invalidateMasterDailyCacheForScrape } from '@/lib/masterDailyLoadCache';
 import { rebuildBrandGroupsMaster } from '@/lib/syncMasterAfterScrape';
 import { getSupabase } from '@/lib/supabase';
 import type { Platform } from '@/types/database';
@@ -253,8 +254,15 @@ export async function writeScrapeDailyRows(input: {
     throw new Error(`SCRAPER_DB_WRITE: ${insertError.message}`);
   }
 
+  const brand = input.brand.trim();
   const { masterInserted } = await rebuildBrandGroupsMaster({
-    brand: input.brand.trim(),
+    brand,
+    platform: input.platform,
+  });
+
+  invalidateMasterDailyCacheForScrape({
+    accountId: input.accountId,
+    brand,
     platform: input.platform,
   });
 

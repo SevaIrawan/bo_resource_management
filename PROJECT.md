@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
-**Versi dokumen:** 2026-06-11  
-**Versi aplikasi:** `1.0.16` (lihat `package.json`)  
+**Versi dokumen:** 2026-06-17  
+**Versi aplikasi:** `1.0.17` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.16)
+## 4. Konfigurasi & installer (kondisi 1.0.17)
 
 ### 4.1 Variabel lingkungan
 
@@ -152,7 +152,7 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 - **Groups / Admin:** format `Y/X` (device vs standar brand)
 - **On device:** total grup di device/daily (`groupsCurrent`)
 - **In brand:** join di master brand (`joinedInMaster` / `groupsTotal`)
-- **Session:** INVALID → Sync/Run langsung modal login; VALID → probe device lalu SYNC / RUN
+- **Session:** INVALID → Sync/Run langsung modal login; VALID → probe device (**20s**, retry busy) lalu SYNC / RUN. Device **busy** (Chrome/scrape lain) → alert, **bukan** modal login palsu. Resolve session selalu **`messaging_accounts.id` baris grid** (`accountSessionResolve.ts`), bukan label global.
 - **Clear Session (X):** hover baris/kolom Session saat **Valid** → purge session lokal + `platform_sessions` invalid → badge Logout/Invalid; Sync berikutnya QR bersih (bukan stuck restore)
 - Multi-akun per brand (slot kosong + Add)
 - Remove akun dari slot → DELETE `messaging_accounts` (CASCADE) + purge WA lokal + **rebuild `groups_master`** dari daily akun tersisa
@@ -172,10 +172,19 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 - **Auto-close:** issue hilang setelah scrape/sync → `resolveTickets` menutup baris open; kartu hilang dari UI
 - Workflow: handle issue, modal proses ticket (migrasi 024–026)
 - Realtime: `group_scrape_daily` + `scrape_runs` completed → reconcile akun → reload ticket
-- **UI ticket (1.0.12):** angka kartu tab Ticket dari `buildTicketSummariesFromEngine` — sama engine dengan kolom Groups/Admin bookmark (`accountMasterDailyCompare`)
-- **Modal Admin vs master (1.0.12):** daftar hanya grup master brand (denominator **X**); grup junk di device tidak masuk modal (lihat tab Ticket → Junk)
+- **Data fresh (1.0.17):** setelah scrape/sync, `invalidateMasterDailyCacheForScrape` + `forceFresh: true` di reconcile & kartu UI — tidak pakai cache master/daily lama
+- **UI ticket:** angka kartu tab Ticket dari `buildTicketSummariesForUser` — sama engine dengan kolom Groups/Admin bookmark (`accountMasterDailyCompare`)
+- **Modal Admin vs master:** daftar hanya grup master brand (denominator **X**); grup junk di device tidak masuk modal (lihat tab Ticket → Junk)
 
-### 6.3 Admin (`/admin`)
+### 6.3 Tab Reporting (read-only)
+
+- Slicer: Platform, Brand, Acc Name (**All** = matrix), bookmark **Full Group** / **Full Admin**
+- Matrix (Acc=All): baris `groups_master` × join/admin per akun dari `group_scrape_daily` terbaru (`dedupeDailyRowsByGroupIdKeepLatest`)
+- Full Group / Full Admin per akun: daily akun atau admin vs master — fetch langsung Supabase (tanpa cache)
+- Realtime: event `rm-reporting-reload` setelah scrape, reconcile, atau perubahan master/daily (debounce 500 ms)
+- Filter kolom akun (Yes/No): jika kosong, header tabel + dropdown tetap tampil + tombol **Back to all groups**
+
+### 6.4 Admin (`/admin`)
 
 - Status sistem, buka folder config (untuk IT), cek update manual
 
@@ -185,7 +194,7 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 
 | Platform | Kunci device | Batasan |
 |----------|--------------|---------|
-| WhatsApp | `resolveDeviceSessionId()` → LocalAuth `clientId` / folder `wa-sessions/session-{id}` | Lock per session; pool max ~4 Chrome (`waBrowserPool.ts`) |
+| WhatsApp | `resolveDeviceSessionId()` → LocalAuth `clientId` / folder `wa-sessions/session-{id}` | Lock per session; pool max ~4 Chrome (`waBrowserPool.ts`); **device key = UUID baris grid** |
 | Telegram | UUID `messaging_accounts.id` → sidecar `SESSIONS[session_id]` | Poll QR v3; tidak cancel `wait_task` saat finalize |
 
 Validasi sebelum rilis: `npm run validate:desktop`
@@ -225,7 +234,7 @@ Detail: `supabase/migrations/README.md`
 | Perubahan di DB | Dampak di app |
 |-----------------|---------------|
 | Ticket, scrape run, snapshot | UI patch / reload ticket |
-| `groups_master`, `group_scrape_daily` | Metrik & master (debounce ~400 ms) |
+| `groups_master`, `group_scrape_daily` | Metrik, ticket reconcile, **Reporting reload** (debounce ~500 ms) |
 | Brand / messaging account | Reload monitoring penuh |
 | Session `is_active` false | Badge session invalid |
 
@@ -285,6 +294,8 @@ release/                Output installer (gitignore)
 | `npm run validate:desktop` | Gate sebelum build |
 | `npm run build:installer` | Installer Windows lengkap |
 | `npm run publish:github` | Build + upload Release (auto-update) |
+| `npm run validate:pre-release` | Gate lengkap sebelum publish (desktop + typecheck) |
+| `node scripts/validate-reporting-matrix.mjs` | Reporting matrix + filter empty back |
 | `npm run typecheck` | TypeScript check |
 
 ---
@@ -327,4 +338,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.16**. Jika version atau alur berubah, perbarui bagian 4, 6, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.17**. Jika version atau alur berubah, perbarui bagian 4, 6, 9, dan nomor versi di header.*

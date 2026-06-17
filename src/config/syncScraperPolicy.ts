@@ -49,9 +49,9 @@ export const SYNC_SCRAPER_POLICY = {
     timeoutMs: 180_000,
   },
 
-  /** Cek session valid/invalid — tetap, tidak skala grup. */
+  /** Cek session valid/invalid — cold WA Chrome + TG sidecar restore; tidak skala grup. */
   sessionCheck: {
-    timeoutMs: 3_000,
+    timeoutMs: 20_000,
   },
 
   deviceSessionProbe: {

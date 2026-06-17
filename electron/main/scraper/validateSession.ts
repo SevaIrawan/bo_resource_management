@@ -57,7 +57,7 @@ export async function validateTelegramSession(
   }
 }
 
-/** WA: 1 akun, getState — tidak baca 1925 grup, timeout tetap 3s. */
+/** WA: 1 akun, getState — tidak baca 1925 grup, timeout tetap 20s. */
 export async function validateWhatsAppSession(
   sessionId: string,
   _options?: { strict?: boolean },
@@ -68,12 +68,19 @@ export async function validateWhatsAppSession(
   try {
     return await withSessionCheckTimeout(probeWhatsAppSessionLinked(sessionId));
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'WhatsApp validate failed';
+    if (
+      message.includes('SESSION_CHECK_TIMEOUT') ||
+      message.toLowerCase().includes('session check timed out')
+    ) {
+      return { valid: false, message: 'Session check timed out' };
+    }
     await forceReleaseWhatsAppForLogin(sessionId, { urgent: true, fast: true }).catch(
       () => undefined,
     );
     return {
       valid: false,
-      message: error instanceof Error ? error.message : 'WhatsApp validate failed',
+      message,
     };
   }
 }

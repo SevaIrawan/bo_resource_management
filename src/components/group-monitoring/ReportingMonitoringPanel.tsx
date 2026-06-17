@@ -271,6 +271,8 @@ export function ReportingMonitoringPanel() {
                   pageOffset={matrixPage.pageOffset}
                   columnFilter={matrixColumnFilter}
                   onColumnFilterChange={setMatrixColumnFilter}
+                  groupNameSearch={filters.groupNameSearch}
+                  onClearGroupNameSearch={() => patchFilters({ groupNameSearch: '' })}
                 />
                 {showMatrixFooter ? (
                   <ReportingCardFooter

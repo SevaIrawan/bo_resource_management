@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ReportingTableShell } from '@/components/group-monitoring/ReportingTableShell';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -20,6 +20,8 @@ interface ReportingJoinMatrixTableProps {
   pageOffset?: number;
   columnFilter: ReportingMatrixColumnFilter;
   onColumnFilterChange: (filter: ReportingMatrixColumnFilter) => void;
+  groupNameSearch?: string;
+  onClearGroupNameSearch?: () => void;
 }
 
 function AccountColumnHeader({
@@ -118,15 +120,18 @@ export function ReportingJoinMatrixTable({
   pageOffset = 0,
   columnFilter,
   onColumnFilterChange,
+  groupNameSearch = '',
+  onClearGroupNameSearch,
 }: ReportingJoinMatrixTableProps) {
   const { t } = useLanguage();
+  const columnCount = 4 + accounts.length;
+  const hasGroupNameSearch = groupNameSearch.trim().length > 0;
+  const showFilteredEmpty = rows.length === 0 && (columnFilter !== null || hasGroupNameSearch);
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && !showFilteredEmpty) {
     return (
-      <p className="reporting-empty text-sm text-text-muted">
-        {columnFilter
-          ? t('groupMonitoring.reporting.matrixFilterEmpty')
-          : t('groupMonitoring.reporting.noMasterRows')}
+      <p className="reporting-empty px-5 py-4 text-sm text-text-muted">
+        {t('groupMonitoring.reporting.noMasterRows')}
       </p>
     );
   }
@@ -152,6 +157,39 @@ export function ReportingJoinMatrixTable({
         </tr>
       }
     >
+      {showFilteredEmpty ? (
+        <tr className="join-report-table__filter-empty-row">
+          <td colSpan={columnCount}>
+            <div className="join-report-table__filter-empty">
+              <p className="join-report-table__filter-empty-text">
+                {columnFilter
+                  ? t('groupMonitoring.reporting.matrixFilterEmpty')
+                  : t('groupMonitoring.reporting.matrixSearchEmpty')}
+              </p>
+              {columnFilter ? (
+                <button
+                  type="button"
+                  className="join-report-table__filter-empty-btn"
+                  onClick={() => onColumnFilterChange(null)}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                  {t('groupMonitoring.reporting.matrixFilterClear')}
+                </button>
+              ) : null}
+              {hasGroupNameSearch && onClearGroupNameSearch ? (
+                <button
+                  type="button"
+                  className="join-report-table__filter-empty-btn"
+                  onClick={onClearGroupNameSearch}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                  {t('groupMonitoring.reporting.matrixSearchClear')}
+                </button>
+              ) : null}
+            </div>
+          </td>
+        </tr>
+      ) : null}
       {rows.map((row, index) => (
         <tr key={row.groupId}>
           <td className="join-report-table__col-no tabular-nums">{pageOffset + index + 1}</td>

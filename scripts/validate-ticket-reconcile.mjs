@@ -209,6 +209,23 @@ const checks = [
       );
     })(),
   },
+  {
+    name: 'Reconcile + kartu Issue: forceFresh baca DB terbaru',
+    ok:
+      reconcile.includes('forceFresh: true') &&
+      read('src/lib/buildTicketSummariesFromEngine.ts').includes('forceFresh: true') &&
+      read('src/lib/hydrateAccountMetricsFromDaily.ts').includes('forceFresh: true'),
+  },
+  {
+    name: 'Scrape: invalidate cache master/daily setelah tulis DB',
+    ok: read('src/lib/accountScraper.ts').includes('invalidateMasterDailyCacheForScrape'),
+  },
+  {
+    name: 'Provider: refreshIssues + realtime daily → scheduleReportingReload',
+    ok:
+      provider.includes('scheduleReportingReload') &&
+      /handleAccountDailyChanged[\s\S]*scheduleReportingReload/.test(provider),
+  },
 ];
 
 let failed = 0;

@@ -1,3 +1,4 @@
+import { normalizeDbAccountId, isLocalAccountSlotId } from '@/lib/accountDbId';
 import { TABLES } from '@/config/tables';
 import { resolveMessagingAccountId } from '@/lib/accountScraper';
 import {
@@ -17,14 +18,37 @@ export interface SessionResolveDiagnostics {
   uiAccountId: string;
   resolvedAccountId: string;
   activeSessionRows: number;
-  matchedBy: 'label_session' | 'resolve' | 'session_data' | 'none';
+  matchedBy: 'row_id' | 'session_data' | 'resolve' | 'none';
   supabaseError?: string;
 }
 
-/** Cari akun yang label-nya cocok DAN punya baris aktif di platform_sessions (tanpa filter user_id). */
+async function messagingAccountBelongsToUser(
+  accountId: string,
+  userId: string,
+): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+
+  const { data, error } = await supabase
+    .from(TABLES.messagingAccounts)
+    .select('id')
+    .eq('id', accountId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[session] messaging_accounts ownership:', error.message);
+    return false;
+  }
+
+  return Boolean(data?.id);
+}
+
+/** Diagnostik — hanya akun user yang sama label+platform+session aktif. */
 export async function findMessagingAccountWithActiveSession(
   label: string,
   platform: Platform,
+  userId: string,
 ): Promise<string | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
@@ -35,6 +59,7 @@ export async function findMessagingAccountWithActiveSession(
   const { data, error } = await supabase
     .from(TABLES.messagingAccounts)
     .select('id, label')
+    .eq('user_id', userId)
     .eq('platform', platform);
 
   if (error) {
@@ -82,25 +107,30 @@ export async function diagnoseSessionResolve(input: {
 }
 
 /**
- * UUID akun untuk session/scrape — prioritas: label+NABIL+session aktif di DB.
+ * UUID kanonik untuk session/scrape/sync — selalu baris grid (`account.id`) bila terdaftar di DB user.
+ * Tidak aliasing label lintas akun (penyebab badge Valid/Invalid random).
  */
 export async function resolveDbAccountForRow(input: {
   userId: string;
   account: AccountBrandRow;
 }): Promise<{ accountId: string; matchedBy: SessionResolveDiagnostics['matchedBy'] }> {
-  const byLabelSession = await findMessagingAccountWithActiveSession(
-    input.account.accountName,
-    input.account.platform,
-  );
-  if (byLabelSession) {
-    return { accountId: byLabelSession, matchedBy: 'label_session' };
+  const rowDbId = normalizeDbAccountId(input.account.id);
+
+  if (rowDbId && !isLocalAccountSlotId(input.account.id)) {
+    if (await messagingAccountBelongsToUser(rowDbId, input.userId)) {
+      return { accountId: rowDbId, matchedBy: 'row_id' };
+    }
   }
 
   const fromSessionData = await findAccountIdBySessionData(
     input.account.id,
     input.account.platform,
   );
-  if (fromSessionData && (await hasActivePlatformSession(fromSessionData))) {
+  if (
+    fromSessionData &&
+    (await messagingAccountBelongsToUser(fromSessionData, input.userId)) &&
+    (await hasActivePlatformSession(fromSessionData))
+  ) {
     return { accountId: fromSessionData, matchedBy: 'session_data' };
   }
 
@@ -113,18 +143,6 @@ export async function resolveDbAccountForRow(input: {
     localId: input.account.id,
   });
 
-  if (await hasActivePlatformSession(resolved)) {
-    return { accountId: resolved, matchedBy: 'resolve' };
-  }
-
-  const byLabelAgain = await findMessagingAccountWithActiveSession(
-    input.account.accountName,
-    input.account.platform,
-  );
-  if (byLabelAgain) {
-    return { accountId: byLabelAgain, matchedBy: 'label_session' };
-  }
-
   return { accountId: resolved, matchedBy: 'none' };
 }
 
@@ -132,6 +150,7 @@ export function formatSessionDiagnostics(d: SessionResolveDiagnostics): string {
   const parts = [
     `akun=${d.label}`,
     `platform=${d.platform}`,
+    `uiId=${d.uiAccountId.slice(0, 8)}…`,
     `dbId=${d.resolvedAccountId.slice(0, 8)}…`,
     `sessionRows=${d.activeSessionRows}`,
     `via=${d.matchedBy}`,

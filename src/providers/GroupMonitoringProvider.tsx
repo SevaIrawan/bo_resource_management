@@ -119,15 +119,16 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       await reloadTicketHandles(summaries);
       const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
       setGroups(loadedGroups);
+      scheduleReportingReload();
     } catch (e) {
       reportError(getErrorMessage(e, t('groupMonitoring.ticketReconcileFailed')));
     } finally {
       ticketSyncLockedRef.current = false;
       ticketReconcileBusyRef.current = false;
     }
-  }, [user?.id, user?.userName, reloadTicketHandles, reportError, t]);
+  }, [user?.id, user?.userName, reloadTicketHandles, reportError, scheduleReportingReload, t]);
 
-  /** Reconcile DB dulu, lalu reload kartu Issue (kontrak 150−146=4 ticket). */
+  /** Reconcile DB dulu, lalu reload kartu Issue + reporting (kontrak 150−146=4 ticket). */
   const refreshIssues = useCallback(
     async (dbAccountId?: string) => {
       ticketSyncLockedRef.current = true;
@@ -137,14 +138,16 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
           await applyAccountGroupsDailyPatch(setGroups, dbAccountId);
         } else if (user?.id) {
           await runTicketReconcile();
+          scheduleReportingReload();
           return;
         }
         await reloadTicketSummaries();
+        scheduleReportingReload();
       } finally {
         ticketSyncLockedRef.current = false;
       }
     },
-    [user?.id, runTicketReconcile, reloadTicketSummaries],
+    [user?.id, runTicketReconcile, reloadTicketSummaries, scheduleReportingReload],
   );
 
   const handleAccountDailyChanged = useCallback(
@@ -165,7 +168,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     [notifyPendingDataUpdate, reloadTicketSummaries, scheduleReportingReload],
   );
 
-  /** Realtime master/daily — refresh kartu dari engine (tanpa reconcile DB). */
+  /** Realtime master/daily — reload kartu Issue dari engine DB terbaru + reporting. */
   const scheduleIssueRefreshFromData = useCallback(() => {
     scheduleReportingReload();
     void reloadTicketSummaries();

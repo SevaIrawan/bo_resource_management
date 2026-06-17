@@ -4,6 +4,7 @@ import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { bootScrapeProgress } from '@/lib/scrapeProgressDisplay';
 import { backfillPlatformSessionIfNeeded, hasStoredPlatformSession } from '@/lib/sessionAvailability';
+import { warmSessionIfStored } from '@/lib/warmPlatformSession';
 import {
   buildLogoutRowAfterDeviceFailure,
   checkDeviceSessionForValidColumn,
@@ -33,6 +34,7 @@ export type ScrapeRunOutcome =
       dbAccountId: string;
       invalidResult: AccountSyncResult;
     }
+  | { kind: 'device_busy'; message: string; dbAccountId: string }
   | { kind: 'error'; message: string; needsLogin: boolean; dbAccountId?: string }
   | {
       kind: 'success';
@@ -89,6 +91,14 @@ export async function executeScrapeRun(input: {
     });
 
     if (!deviceCheck.ok) {
+      if (deviceCheck.busy) {
+        return {
+          kind: 'device_busy',
+          message: deviceCheck.message,
+          dbAccountId,
+        };
+      }
+
       let brandX = account.groupsTotal > 0 ? account.groupsTotal : 0;
       const supabase = getSupabase();
       if (supabase) {
@@ -133,6 +143,7 @@ export async function executeScrapeRun(input: {
       account,
       sessionId: account.id,
       userId,
+      dbAccountId,
     });
 
     const supabase = getSupabase();
@@ -160,6 +171,7 @@ export async function executeScrapeRun(input: {
       brand: account.brandName,
       platform: account.platform,
       sessionValid: true,
+      forceFresh: true,
     });
 
     markAccountScrapeGrace(account.id);
@@ -227,6 +239,13 @@ export async function runScrapeFlow(input: {
     userId: input.userId,
     account: input.account,
     dbAccountId: input.dbAccountId,
+  });
+
+  await warmSessionIfStored({
+    sessionId: input.account.id,
+    platform: input.account.platform,
+    accountId: input.dbAccountId,
+    userId: input.userId,
   });
 
   return executeScrapeRun({

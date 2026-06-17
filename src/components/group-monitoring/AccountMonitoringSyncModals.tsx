@@ -49,6 +49,9 @@ function resolveAlertMessage(
   if (code === 'SESSION_WARM_PENDING') {
     return t('groupMonitoring.sync.sessionWarmPending');
   }
+  if (code === 'SESSION_CHECK_BUSY') {
+    return t('groupMonitoring.sync.sessionCheckBusy');
+  }
   if (code === 'OPERATION_GLOBAL_BUSY') {
     return t('groupMonitoring.accountCard.operationGlobalBusy');
   }

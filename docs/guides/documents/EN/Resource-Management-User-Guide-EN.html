@@ -11,7 +11,7 @@
     <p class="doc-cover-logo">Backend Operation</p>
     <h1>Resource Management</h1>
     <p class="doc-cover-subtitle">Official User Guide</p>
-    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.16</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Admin → Language)</td></tr></table>
+    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.17</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Admin → Language)</td></tr></table>
   </header>
   
 <section class="doc-toc">
@@ -22,11 +22,12 @@
 <li><a href="#3-navigation-and-layout">3. Navigation and layout</a></li>
 <li><a href="#4-account-tab-account-monitoring">4. Account tab — account monitoring</a></li>
 <li><a href="#5-ticket-tab-issues-and-remediation">5. Ticket tab — issues and remediation</a></li>
-<li><a href="#6-admin-page">6. Admin page</a></li>
-<li><a href="#7-data-synchronization-realtime">7. Data synchronization (realtime)</a></li>
-<li><a href="#8-recommended-daily-workflows">8. Recommended daily workflows</a></li>
-<li><a href="#9-glossary">9. Glossary</a></li>
-<li><a href="#10-faq">10. FAQ</a></li>
+<li><a href="#6-reporting-tab-join-admin-matrix">6. Reporting tab — join/admin matrix</a></li>
+<li><a href="#7-admin-page">7. Admin page</a></li>
+<li><a href="#8-data-synchronization-realtime">8. Data synchronization (realtime)</a></li>
+<li><a href="#9-recommended-daily-workflows">9. Recommended daily workflows</a></li>
+<li><a href="#10-glossary">10. Glossary</a></li>
+<li><a href="#11-faq">11. FAQ</a></li>
 <li><a href="#appendix-quick-feature-map">Appendix — Quick feature map</a></li></ol>
 </section>
   <main class="doc-body">
@@ -39,11 +40,12 @@
 <li><a href="#3-navigation-and-layout">Navigation and layout</a></li>
 <li><a href="#4-account-tab--account-monitoring">Account tab — account monitoring</a></li>
 <li><a href="#5-ticket-tab--issues-and-remediation">Ticket tab — issues and remediation</a></li>
-<li><a href="#6-admin-page">Admin page</a></li>
-<li><a href="#7-data-synchronization-realtime">Data synchronization (realtime)</a></li>
-<li><a href="#8-recommended-daily-workflows">Recommended daily workflows</a></li>
-<li><a href="#9-glossary">Glossary</a></li>
-<li><a href="#10-faq">FAQ</a></li>
+<li><a href="#6-reporting-tab--joinadmin-matrix">Reporting tab — join/admin matrix</a></li>
+<li><a href="#7-admin-page">Admin page</a></li>
+<li><a href="#8-data-synchronization-realtime">Data synchronization (realtime)</a></li>
+<li><a href="#9-recommended-daily-workflows">Recommended daily workflows</a></li>
+<li><a href="#10-glossary">Glossary</a></li>
+<li><a href="#11-faq">FAQ</a></li>
 <li><a href="#appendix--quick-feature-map">Appendix — Quick feature map</a></li>
 </ol>
 <hr>
@@ -927,9 +929,42 @@
 <td>Tickets close or shrink when data aligns (realtime after DB update)</td>
 </tr>
 </tbody></table>
-<p>If tickets remain after phone fix: <strong>Run</strong> scraper to push latest device data.</p>
+<p>If tickets remain after phone fix: <strong>Run</strong> scraper to push latest device data. After scrape, ticket counts and Groups columns refresh from the latest database (not stale cache).</p>
 <hr>
-<h2 id="6-admin-page">6. Admin page</h2>
+<h2 id="6-reporting-tab-join-admin-matrix">6. Reporting tab — join/admin matrix</h2>
+<p>Read-only — does not change sessions, scraper, or tickets.</p>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Platform</strong></td>
+<td>WhatsApp or Telegram</td>
+</tr>
+<tr>
+<td><strong>Brand</strong></td>
+<td>Brand with accounts</td>
+</tr>
+<tr>
+<td><strong>Acc Name</strong></td>
+<td><strong>All</strong> = matrix for all accounts; one account = single-account report</td>
+</tr>
+<tr>
+<td><strong>Full Group / Full Admin</strong></td>
+<td>Join status or admin status vs master</td>
+</tr>
+<tr>
+<td><strong>Search group name</strong></td>
+<td>Filter by group name</td>
+</tr>
+</tbody></table>
+<p><strong>Matrix (Acc Name = All):</strong> master rows × account columns (Yes/No). Column header dropdown: Yes / No / All. If filter returns no rows, table headers stay visible — click <strong>Back to all groups</strong> or choose <strong>All</strong>.</p>
+<p>Updates automatically after scrape or Supabase changes (realtime).</p>
+<hr>
+<h2 id="7-admin-page">7. Admin page</h2>
 <p>Open from sidebar: <strong>Admin</strong>.</p>
 <p>Subtitle: <em>System status and application preferences</em></p>
 <h3 id="6-1-system-status">6.1 System status</h3>
@@ -1018,7 +1053,7 @@
 </tbody></table>
 <p>Change applies immediately across dashboard captions.</p>
 <hr>
-<h2 id="7-data-synchronization-realtime">7. Data synchronization (realtime)</h2>
+<h2 id="8-data-synchronization-realtime">8. Data synchronization (realtime)</h2>
 <h3 id="7-1-database-changes-open-apps">7.1 Database changes → open apps</h3>
 <p>When IT or automation changes <strong>Supabase</strong> (accounts, tickets, master groups, session flags):</p>
 <table>
@@ -1076,7 +1111,7 @@
 <p><strong>WhatsApp multi-PC:</strong> Session does not move between PCs. Hand off → <strong>Clear Session</strong> on the old PC (optional) → new operator <strong>Sync</strong> + scan QR on their PC.</p>
 <p><strong>Telegram multi-PC:</strong> Session string is in the cloud — another PC can <strong>Sync</strong>/<strong>Run</strong> while Session is <strong>Valid</strong>. Hand off → <strong>Clear Session</strong> (required) so the new operator scans QR on their PC.</p>
 <hr>
-<h2 id="8-recommended-daily-workflows">8. Recommended daily workflows</h2>
+<h2 id="9-recommended-daily-workflows">9. Recommended daily workflows</h2>
 <h3 id="8-1-onboard-a-new-marketing-account-after-test-data-cleanup">8.1 Onboard a new marketing account (after test data cleanup)</h3>
 <table>
 <thead>
@@ -1168,7 +1203,7 @@
 </tr>
 </tbody></table>
 <hr>
-<h2 id="9-glossary">9. Glossary</h2>
+<h2 id="10-glossary">10. Glossary</h2>
 <table>
 <thead>
 <tr>
@@ -1230,7 +1265,7 @@
 </tr>
 </tbody></table>
 <hr>
-<h2 id="10-faq">10. FAQ</h2>
+<h2 id="11-faq">11. FAQ</h2>
 <p><strong>Do I need to reinstall when the app updates?</strong><br>No. <strong>Restart</strong> after the update notification (if IT published to GitHub).</p>
 <p><strong>Does deleting data in Supabase remove the installer?</strong><br>No. Only dashboard data changes.</p>
 <p><strong>Why is Session Valid but Run still asks for login?</strong><br>This PC may have lost the device session — click <strong>Sync</strong> to verify.</p>
@@ -1293,11 +1328,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>This guide matches application version <strong>1.0.16</strong>. Update this document when new features ship.</em></p>
+<p><em>This guide matches application version <strong>1.0.17</strong>. Update this document when new features ship.</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — Resource Management v1.0.16</p>
+    <p>Internal use only — Resource Management v1.0.17</p>
   </footer>
 </body>
 </html>

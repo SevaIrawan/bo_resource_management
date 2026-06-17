@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.16 |
+| **App version** | 1.0.17 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (Admin → Language) |
@@ -19,12 +19,13 @@ This document is the **official guide to every feature** in the current applicat
 3. [Navigation and layout](#3-navigation-and-layout)
 4. [Account tab — account monitoring](#4-account-tab--account-monitoring)
 5. [Ticket tab — issues and remediation](#5-ticket-tab--issues-and-remediation)
-6. [Admin page](#6-admin-page)
-7. [Data synchronization (realtime)](#7-data-synchronization-realtime)
-8. [Recommended daily workflows](#8-recommended-daily-workflows)
-9. [Glossary](#9-glossary)
-10. [FAQ](#10-faq)
-11. [Appendix — Quick feature map](#appendix--quick-feature-map)
+6. [Reporting tab — join/admin matrix](#6-reporting-tab--joinadmin-matrix)
+7. [Admin page](#7-admin-page)
+8. [Data synchronization (realtime)](#8-data-synchronization-realtime)
+9. [Recommended daily workflows](#9-recommended-daily-workflows)
+10. [Glossary](#10-glossary)
+11. [FAQ](#11-faq)
+12. [Appendix — Quick feature map](#appendix--quick-feature-map)
 
 ---
 
@@ -408,11 +409,29 @@ Bookmarks **In Progress** / **Completed** follow the saved task status.
 | 2 | On affected account: **Sync** or **Run** again |
 | 3 | Tickets close or shrink when data aligns (realtime after DB update) |
 
-If tickets remain after phone fix: **Run** scraper to push latest device data.
+If tickets remain after phone fix: **Run** scraper to push latest device data. After scrape, ticket counts and Groups columns refresh from the latest database (not stale cache).
 
 ---
 
-## 6. Admin page
+## 6. Reporting tab — join/admin matrix
+
+Read-only — does not change sessions, scraper, or tickets.
+
+| Filter | Purpose |
+|--------|---------|
+| **Platform** | WhatsApp or Telegram |
+| **Brand** | Brand with accounts |
+| **Acc Name** | **All** = matrix for all accounts; one account = single-account report |
+| **Full Group / Full Admin** | Join status or admin status vs master |
+| **Search group name** | Filter by group name |
+
+**Matrix (Acc Name = All):** master rows × account columns (Yes/No). Column header dropdown: Yes / No / All. If filter returns no rows, table headers stay visible — click **Back to all groups** or choose **All**.
+
+Updates automatically after scrape or Supabase changes (realtime).
+
+---
+
+## 7. Admin page
 
 Open from sidebar: **Admin**.
 
@@ -462,7 +481,7 @@ Change applies immediately across dashboard captions.
 
 ---
 
-## 7. Data synchronization (realtime)
+## 8. Data synchronization (realtime)
 
 ### 7.1 Database changes → open apps
 
@@ -497,7 +516,7 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 
 ---
 
-## 8. Recommended daily workflows
+## 9. Recommended daily workflows
 
 ### 8.1 Onboard a new marketing account (after test data cleanup)
 
@@ -537,7 +556,7 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 
 ---
 
-## 9. Glossary
+## 10. Glossary
 
 | Term | Definition |
 |------|------------|
@@ -557,7 +576,7 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 
 ---
 
-## 10. FAQ
+## 11. FAQ
 
 **Do I need to reinstall when the app updates?**  
 No. **Restart** after the update notification (if IT published to GitHub).
@@ -639,4 +658,4 @@ Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type,
 
 ---
 
-*This guide matches application version **1.0.16**. Update this document when new features ship.*
+*This guide matches application version **1.0.17**. Update this document when new features ship.*

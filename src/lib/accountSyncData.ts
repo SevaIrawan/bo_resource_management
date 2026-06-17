@@ -1,4 +1,7 @@
+import { normalizeDbAccountId } from '@/lib/accountDbId';
 import { DAILY_PHONE_SELECT } from '@/config/dbColumns';
+
+export { normalizeDbAccountId } from '@/lib/accountDbId';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import { computeIsMisaligned } from '@/lib/accountDisplayMetrics';
 import { fetchAccountBookmarkMetrics } from '@/lib/accountMasterDailyCompare';
@@ -51,23 +54,12 @@ function filterRowsByPhone<T extends { phone_number?: string | null }>(
   return rows.filter((row) => phonesMatch(String(row.phone_number ?? ''), phoneRaw));
 }
 
-const UUID_RE = /^[0-9a-f-]{36}$/i;
-
-function normalizeDbAccountId(accountId: string): string | null {
-  const trimmed = accountId.trim();
-  if (UUID_RE.test(trimmed)) return trimmed;
-  if (trimmed.startsWith('acc-')) {
-    const id = trimmed.slice(4);
-    return UUID_RE.test(id) ? id : null;
-  }
-  return null;
-}
-
 /** Metrik master↔daily — logic sama ticket reconcile (group_id raw, semua akun). */
 export async function fetchMasterGroupStatsForAccount(input: {
   accountId: string;
   brand: string;
   platform: Platform;
+  forceFresh?: boolean;
 }): Promise<MasterGroupStats> {
   const dbId = normalizeDbAccountId(input.accountId);
   const brand = input.brand.trim();
@@ -79,6 +71,7 @@ export async function fetchMasterGroupStatsForAccount(input: {
       accountId: dbId,
       brandName: brand,
       platform: input.platform,
+      forceFresh: input.forceFresh,
     });
     return {
       dailyTotal: m.groupsCurrent,
@@ -109,6 +102,8 @@ export async function buildMetricsFromScrapeDaily(input: {
   deviceAdminCount?: number;
   /** Batch load — hindari query ganda saat buka monitoring. */
   masterHint?: MasterGroupStats;
+  /** Setelah scrape/realtime daily — baca DB terbaru, bukan cache load awal. */
+  forceFresh?: boolean;
 }): Promise<{ result: AccountSyncResult; master: MasterGroupStats }> {
   void input.brandStandard;
   void input.deviceGroupCount;
@@ -120,6 +115,7 @@ export async function buildMetricsFromScrapeDaily(input: {
       accountId: input.accountId,
       brand: input.brand,
       platform: input.platform,
+      forceFresh: input.forceFresh,
     }));
 
   const sessionValid = input.sessionValid !== false;

@@ -25,6 +25,7 @@ import {
   classifyWaSocketState,
   waLinkProbeMessage,
 } from '../scraper/whatsappLinkState';
+import { SESSION_CHECK_TIMEOUT_MS } from '../scraper/deviceGroupScale';
 
 const { Client, LocalAuth } = pkg;
 
@@ -824,6 +825,31 @@ function waStateProbeResult(state: string | null): { valid: boolean; message: st
   return { valid: link === 'linked', message };
 }
 
+/** Tunggu CONNECTED setelah initialize — OPENING/UNLAUNCHED bukan unlink di HP. */
+async function pollWaLinkedAfterInit(
+  client: InstanceType<typeof Client>,
+  deadlineMs: number,
+): Promise<{ valid: boolean; message: string }> {
+  const deadline = Date.now() + deadlineMs;
+  let last = waStateProbeResult(null);
+
+  while (Date.now() < deadline) {
+    try {
+      const state = await client.getState();
+      last = waStateProbeResult(state);
+      const link = classifyWaSocketState(state);
+      if (link === 'linked' || link === 'unlinked') {
+        return last;
+      }
+    } catch {
+      break;
+    }
+    await delayMs(400);
+  }
+
+  return last;
+}
+
 /**
  * Cek session WA — 1 akun, `getState()` saja.
  * Boleh buka Chrome minimal; tidak baca daftar grup; tidak `waitForWhatsAppStoreReady`.
@@ -835,7 +861,11 @@ async function probeWhatsAppSessionLinkedInner(
   if (existing) {
     try {
       const state = await existing.client.getState();
-      return waStateProbeResult(state);
+      const immediate = waStateProbeResult(state);
+      if (immediate.valid || classifyWaSocketState(state) === 'unlinked') {
+        return immediate;
+      }
+      return pollWaLinkedAfterInit(existing.client, Math.min(8_000, SESSION_CHECK_TIMEOUT_MS));
     } catch {
       await destroyWhatsAppSession(sessionId);
     }
@@ -850,8 +880,8 @@ async function probeWhatsAppSessionLinkedInner(
   sessions.set(sessionId, { client, mode: 'qr', forwardQrToUi: false });
   try {
     await withWaBrowserSlot(() => client.initialize());
-    const state = await client.getState();
-    return waStateProbeResult(state);
+    const pollMs = Math.max(3_000, SESSION_CHECK_TIMEOUT_MS - 2_000);
+    return await pollWaLinkedAfterInit(client, pollMs);
   } catch (error) {
     return {
       valid: false,

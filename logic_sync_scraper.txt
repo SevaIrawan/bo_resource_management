@@ -38,6 +38,18 @@ BAGIAN 6: METRIK GRID, TICKET & MODAL GROUP LINK (satu engine)
 - Grid: kolom On device (groupsCurrent), In brand (joinedInMaster/groupsTotal).
 - Export group link: RM-[nama akun]-YYYYMMDD.xlsx.
 
+BAGIAN 7: SESSION PROBE & RESOLVE AKUN (1.0.17)
+- Probe device VALID+Sync/Run: timeout 20s, retry busy — bukan skala grup; busy → alert SESSION_CHECK_BUSY (bukan modal login).
+- Device key = messaging_accounts.id baris grid (accountSessionResolve.ts); bukan label global.
+- shouldInvalidate DB hanya session mati (UNPAIRED/logout), bukan timeout/busy.
+
+BAGIAN 8: DATA FRESH TICKET / REPORTING (1.0.17)
+- Scrape: DELETE daily → INSERT → rebuild master → invalidateMasterDailyCacheForScrape.
+- Reconcile + kartu Issue + patch grid: forceFresh baca Supabase (bukan cache warm load).
+- Reporting: fetch langsung DB + dedupe scraped_at; reload via rm-reporting-reload setelah scrape/reconcile.
+- Matrix filter kolom Yes/No kosong: header tabel tetap + Back to all groups.
+
 Implementasi: useAccountSyncFlow.ts, clearAccountSession.ts, accountMonitoringEngine.ts, accountMasterDailyCompare.ts,
-buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx,
+buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx, ReportingMonitoringPanel.tsx,
+ReportingJoinMatrixTable.tsx, loadJoinGroupReport.ts, masterDailyLoadCache.ts, accountSessionResolve.ts,
 PlatformLoginModal.tsx, electron/main/scraper/countWhatsApp.ts, migrations/028_rm_account_master_stats_rpc.sql

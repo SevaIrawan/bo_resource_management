@@ -30,6 +30,7 @@ export async function patchBrandPlatformMasterInGroups(
             accountId: account.id,
             brand: brandKey,
             platform,
+            forceFresh: true,
           });
           return patchMasterTotalsOnRow(account, master, brandX);
         }),

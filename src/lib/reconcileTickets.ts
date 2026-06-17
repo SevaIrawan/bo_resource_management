@@ -242,6 +242,7 @@ export async function reconcileTicketsForAccount(input: ReconcileInput): Promise
     accountId: input.accountId,
     brandName: input.brandName,
     platform: input.platform,
+    forceFresh: true,
   });
 
   if (!masterRows.length && !dailyRows.length) return;

@@ -14,6 +14,10 @@ export function isDeviceBusyMessage(message: string | undefined): boolean {
     lower.includes('session_warm_pending') ||
     lower.includes('wa_store_not_ready') ||
     lower.includes('session check timed out') ||
+    lower.includes('session_check_timeout') ||
+    lower.includes('fetch failed') ||
+    lower.includes('econnrefused') ||
+    lower.includes('network request failed') ||
     (lower.includes('timed out') && lower.includes('restore device session'))
   );
 }

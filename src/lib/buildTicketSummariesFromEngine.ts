@@ -181,6 +181,7 @@ export async function buildTicketSummariesForUser(userId: string): Promise<Ticke
           accountId,
           brandName,
           platform,
+          forceFresh: true,
         });
         const breakdown = computeAccountTicketBreakdown(masterRows, dailyRows);
 

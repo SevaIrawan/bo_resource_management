@@ -1,8 +1,8 @@
 /** Target operasional: akun dengan ribuan grup (hingga ~3000). */
 export const DEVICE_GROUP_TARGET_MAX = 3000;
 
-/** Cek session valid/invalid — 1 akun, getState saja; tidak baca daftar grup; tidak skala Y/X. */
-export const SESSION_CHECK_TIMEOUT_MS = 3_000;
+/** Cek session valid/invalid — cold WA Chrome + TG restore; tidak baca daftar grup; tidak skala Y/X. */
+export const SESSION_CHECK_TIMEOUT_MS = 20_000;
 
 /** Post-login detect total grup — satu pass store; tidak skala jumlah grup. */
 export const POST_LOGIN_DETECT_TIMEOUT_MS = 90_000;

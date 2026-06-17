@@ -6,6 +6,7 @@ import { hasStoredPlatformSession } from '@/lib/sessionAvailability';
 import { markPlatformSessionSynced } from '@/lib/platformSessions';
 import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
 import { isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
+import { warmSessionIfStored } from '@/lib/warmPlatformSession';
 import type { Platform } from '@/types/database';
 
 export type UserSessionGateMode = 'sync' | 'scrape';
@@ -16,6 +17,11 @@ export type UserSessionCheckResult =
       ok: false;
       kind: 'db_invalid';
       reloginCode: 'SESSION_INVALID_RELOGIN' | 'SESSION_INVALID_FORCE_SCRAPER';
+    }
+  | {
+      ok: false;
+      kind: 'device_busy';
+      message: string;
     }
   | {
       ok: false;
@@ -35,7 +41,7 @@ function reloginCodeForAccount(
 }
 
 /**
- * Sync / Run: DB → probe valid/invalid (≤3s) → valid lanjut / invalid login.
+ * Sync / Run: DB baris akun → warm device → probe → valid lanjut / mati → login.
  */
 export async function checkUserActionDeviceSession(input: {
   sessionId: string;
@@ -55,6 +61,12 @@ export async function checkUserActionDeviceSession(input: {
     };
   }
 
+  await warmSessionIfStored({
+    sessionId: input.sessionId,
+    platform: input.platform,
+    accountId: input.dbAccountId,
+  });
+
   const gate = await gateDeviceSession(
     {
       sessionId: input.sessionId,
@@ -69,6 +81,14 @@ export async function checkUserActionDeviceSession(input: {
   if (gate.ok) {
     await markPlatformSessionSynced(input.dbAccountId);
     return { ok: true };
+  }
+
+  if (!gate.shouldInvalidate) {
+    return {
+      ok: false,
+      kind: 'device_busy',
+      message: gate.message,
+    };
   }
 
   const hasStored = await hasStoredPlatformSession(input.dbAccountId, input.platform);

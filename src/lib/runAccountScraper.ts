@@ -20,6 +20,8 @@ export interface RunAccountScraperInput {
   account: AccountBrandRow;
   sessionId: string;
   userId: string;
+  /** UUID kanonik — sama dengan `account.id` baris grid; hindari resolve ulang. */
+  dbAccountId?: string;
 }
 
 async function persistTelegramSession(accountId: string, sessionId: string): Promise<void> {
@@ -53,10 +55,14 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     throw new Error('SCRAPER_DESKTOP_REQUIRED');
   }
 
-  const { accountId } = await resolveDbAccountForRow({
-    userId: input.userId,
-    account: input.account,
-  });
+  const accountId =
+    input.dbAccountId ??
+    (
+      await resolveDbAccountForRow({
+        userId: input.userId,
+        account: input.account,
+      })
+    ).accountId;
 
   const deviceSessionId = await resolveDeviceSessionId({
     sessionId: input.account.id,

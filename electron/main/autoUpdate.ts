@@ -117,7 +117,7 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
   });
 
   autoUpdater.on('update-available', (info) => {
-    const files = (info as { files?: Array<{ url?: string }> }).files ?? [];
+    const files = (info as { files?: Array<{ url?: string; size?: number }> }).files ?? [];
     const urls = files.map((f) => f.url ?? '').join(' ');
     const brokenMeta = releaseMetadataBroken(urls);
     if (brokenMeta) {
@@ -125,8 +125,19 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
       broadcastUpdateStatus({ status: 'error', version: info.version, errorMessage: brokenMeta });
       return;
     }
+    const primary = files[0];
+    if (primary && (!primary.size || primary.size <= 0)) {
+      const msg =
+        'Metadata rilis v' +
+        info.version +
+        ' rusak (size kosong). Install manual dari GitHub Releases atau tunggu IT perbaiki latest.yml.';
+      console.error('[auto-update]', msg, urls);
+      broadcastUpdateStatus({ status: 'error', version: info.version, errorMessage: msg });
+      return;
+    }
     console.info('[auto-update] update available:', info.version, urls);
-    broadcastUpdateStatus({ status: 'available', version: info.version });
+    updateStatus = { status: 'available', version: info.version };
+    broadcastUpdateStatus(updateStatus);
   });
 
   autoUpdater.on('update-not-available', () => {
@@ -137,10 +148,21 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
   autoUpdater.on('error', (err) => {
     const message = err.message || 'Update gagal';
     console.error('[auto-update]', message);
+    try {
+      autoUpdater.cancelDownload?.();
+    } catch {
+      /* no active download */
+    }
+    const checksumFailed =
+      /sha512|checksum|integrity|ENOENT|404|403/i.test(message) ||
+      message.includes('size');
+    const errorMessage = checksumFailed
+      ? `${message} — Install manual: GitHub Releases → Resource.Management.Setup.${updateStatus.version ?? 'latest'}.exe`
+      : message;
     broadcastUpdateStatus({
       status: 'error',
       version: updateStatus.version,
-      errorMessage: message,
+      errorMessage,
     });
   });
 

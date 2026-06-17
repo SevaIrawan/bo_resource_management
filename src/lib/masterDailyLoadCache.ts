@@ -101,19 +101,39 @@ export async function warmMasterDailyLoadCache(
   await Promise.all([...masterFetches, partitionDailyBatch(accountIds)]);
 }
 
-async function partitionDailyBatch(accountIds: string[]): Promise<void> {
+const DAILY_IN_CHUNK = 40;
+const DAILY_PAGE_SIZE = 5000;
+
+async function fetchDailyRowsForAccounts(accountIds: string[]): Promise<DailyRowRaw[]> {
   const supabase = getSupabase();
-  if (!supabase || accountIds.length === 0) return;
+  if (!supabase || accountIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from(TABLES.groupScrapeDaily)
-    .select('account_id, group_id, group_name, invite_link, is_admin, scraped_at')
-    .in('account_id', accountIds);
+  const rows: DailyRowRaw[] = [];
+  for (let i = 0; i < accountIds.length; i += DAILY_IN_CHUNK) {
+    const chunk = accountIds.slice(i, i + DAILY_IN_CHUNK);
+    let from = 0;
+    for (;;) {
+      const to = from + DAILY_PAGE_SIZE - 1;
+      const { data, error } = await supabase
+        .from(TABLES.groupScrapeDaily)
+        .select('account_id, group_id, group_name, invite_link, is_admin, scraped_at')
+        .in('account_id', chunk)
+        .range(from, to);
+      if (error) throw error;
+      const page = (data ?? []) as DailyRowRaw[];
+      rows.push(...page);
+      if (page.length < DAILY_PAGE_SIZE) break;
+      from += DAILY_PAGE_SIZE;
+    }
+  }
+  return rows;
+}
 
-  if (error) throw error;
+async function partitionDailyBatch(accountIds: string[]): Promise<void> {
+  const data = await fetchDailyRowsForAccounts(accountIds);
 
   const rawByAccount = new Map<string, DailyRowRaw[]>();
-  for (const row of (data ?? []) as DailyRowRaw[]) {
+  for (const row of data) {
     const accountId = String(row.account_id ?? '').trim();
     if (!accountId) continue;
     const list = rawByAccount.get(accountId) ?? [];

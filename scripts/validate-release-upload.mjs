@@ -1,6 +1,7 @@
 /**
  * Sebelum upload GitHub Release: pastikan installer + yml ada dan URL di yml cocok dengan nama file.
  */
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -40,6 +41,12 @@ function installerBackingFile(ymlPath) {
   return null;
 }
 
+function sha512Base64(filePath) {
+  const hash = crypto.createHash('sha512');
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest('base64');
+}
+
 function assertYmlMatchesDisk(ymlName) {
   const p = path.join(releaseDir, ymlName);
   if (!fs.existsSync(p)) {
@@ -48,8 +55,14 @@ function assertYmlMatchesDisk(ymlName) {
   }
   const text = fs.readFileSync(p, 'utf8');
   const url = text.match(/^path:\s*(.+)$/m)?.[1]?.trim();
+  const ymlSha = text.match(/^sha512:\s*(.+)$/m)?.[1]?.trim();
+  const fileSizeMatch = text.match(/^\s+size:\s*(\d+)\s*$/m);
   if (!url) {
     errors.push(`${ymlName} tanpa path`);
+    return;
+  }
+  if (!fileSizeMatch) {
+    errors.push(`${ymlName} tanpa size di files — electron-updater macet di 0%`);
     return;
   }
   if (/\s/.test(url)) {
@@ -69,6 +82,20 @@ function assertYmlMatchesDisk(ymlName) {
   }
   if (url !== publicAssetName(backing)) {
     errors.push(`${ymlName} path harus ${publicAssetName(backing)} (nama publik GitHub), bukan variasi lain`);
+  }
+  const full = path.join(releaseDir, backing);
+  const stat = fs.statSync(full);
+  const declaredSize = Number(fileSizeMatch[1]);
+  if (declaredSize !== stat.size) {
+    errors.push(`${ymlName} size ${declaredSize} ≠ file ${stat.size} bytes`);
+  }
+  if (ymlSha) {
+    const actualSha = sha512Base64(full);
+    if (ymlSha !== actualSha) {
+      errors.push(`${ymlName} sha512 tidak cocok dengan installer — auto-update gagal checksum`);
+    }
+  } else {
+    errors.push(`${ymlName} tanpa sha512`);
   }
 }
 

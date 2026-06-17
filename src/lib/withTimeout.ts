@@ -1,29 +1,23 @@
 export class OperationTimeoutError extends Error {
-  constructor(label: string, ms: number) {
-    super(`${label} timed out after ${Math.round(ms / 1000)}s`);
+  constructor(label: string, timeoutMs: number) {
+    super(`${label} timed out after ${Math.round(timeoutMs / 1000)}s — check network or Supabase.`);
     this.name = 'OperationTimeoutError';
   }
 }
 
-export function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label = 'Operation',
-): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(() => {
-      reject(new OperationTimeoutError(label, ms));
-    }, ms);
-
-    void promise.then(
-      (value) => {
-        window.clearTimeout(timer);
+    const timer = setTimeout(() => {
+      reject(new OperationTimeoutError(label, timeoutMs));
+    }, timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
         resolve(value);
-      },
-      (error) => {
-        window.clearTimeout(timer);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
         reject(error);
-      },
-    );
+      });
   });
 }

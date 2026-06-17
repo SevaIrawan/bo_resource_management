@@ -10,6 +10,7 @@ import { useMonitoringTab } from '@/hooks/useMonitoringTab';
 import { useMonitoringPending } from '@/hooks/useMonitoringPending';
 import { assertRmSchema } from '@/lib/assertRmSchema';
 import { getErrorMessage } from '@/lib/errorMessage';
+import { withTimeout } from '@/lib/withTimeout';
 import { loadAccountMonitoringGroups } from '@/lib/loadAccountMonitoring';
 import { clearMasterDailyLoadCache } from '@/lib/masterDailyLoadCache';
 import { buildTicketSummariesForUser } from '@/lib/buildTicketSummariesFromEngine';
@@ -126,7 +127,11 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       const summaries = await buildTicketSummariesForUser(dataUserId);
       setTicketSummaries(summaries);
       await reloadTicketHandles(summaries);
-      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
+      const loadedGroups = await withTimeout(
+        loadAccountMonitoringGroups(dataUserId),
+        120_000,
+        'Load accounts',
+      );
       setGroups(loadedGroups);
       scheduleReportingReload();
     } catch (e) {
@@ -271,7 +276,11 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       await assertRmSchema();
       const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
 
-      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
+      const loadedGroups = await withTimeout(
+        loadAccountMonitoringGroups(dataUserId),
+        120_000,
+        'Load accounts',
+      );
       if (seq !== reloadAllSeqRef.current) return;
       setGroups(loadedGroups);
     } catch (e) {
@@ -359,7 +368,11 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     if (!user?.id) return;
     try {
       const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
-      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
+      const loadedGroups = await withTimeout(
+        loadAccountMonitoringGroups(dataUserId),
+        120_000,
+        'Load accounts',
+      );
       setGroups(loadedGroups);
     } catch {
       /* tetap tampilkan data lama */

@@ -603,6 +603,8 @@ function runWhatsAppLoginOperation<T>(sessionId: string, fn: () => Promise<T>): 
 interface WaClientOpenOptions {
   storeWaitMs?: number;
   readyTimeoutMs?: number;
+  /** Scrape: tutup client in-memory — paksa WA Web load & sync ulang (bukan cache session lama). */
+  freshBoot?: boolean;
 }
 
 async function ensureWhatsAppClientInner(
@@ -611,6 +613,9 @@ async function ensureWhatsAppClientInner(
 ): Promise<InstanceType<typeof Client>> {
   const readyTimeoutMs = options?.readyTimeoutMs ?? waQrScanWaitMs(3000);
   const storeWaitMs = options?.storeWaitMs;
+  if (options?.freshBoot) {
+    await destroyWhatsAppSession(sessionId);
+  }
   const existing = sessions.get(sessionId);
   if (existing) {
     try {

@@ -1,4 +1,5 @@
 import type { Chat, Client, GroupChat } from 'whatsapp-web.js';
+import { scrapeWhatsAppGroupFromStore } from './whatsappGroupScrapeStore';
 
 export interface WaGroupParticipant {
   id: string;
@@ -6,40 +7,32 @@ export interface WaGroupParticipant {
   isSuperAdmin: boolean;
 }
 
+/** @deprecated Prefer scrapeWhatsAppGroupFromStore — server metadata + LID. */
 export async function fetchGroupParticipants(
   client: Client,
   chat: Chat,
 ): Promise<WaGroupParticipant[]> {
   const group = chat as GroupChat;
-  const meId = client.info?.wid?._serialized;
+  const groupId = group.id?._serialized;
+  if (!groupId) return [];
 
-  try {
-    if (typeof group.getParticipants === 'function') {
-      const list = await group.getParticipants();
-      return list.map((p) => ({
-        id: p.id._serialized,
-        isAdmin: Boolean(p.isAdmin),
-        isSuperAdmin: Boolean(p.isSuperAdmin),
-      }));
+  const core = await scrapeWhatsAppGroupFromStore(client, groupId);
+  if ('skip' in core) {
+    const meId = client.info?.wid?._serialized;
+    if (meId) {
+      return [{ id: meId, isAdmin: false, isSuperAdmin: false }];
     }
-  } catch {
-    // fall through to legacy participants array
+    return [];
   }
 
-  const legacy = group.participants ?? [];
-  if (legacy.length > 0) {
-    return legacy.map((p) => ({
-      id: p.id._serialized,
-      isAdmin: Boolean(p.isAdmin),
-      isSuperAdmin: Boolean(p.isSuperAdmin),
-    }));
-  }
-
-  if (meId) {
-    return [{ id: meId, isAdmin: false, isSuperAdmin: false }];
-  }
-
-  return [];
+  const meId = client.info?.wid?._serialized ?? '';
+  return [
+    {
+      id: meId,
+      isAdmin: core.is_admin === 'yes',
+      isSuperAdmin: false,
+    },
+  ];
 }
 
 function idsMatch(a: string, b: string): boolean {

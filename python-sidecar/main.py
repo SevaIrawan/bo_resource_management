@@ -83,6 +83,7 @@ class RestoreBody(BaseModel):
 
 class ScrapeBody(BaseModel):
     sessionString: str | None = None
+    expectedPhone: str | None = None
 
 @app.get("/health")
 async def health() -> dict:
@@ -126,7 +127,8 @@ async def telegram_login_cancel(session_id: str) -> dict:
 @app.post("/telegram/scrape/{session_id}")
 async def telegram_scrape(session_id: str, body: ScrapeBody | None = None) -> dict:
     session_string = body.sessionString if body else None
-    return await scrape_telegram_groups(session_id, session_string)
+    expected_phone = body.expectedPhone if body else None
+    return await scrape_telegram_groups(session_id, session_string, expected_phone)
 
 @app.get("/telegram/scrape/progress/{session_id}")
 async def telegram_scrape_progress(session_id: str) -> dict:

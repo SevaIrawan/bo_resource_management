@@ -28,6 +28,8 @@ export interface ScrapeRunPayload {
   sessionId: string;
   platform: Platform;
   storedSessionString?: string | null;
+  /** Pastikan session = nomor akun grid (WA + TG phone login). */
+  expectedPhone?: string;
 }
 
 export interface CountGroupsPayload {
@@ -65,8 +67,12 @@ export function registerScraperIpc() {
     const work = (async () => {
     const raw =
       payload.platform === 'telegram'
-        ? await runTelegramScrape(payload.sessionId, payload.storedSessionString)
-        : await runWhatsAppScrape(payload.sessionId);
+        ? await runTelegramScrape(
+            payload.sessionId,
+            payload.storedSessionString,
+            payload.expectedPhone,
+          )
+        : await runWhatsAppScrape(payload.sessionId, payload.expectedPhone);
 
     const groups = normalizeScrapeResult(raw.groups);
     if (!groups.length) {

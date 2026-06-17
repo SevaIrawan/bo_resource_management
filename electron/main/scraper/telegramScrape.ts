@@ -107,17 +107,23 @@ async function pollTelegramScrapeProgress(
 async function postTelegramScrape(
   sessionId: string,
   sessionString?: string | null,
+  expectedPhone?: string,
 ): Promise<{
   status: string;
   message?: string;
   groups?: ScrapedGroupRow[];
   count?: number;
+  telegramUser?: string;
+  elapsedMs?: number;
 }> {
   return withNetworkRetry('Telegram scrape', async () => {
     const res = await fetch(`${SIDECAR_URL}/telegram/scrape/${encodeURIComponent(sessionId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionString: sessionString ?? undefined }),
+      body: JSON.stringify({
+        sessionString: sessionString ?? undefined,
+        expectedPhone: expectedPhone?.trim() || undefined,
+      }),
       signal: AbortSignal.timeout(scrapeGroupsTimeoutMs()),
     });
 
@@ -126,6 +132,8 @@ async function postTelegramScrape(
       message?: string;
       groups?: ScrapedGroupRow[];
       count?: number;
+      telegramUser?: string;
+      elapsedMs?: number;
     };
 
     if (!res.ok) {
@@ -139,10 +147,14 @@ async function postTelegramScrape(
 export async function runTelegramScrape(
   sessionId: string,
   storedSessionString?: string | null,
+  expectedPhone?: string,
 ): Promise<{
   ok: boolean;
   groups: ScrapedGroupRow[];
   count: number;
+  hint?: string;
+  telegramUser?: string;
+  elapsedMs?: number;
 }> {
   emitScrapeProgress({ sessionId, phase: 'start' });
   await ensureSidecarRunning();
@@ -160,7 +172,7 @@ export async function runTelegramScrape(
 
   let json: Awaited<ReturnType<typeof postTelegramScrape>>;
   try {
-    json = await postTelegramScrape(sessionId, sessionString);
+    json = await postTelegramScrape(sessionId, sessionString, expectedPhone);
 
     const needsRestore =
       json.status === 'error' &&
@@ -169,7 +181,7 @@ export async function runTelegramScrape(
 
     if (needsRestore && sessionString) {
       await restoreTelegramSession(sessionId, sessionString);
-      json = await postTelegramScrape(sessionId, sessionString);
+      json = await postTelegramScrape(sessionId, sessionString, expectedPhone);
     }
   } finally {
     pollUntil.done = true;
@@ -201,6 +213,7 @@ export async function runTelegramScrape(
     groups: json.groups ?? [],
     count,
     hint: (json as { hint?: string }).hint,
-    telegramUser: (json as { telegramUser?: string }).telegramUser,
+    telegramUser: json.telegramUser,
+    elapsedMs: json.elapsedMs,
   };
 }

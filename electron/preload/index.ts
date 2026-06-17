@@ -136,6 +136,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       sessionId: string;
       platform: Platform;
       storedSessionString?: string | null;
+      expectedPhone?: string;
     }) => ipcRenderer.invoke('scraper:run', payload),
     cancel: (payload: { sessionId: string; platform: Platform }) =>
       ipcRenderer.invoke('scraper:cancel', payload),

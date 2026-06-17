@@ -86,6 +86,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
         sessionId: deviceSessionId,
         platform: input.account.platform,
         storedSessionString,
+        expectedPhone: input.account.phoneNumber?.trim() || undefined,
       }),
     );
 
@@ -114,11 +115,21 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
         groupsSuccess: deviceGroupCount,
       });
     }
+    const scrapeMeta = result as {
+      loggedInAs?: string;
+      telegramUser?: string;
+      elapsedMs?: number;
+    };
+    const identity = scrapeMeta.loggedInAs ?? scrapeMeta.telegramUser;
+    const metaSuffix = identity
+      ? ` (${identity}${scrapeMeta.elapsedMs ? `, ${Math.round(scrapeMeta.elapsedMs / 1000)}s` : ''})`
+      : '';
+
     await logPlatformSessionEvent({
       accountId,
       platform: input.account.platform,
       eventType: 'login_success',
-      message: `Scrape: ${deviceGroupCount} groups on device, ${masterCount} in brand master`,
+      message: `Scrape: ${deviceGroupCount} groups, admin ${deviceAdminCount}, master ${masterCount}${metaSuffix}`,
     });
     const supabase = getSupabase();
     if (supabase) {

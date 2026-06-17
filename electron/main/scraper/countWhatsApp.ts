@@ -4,13 +4,12 @@ import {
   withWhatsAppClient,
 } from '../platformLogin/whatsapp';
 import { isAnyCountAborted } from './countGroupsCancel';
-import { fetchGroupParticipants, meParticipantStats } from './whatsappParticipants';
-import { isWhatsAppGroupChat } from './whatsappGroupFilter';
 import {
   assertWhatsAppScrapeClient,
   countWhatsAppGroupsOnDevice,
   listWhatsAppGroupIds,
 } from './whatsappGroupDiscovery';
+import { scrapeWhatsAppGroupFromStore } from './whatsappGroupScrapeStore';
 import {
   DEVICE_GROUP_TARGET_MAX,
   QUICK_COUNT_STORE_WAIT_MS,
@@ -87,15 +86,11 @@ async function countFromConnectedClient(
     label: `${totalGroups} groups on device`,
   });
 
-  const meId = client.info?.wid?._serialized;
   const scanIds = groupIds.slice(0, DEVICE_GROUP_TARGET_MAX);
 
   const adminFlags = await runPooled(scanIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId, index) => {
-    const chat = await client.getChatById(groupId);
-    if (!chat || !isWhatsAppGroupChat(chat)) return false;
-
-    const participants = await fetchGroupParticipants(client, chat);
-    const stats = meParticipantStats(participants, meId);
+    const core = await scrapeWhatsAppGroupFromStore(client, groupId);
+    if ('skip' in core) return false;
 
     if ((index + 1) % 25 === 0 || index === scanIds.length - 1) {
       emitScrapeProgress({
@@ -107,7 +102,7 @@ async function countFromConnectedClient(
       });
     }
 
-    return stats.isAdmin;
+    return core.is_admin === 'yes';
   });
 
   const adminGroups = adminFlags.filter(Boolean).length;

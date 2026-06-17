@@ -122,7 +122,14 @@ declare global {
           sessionId: string;
           platform: Platform;
           storedSessionString?: string | null;
-        }) => Promise<{ ok: boolean; groups: ScrapedGroupRow[]; count: number }>;
+          expectedPhone?: string;
+        }) => Promise<{
+          ok: boolean;
+          groups: ScrapedGroupRow[];
+          count: number;
+          loggedInAs?: string;
+          elapsedMs?: number;
+        }>;
         cancel: (payload: {
           sessionId: string;
           platform: Platform;

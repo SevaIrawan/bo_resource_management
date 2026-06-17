@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from telethon.tl.functions.messages import ExportChatInviteRequest, GetFullChatRequest
 from telethon.tl.types import (
     Channel,
@@ -66,6 +68,50 @@ def get_scrape_progress(session_id: str) -> dict:
 
 def _admin_label(is_admin: bool) -> str:
     return "yes" if is_admin else "no"
+
+
+def _normalize_phone_digits(raw: str) -> str:
+    return "".join(ch for ch in raw if ch.isdigit())
+
+
+def _phones_match(a: str, b: str) -> bool:
+    da = _normalize_phone_digits(a)
+    db = _normalize_phone_digits(b)
+    if not da or not db:
+        return False
+    return da == db or da.endswith(db) or db.endswith(da)
+
+
+def _assert_telegram_account_match(me, expected_phone: str | None) -> str:
+    me_label = me.username or me.phone or str(me.id)
+    exp = (expected_phone or "").strip()
+    if not exp:
+        return me_label
+    me_phone = me.phone or ""
+    if me_phone and not _phones_match(me_phone, exp):
+        raise ValueError(
+            f"TG_ACCOUNT_MISMATCH: Telegram logged in as {me_label} (phone {me_phone}), "
+            f"expected {exp}. Clear session and log in again."
+        )
+    return me_label
+
+
+def _assert_scrape_quality(groups: list[dict], elapsed_sec: float) -> None:
+    n = len(groups)
+    if n < 5:
+        return
+    min_elapsed = max(30.0, n * 0.28)
+    if elapsed_sec < min_elapsed:
+        raise ValueError(
+            f"SCRAPE_TOO_FAST: {n} groups in {elapsed_sec:.0f}s "
+            f"(min ~{min_elapsed:.0f}s for live Telegram API). Retry scrape."
+        )
+    bad_member = sum(1 for group in groups if int(group.get("member_count") or 0) <= 0)
+    if bad_member / n > 0.12:
+        raise ValueError(
+            f"SCRAPE_INCOMPLETE: {bad_member}/{n} groups have member_count=0 — "
+            "Telegram API did not return participant counts. Retry or re-login."
+        )
 
 
 def _is_group_dialog(dialog) -> bool:
@@ -151,12 +197,12 @@ async def _count_admin_roles(client, entity) -> tuple[int, int]:
         return 0, 0
 
 
-async def _collect_groups(session_id: str) -> dict:
+async def _collect_groups(session_id: str, expected_phone: str | None = None) -> dict:
     async with tg_session_lock(session_id):
-        return await _collect_groups_locked(session_id)
+        return await _collect_groups_locked(session_id, expected_phone)
 
 
-async def _collect_groups_locked(session_id: str) -> dict:
+async def _collect_groups_locked(session_id: str, expected_phone: str | None = None) -> dict:
     session = SESSIONS.get(session_id)
     if not session:
         return {"status": "error", "message": "Login session not found. Log in first."}
@@ -168,16 +214,25 @@ async def _collect_groups_locked(session_id: str) -> dict:
         }
 
     client = session.client
+    if not client.is_connected():
+        await client.connect()
     if not await client.is_user_authorized():
         return {"status": "error", "message": "Session is not authorized", "valid": False}
 
     me = await client.get_me()
-    me_label = me.username or me.phone or str(me.id)
+    try:
+        me_label = _assert_telegram_account_match(me, expected_phone)
+    except ValueError as exc:
+        return {"status": "error", "message": str(exc), "valid": False}
 
     clear_scrape_progress(session_id)
     clear_scrape_cancel(session_id)
+    started_at = time.monotonic()
     try:
         set_scrape_progress(session_id, phase="discover", label="Discovering groups on Telegram")
+
+        # Refresh dialog list from Telegram servers before membership scrape.
+        await client.get_dialogs()
 
         targets: list = []
         total_on_account = 0
@@ -261,6 +316,12 @@ async def _collect_groups_locked(session_id: str) -> dict:
                 }
             )
 
+        elapsed_sec = time.monotonic() - started_at
+        try:
+            _assert_scrape_quality(groups, elapsed_sec)
+        except ValueError as exc:
+            return {"status": "error", "message": str(exc), "valid": False}
+
         admin_count = sum(1 for group in groups if group["is_admin"] == "yes")
         payload = {
             "status": "ok",
@@ -269,6 +330,7 @@ async def _collect_groups_locked(session_id: str) -> dict:
             "count": len(groups),
             "adminCount": admin_count,
             "telegramUser": me_label,
+            "elapsedMs": int(elapsed_sec * 1000),
         }
         if len(groups) == 0:
             payload["hint"] = "ZERO_GROUPS_ON_ACCOUNT"
@@ -284,6 +346,7 @@ async def _collect_groups_locked(session_id: str) -> dict:
 async def scrape_telegram_groups(
     session_id: str,
     session_string: str | None = None,
+    expected_phone: str | None = None,
 ) -> dict:
     if session_string and session_string.strip():
         restored = await restore_telegram_session(session_id, session_string.strip())
@@ -293,7 +356,7 @@ async def scrape_telegram_groups(
                 "message": restored.get("message", "Session restore failed"),
             }
 
-    result = await _collect_groups(session_id)
+    result = await _collect_groups(session_id, expected_phone)
     if result.get("status") == "error":
         return result
     payload = dict(result)

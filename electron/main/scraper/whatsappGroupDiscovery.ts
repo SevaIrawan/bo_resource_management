@@ -84,6 +84,34 @@ export async function countWhatsAppGroupsOnDevice(
   });
 }
 
+/** Setelah cold-boot — tunggu jumlah grup di store stabil (WA Web selesai sync inbox). */
+export async function waitForWhatsAppInboxStable(
+  client: Client,
+  options?: { maxMs?: number; pollMs?: number; stableRounds?: number },
+): Promise<void> {
+  assertWhatsAppScrapeClient(client);
+  const maxMs = options?.maxMs ?? 120_000;
+  const pollMs = options?.pollMs ?? 5_000;
+  const stableRounds = options?.stableRounds ?? 2;
+  const deadline = Date.now() + maxMs;
+  let lastCount = -1;
+  let stable = 0;
+
+  while (Date.now() < deadline) {
+    const count = await countWhatsAppGroupsOnDevice(client);
+    if (count === lastCount) {
+      stable += 1;
+      if (stable >= stableRounds) return;
+    } else {
+      stable = 0;
+      lastCount = count;
+    }
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, pollMs);
+    });
+  }
+}
+
 /** Daftar JID grup dari store WA Web — tanpa `client.getChats()`. */
 export async function listWhatsAppGroupIds(
   client: Client,

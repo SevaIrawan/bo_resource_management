@@ -60,6 +60,20 @@ const checks = [
     name: 'sessionAvailability no global label session lookup',
     ok: !read('src/lib/sessionAvailability.ts').includes('findMessagingAccountWithActiveSession'),
   },
+  {
+    name: 'WA probe: null getState treated as loading (not unlinked)',
+    ok: read('electron/main/scraper/whatsappLinkState.ts').includes("if (!state) return 'loading'"),
+  },
+  {
+    name: 'Sync skip device probe during session grace',
+    ok: read('src/services/syncFlowService.ts').includes('isAccountInSessionGrace(account.id)'),
+  },
+  {
+    name: 'Grid patch after scrape: dbAccountId + uiAccountId lookup',
+    ok:
+      read('src/lib/patchAccountGridAfterDailyWrite.ts').includes('uiAccountId') &&
+      read('src/providers/GroupMonitoringProvider.tsx').includes('refreshAccountAfterDailyWrite(dbAccountId, uiAccountId)'),
+  },
 ];
 
 let failed = 0;

@@ -2,7 +2,11 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.18` (lihat `package.json`)
+**Versi saat ini:** `1.0.20` (lihat `package.json`)
+
+**Rilis 1.0.20:** stabilitas Scrape/Sync — WA probe null state, grace skip probe, grid patch db+ui id, ticket/reporting refresh tanpa gate brandId, sync metrik dari daily DB.
+
+**Rilis 1.0.19:** tab Operations stock engine, Reporting kolom Status + slicer, export modal bucket, worker settings scaffolding.
 
 **Rilis 1.0.18:** perbaikan UI ticket/grid/reporting realtime setelah Run Scraper (bypass ticket lock, patch grid atomik).
 

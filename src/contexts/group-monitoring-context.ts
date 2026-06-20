@@ -23,7 +23,7 @@ export interface GroupMonitoringContextValue {
   setTicketFilters: Dispatch<SetStateAction<TicketSlicerFilters>>;
   reloadTickets: () => Promise<void>;
   /** Rekonsiliasi issue dari DB + muat ulang kartu (setelah sync/scrape). */
-  refreshIssues: (dbAccountId?: string) => Promise<void>;
+  refreshIssues: (dbAccountId?: string, uiAccountId?: string) => Promise<void>;
   accountKpis: KpiItem[];
   ticketKpis: KpiItem[];
   /** Tab Account — muat registry + metrik total per akun. */

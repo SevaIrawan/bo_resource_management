@@ -25,8 +25,8 @@ const checks = [
     ok: (() => {
       const syncFlow = read('src/hooks/useAccountSyncFlow.ts');
       return (
-        syncFlow.includes('await onTicketsReload?.(dbAccountId)') &&
-        syncFlow.includes('fetchBrandIdForAccount(dbAccountId)')
+        syncFlow.includes('await onTicketsReload?.(dbAccountId') &&
+        syncFlow.includes('await onTicketsReload?.(outcome.dbAccountId, account.id)')
       );
     })(),
   },

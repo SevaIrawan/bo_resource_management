@@ -17,7 +17,7 @@ const UNLINKED_STATES = new Set([
 ]);
 
 export function classifyWaSocketState(state: string | null | undefined): WaLinkStatus {
-  if (!state) return 'unlinked';
+  if (!state) return 'loading';
   if (state === 'CONNECTED') return 'linked';
   if (LOADING_STATES.has(state)) return 'loading';
   if (UNLINKED_STATES.has(state)) return 'unlinked';

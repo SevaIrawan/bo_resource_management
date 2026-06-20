@@ -111,7 +111,7 @@ const implChecks = [
   {
     name: 'ticket reconcile setelah sync/scrape (await refreshIssues)',
     ok:
-      /await onTicketsReload\?\.\(dbAccountId\)/.test(syncFlow) &&
+      /await onTicketsReload\?\.\(dbAccountId/.test(syncFlow) &&
       syncFlow.includes("outcome.kind === 'success'"),
   },
   {

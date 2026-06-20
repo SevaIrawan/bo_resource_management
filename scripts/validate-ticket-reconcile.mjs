@@ -84,7 +84,7 @@ const checks = [
     name: 'Scrape: refresh Issue setelah applyResult sukses',
     ok:
       read('src/hooks/useAccountSyncFlow.ts').includes('lastSyncAt: outcome.scrapedAt') &&
-      read('src/hooks/useAccountSyncFlow.ts').includes('await onTicketsReload?.(dbAccountId)'),
+      read('src/hooks/useAccountSyncFlow.ts').includes('await onTicketsReload?.(dbAccountId'),
   },
   {
     name: 'Realtime tickets: reload kartu segera',
@@ -138,7 +138,7 @@ const checks = [
     name: 'Scrape selesai → await refreshIssues (reconcile + reload)',
     ok:
       read('src/hooks/useAccountSyncFlow.ts').includes("outcome.kind === 'success'") &&
-      read('src/hooks/useAccountSyncFlow.ts').includes('await onTicketsReload?.(dbAccountId)'),
+      read('src/hooks/useAccountSyncFlow.ts').includes('await onTicketsReload?.(dbAccountId'),
   },
   {
     name: 'Issue hilang → resolveTickets tutup open ticket',

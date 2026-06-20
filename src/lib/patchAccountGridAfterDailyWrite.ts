@@ -1,4 +1,5 @@
 import { patchGroupsFromDailyInState } from '@/lib/hydrateAccountMetricsFromDaily';
+import { findAccountInGroups } from '@/lib/accountSessionPatch';
 import { patchBrandPlatformMasterInGroups } from '@/lib/patchAccountMasterInGroups';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 
@@ -9,9 +10,14 @@ import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 export async function patchAccountGridAfterDailyWrite(
   groups: AccountBrandGroup[],
   dbAccountId: string,
+  uiAccountId?: string,
 ): Promise<AccountBrandGroup[]> {
-  const withDaily = await patchGroupsFromDailyInState(groups, dbAccountId);
-  const hit = withDaily.flatMap((g) => g.accounts).find((a) => a.id === dbAccountId);
+  const lookupId =
+    findAccountInGroups(groups, dbAccountId)?.account.id ??
+    (uiAccountId ? findAccountInGroups(groups, uiAccountId)?.account.id : undefined) ??
+    dbAccountId;
+  const withDaily = await patchGroupsFromDailyInState(groups, lookupId, dbAccountId);
+  const hit = findAccountInGroups(withDaily, lookupId, [dbAccountId, uiAccountId ?? '']);
   if (!hit) return withDaily;
-  return patchBrandPlatformMasterInGroups(withDaily, hit.brandName, hit.platform);
+  return patchBrandPlatformMasterInGroups(withDaily, hit.account.brandName, hit.account.platform);
 }

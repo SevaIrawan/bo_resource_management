@@ -143,20 +143,20 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     }
   }, [user?.id, user?.userName, reloadTicketHandles, reportError, scheduleReportingReload, t]);
 
-  const patchAccountGridFromDb = useCallback(async (dbAccountId: string) => {
+  const patchAccountGridFromDb = useCallback(async (dbAccountId: string, uiAccountId?: string) => {
     const snapshot = await new Promise<AccountBrandGroup[]>((resolve) => {
       setGroups((current) => {
         resolve(current);
         return current;
       });
     });
-    const patched = await patchAccountGridAfterDailyWrite(snapshot, dbAccountId);
+    const patched = await patchAccountGridAfterDailyWrite(snapshot, dbAccountId, uiAccountId);
     setGroups((prev) => mergeGroupsAccountMetrics(prev, patched));
   }, []);
 
   /** Reconcile + grid + ticket + reporting setelah daily/master berubah (scrape/realtime). */
   const refreshAccountAfterDailyWrite = useCallback(
-    async (dbAccountId: string) => {
+    async (dbAccountId: string, uiAccountId?: string) => {
       if (accountRefreshBusyRef.current.has(dbAccountId)) {
         pendingAccountRefreshRef.current.add(dbAccountId);
         return;
@@ -165,7 +165,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       ticketSyncLockedRef.current = true;
       try {
         await reconcileTicketsForAccountFromDb(dbAccountId);
-        await patchAccountGridFromDb(dbAccountId);
+        await patchAccountGridFromDb(dbAccountId, uiAccountId);
         await setTicketSummariesFromEngine();
         scheduleReportingReload();
       } finally {
@@ -173,7 +173,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         ticketSyncLockedRef.current = false;
         if (pendingAccountRefreshRef.current.has(dbAccountId)) {
           pendingAccountRefreshRef.current.delete(dbAccountId);
-          void refreshAccountAfterDailyWrite(dbAccountId);
+          void refreshAccountAfterDailyWrite(dbAccountId, uiAccountId);
         }
       }
     },
@@ -182,9 +182,9 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   /** Reconcile DB dulu, lalu reload kartu Issue + reporting (kontrak 150−146=4 ticket). */
   const refreshIssues = useCallback(
-    async (dbAccountId?: string) => {
+    async (dbAccountId?: string, uiAccountId?: string) => {
       if (dbAccountId) {
-        await refreshAccountAfterDailyWrite(dbAccountId);
+        await refreshAccountAfterDailyWrite(dbAccountId, uiAccountId);
         return;
       }
       if (user?.id) {
@@ -211,11 +211,16 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     [notifyPendingDataUpdate, refreshAccountAfterDailyWrite],
   );
 
-  /** Realtime master/daily — reload kartu Issue dari engine DB terbaru + reporting. */
+  /** Realtime master/daily — reconcile penuh jika tidak sedang post-scrape lock. */
   const scheduleIssueRefreshFromData = useCallback(() => {
     scheduleReportingReload();
-    void setTicketSummariesFromEngine();
-  }, [scheduleReportingReload, setTicketSummariesFromEngine]);
+    if (ticketReloadDebounceRef.current) clearTimeout(ticketReloadDebounceRef.current);
+    ticketReloadDebounceRef.current = setTimeout(() => {
+      ticketReloadDebounceRef.current = null;
+      if (ticketSyncLockedRef.current || ticketReconcileBusyRef.current) return;
+      void runTicketReconcile();
+    }, 500);
+  }, [runTicketReconcile, scheduleReportingReload]);
 
   const loadTicketsStaged = useCallback(
     async (options?: { force?: boolean }) => {

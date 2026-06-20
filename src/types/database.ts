@@ -133,6 +133,10 @@ export interface GroupsMaster {
   brand: string;
   platform: Platform;
   last_sync: string;
+  owner_count: number;
+  admin_count: number;
+  member_count: number;
+  member_non_admin: number;
 }
 
 export interface AccountSnapshot {

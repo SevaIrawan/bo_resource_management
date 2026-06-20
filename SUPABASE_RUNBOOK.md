@@ -35,6 +35,7 @@ Jalankan **berurutan**, satu file = satu kali **Run**, tunggu sukses sebelum fil
 | 2 | `supabase/migrations/017_rm_full_reset.sql` |
 | 3 | `supabase/migrations/020_fix_duplicate_active_sessions.sql` |
 | 4 | `supabase/migrations/023_session_and_sync_logs_bundle.sql` |
+| 5 | `supabase/migrations/030_groups_master_member_counts.sql` — count di `groups_master` + RPC rebuild |
 
 **Jangan jalankan:** 018, 019 (kecuali skenario B).
 
@@ -50,6 +51,7 @@ Jalankan **berurutan**:
 | 2 | `019_realtime_group_scrape_daily.sql` | Opsional; aman di-run jika ragu |
 | 3 | `020_fix_duplicate_active_sessions.sql` | Wajib |
 | 4 | `023_session_and_sync_logs_bundle.sql` | **Wajib** — perbaiki error 404/400 di console |
+| 5 | `030_groups_master_member_counts.sql` | **Wajib** — `owner_count`, `admin_count`, `member_count`, `member_non_admin` di master + RPC rebuild |
 
 **Jangan jalankan:** 017 lagi (akan **hapus semua data** RM).
 
@@ -77,7 +79,17 @@ WHERE table_name = 'resource_management_platform_session_logs'
 
 -- Harus ada tabel ini (bukan 404 di app)
 SELECT 1 FROM resource_management_sync_activity_logs LIMIT 1;
+
+-- Harus ada kolom count di groups_master (bukan 42703 di app setelah scrape)
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'resource_management_groups_master'
+  AND column_name IN ('owner_count', 'admin_count', 'member_count', 'member_non_admin')
+ORDER BY 1;
 ```
+
+Harus **4 baris** kolom count. Kalau kosong → file **030** belum di-run.
 
 Kalau query ketiga error **relation does not exist** → file **023** belum di-run atau gagal.
 

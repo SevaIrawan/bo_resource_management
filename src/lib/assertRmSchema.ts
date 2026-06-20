@@ -9,7 +9,7 @@ import { RM_ACTIVE_TABLES, TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
 
 export const RM_SCHEMA_HINT =
-  'SCHEMA_OUTDATED: Instal baru → 003 + 017 + 020 + 023 + 026. DB lama → 018 (sekali) + 020 + 023 + 026.';
+  'SCHEMA_OUTDATED: Instal baru → 003 + 017 + 020 + 023 + 026 + 030. DB lama → 018 (sekali) + 020 + 023 + 026 + 030.';
 
 function isSchemaError(message: string | undefined): boolean {
   if (!message) return false;

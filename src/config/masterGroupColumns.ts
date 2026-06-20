@@ -7,6 +7,10 @@ export const MASTER_GROUP_COLUMNS = [
   'brand',
   'platform',
   'last_sync',
+  'owner_count',
+  'admin_count',
+  'member_count',
+  'member_non_admin',
 ] as const;
 
 export const MASTER_GROUP_SELECT = MASTER_GROUP_COLUMNS.join(', ');

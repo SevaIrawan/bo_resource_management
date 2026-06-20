@@ -77,6 +77,25 @@ const implChecks = [
       fs.existsSync(path.join(root, 'supabase/migrations/029_rm_account_master_stats_raw.sql')),
   },
   {
+    name: 'Master counts: migrasi 030 + kolom master + rebuild setelah scrape',
+    ok: (() => {
+      const mig030 = read('supabase/migrations/030_groups_master_member_counts.sql');
+      const masterCols = read('src/config/masterGroupColumns.ts');
+      const scraper = read('src/lib/accountScraper.ts');
+      return (
+        mig030.includes('member_non_admin') &&
+        mig030.includes('owner_count') &&
+        mig030.includes('INSERT INTO public.resource_management_groups_master') &&
+        masterCols.includes("'owner_count'") &&
+        masterCols.includes("'admin_count'") &&
+        masterCols.includes("'member_count'") &&
+        masterCols.includes("'member_non_admin'") &&
+        scraper.includes('rebuildBrandGroupsMaster') &&
+        read('src/lib/syncMasterAfterScrape.ts').includes("rpc('rm_rebuild_brand_groups_master'")
+      );
+    })(),
+  },
+  {
     name: 'quick sync skip merge device group ids',
     ok:
       read('src/lib/accountMonitoringEngine.ts').includes('skipMergeDeviceGroups') &&

@@ -12,6 +12,7 @@ Migrasi di folder ini — jalankan urutan di `SUPABASE_RUNBOOK.md` / `JALANKAN_I
 | 2 | `017_rm_full_reset.sql` — **hapus semua data RM** |
 | 3 | `020_fix_duplicate_active_sessions.sql` |
 | 4 | `023_session_and_sync_logs_bundle.sql` — session log + sync activity (fix 404/400) |
+| 5 | `030_groups_master_member_counts.sql` — count master + RPC rebuild dari daily picked |
 
 ## DB production yang sudah jalan (tanpa full reset)
 
@@ -21,6 +22,7 @@ Migrasi di folder ini — jalankan urutan di `SUPABASE_RUNBOOK.md` / `JALANKAN_I
 | 2 | `019_realtime_group_scrape_daily.sql` — opsional |
 | 3 | `020_fix_duplicate_active_sessions.sql` |
 | 4 | `023_session_and_sync_logs_bundle.sql` — **wajib** untuk auto-sync log |
+| 5 | `030_groups_master_member_counts.sql` — **wajib** — count di master + RPC rebuild |
 
 **Jangan** jalankan `017` lagi.
 

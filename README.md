@@ -87,8 +87,8 @@ Ringkas: tim internal install `.exe` sekali → login → SYNC WA/TG. Config ter
 **Urutan SQL wajib (jangan tebak-tebak):** lihat **[SUPABASE_RUNBOOK.md](./SUPABASE_RUNBOOK.md)** di root project.
 
 Ringkas:
-- **DB baru:** `003` → `017` → `020` → `023` → `024` → `025` → `026`
-- **DB sudah jalan:** `018` (sekali) → `019` (opsional) → `020` → `023` → `024`–`026`
+- **DB baru:** `003` → `017` → `020` → `023` → `024` → `025` → `026` → `030`
+- **DB sudah jalan:** `018` (sekali) → `019` (opsional) → `020` → `023` → `024`–`026` → **`030`**
 - Error console `404 sync_activity_logs` / `400 session_status` = belum jalankan **`023`**
 
 **Prinsip:** Semua data bisnis di Supabase; session WA/TG tersimpan + Realtime; metrik sync di `account_snapshots`; audit di `platform_session_logs` & `scrape_runs`.

@@ -84,6 +84,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     reportingReloadDebounceRef.current = setTimeout(() => {
       reportingReloadDebounceRef.current = null;
       window.dispatchEvent(new Event('rm-reporting-reload'));
+      window.dispatchEvent(new Event('rm-operations-reload'));
     }, 500);
   }, []);
 
@@ -318,6 +319,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         await runTicketReconcile();
       } else if (activeTab === 'reporting') {
         window.dispatchEvent(new Event('rm-reporting-reload'));
+      } else if (activeTab === 'operations') {
+        window.dispatchEvent(new Event('rm-operations-reload'));
       } else {
         await reloadAll();
       }
@@ -329,6 +332,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     registerFullRefreshHandler(async () => {
       await reloadAll();
       window.dispatchEvent(new Event('rm-reporting-reload'));
+      window.dispatchEvent(new Event('rm-operations-reload'));
     });
     return () => registerFullRefreshHandler(null);
   }, [registerFullRefreshHandler, reloadAll]);

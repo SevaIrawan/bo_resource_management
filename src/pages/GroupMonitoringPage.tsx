@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AccountMonitoringBody } from '@/components/group-monitoring/AccountMonitoringBody';
+import { OperationsMonitoringPanel } from '@/components/group-monitoring/OperationsMonitoringPanel';
 import { ReportingMonitoringPanel } from '@/components/group-monitoring/ReportingMonitoringPanel';
 import { TicketMonitoringBody } from '@/components/group-monitoring/TicketMonitoringBody';
 import { ContentAreaCard } from '@/components/group-monitoring/ContentAreaCard';
@@ -18,6 +19,14 @@ function GroupMonitoringContent() {
     return (
       <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">
         <ReportingMonitoringPanel />
+      </div>
+    );
+  }
+
+  if (tab === 'operations') {
+    return (
+      <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">
+        <OperationsMonitoringPanel />
       </div>
     );
   }

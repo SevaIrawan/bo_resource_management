@@ -3,16 +3,22 @@ import { useMemo } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
+import type { ReportingStockStatusFilter } from '@/lib/filterReportingStockStatus';
 import { cn } from '@/lib/utils';
+import type { GroupStockBucket } from '@/types/groupStock';
+import { GROUP_STOCK_BUCKETS } from '@/types/groupStock';
 import type { Platform } from '@/types/database';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 
 export type ReportingBookmark = 'full_group' | 'full_admin';
 
+export type { ReportingStockStatusFilter };
+
 export type ReportingFilters = {
   brandName: string;
   platform: Platform;
   accountId: string;
+  stockStatus: ReportingStockStatusFilter;
   bookmark: ReportingBookmark;
   groupNameSearch: string;
 };
@@ -110,6 +116,16 @@ export function ReportingSlicerHeader({
     ];
   }, [brandGroup, filters.brandName, filters.platform, t]);
 
+  const statusOptions = useMemo(() => {
+    return [
+      { value: 'all', label: t('groupMonitoring.reporting.statusAll') },
+      ...GROUP_STOCK_BUCKETS.map((bucket) => ({
+        value: bucket,
+        label: t(`operations.stock.${bucket}`),
+      })),
+    ];
+  }, [t]);
+
   const bookmarks: ReportingBookmark[] = ['full_group', 'full_admin'];
 
   return (
@@ -158,6 +174,15 @@ export function ReportingSlicerHeader({
             options={accountOptions}
             menuAlign="right"
           />
+          <ReportingSlicerField
+            label={t('groupMonitoring.reporting.statusLabel')}
+            value={filters.stockStatus}
+            onChange={(stockStatus) =>
+              onChange({ stockStatus: stockStatus as ReportingStockStatusFilter })
+            }
+            options={statusOptions}
+            menuAlign="right"
+          />
         </div>
 
         <div
@@ -193,6 +218,7 @@ export function defaultReportingFilters(groups: AccountBrandGroup[]): ReportingF
     brandName,
     platform,
     accountId: REPORTING_ACCOUNT_ALL,
+    stockStatus: 'all',
     bookmark: 'full_group',
     groupNameSearch: '',
   };
@@ -222,11 +248,17 @@ export function normalizeReportingFilters(
       : REPORTING_ACCOUNT_ALL;
 
   const bookmark = current.bookmark === 'full_admin' ? 'full_admin' : 'full_group';
+  const stockStatus =
+    current.stockStatus === 'all' ||
+    GROUP_STOCK_BUCKETS.includes(current.stockStatus as GroupStockBucket)
+      ? current.stockStatus
+      : 'all';
 
   return {
     brandName,
     platform,
     accountId,
+    stockStatus,
     bookmark,
     groupNameSearch: current.groupNameSearch ?? '',
   };

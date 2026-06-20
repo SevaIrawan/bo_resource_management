@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ReportingTableShell } from '@/components/group-monitoring/ReportingTableShell';
+import { ReportingStockStatusCell } from '@/components/group-monitoring/ReportingStockStatusCell';
 import { useLanguage } from '@/hooks/useLanguage';
 import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
 import type {
@@ -9,6 +10,7 @@ import type {
 } from '@/lib/reportingMatrixColumn';
 import { cn } from '@/lib/utils';
 import type { JoinGroupMatrixRow, ReportingAccountRef } from '@/lib/loadJoinGroupReport';
+import type { ReportingStockStatusFilter } from '@/lib/filterReportingStockStatus';
 
 export type ReportingMatrixMode = 'join' | 'admin';
 
@@ -22,6 +24,8 @@ interface ReportingJoinMatrixTableProps {
   onColumnFilterChange: (filter: ReportingMatrixColumnFilter) => void;
   groupNameSearch?: string;
   onClearGroupNameSearch?: () => void;
+  stockStatusFilter?: ReportingStockStatusFilter;
+  onClearStockStatusFilter?: () => void;
 }
 
 function AccountColumnHeader({
@@ -122,11 +126,15 @@ export function ReportingJoinMatrixTable({
   onColumnFilterChange,
   groupNameSearch = '',
   onClearGroupNameSearch,
+  stockStatusFilter = 'all',
+  onClearStockStatusFilter,
 }: ReportingJoinMatrixTableProps) {
   const { t } = useLanguage();
-  const columnCount = 4 + accounts.length;
+  const columnCount = 5 + accounts.length;
   const hasGroupNameSearch = groupNameSearch.trim().length > 0;
-  const showFilteredEmpty = rows.length === 0 && (columnFilter !== null || hasGroupNameSearch);
+  const hasStockStatusFilter = stockStatusFilter !== 'all';
+  const showFilteredEmpty =
+    rows.length === 0 && (columnFilter !== null || hasGroupNameSearch || hasStockStatusFilter);
 
   if (rows.length === 0 && !showFilteredEmpty) {
     return (
@@ -144,6 +152,7 @@ export function ReportingJoinMatrixTable({
           <th>{t('groupMonitoring.reporting.colGroupName')}</th>
           <th>{t('groupMonitoring.reporting.colGroupId')}</th>
           <th>{t('groupMonitoring.reporting.colGroupLink')}</th>
+          <th>{t('groupMonitoring.reporting.colStatus')}</th>
           {accounts.map((acc) => (
             <th key={acc.id} className="join-report-table__account-col">
               <AccountColumnHeader
@@ -164,7 +173,9 @@ export function ReportingJoinMatrixTable({
               <p className="join-report-table__filter-empty-text">
                 {columnFilter
                   ? t('groupMonitoring.reporting.matrixFilterEmpty')
-                  : t('groupMonitoring.reporting.matrixSearchEmpty')}
+                  : hasStockStatusFilter
+                    ? t('groupMonitoring.reporting.statusFilterEmpty')
+                    : t('groupMonitoring.reporting.matrixSearchEmpty')}
               </p>
               {columnFilter ? (
                 <button
@@ -184,6 +195,16 @@ export function ReportingJoinMatrixTable({
                 >
                   <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
                   {t('groupMonitoring.reporting.matrixSearchClear')}
+                </button>
+              ) : null}
+              {hasStockStatusFilter && onClearStockStatusFilter ? (
+                <button
+                  type="button"
+                  className="join-report-table__filter-empty-btn"
+                  onClick={onClearStockStatusFilter}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                  {t('groupMonitoring.reporting.statusFilterClear')}
                 </button>
               ) : null}
             </div>
@@ -208,6 +229,9 @@ export function ReportingJoinMatrixTable({
             ) : (
               <span className="text-text-muted">—</span>
             )}
+          </td>
+          <td>
+            <ReportingStockStatusCell status={row.stockStatus} />
           </td>
           {accounts.map((acc) => {
             const active =

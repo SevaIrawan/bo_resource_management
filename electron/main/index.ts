@@ -10,6 +10,7 @@ import {
   setPlatformLoginWindow,
 } from './platformLogin';
 import { registerScraperIpc } from './scraper';
+import { registerAutomationIpc } from './automation';
 import { disposeAutoUpdate, setupAutoUpdate } from './autoUpdate';
 
 if (!app.isPackaged) {
@@ -84,6 +85,7 @@ app.whenReady().then(() => {
   registerAppIpc();
   registerPlatformLoginIpc();
   registerScraperIpc();
+  registerAutomationIpc();
   createWindow();
   setupAutoUpdate(() => mainWindowRef);
 });

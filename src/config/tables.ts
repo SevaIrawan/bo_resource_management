@@ -11,6 +11,8 @@ export const TABLES = {
   scrapeRuns: 'resource_management_scrape_runs',
   groupScrapeDaily: 'resource_management_group_scrape_daily',
   groupsMaster: 'resource_management_groups_master',
+  /** Metrik bisnis harian — line = brand RM, bukan tabel RM core. */
+  newRegister: 'new_register',
   accountSnapshots: 'resource_management_account_snapshots',
   tickets: 'resource_management_tickets',
   ticketIssueHandles: 'resource_management_ticket_issue_handles',

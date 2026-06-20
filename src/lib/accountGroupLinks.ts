@@ -3,8 +3,10 @@ import {
   dedupeDailyRowsByGroupId,
   dedupeDailyRowsByGroupIdKeepLatest,
 } from '@/lib/dedupeScrapeDaily';
+import { computeReportingStockStatus } from '@/lib/reportingStockStatus';
 import { TABLES } from '@/config/tables';
 import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
+import type { GroupStockBucket } from '@/types/groupStock';
 import type { AdminYesNo, Platform } from '@/types/database';
 
 export interface AccountGroupLinkRow {
@@ -15,6 +17,8 @@ export interface AccountGroupLinkRow {
   inMaster: boolean;
   memberCount: number;
   adminCount: number;
+  memberNonAdmin?: number;
+  stockStatus?: GroupStockBucket;
 }
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
@@ -57,13 +61,15 @@ async function fetchMasterForBrand(
     group_id: string;
     group_name: string;
     invite_link: string;
+    member_non_admin: number;
   }[]
 > {
   const rows = await fetchAllSupabaseRows<{
     group_id: string;
     group_name: string;
     invite_link: string;
-  }>(TABLES.groupsMaster, 'group_id, group_name, invite_link', [
+    member_non_admin: number;
+  }>(TABLES.groupsMaster, 'group_id, group_name, invite_link, member_non_admin', [
     { column: 'brand', value: brand.trim() },
     { column: 'platform', value: platform },
   ]);
@@ -71,6 +77,7 @@ async function fetchMasterForBrand(
     group_id: string;
     group_name: string;
     invite_link: string;
+    member_non_admin: number;
   }[];
 }
 
@@ -114,19 +121,24 @@ export async function fetchAccountGroupLinks(
 
   const master = await fetchMasterForBrand(brand, platform);
   const rows: AccountGroupLinkRow[] = [];
+  const brandTrimmed = brand.trim();
 
   for (const m of master) {
     const gid = String(m.group_id).trim();
     if (!gid) continue;
     const d = dailyByGid.get(gid);
+    const groupName = (m.group_name ?? '').trim() || 'Group';
+    const memberNonAdmin = Math.max(0, Number(m.member_non_admin) || 0);
     rows.push({
       groupId: gid,
-      groupName: (m.group_name ?? '').trim() || 'Group',
+      groupName,
       inviteLink: m.invite_link?.trim() || null,
       isAdmin: d?.is_admin === 'yes' ? 'yes' : 'no',
       inMaster: true,
       memberCount: Math.max(0, Number(d?.member_count) || 0),
       adminCount: Math.max(0, Number(d?.admin_count) || 0),
+      memberNonAdmin,
+      stockStatus: computeReportingStockStatus(groupName, memberNonAdmin, brandTrimmed),
     });
   }
 

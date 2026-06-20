@@ -1,4 +1,5 @@
 import { ReportingTableShell } from '@/components/group-monitoring/ReportingTableShell';
+import { ReportingStockStatusCell } from '@/components/group-monitoring/ReportingStockStatusCell';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountGroupLinkRow } from '@/lib/accountGroupLinks';
 
@@ -36,6 +37,7 @@ export function ReportingDailyTable({ rows, pageOffset = 0 }: ReportingDailyTabl
             {t('groupMonitoring.reporting.colIsAdmin')}
           </th>
           <th className="join-report-table__col-link">{t('groupMonitoring.reporting.colGroupLink')}</th>
+          <th>{t('groupMonitoring.reporting.colStatus')}</th>
         </tr>
       }
     >
@@ -68,6 +70,9 @@ export function ReportingDailyTable({ rows, pageOffset = 0 }: ReportingDailyTabl
             ) : (
               <span className="text-text-muted">—</span>
             )}
+          </td>
+          <td>
+            <ReportingStockStatusCell status={row.stockStatus ?? 'other'} />
           </td>
         </tr>
       ))}

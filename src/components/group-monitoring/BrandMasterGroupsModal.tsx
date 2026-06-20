@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
-import { BrandImage } from '@/components/brand/BrandImage';
+import { PlatformGroupsCountBadge } from '@/components/group-monitoring/PlatformGroupsCountBadge';
 import {
   GROUP_LINKS_PAGE_SIZE,
   GROUP_LINKS_VISIBLE_ROWS,
@@ -32,26 +32,15 @@ export function BrandPlatformGroupsBadgeButton({
   count: number;
   onClick: () => void;
 }) {
-  const { t } = useLanguage();
-  const asset = platform === 'whatsapp' ? 'whatsapp' : 'telegram';
-  const label =
-    platform === 'whatsapp'
-      ? t('groupMonitoring.accountCard.platformGroupsBadgeWa', { count })
-      : t('groupMonitoring.accountCard.platformGroupsBadgeTg', { count });
-
   return (
-    <button
-      type="button"
-      className="brand-card-badge brand-card-badge--neutral brand-card-badge--split brand-card-badge--clickable"
+    <PlatformGroupsCountBadge
+      platform={platform}
+      count={count}
       onClick={(event) => {
         event.stopPropagation();
         onClick();
       }}
-      aria-label={label}
-    >
-      <BrandImage asset={asset} alt="" className="mr-1 inline h-3 w-3 opacity-80" aria-hidden />
-      {label}
-    </button>
+    />
   );
 }
 

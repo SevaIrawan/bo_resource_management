@@ -33,6 +33,7 @@ import {
   type ReportingAccountRef,
 } from '@/lib/loadJoinGroupReport';
 import { filterReportingRowsByGroupName } from '@/lib/filterReportingGroupName';
+import { filterReportingRowsByStockStatus } from '@/lib/filterReportingStockStatus';
 import {
   filterReportingMatrixRows,
   type ReportingMatrixColumnFilter,
@@ -108,7 +109,11 @@ export function ReportingMonitoringPanel() {
         setDailyRows(rows);
         setMatrixRows([]);
       } else {
-        const rows = await loadAccountDailyReport(filters.accountId);
+        const rows = await loadAccountDailyReport(
+          filters.accountId,
+          filters.brandName,
+          filters.platform,
+        );
         setDailyRows(rows);
         setMatrixRows([]);
       }
@@ -140,6 +145,7 @@ export function ReportingMonitoringPanel() {
     filters.accountId,
     filters.bookmark,
     filters.groupNameSearch,
+    filters.stockStatus,
     reloadTick,
     matrixColumnFilter,
   ]);
@@ -153,19 +159,29 @@ export function ReportingMonitoringPanel() {
     [matrixRows, filters.groupNameSearch],
   );
 
+  const statusFilteredMatrixRows = useMemo(
+    () => filterReportingRowsByStockStatus(searchedMatrixRows, filters.stockStatus),
+    [filters.stockStatus, searchedMatrixRows],
+  );
+
   const searchedDailyRows = useMemo(
     () => filterReportingRowsByGroupName(dailyRows, filters.groupNameSearch),
     [dailyRows, filters.groupNameSearch],
   );
 
+  const statusFilteredDailyRows = useMemo(
+    () => filterReportingRowsByStockStatus(searchedDailyRows, filters.stockStatus),
+    [filters.stockStatus, searchedDailyRows],
+  );
+
   const filteredMatrixRows = useMemo(
     () =>
       filterReportingMatrixRows(
-        searchedMatrixRows,
+        statusFilteredMatrixRows,
         matrixColumnFilter,
         isAdminBookmark ? 'admin' : 'join',
       ),
-    [isAdminBookmark, matrixColumnFilter, searchedMatrixRows],
+    [isAdminBookmark, matrixColumnFilter, statusFilteredMatrixRows],
   );
 
   const matrixPage = sliceReportingPage(filteredMatrixRows, page);
@@ -174,7 +190,7 @@ export function ReportingMonitoringPanel() {
     setFilters((prev) => normalizeReportingFilters(groups, { ...prev, ...patch }));
   };
 
-  const dailyPage = sliceReportingPage(searchedDailyRows, page);
+  const dailyPage = sliceReportingPage(statusFilteredDailyRows, page);
 
   const exportMeta = useMemo((): ReportingExportMeta => {
     const accountDisplayName =
@@ -212,11 +228,11 @@ export function ReportingMonitoringPanel() {
     if (searchedDailyRows.length === 0) return;
 
     if (isAdminBookmark) {
-      exportReportingAdminDailyExcel({ meta: exportMeta, rows: searchedDailyRows });
+      exportReportingAdminDailyExcel({ meta: exportMeta, rows: statusFilteredDailyRows });
       return;
     }
 
-    exportReportingDailyExcel({ meta: exportMeta, rows: searchedDailyRows });
+    exportReportingDailyExcel({ meta: exportMeta, rows: statusFilteredDailyRows });
   };
 
   const showMatrixFooter =
@@ -273,6 +289,8 @@ export function ReportingMonitoringPanel() {
                   onColumnFilterChange={setMatrixColumnFilter}
                   groupNameSearch={filters.groupNameSearch}
                   onClearGroupNameSearch={() => patchFilters({ groupNameSearch: '' })}
+                  stockStatusFilter={filters.stockStatus}
+                  onClearStockStatusFilter={() => patchFilters({ stockStatus: 'all' })}
                 />
                 {showMatrixFooter ? (
                   <ReportingCardFooter
@@ -290,6 +308,21 @@ export function ReportingMonitoringPanel() {
                 ? t('groupMonitoring.reporting.noMasterRows')
                 : t('groupMonitoring.reporting.noDailyRows')}
             </p>
+          ) : statusFilteredDailyRows.length === 0 ? (
+            <div className="reporting-table-panel">
+              <p className="reporting-empty px-5 py-4 text-sm text-text-muted">
+                {t('groupMonitoring.reporting.statusFilterEmpty')}
+              </p>
+              <div className="px-5 pb-4">
+                <button
+                  type="button"
+                  className="join-report-table__filter-empty-btn"
+                  onClick={() => patchFilters({ stockStatus: 'all' })}
+                >
+                  {t('groupMonitoring.reporting.statusFilterClear')}
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="reporting-table-panel">
               {isAdminBookmark ? (
@@ -302,7 +335,7 @@ export function ReportingMonitoringPanel() {
               )}
               {showDailyFooter ? (
                 <ReportingCardFooter
-                  totalRows={searchedDailyRows.length}
+                  totalRows={statusFilteredDailyRows.length}
                   page={page}
                   onPageChange={setPage}
                   onExport={handleExport}

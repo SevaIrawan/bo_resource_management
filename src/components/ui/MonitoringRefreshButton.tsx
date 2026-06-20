@@ -16,7 +16,9 @@ export function MonitoringRefreshButton() {
       ? t('tabs.refreshTicket')
       : tab === 'reporting'
         ? t('tabs.refreshReporting')
-        : t('tabs.refreshAccount');
+        : tab === 'operations'
+          ? t('tabs.refreshOperations')
+          : t('tabs.refreshAccount');
 
   const handleRefresh = useCallback(async () => {
     if (refreshing) return;

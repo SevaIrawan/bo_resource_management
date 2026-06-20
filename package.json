@@ -53,6 +53,8 @@
     "validate:account-slot-lifecycle": "node scripts/validate-account-slot-lifecycle.mjs",
     "validate:ticket-reconcile": "node scripts/validate-ticket-reconcile.mjs",
     "validate:reporting-matrix": "node scripts/validate-reporting-matrix.mjs",
+    "validate:operations-stock": "node scripts/validate-operations-stock.mjs",
+    "validate:worker-platform-settings": "node scripts/validate-worker-platform-settings.mjs",
     "validate:ticket-logic": "node scripts/verify-ticket-logic.mjs",
     "validate:ticket-live": "node scripts/validate-ticket-live.mjs",
     "validate:ticket-live:sbmy": "node scripts/validate-ticket-live.mjs --brand SBMY",

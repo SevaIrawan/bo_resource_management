@@ -102,7 +102,7 @@ Routing: `src/App.tsx` (HashRouter)
 | Path | Halaman | Akses | Sumber |
 |------|---------|-------|--------|
 | `/login` | Login app (`loginWithCredentials` → tabel `users`) | Guest | `src/lib/auth.ts`, `src/App.tsx` |
-| `/` | Group Monitoring — tab Account + Ticket + **Reporting** | Login required | `GroupMonitoringPage.tsx` |
+| `/` | Group Monitoring — tab Account + Operations + Ticket + **Reporting** | Login required | `GroupMonitoringPage.tsx` |
 | `/admin` | Admin settings | `AdminRoute` — username `admin` | `AdminRoute.tsx` |
 | `/settings` | Redirect → `/admin` jika admin, else `/` | Login required | `SettingsRedirect.tsx` |
 
@@ -111,6 +111,7 @@ Routing: `src/App.tsx` (HashRouter)
 **Group Monitoring** — `GroupMonitoringPage.tsx` + `useMonitoringTab()`:
 
 - **Account** — brand card, grid akun, sync/scrape
+- **Operations** — stock opname per brand+platform (`OperationsMonitoringPanel.tsx`); klasifikasi bucket dari `groups_master` — lihat [`OPERATIONS-STOCK-ENGINE.md`](./OPERATIONS-STOCK-ENGINE.md)
 - **Ticket** — issue per akun (missing group, not admin, duplicate, dll.)
 - **Reporting** — matrix join/admin read-only per brand+platform (`ReportingMonitoringPanel.tsx`)
 
@@ -720,6 +721,9 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | `ScrapeCancelConfirmModal.tsx` | Konfirmasi cancel scrape |
 | `ReportingMonitoringPanel.tsx` | Tab Reporting — slicer + reload |
 | `ReportingJoinMatrixTable.tsx` | Matrix join/admin + filter kolom |
+| `OperationsMonitoringPanel.tsx` | Tab Operations — stock chip + Avg ND |
+| `classifyGroupStock.ts` | Decision table stock bucket |
+| `loadOperationsStockCounts.ts` | Load + agregat stock dari master |
 | `loadJoinGroupReport.ts` | Fetch matrix/daily reporting |
 | `masterDailyLoadCache.ts` | Cache warm load awal; **invalidate** setelah scrape |
 | `accountSessionResolve.ts` | Resolve UUID akun per baris grid |
@@ -768,6 +772,7 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | File | Peran |
 |------|-------|
 | `logic_sync_scraper.txt` | Spec produk singkat |
+| `docs/OPERATIONS-STOCK-ENGINE.md` | Kontrak klasifikasi stock Operations |
 | `docs/HANDBOOK.md` | Panduan operator |
 | `docs/PROJECT-MASTER-REFERENCE.md` | **Dokumen ini** |
 
@@ -796,6 +801,7 @@ Jalankan sebelum release: `npm run validate:pre-release`
 | `validate:ticket-reconcile` | Reconcile ticket + forceFresh + reporting reload |
 | `validate:ticket-logic` | Engine ticket |
 | `validate-reporting-matrix.mjs` | Tab Reporting matrix + filter back |
+| `validate:operations-stock` | Decision table stock + wire Operations UI |
 | `validate:device-group-scale` | Skala 3000 grup |
 | `validate:post-login-sync` | Sync setelah login |
 | `validate:desktop` | Gabungan validator desktop |

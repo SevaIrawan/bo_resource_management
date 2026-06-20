@@ -5,8 +5,10 @@ import { dedupeMasterRowsByGroupId } from '@/lib/accountMasterDailyCompare';
 import { fetchAccountDailyGroupLinks, type AccountGroupLinkRow } from '@/lib/accountGroupLinks';
 import { dedupeDailyRowsByGroupIdKeepLatest } from '@/lib/dedupeScrapeDaily';
 import { buildDailyGroupIdSet, isMasterGroupIdInDaily } from '@/lib/masterDailyMatch';
+import { computeReportingStockStatus } from '@/lib/reportingStockStatus';
 import { TABLES } from '@/config/tables';
 import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
+import type { GroupStockBucket } from '@/types/groupStock';
 import type { Platform } from '@/types/database';
 
 export type ReportingAccountRef = {
@@ -18,6 +20,7 @@ export type JoinGroupMatrixRow = {
   groupName: string;
   groupId: string;
   inviteLink: string | null;
+  stockStatus: GroupStockBucket;
   /** accountId → joined (Yes) */
   joinByAccountId: Record<string, boolean>;
   /** accountId → is admin (Yes) — hanya meaningful jika sudah join */
@@ -37,7 +40,8 @@ export async function loadJoinGroupMatrix(input: {
       group_id: string;
       group_name: string | null;
       invite_link: string | null;
-    }>(TABLES.groupsMaster, 'group_id, group_name, invite_link', [
+      member_non_admin: number;
+    }>(TABLES.groupsMaster, 'group_id, group_name, invite_link, member_non_admin', [
       { column: 'brand', value: brand },
       { column: 'platform', value: input.platform },
     ]),
@@ -77,10 +81,13 @@ export async function loadJoinGroupMatrix(input: {
       const dailyRow = dailyMap.get(gid);
       adminByAccountId[acc.id] = joined && dailyRow?.is_admin === 'yes';
     }
+    const groupName = String(m.group_name ?? '').trim() || 'Group';
+    const memberNonAdmin = Math.max(0, Number(m.member_non_admin) || 0);
     rows.push({
-      groupName: String(m.group_name ?? '').trim() || 'Group',
+      groupName,
       groupId: gid,
       inviteLink: m.invite_link?.trim() || null,
+      stockStatus: computeReportingStockStatus(groupName, memberNonAdmin, brand),
       joinByAccountId,
       adminByAccountId,
     });
@@ -90,6 +97,39 @@ export async function loadJoinGroupMatrix(input: {
   return rows;
 }
 
-export async function loadAccountDailyReport(accountId: string): Promise<AccountGroupLinkRow[]> {
-  return fetchAccountDailyGroupLinks(accountId);
+export async function loadAccountDailyReport(
+  accountId: string,
+  brandName: string,
+  platform: Platform,
+): Promise<AccountGroupLinkRow[]> {
+  const rows = await fetchAccountDailyGroupLinks(accountId);
+  if (rows.length === 0) return rows;
+
+  const brand = brandName.trim();
+  const masterRows = dedupeMasterRowsByGroupId(
+    await fetchAllSupabaseRows<{
+      group_id: string;
+      member_non_admin: number;
+    }>(TABLES.groupsMaster, 'group_id, member_non_admin', [
+      { column: 'brand', value: brand },
+      { column: 'platform', value: platform },
+    ]),
+  );
+  const memberNonAdminByGroupId = new Map(
+    masterRows.map((row) => [
+      String(row.group_id ?? '').trim(),
+      Math.max(0, Number(row.member_non_admin) || 0),
+    ]),
+  );
+
+  return rows.map((row) => {
+    const fromMaster = memberNonAdminByGroupId.get(row.groupId);
+    const memberNonAdmin =
+      fromMaster ?? Math.max(0, row.memberCount - row.adminCount);
+    return {
+      ...row,
+      memberNonAdmin,
+      stockStatus: computeReportingStockStatus(row.groupName, memberNonAdmin, brand),
+    };
+  });
 }

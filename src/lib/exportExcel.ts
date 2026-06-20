@@ -5,6 +5,10 @@ import type { TicketDetailLine } from '@/lib/ticketGroups';
 import { ticketGroupToExportRows } from '@/lib/ticketExportRows';
 import { ticketTypeExportLabel, type TicketSummaryGroup } from '@/lib/ticketGroups';
 import type { JoinGroupMatrixRow, ReportingAccountRef } from '@/lib/loadJoinGroupReport';
+import { formatLastSyncAt } from '@/lib/formatLastSync';
+import type { OperationsStockDetailRow } from '@/lib/loadOperationsStockBucketDetails';
+import { REPORTING_STOCK_EXPORT_LABEL } from '@/lib/reportingStockStatus';
+import type { GroupStockBucket } from '@/types/groupStock';
 import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
@@ -95,6 +99,30 @@ export function exportBrandMasterGroupsExcel(input: {
   saveWorkbook(workbook, rmExportFileName(`${input.brandName}_master-${plat}`));
 }
 
+/** Operations stock bucket modal — kolom sama dengan UI detail table. */
+export function exportOperationsStockBucketExcel(input: {
+  brandName: string;
+  platform: Platform;
+  bucket: GroupStockBucket;
+  rows: OperationsStockDetailRow[];
+  locale?: string;
+}) {
+  const plat = input.platform === 'whatsapp' ? 'WA' : 'TG';
+  const bucketLabel = REPORTING_STOCK_EXPORT_LABEL[input.bucket];
+  const sheet = XLSX.utils.json_to_sheet(
+    input.rows.map((row) => ({
+      'Group Name': row.groupName,
+      'Group ID': row.groupId || '—',
+      'Non-admin': row.memberNonAdmin,
+      'Invite Link': row.inviteLink ?? '',
+      'Last sync': formatLastSyncAt(row.lastSync, input.locale),
+    })),
+  );
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, bucketLabel);
+  saveWorkbook(workbook, rmExportFileName(`${input.brandName}_${bucketLabel}-${plat}_stock`));
+}
+
 export function exportAllAccountsExcel(groups: AccountBrandGroup[]) {
   const rows = groups.flatMap((group) => group.accounts);
   const sheet = XLSX.utils.json_to_sheet(accountRowsForExport(rows));
@@ -157,6 +185,7 @@ export function exportReportingDailyExcel(input: {
       'Admin Count': row.adminCount,
       'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
       'Group Link': row.inviteLink ?? '',
+      Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'other'],
     })),
   );
   const workbook = XLSX.utils.book_new();
@@ -175,6 +204,7 @@ export function exportReportingAdminDailyExcel(input: {
       'Group Name': row.groupName,
       'Group ID': row.groupId,
       'Group Link': row.inviteLink ?? '',
+      Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'other'],
       'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
     })),
   );
@@ -197,6 +227,7 @@ export function exportReportingMatrixExcel(input: {
         'Group Name': row.groupName,
         'Group ID': row.groupId,
         'Group Link': row.inviteLink ?? '',
+        Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'other'],
       };
       for (const acc of input.accounts) {
         const active =

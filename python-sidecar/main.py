@@ -27,6 +27,7 @@ from telegram_scraper import (
     scrape_telegram_groups,
     validate_telegram_session,
 )
+from telegram_automation import run_create_group, run_join_by_invite_link, run_set_admin
 
 def _load_env() -> None:
     env_file = os.environ.get("RM_ENV_FILE", "").strip()
@@ -85,9 +86,47 @@ class ScrapeBody(BaseModel):
     sessionString: str | None = None
     expectedPhone: str | None = None
 
+class AutomationDelayBody(BaseModel):
+    between_targets_sec: float | None = None
+    after_create_sec: float | None = None
+    flood_wait_extra_sec: float | None = None
+    max_floodwait_auto_sleep_sec: int | None = None
+    invite_export_retries: int | None = None
+    invite_export_retry_sec: float | None = None
+    jitter_percent: float | None = None
+
+class CreateGroupBody(BaseModel):
+    groupName: str = Field(min_length=1)
+    description: str = ""
+    hideChatHistory: bool = False
+    sessionString: str | None = None
+    expectedPhone: str | None = None
+    delay: AutomationDelayBody | None = None
+
+class SetAdminBody(BaseModel):
+    targets: list[str] = Field(min_length=1)
+    groupId: str | None = None
+    groupLink: str | None = None
+    adminRights: dict | None = None
+    sessionString: str | None = None
+    expectedPhone: str | None = None
+    delay: AutomationDelayBody | None = None
+
+class JoinInviteBody(BaseModel):
+    inviteLink: str = Field(min_length=8)
+    sessionString: str | None = None
+    expectedPhone: str | None = None
+    delay: AutomationDelayBody | None = None
+
+def _delay_dict(body: AutomationDelayBody | None) -> dict | None:
+    if body is None:
+        return None
+    raw = body.model_dump(exclude_none=True)
+    return raw or None
+
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "version": 3, "features": ["login", "scrape", "count", "validate"]}
+    return {"ok": True, "version": 3, "features": ["login", "scrape", "count", "validate", "automation"]}
 
 @app.post("/telegram/login/qr/start")
 async def telegram_qr_start(body: SessionBody) -> dict:
@@ -157,6 +196,41 @@ async def telegram_export_session(session_id: str) -> dict:
 @app.post("/telegram/session/restore")
 async def telegram_restore_session(body: RestoreBody) -> dict:
     return await restore_telegram_session(body.sessionId, body.sessionString)
+
+@app.post("/telegram/automation/create-group/{session_id}")
+async def telegram_automation_create_group(session_id: str, body: CreateGroupBody) -> dict:
+    return await run_create_group(
+        session_id,
+        group_name=body.groupName,
+        description=body.description,
+        hide_chat_history=body.hideChatHistory,
+        session_string=body.sessionString,
+        expected_phone=body.expectedPhone,
+        delay=_delay_dict(body.delay),
+    )
+
+@app.post("/telegram/automation/set-admin/{session_id}")
+async def telegram_automation_set_admin(session_id: str, body: SetAdminBody) -> dict:
+    return await run_set_admin(
+        session_id,
+        targets=body.targets,
+        group_id=body.groupId,
+        group_link=body.groupLink,
+        admin_rights=body.adminRights,
+        session_string=body.sessionString,
+        expected_phone=body.expectedPhone,
+        delay=_delay_dict(body.delay),
+    )
+
+@app.post("/telegram/automation/join-invite/{session_id}")
+async def telegram_automation_join_invite(session_id: str, body: JoinInviteBody) -> dict:
+    return await run_join_by_invite_link(
+        session_id,
+        invite_link=body.inviteLink,
+        session_string=body.sessionString,
+        expected_phone=body.expectedPhone,
+        delay=_delay_dict(body.delay),
+    )
 
 # Backward-compatible alias
 @app.post("/telegram/login/start")

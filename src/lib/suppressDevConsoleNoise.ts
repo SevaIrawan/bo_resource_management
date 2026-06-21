@@ -1,12 +1,17 @@
 const DEVTOOLS_BANNER = 'Download the React DevTools';
 const ELECTRON_SECURITY_WARNING = 'Electron Security Warning';
+const SUPABASE_LOCKMANAGER_NOISE = 'Navigator LockManager returned a null lock';
 
 function shouldSuppress(args: unknown[]): boolean {
   const text = args
     .map((arg) => (typeof arg === 'string' ? arg : ''))
     .join(' ');
 
-  return text.includes(DEVTOOLS_BANNER) || text.includes(ELECTRON_SECURITY_WARNING);
+  return (
+    text.includes(DEVTOOLS_BANNER) ||
+    text.includes(ELECTRON_SECURITY_WARNING) ||
+    text.includes(SUPABASE_LOCKMANAGER_NOISE)
+  );
 }
 
 function patchConsole(level: 'info' | 'warn' | 'error') {

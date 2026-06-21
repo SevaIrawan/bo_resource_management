@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { supabaseInProcessAuthLock } from '@/lib/supabaseAuthLock';
 
 let client: SupabaseClient | null = null;
 let url = import.meta.env.VITE_SUPABASE_URL?.trim() ?? '';
@@ -16,7 +17,12 @@ function applyConfig(nextUrl: string, nextKey: string) {
   client =
     url && anonKey
       ? createClient(url, anonKey, {
-          auth: { persistSession: true, autoRefreshToken: true },
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            lock: supabaseInProcessAuthLock,
+            lockAcquireTimeout: 5000,
+          },
         })
       : null;
 }

@@ -23,6 +23,10 @@ import {
   toTelegramAdminRightsPayload,
 } from '@/config/workerPlatformSettings';
 import { useLanguage } from '@/hooks/useLanguage';
+import {
+  enqueueErrorResult,
+  isEnqueueErrorResult,
+} from '@/lib/operationsJobQueueEnqueueResult';
 import type { JobQueueTaskType } from '@/lib/operationsJobQueueUi';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { MissingMasterGroupForJoin } from '@/lib/loadMissingMasterGroupsForJoin';
@@ -47,6 +51,12 @@ function mapEnqueueError(error: string, t: (key: string) => string): string {
   if (error === 'JOB_ALREADY_RUNNING_FOR_ACCOUNT') return t('operations.jobQueue.accountBusy');
   if (error === 'JOB_ALREADY_QUEUED_FOR_ACCOUNT') return t('operations.jobQueue.oneJobPerAccount');
   return t('operations.jobQueue.enqueueFailed');
+}
+
+function returnEnqueueError(error: string, t: (key: string) => string, setFeedback: (msg: string) => void): string {
+  const message = mapEnqueueError(error, t);
+  setFeedback(message);
+  return enqueueErrorResult(message);
 }
 
 export function OperationsJobQueueAddBar({
@@ -300,8 +310,7 @@ export function OperationsJobQueueAddBar({
             delay: ctx.delay,
           });
           if (!result.ok) {
-            setFeedback(mapEnqueueError(result.error, t));
-            return null;
+            return returnEnqueueError(result.error, t, setFeedback);
           }
           queued += 1;
           lastGroupName = group.groupName;
@@ -363,8 +372,7 @@ export function OperationsJobQueueAddBar({
         });
 
         if (!result.ok) {
-          setFeedback(mapEnqueueError(result.error, t));
-          return null;
+          return returnEnqueueError(result.error, t, setFeedback);
         }
         queued += 1;
       }
@@ -419,8 +427,7 @@ export function OperationsJobQueueAddBar({
           delay: ctx.delay,
         });
         if (!result.ok) {
-          setFeedback(mapEnqueueError(result.error, t));
-          return null;
+          return returnEnqueueError(result.error, t, setFeedback);
         }
         queued += 1;
       }
@@ -599,17 +606,17 @@ export function OperationsJobQueueAddBar({
         saving={submitting}
         onSaveJoin={async (groupIds) => {
           const message = await saveJoinBatch(groupIds);
-          if (message) handleSetupSaved(message);
+          if (message && !isEnqueueErrorResult(message)) handleSetupSaved(message);
           return message;
         }}
         onSaveCreate={async (draft) => {
           const message = await saveCreateBatch(draft);
-          if (message) handleSetupSaved(message);
+          if (message && !isEnqueueErrorResult(message)) handleSetupSaved(message);
           return message;
         }}
         onSaveSetAdmin={async (draft) => {
           const message = await saveSetAdminBatch(draft);
-          if (message) handleSetupSaved(message);
+          if (message && !isEnqueueErrorResult(message)) handleSetupSaved(message);
           return message;
         }}
       />

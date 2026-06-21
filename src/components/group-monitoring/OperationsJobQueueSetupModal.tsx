@@ -7,9 +7,16 @@ import {
   readWhatsAppWorkerSettings,
 } from '@/config/workerPlatformSettings';
 import { useLanguage } from '@/hooks/useLanguage';
+import {
+  isEnqueueErrorResult,
+  parseEnqueueErrorResult,
+} from '@/lib/operationsJobQueueEnqueueResult';
 import type { JobQueueTaskType } from '@/lib/operationsJobQueueUi';
 import type { MissingMasterGroupForJoin } from '@/lib/loadMissingMasterGroupsForJoin';
-import type { SuperAdminGroupForSetAdmin } from '@/lib/loadSuperAdminGroupsForSetAdmin';
+import {
+  filterSetAdminGroupsForTargets,
+  type SuperAdminGroupForSetAdmin,
+} from '@/lib/loadSuperAdminGroupsForSetAdmin';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
@@ -62,6 +69,7 @@ export function OperationsJobQueueSetupModal({
   superAdminAccount,
   targetAccountCandidates,
   joinableGroups,
+  joinGroupAccountIds,
   loadingJoinGroups,
   superAdminGroups,
   loadingSuperAdminGroups,
@@ -83,6 +91,10 @@ export function OperationsJobQueueSetupModal({
   const [selectedSetAdminTargetAccountIds, setSelectedSetAdminTargetAccountIds] = useState<
     string[]
   >([]);
+  const [eligibleSetAdminGroups, setEligibleSetAdminGroups] = useState<SuperAdminGroupForSetAdmin[]>(
+    [],
+  );
+  const [filteringSetAdminGroups, setFilteringSetAdminGroups] = useState(false);
 
   const workerSettings =
     platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
@@ -101,12 +113,24 @@ export function OperationsJobQueueSetupModal({
     [targetAccountCandidates],
   );
 
+  const visibleJoinGroups = useMemo(() => {
+    const accountIds = new Set(selectedAccounts.map((row) => row.id));
+    if (accountIds.size === 0) return [];
+    return joinableGroups.filter((group) => {
+      const eligible = joinGroupAccountIds[group.groupId] ?? [];
+      return eligible.some((id) => accountIds.has(id));
+    });
+  }, [joinGroupAccountIds, joinableGroups, selectedAccounts]);
+
   const allJoinGroupsSelected =
-    joinableGroups.length > 0 && joinableGroups.every((group) => selectedJoinGroupIds.has(group.groupId));
+    visibleJoinGroups.length > 0 &&
+    visibleJoinGroups.every((group) => selectedJoinGroupIds.has(group.groupId));
 
   const allSetAdminGroupsSelected =
-    superAdminGroups.length > 0 &&
-    superAdminGroups.every((group) => selectedSetAdminGroupIds.has(group.groupId));
+    eligibleSetAdminGroups.length > 0 &&
+    eligibleSetAdminGroups.every((group) => selectedSetAdminGroupIds.has(group.groupId));
+
+  const loadingSetAdminGroupList = loadingSuperAdminGroups || filteringSetAdminGroups;
 
   useEffect(() => {
     if (!open) return;
@@ -118,7 +142,51 @@ export function OperationsJobQueueSetupModal({
     setCreateStartFrom('1');
     setSelectedSetAdminGroupIds(new Set());
     setSelectedSetAdminTargetAccountIds([]);
+    setEligibleSetAdminGroups([]);
   }, [open, taskType, activeBrand]);
+
+  useEffect(() => {
+    if (!open || taskType !== 'set_admin') return;
+
+    if (selectedSetAdminTargetAccountIds.length === 0) {
+      setEligibleSetAdminGroups([]);
+      setFilteringSetAdminGroups(false);
+      return;
+    }
+
+    let cancelled = false;
+    setFilteringSetAdminGroups(true);
+
+    void filterSetAdminGroupsForTargets({
+      ownerGroups: superAdminGroups,
+      targetAccountIds: selectedSetAdminTargetAccountIds,
+      brandName: activeBrand,
+      platform,
+    })
+      .then((rows) => {
+        if (cancelled) return;
+        setEligibleSetAdminGroups(rows);
+        setSelectedSetAdminGroupIds((prev) => {
+          const allowed = new Set(rows.map((row) => row.groupId));
+          const next = new Set([...prev].filter((id) => allowed.has(id)));
+          return next.size === prev.size ? prev : next;
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setFilteringSetAdminGroups(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeBrand,
+    open,
+    platform,
+    selectedSetAdminTargetAccountIds,
+    superAdminGroups,
+    taskType,
+  ]);
 
   useEffect(() => {
     if (!open) return;
@@ -145,7 +213,7 @@ export function OperationsJobQueueSetupModal({
       setSelectedJoinGroupIds(new Set());
       return;
     }
-    setSelectedJoinGroupIds(new Set(joinableGroups.map((group) => group.groupId)));
+    setSelectedJoinGroupIds(new Set(visibleJoinGroups.map((group) => group.groupId)));
   }
 
   function toggleSetAdminGroup(groupId: string) {
@@ -162,7 +230,7 @@ export function OperationsJobQueueSetupModal({
       setSelectedSetAdminGroupIds(new Set());
       return;
     }
-    setSelectedSetAdminGroupIds(new Set(superAdminGroups.map((group) => group.groupId)));
+    setSelectedSetAdminGroupIds(new Set(eligibleSetAdminGroups.map((group) => group.groupId)));
   }
 
   async function handleSave() {
@@ -201,11 +269,15 @@ export function OperationsJobQueueSetupModal({
       });
     }
 
-    if (message) {
-      onClose();
-    } else {
+    if (!message) {
       setSaveError(t('operations.jobQueue.enqueueFailed'));
+      return;
     }
+    if (isEnqueueErrorResult(message)) {
+      setSaveError(parseEnqueueErrorResult(message));
+      return;
+    }
+    onClose();
   }
 
   const modalTitle =
@@ -285,7 +357,7 @@ export function OperationsJobQueueSetupModal({
                             type="checkbox"
                             checked={allJoinGroupsSelected}
                             onChange={toggleAllJoinGroups}
-                            disabled={loadingJoinGroups || joinableGroups.length === 0 || saving}
+                            disabled={loadingJoinGroups || visibleJoinGroups.length === 0 || saving}
                           />
                           <span>{t('operations.jobQueue.selectAll')}</span>
                         </label>
@@ -301,14 +373,14 @@ export function OperationsJobQueueSetupModal({
                           {t('operations.jobQueue.loadingMissing')}
                         </td>
                       </tr>
-                    ) : joinableGroups.length === 0 ? (
+                    ) : visibleJoinGroups.length === 0 ? (
                       <tr>
                         <td colSpan={2} className="operations-job-queue-empty">
                           {t('operations.jobQueue.noMissingGroups')}
                         </td>
                       </tr>
                     ) : (
-                      joinableGroups.map((group) => (
+                      visibleJoinGroups.map((group) => (
                         <tr key={group.groupId}>
                           <td className="operations-job-queue-select-col">
                             <input
@@ -400,7 +472,10 @@ export function OperationsJobQueueSetupModal({
                 ) : (
                   <DarkMultiSelect
                     values={selectedSetAdminTargetAccountIds}
-                    onChange={setSelectedSetAdminTargetAccountIds}
+                    onChange={(values) => {
+                      setSelectedSetAdminTargetAccountIds(values);
+                      setSelectedSetAdminGroupIds(new Set());
+                    }}
                     options={setAdminTargetOptions}
                     disabledValues={setAdminTargetDisabledIds}
                     ariaLabel={t('operations.jobQueue.setAdminTargetAccounts')}
@@ -424,7 +499,10 @@ export function OperationsJobQueueSetupModal({
                             checked={allSetAdminGroupsSelected}
                             onChange={toggleAllSetAdminGroups}
                             disabled={
-                              loadingSuperAdminGroups || superAdminGroups.length === 0 || saving
+                              loadingSetAdminGroupList ||
+                              eligibleSetAdminGroups.length === 0 ||
+                              saving ||
+                              selectedSetAdminTargetAccountIds.length === 0
                             }
                           />
                           <span>{t('operations.jobQueue.selectAll')}</span>
@@ -434,21 +512,27 @@ export function OperationsJobQueueSetupModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {loadingSuperAdminGroups ? (
+                    {loadingSetAdminGroupList ? (
                       <tr>
                         <td colSpan={2} className="operations-job-queue-empty">
                           <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
                           {t('operations.jobQueue.loadingMissing')}
                         </td>
                       </tr>
-                    ) : superAdminGroups.length === 0 ? (
+                    ) : selectedSetAdminTargetAccountIds.length === 0 ? (
                       <tr>
                         <td colSpan={2} className="operations-job-queue-empty">
-                          {t('operations.jobQueue.setAdminNoAdminGroups')}
+                          {t('operations.jobQueue.setAdminSelectTargetFirst')}
+                        </td>
+                      </tr>
+                    ) : eligibleSetAdminGroups.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="operations-job-queue-empty">
+                          {t('operations.jobQueue.setAdminAllTargetsAlreadyAdmin')}
                         </td>
                       </tr>
                     ) : (
-                      superAdminGroups.map((group) => (
+                      eligibleSetAdminGroups.map((group) => (
                         <tr key={group.groupId}>
                           <td className="operations-job-queue-select-col">
                             <input

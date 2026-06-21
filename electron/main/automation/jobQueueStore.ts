@@ -130,12 +130,6 @@ export function setRunnerPaused(paused: boolean): AutomationJobRunnerState {
 
 export function enqueueAutomationJob(input: AutomationJobEnqueueInput): AutomationJobRecord {
   ensureLoaded();
-  const runningForAccount = jobs.some(
-    (job) => job.accountId === input.accountId && job.status === 'running',
-  );
-  if (runningForAccount) {
-    throw new Error('JOB_ALREADY_RUNNING_FOR_ACCOUNT');
-  }
 
   const targetGroupId = input.payload.groupId?.trim();
   if (targetGroupId) {

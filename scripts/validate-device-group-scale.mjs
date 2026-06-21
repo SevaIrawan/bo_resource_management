@@ -52,8 +52,10 @@ const checks = [
     ok: waCount.includes('runPooled') && waCount.includes('countWhatsAppGroupsQuick'),
   },
   {
-    name: 'WA scrape paralel (bukan sequential 2000x)',
-    ok: waScrape.includes('runPooled') && waScrape.includes('DEVICE_GROUP_TARGET_MAX'),
+    name: 'WA scrape getChats sequential per group',
+    ok:
+      waScrape.includes('scrapeAllWhatsAppGroups') &&
+      read('electron/main/scraper/whatsappScrapeGroups.ts').includes('getChats'),
   },
   {
     name: 'Telegram count quick (iter_dialogs tanpa full scrape)',

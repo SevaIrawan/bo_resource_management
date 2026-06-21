@@ -1,5 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import { AccountBrandCard } from '@/components/group-monitoring/AccountBrandCard';
+import type { EditAccountFormValues } from '@/components/group-monitoring/EditAccountModal';
 import { AddBrandCard } from '@/components/group-monitoring/AddBrandCard';
 import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
 import { RemoveBrandModal } from '@/components/group-monitoring/RemoveBrandModal';
@@ -7,7 +8,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
-import { addAccountToGroup, createEmptyBrandGroup } from '@/lib/accountBrandUtils';
+import { addAccountToGroup, createEmptyBrandGroup, patchAccountDetailsInGroups } from '@/lib/accountBrandUtils';
+import { commitAccountDetailsEdit } from '@/lib/commitAccountDetailsEdit';
 import { ensureBrand, removeBrandCompletely } from '@/lib/brands';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { createMessagingAccount } from '@/lib/messagingAccounts';
@@ -84,6 +86,7 @@ export function AccountBrandCardList({
         platform: input.platform,
         label: input.accountName,
         phoneNumber: input.phoneNumber,
+        locationDevice: input.locationDevice,
         brand: group.brandName,
         brandId: group.dbBrandId,
       });
@@ -93,6 +96,25 @@ export function AccountBrandCardList({
       prev.map((item) =>
         item.id === group.id ? addAccountToGroup(item, { ...input, dbAccountId }) : item,
       ),
+    );
+  }
+
+  async function handleEditAccount(
+    group: AccountBrandGroup,
+    account: AccountBrandRow,
+    values: EditAccountFormValues,
+  ) {
+    if (!canManageStructure) return;
+
+    const normalized = await commitAccountDetailsEdit({
+      userId: user?.id,
+      brandName: group.brandName,
+      account,
+      values,
+    });
+
+    onGroupsChange((prev) =>
+      patchAccountDetailsInGroups(prev, group.id, account.id, normalized),
     );
   }
 
@@ -147,6 +169,7 @@ export function AccountBrandCardList({
             key={group.id}
             group={group}
             onAddAccount={(input) => handleAddAccount(group, input)}
+            onEditAccount={(account, values) => handleEditAccount(group, account, values)}
             canManageStructure={canManageStructure}
             canOperatePlatform={canOperatePlatform}
             onSyncAccount={(accountId) => {

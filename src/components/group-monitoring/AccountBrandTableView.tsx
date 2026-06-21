@@ -1,10 +1,18 @@
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { AccountTableRow } from '@/components/group-monitoring/AccountMonitoringCells';
+import {
+  EditAccountModal,
+  type EditAccountFormValues,
+} from '@/components/group-monitoring/EditAccountModal';
 import {
   ACCOUNT_TABLE_COLUMN_COUNT,
   AccountMonitoringTableColGroup,
   AccountMonitoringTableHead,
 } from '@/components/group-monitoring/AccountMonitoringTableParts';
-import { flattenBrandAccounts } from '@/lib/accountBrandUtils';
+import { flattenBrandAccounts, patchAccountDetailsInGroups } from '@/lib/accountBrandUtils';
+import { commitAccountDetailsEdit } from '@/lib/commitAccountDetailsEdit';
+import { resolveMessagingAccountSaveErrorCode } from '@/lib/messagingAccounts';
+import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
@@ -14,13 +22,26 @@ type SyncFlow = ReturnType<typeof useAccountSyncFlow>;
 
 interface AccountBrandTableViewProps {
   groups: AccountBrandGroup[];
+  onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   sync: SyncFlow;
   onRemoveFromSlot: (groupId: string, account: AccountBrandRow) => void;
 }
 
-export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: AccountBrandTableViewProps) {
+export function AccountBrandTableView({
+  groups,
+  onGroupsChange,
+  sync,
+  onRemoveFromSlot,
+}: AccountBrandTableViewProps) {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const { canManageStructure, canOperatePlatform } = usePermissions();
+  const [editTarget, setEditTarget] = useState<{
+    groupId: string;
+    account: AccountBrandRow;
+  } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const rows = flattenBrandAccounts(groups);
   const {
     processingAccountId,
@@ -65,6 +86,56 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
     onRemoveFromSlot(group.id, account);
   }
 
+  function handleEditRow(accountId: string) {
+    if (!canManageStructure) return;
+    const group = groups.find((item) => item.accounts.some((row) => row.id === accountId));
+    const account = group?.accounts.find((row) => row.id === accountId);
+    if (!group || !account) return;
+    setEditError(null);
+    setEditTarget({ groupId: group.id, account });
+  }
+
+  function closeEditModal() {
+    if (editSaving) return;
+    setEditTarget(null);
+    setEditError(null);
+  }
+
+  async function handleSaveEdit(values: EditAccountFormValues) {
+    if (!canManageStructure || !editTarget) return;
+
+    const { groupId, account } = editTarget;
+    const group = groups.find((item) => item.id === groupId);
+    if (!group) return;
+
+    setEditSaving(true);
+    setEditError(null);
+
+    try {
+      const normalized = await commitAccountDetailsEdit({
+        userId: user?.id,
+        brandName: group.brandName,
+        account,
+        values,
+      });
+
+      onGroupsChange((prev) => patchAccountDetailsInGroups(prev, groupId, account.id, normalized));
+      setEditTarget(null);
+      setEditError(null);
+    } catch (error) {
+      const code = resolveMessagingAccountSaveErrorCode(error);
+      setEditError(
+        code === 'SUPABASE_NOT_CONFIGURED'
+          ? t('login.supabaseNotConfigured')
+          : code === 'ACCOUNT_LABEL_IN_USE'
+            ? t('groupMonitoring.accountCard.accountLabelInUse')
+            : t('groupMonitoring.accountCard.saveAccountFailed'),
+      );
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   function handleCancelScrapeRow(accountId: string) {
     if (!canOperatePlatform) return;
     const group = groups.find((item) => item.accounts.some((row) => row.id === accountId));
@@ -98,6 +169,7 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
                   }
                   scrapeProgress={getScrapeProgress(row.id)}
                   onRemoveFromSlot={() => handleRemoveRow(row.id)}
+                  onEditAccount={() => handleEditRow(row.id)}
                   onClearSession={() => handleClearSessionRow(row.id)}
                   clearSessionLoading={clearingSessionAccountId === row.id}
                 />
@@ -112,6 +184,16 @@ export function AccountBrandTableView({ groups, sync, onRemoveFromSlot }: Accoun
           </tbody>
         </table>
       </div>
+
+      <EditAccountModal
+        open={editTarget != null}
+        account={editTarget?.account ?? null}
+        brandName={editTarget?.account.brandName ?? ''}
+        saving={editSaving}
+        error={editError}
+        onClose={closeEditModal}
+        onSubmit={(values) => void handleSaveEdit(values)}
+      />
     </div>
   );
 }

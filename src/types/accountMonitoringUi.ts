@@ -40,6 +40,8 @@ export interface AccountBrandRow {
   isMisaligned: boolean;
   /** ISO timestamp — scrape/sync selesai (dari snapshot DB). */
   lastSyncAt?: string | null;
+  /** Lokasi device HP (metadata akun). */
+  locationDevice?: string;
 }
 
 export interface AccountBrandEmptySlot {
@@ -67,6 +69,7 @@ export interface AddAccountInput {
   platform: Platform;
   accountName: string;
   phoneNumber?: string;
+  locationDevice?: string;
   slotId?: string;
   dbAccountId?: string;
 }

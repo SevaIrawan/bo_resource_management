@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RefreshCw, X } from 'lucide-react';
+import { RefreshCw, Pencil, X } from 'lucide-react';
 import { PermissionLockedButton } from '@/components/ui/PermissionLockedButton';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { GroupLinksModal } from '@/components/group-monitoring/GroupLinksModal';
@@ -409,6 +409,42 @@ function AccountSyncIcon({
   );
 }
 
+function AccountEditSlotIcon({
+  onEdit,
+  structureLocked = false,
+}: {
+  onEdit?: () => void;
+  structureLocked?: boolean;
+}) {
+  const { t } = useLanguage();
+
+  if (structureLocked) {
+    return (
+      <PermissionLockedButton
+        className="brand-account-edit-btn permission-locked-btn--edit"
+        title={t('groupMonitoring.accountCard.editAccountAria')}
+      />
+    );
+  }
+
+  if (!onEdit) return null;
+
+  return (
+    <button
+      type="button"
+      className="brand-account-edit-btn"
+      title={t('groupMonitoring.accountCard.editAccountAria')}
+      aria-label={t('groupMonitoring.accountCard.editAccountAria')}
+      onClick={(event) => {
+        event.stopPropagation();
+        onEdit();
+      }}
+    >
+      <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
+    </button>
+  );
+}
+
 function AccountRemoveSlotIcon({
   onRemove,
   structureLocked = false,
@@ -452,6 +488,7 @@ export function AccountTableRow({
   onRunScraper,
   onCancelScrape,
   onRemoveFromSlot,
+  onEditAccount,
   onClearSession,
   canOperatePlatform = true,
   canManageStructure = true,
@@ -466,6 +503,7 @@ export function AccountTableRow({
   onRunScraper?: () => void;
   onCancelScrape?: () => void;
   onRemoveFromSlot?: () => void;
+  onEditAccount?: () => void;
   onClearSession?: () => void;
   canOperatePlatform?: boolean;
   canManageStructure?: boolean;
@@ -485,7 +523,9 @@ export function AccountTableRow({
   const operateLocked = !canOperatePlatform;
   const structureLocked = !canManageStructure;
   const showRemoveHover =
-    (Boolean(onRemoveFromSlot) || structureLocked) && !isPending && !isProcessing;
+    (Boolean(onRemoveFromSlot) || Boolean(onEditAccount) || structureLocked) &&
+    !isPending &&
+    !isProcessing;
   const showClearSessionHover =
     (Boolean(onClearSession) || operateLocked) &&
     !isPending &&
@@ -516,10 +556,16 @@ export function AccountTableRow({
             </div>
             <div className="brand-account-cell-tools">
               {showRemoveHover ? (
-                <AccountRemoveSlotIcon
-                  onRemove={onRemoveFromSlot}
-                  structureLocked={structureLocked}
-                />
+                <>
+                  <AccountEditSlotIcon
+                    onEdit={onEditAccount}
+                    structureLocked={structureLocked}
+                  />
+                  <AccountRemoveSlotIcon
+                    onRemove={onRemoveFromSlot}
+                    structureLocked={structureLocked}
+                  />
+                </>
               ) : null}
               <AccountSyncIcon
                 onSync={onSync}
@@ -531,7 +577,9 @@ export function AccountTableRow({
         </td>
         <td className="brand-col-cell brand-col-cell--brand">
           <div className="brand-col-cell-inner">
-            <span className="truncate text-text-secondary">{row.brandName}</span>
+            <span className="truncate text-text-secondary">
+              {row.locationDevice?.trim() ? row.locationDevice : '—'}
+            </span>
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--status">

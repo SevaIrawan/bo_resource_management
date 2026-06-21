@@ -17,12 +17,16 @@ import {
   AddAccountModal,
   type AddAccountFormValues,
 } from '@/components/group-monitoring/AddAccountModal';
+import {
+  EditAccountModal,
+  type EditAccountFormValues,
+} from '@/components/group-monitoring/EditAccountModal';
 import { AccountEmptySlotRow, AccountTableRow } from '@/components/group-monitoring/AccountMonitoringCells';
 import {
   AccountMonitoringTableColGroup,
   AccountMonitoringTableHead,
 } from '@/components/group-monitoring/AccountMonitoringTableParts';
-import type { AddAccountInput, AccountBrandGroup } from '@/types/accountMonitoringUi';
+import type { AddAccountInput, AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
@@ -31,6 +35,7 @@ interface AccountBrandCardProps {
   canManageStructure?: boolean;
   canOperatePlatform?: boolean;
   onAddAccount: (input: AddAccountInput) => Promise<void>;
+  onEditAccount?: (account: AccountBrandRow, values: EditAccountFormValues) => Promise<void>;
   onSyncAccount?: (accountId: string) => void;
   onClearSession?: (accountId: string) => void;
   onRemoveFromSlot?: (account: import('@/types/accountMonitoringUi').AccountBrandRow) => void;
@@ -49,6 +54,7 @@ export function AccountBrandCard({
   canManageStructure = true,
   canOperatePlatform = true,
   onAddAccount,
+  onEditAccount,
   onSyncAccount,
   onClearSession,
   onRemoveFromSlot,
@@ -66,6 +72,9 @@ export function AccountBrandCard({
   const [addPlatform, setAddPlatform] = useState<Platform | null>(null);
   const [addSlotId, setAddSlotId] = useState<string | undefined>();
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<AccountBrandRow | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [comparePlatform, setComparePlatform] = useState<Platform | null>(null);
@@ -117,6 +126,7 @@ export function AccountBrandCard({
         platform,
         accountName: values.accountName,
         phoneNumber: values.phoneNumber,
+        locationDevice: values.locationDevice,
         slotId: addSlotId,
       });
       setAddModalOpen(false);
@@ -134,6 +144,36 @@ export function AccountBrandCard({
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  function closeEditFlow() {
+    if (editSaving) return;
+    setEditTarget(null);
+    setEditError(null);
+  }
+
+  async function handleSaveEdit(values: EditAccountFormValues) {
+    if (!editTarget || !onEditAccount) return;
+
+    setEditSaving(true);
+    setEditError(null);
+
+    try {
+      await onEditAccount(editTarget, values);
+      setEditTarget(null);
+      setEditError(null);
+    } catch (error) {
+      const code = resolveMessagingAccountSaveErrorCode(error);
+      setEditError(
+        code === 'SUPABASE_NOT_CONFIGURED'
+          ? t('login.supabaseNotConfigured')
+          : code === 'ACCOUNT_LABEL_IN_USE'
+            ? t('groupMonitoring.accountCard.accountLabelInUse')
+            : t('groupMonitoring.accountCard.saveAccountFailed'),
+      );
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -219,6 +259,9 @@ export function AccountBrandCard({
                       onRemoveFromSlot={
                         onRemoveFromSlot ? () => onRemoveFromSlot(row) : undefined
                       }
+                      onEditAccount={
+                        onEditAccount ? () => setEditTarget(row) : undefined
+                      }
                       onClearSession={
                         onClearSession ? () => onClearSession(row.id) : undefined
                       }
@@ -247,6 +290,16 @@ export function AccountBrandCard({
         error={saveError}
         onClose={closeAddFlow}
         onSubmit={handleSaveAccount}
+      />
+
+      <EditAccountModal
+        open={editTarget != null}
+        account={editTarget}
+        brandName={group.brandName}
+        saving={editSaving}
+        error={editError}
+        onClose={closeEditFlow}
+        onSubmit={(values) => void handleSaveEdit(values)}
       />
 
       {comparePlatform ? (

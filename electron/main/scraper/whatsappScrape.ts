@@ -1,23 +1,14 @@
 import pkg from 'whatsapp-web.js';
 import { withWhatsAppClient } from '../platformLogin/whatsapp';
-import type { ScrapedGroupRow } from './index';
-import { isWhatsAppGroupChat } from './whatsappGroupFilter';
 import {
   assertWhatsAppScrapeClient,
-  listWhatsAppGroupIds,
   waitForWhatsAppInboxStable,
   waitForWhatsAppStoreReady,
 } from './whatsappGroupDiscovery';
-import { scrapeWhatsAppGroupFromStore } from './whatsappGroupScrapeStore';
-import { assertWhatsAppScrapeQuality } from './whatsappScrapeQuality';
+import { scrapeAllWhatsAppGroups } from './whatsappScrapeGroups';
+import { assertWhatsAppScrapeHasRows } from './whatsappScrapeQuality';
 import { emitScrapeProgress } from './scrapeProgress';
-import {
-  DEVICE_GROUP_TARGET_MAX,
-  runPooled,
-  scrapeGroupsTimeoutMs,
-  WA_GROUP_PROCESS_CONCURRENCY,
-  withScrapeTimeout,
-} from './deviceGroupScale';
+import { DEVICE_GROUP_TARGET_MAX, scrapeGroupsTimeoutMs, withScrapeTimeout } from './deviceGroupScale';
 import { throwIfScrapeCancelled } from './scrapeCancel';
 
 const { Client } = pkg;
@@ -55,25 +46,12 @@ async function assertWhatsAppLoggedInPhone(
   return loggedInAs;
 }
 
-async function resolveInviteLink(
-  chat: { getInviteCode?: () => Promise<string> },
-): Promise<string | null> {
-  try {
-    if (typeof chat.getInviteCode !== 'function') return null;
-    const code = await chat.getInviteCode();
-    if (!code) return null;
-    return `https://chat.whatsapp.com/${code}`;
-  } catch {
-    return null;
-  }
-}
-
 async function runWhatsAppScrapeInner(
   sessionId: string,
   expectedPhone?: string,
 ): Promise<{
   ok: boolean;
-  groups: ScrapedGroupRow[];
+  groups: import('./index').ScrapedGroupRow[];
   count: number;
   loggedInAs?: string;
   elapsedMs?: number;
@@ -87,7 +65,7 @@ async function runWhatsAppScrapeInner(
       async (client) => {
         assertWhatsAppScrapeClient(client);
 
-        emitScrapeProgress({ sessionId, phase: 'connect', label: 'Opening fresh WhatsApp session…' });
+        emitScrapeProgress({ sessionId, phase: 'connect', label: 'Opening WhatsApp session…' });
 
         const loggedInAs = await assertWhatsAppLoggedInPhone(client, expectedPhone);
         console.info(`[wa-scrape] sessionId=${sessionId} loggedInAs=${loggedInAs}`);
@@ -106,78 +84,31 @@ async function runWhatsAppScrapeInner(
         });
         await waitForWhatsAppStoreReady(client, 120_000);
         await waitForWhatsAppInboxStable(client);
-
-        emitScrapeProgress({ sessionId, phase: 'discover', label: 'Discovering groups on device' });
-        const groupIds = await listWhatsAppGroupIds(client);
-        const total = groupIds.length;
+        throwIfScrapeCancelled(sessionId);
 
         emitScrapeProgress({
           sessionId,
           phase: 'discover',
-          current: total,
-          total,
-          label: `${total} groups on device (${loggedInAs})`,
+          label: 'Loading group list (getChats)…',
         });
 
-        const rows: ScrapedGroupRow[] = [];
-        const scrapeIds = groupIds.slice(0, DEVICE_GROUP_TARGET_MAX);
-
-        if (groupIds.length > DEVICE_GROUP_TARGET_MAX) {
-          console.warn(
-            `[wa-scrape] ${groupIds.length} groups; scraping first ${DEVICE_GROUP_TARGET_MAX}`,
-          );
-        }
-
-        emitScrapeProgress({
+        const { rows, skipped } = await scrapeAllWhatsAppGroups({
+          client,
           sessionId,
-          phase: 'group',
-          current: 0,
-          total: scrapeIds.length,
-          label: `Reading groups from server (0/${scrapeIds.length})`,
+          onProgress: ({ current, total, label }) => {
+            emitScrapeProgress({
+              sessionId,
+              phase: 'group',
+              current,
+              total,
+              label,
+            });
+          },
         });
 
-        let completed = 0;
-        let skippedLeft = 0;
-        const scraped = await runPooled(scrapeIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId) => {
-          throwIfScrapeCancelled(sessionId);
-
-          const core = await scrapeWhatsAppGroupFromStore(client, groupId);
-          if ('skip' in core) {
-            if (
-              core.reason === 'not_member' ||
-              core.reason === 'empty_participants' ||
-              core.reason === 'metadata_missing'
-            ) {
-              skippedLeft += 1;
-            }
-            return null;
-          }
-
-          const chat = await client.getChatById(groupId);
-          const inviteLink =
-            chat && isWhatsAppGroupChat(chat) ? await resolveInviteLink(chat) : null;
-
-          completed += 1;
-          emitScrapeProgress({
-            sessionId,
-            phase: 'group',
-            current: completed,
-            total: scrapeIds.length,
-            label: `${core.group_name} (${completed}/${scrapeIds.length})`,
-          });
-
-          return {
-            ...core,
-            invite_link: inviteLink,
-          } satisfies ScrapedGroupRow;
-        });
-
-        for (const row of scraped) {
-          if (row) rows.push(row);
-        }
+        assertWhatsAppScrapeHasRows(rows);
 
         const elapsedMs = Date.now() - startedAt;
-        assertWhatsAppScrapeQuality({ rows, elapsedMs, skippedLeft });
 
         emitScrapeProgress({
           sessionId,
@@ -188,10 +119,16 @@ async function runWhatsAppScrapeInner(
         });
 
         console.info(
-          `[wa-scrape] done sessionId=${sessionId} groups=${rows.length} skipped=${skippedLeft} elapsedMs=${elapsedMs}`,
+          `[wa-scrape] done sessionId=${sessionId} groups=${rows.length} skipped=${skipped} elapsedMs=${elapsedMs}`,
         );
 
-        return { ok: true, groups: rows, count: rows.length, loggedInAs, elapsedMs };
+        return {
+          ok: true,
+          groups: rows,
+          count: rows.length,
+          loggedInAs,
+          elapsedMs,
+        };
       },
       { freshBoot: true, storeWaitMs: 120_000 },
     );
@@ -207,7 +144,7 @@ export async function runWhatsAppScrape(
   expectedPhone?: string,
 ): Promise<{
   ok: boolean;
-  groups: ScrapedGroupRow[];
+  groups: import('./index').ScrapedGroupRow[];
   count: number;
   loggedInAs?: string;
   elapsedMs?: number;

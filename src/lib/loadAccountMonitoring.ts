@@ -20,6 +20,7 @@ import {
   upsertAccountSnapshot,
 } from '@/lib/accountSnapshots';
 import { MESSAGING_ACCOUNT_SELECT } from '@/config/dbColumns';
+import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { readPhoneFromAccount } from '@/lib/accountPhone';
 import { loadUserBrands } from '@/lib/brands';
 import { TABLES } from '@/config/tables';
@@ -44,6 +45,13 @@ function buildBrandStandardFromCache(
   return map;
 }
 
+function readLocationDevice(account: MessagingAccount): string {
+  const fromColumn = normalizeLocationDeviceOption(String(account.location_device ?? ''));
+  if (fromColumn) return fromColumn;
+  const meta = account.metadata as { location_device?: string } | null;
+  return normalizeLocationDeviceOption(String(meta?.location_device ?? ''));
+}
+
 function accountRowFromDb(
   account: MessagingAccount,
   brandName: string,
@@ -59,6 +67,7 @@ function accountRowFromDb(
     platform: account.platform,
     accountName: account.label,
     phoneNumber: readPhoneFromAccount(account),
+    locationDevice: readLocationDevice(account) || undefined,
     brandName,
     status,
     groupsCurrent: 0,

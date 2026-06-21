@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { AddAccountPlatformBadge } from '@/components/group-monitoring/AddAccountHeaderMenu';
+import { LocationDeviceSelect } from '@/components/group-monitoring/LocationDeviceSelect';
 import { normalizePhoneDigits } from '@/lib/phoneNormalize';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { Platform } from '@/types/database';
@@ -10,6 +11,7 @@ import type { Platform } from '@/types/database';
 export interface AddAccountFormValues {
   accountName: string;
   phoneNumber: string;
+  locationDevice: string;
 }
 
 interface AddAccountModalProps {
@@ -35,6 +37,7 @@ export function AddAccountModal({
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(platform);
   const [accountName, setAccountName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [locationDevice, setLocationDevice] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,6 +46,7 @@ export function AddAccountModal({
     setSelectedPlatform(platform);
     setAccountName('');
     setPhoneNumber('');
+    setLocationDevice('');
     setLocalError(null);
   }, [open, platform]);
 
@@ -81,7 +85,10 @@ export function AddAccountModal({
     }
 
     setLocalError(null);
-    onSubmit({ accountName: name, phoneNumber: phone }, selectedPlatform);
+    onSubmit(
+      { accountName: name, phoneNumber: phone, locationDevice: locationDevice.trim() },
+      selectedPlatform,
+    );
   }
 
   const displayError = localError ?? error;
@@ -179,6 +186,23 @@ export function AddAccountModal({
                 placeholder={t('groupMonitoring.accountCard.phonePlaceholder')}
                 className="brand-modal-input"
                 disabled={saving}
+              />
+
+              <label htmlFor="add-account-location-device" className="brand-modal-label">
+                {t('groupMonitoring.accountCard.locationDeviceLabel')}
+                <span className="brand-modal-label-optional">
+                  {' '}
+                  ({t('groupMonitoring.accountCard.optional')})
+                </span>
+              </label>
+              <LocationDeviceSelect
+                id="add-account-location-device"
+                value={locationDevice}
+                disabled={saving}
+                onChange={(value) => {
+                  setLocationDevice(value);
+                  if (localError) setLocalError(null);
+                }}
               />
             </>
           )}

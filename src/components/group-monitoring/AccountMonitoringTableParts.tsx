@@ -29,7 +29,7 @@ export function AccountMonitoringTableHead() {
           {t('groupMonitoring.accountCard.colAccount')}
         </th>
         <th className="brand-col-head brand-col-head--brand">
-          {t('groupMonitoring.accountCard.colBrand')}
+          {t('groupMonitoring.accountCard.colLocation')}
         </th>
         <th className="brand-col-head brand-col-head--status">
           {t('groupMonitoring.accountCard.colStatus')}

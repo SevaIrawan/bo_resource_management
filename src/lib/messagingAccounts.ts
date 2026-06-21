@@ -1,3 +1,4 @@
+import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { ensureBrand } from '@/lib/brands';
 import { markPlatformSessionInvalid } from '@/lib/platformSessions';
 import { invalidatePlatformSessionEverywhere } from '@/lib/platformSessionSync';
@@ -11,8 +12,18 @@ export interface CreateMessagingAccountInput {
   platform: Platform;
   label: string;
   phoneNumber?: string;
+  locationDevice?: string;
   brand: string;
   brandId?: string;
+}
+
+function buildAccountMetadata(brand: string): Record<string, string> {
+  return { brand: brand.trim() };
+}
+
+function normalizeLocationDevice(value?: string): string | null {
+  const normalized = normalizeLocationDeviceOption(value ?? '');
+  return normalized || null;
 }
 
 function isDuplicateLabelError(error: unknown): boolean {
@@ -39,6 +50,7 @@ async function reactivateInactiveMessagingAccount(input: {
   brandId: string;
   brandName: string;
   phoneNumber?: string;
+  locationDevice?: string;
 }): Promise<string> {
   const supabase = getSupabase();
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED');
@@ -51,7 +63,8 @@ async function reactivateInactiveMessagingAccount(input: {
       is_active: true,
       brand_id: input.brandId,
       phone_number: phone || null,
-      metadata: { brand: input.brandName.trim() },
+      location_device: normalizeLocationDevice(input.locationDevice),
+      metadata: buildAccountMetadata(input.brandName),
       notes: null,
       updated_at: new Date().toISOString(),
     })
@@ -100,6 +113,7 @@ export async function createMessagingAccount(
       brandId: brand.id,
       brandName: input.brand,
       phoneNumber: input.phoneNumber,
+      locationDevice: input.locationDevice,
     });
   }
 
@@ -111,7 +125,8 @@ export async function createMessagingAccount(
       platform: input.platform,
       label,
       phone_number: phone || null,
-      metadata: { brand: input.brand.trim() },
+      location_device: normalizeLocationDevice(input.locationDevice),
+      metadata: buildAccountMetadata(input.brand),
     })
     .select('id')
     .single();
@@ -187,6 +202,60 @@ export async function removeMessagingAccountFromSlot(
 
   if (reason !== 'brand_card_removed' && brandName) {
     await rebuildBrandGroupsMaster({ brand: brandName, platform });
+  }
+}
+
+export interface UpdateMessagingAccountDetailsInput {
+  accountId: string;
+  userId: string;
+  platform: Platform;
+  label: string;
+  phoneNumber?: string;
+  locationDevice?: string;
+  brandName: string;
+}
+
+export async function updateMessagingAccountDetails(
+  input: UpdateMessagingAccountDetailsInput,
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error('SUPABASE_NOT_CONFIGURED');
+  }
+
+  const label = input.label.trim();
+  const phone = input.phoneNumber?.trim();
+
+  const { data: existing, error: findError } = await supabase
+    .from(TABLES.messagingAccounts)
+    .select('id')
+    .eq('user_id', input.userId)
+    .eq('platform', input.platform)
+    .eq('label', label)
+    .neq('id', input.accountId)
+    .maybeSingle();
+
+  if (findError) throw findError;
+  if (existing) {
+    throw new Error('ACCOUNT_LABEL_IN_USE');
+  }
+
+  const { error } = await supabase
+    .from(TABLES.messagingAccounts)
+    .update({
+      label,
+      phone_number: phone || null,
+      location_device: normalizeLocationDevice(input.locationDevice),
+      metadata: buildAccountMetadata(input.brandName),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.accountId);
+
+  if (error) {
+    if (isDuplicateLabelError(error)) {
+      throw new Error('ACCOUNT_LABEL_IN_USE');
+    }
+    throw error;
   }
 }
 

@@ -96,6 +96,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
           hasFilteredBrands ? (
             <AccountBrandTableView
               groups={filteredGroups}
+              onGroupsChange={onGroupsChange}
               sync={sync}
               onRemoveFromSlot={removeSlot.openRemoveModal}
             />

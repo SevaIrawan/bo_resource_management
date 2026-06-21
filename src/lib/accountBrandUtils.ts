@@ -1,4 +1,5 @@
 import { isMisalignedFromSyncResult } from '@/lib/accountDisplayMetrics';
+import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { buildStandardCountByPlatformFromRows } from '@/lib/brandStandardCount';
 import type { AccountBrandGroup, AddAccountInput } from '@/types/accountMonitoringUi';
 import type { SessionUiStatus } from '@/types/accountMonitoringUi';
@@ -79,11 +80,13 @@ export function addAccountToGroup(
   input: AddAccountInput,
 ): AccountBrandGroup {
   const phone = input.phoneNumber?.trim() ?? '';
+  const locationDevice = normalizeLocationDeviceOption(input.locationDevice?.trim() ?? '');
   const newRow = {
     id: input.dbAccountId ?? createAccountRowId(),
     platform: input.platform,
     accountName: input.accountName.trim(),
     phoneNumber: phone,
+    locationDevice: locationDevice || undefined,
     brandName: group.brandName,
     status: 'logout' as const,
     groupsCurrent: 0,
@@ -185,6 +188,31 @@ export function applySyncResultToGroup(
   });
 
   return rebuildGroupMetrics({ ...group, accounts });
+}
+
+export function patchAccountDetailsInGroups(
+  groups: AccountBrandGroup[],
+  groupId: string,
+  accountId: string,
+  patch: {
+    accountName: string;
+    phoneNumber: string;
+    locationDevice: string;
+  },
+): AccountBrandGroup[] {
+  return patchBrandGroup(groups, groupId, (group) => ({
+    ...group,
+    accounts: group.accounts.map((account) =>
+      account.id === accountId
+        ? {
+            ...account,
+            accountName: patch.accountName.trim(),
+            phoneNumber: patch.phoneNumber.trim(),
+            locationDevice: normalizeLocationDeviceOption(patch.locationDevice) || undefined,
+          }
+        : account,
+    ),
+  }));
 }
 
 export function setAccountProcessAction(

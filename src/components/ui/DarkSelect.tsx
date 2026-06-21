@@ -12,6 +12,7 @@ export interface DarkSelectProps {
   value: string;
   onChange: (value: string) => void;
   options: DarkSelectOption[];
+  id?: string;
   ariaLabel?: string;
   className?: string;
   triggerClassName?: string;
@@ -23,6 +24,7 @@ export function DarkSelect({
   value,
   onChange,
   options,
+  id,
   ariaLabel,
   className,
   triggerClassName,
@@ -61,6 +63,7 @@ export function DarkSelect({
     <div className={cn('dark-select-wrap', className)} ref={wrapRef}>
       <button
         type="button"
+        id={id}
         className={cn('dark-select-trigger', triggerClassName, disabled && 'dark-select-trigger--disabled')}
         aria-label={ariaLabel}
         aria-haspopup="listbox"

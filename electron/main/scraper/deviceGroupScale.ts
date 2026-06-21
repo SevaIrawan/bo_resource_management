@@ -13,8 +13,18 @@ export const QUICK_COUNT_STORE_WAIT_MS = 20_000;
 /** Batas aman daftar grup dari store WA Web (satu pass di browser). */
 export const WA_STORE_GROUP_LIST_CAP = 6000;
 
-/** Scrape / admin detail — paralel terbatas agar Chrome tidak jebol. */
+/** Scrape / admin detail — paralel terbatas (count full admin scan). */
 export const WA_GROUP_PROCESS_CONCURRENCY = 12;
+
+/** Jeda antar grup saat scrape penuh (RM_WA_SCRAPE_GROUP_DELAY_MS / JITTER). */
+export const WA_SCRAPE_GROUP_DELAY_MS = Math.max(
+  0,
+  Math.floor(Number(process.env.RM_WA_SCRAPE_GROUP_DELAY_MS) || 600),
+);
+export const WA_SCRAPE_GROUP_JITTER_MS = Math.max(
+  0,
+  Math.floor(Number(process.env.RM_WA_SCRAPE_GROUP_JITTER_MS) || 400),
+);
 
 const COUNT_BASE_MS = 120_000;
 const COUNT_PER_GROUP_MS = 30;

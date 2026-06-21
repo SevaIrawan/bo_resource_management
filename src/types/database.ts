@@ -33,6 +33,7 @@ export interface MessagingAccount {
   platform: Platform;
   label: string;
   phone_number: string | null;
+  location_device: string | null;
   is_active: boolean;
   notes: string | null;
   metadata: Record<string, unknown>;

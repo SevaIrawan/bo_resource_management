@@ -8,6 +8,14 @@ export type WhatsAppGroupScrapeCore = Omit<ScrapedGroupRow, 'invite_link'>;
 
 export type WhatsAppGroupScrapeStoreResult = WhatsAppGroupScrapeCore | WhatsAppGroupScrapeSkip;
 
+export type WhatsAppGroupScrapeOptions = {
+  /** Default 6 (harvest); repair pass uses 3. */
+  maxAttempts?: number;
+};
+
+const FULL_RETRY_DELAYS_MS = [500, 900, 1400, 2000, 2800, 3600];
+const QUICK_RETRY_DELAYS_MS = [350, 650, 1000];
+
 /**
  * Satu grup: refresh metadata dari server WA (queryAndUpdateGroupMetadataById),
  * baca participant + admin LID-aware. Skip jika sudah tidak member.
@@ -15,10 +23,18 @@ export type WhatsAppGroupScrapeStoreResult = WhatsAppGroupScrapeCore | WhatsAppG
 export async function scrapeWhatsAppGroupFromStore(
   client: Client,
   groupId: string,
+  options?: WhatsAppGroupScrapeOptions,
 ): Promise<WhatsAppGroupScrapeStoreResult> {
   assertWhatsAppScrapeClient(client);
 
-  return client.pupPage.evaluate(async (gid) => {
+  const maxAttempts = Math.max(1, Math.min(6, options?.maxAttempts ?? FULL_RETRY_DELAYS_MS.length));
+  const retryDelaysMs =
+    maxAttempts <= QUICK_RETRY_DELAYS_MS.length
+      ? QUICK_RETRY_DELAYS_MS.slice(0, maxAttempts)
+      : FULL_RETRY_DELAYS_MS.slice(0, maxAttempts);
+
+  return client.pupPage.evaluate(
+    async (gid, delays: number[]) => {
     function widSerialized(w: unknown): string {
       if (!w || typeof w !== 'object') return String(w ?? '').trim();
       const o = w as { _serialized?: string; id?: { _serialized?: string } };
@@ -77,18 +93,44 @@ export async function scrapeWhatsAppGroupFromStore(
       return out;
     }
 
+    async function refreshGroupMetadata(gid: string): Promise<void> {
+      const GroupQueryJob = window.require('WAWebGroupQueryJob');
+      const queryResult = GroupQueryJob.queryAndUpdateGroupMetadataById({ id: gid });
+      if (queryResult && typeof (queryResult as Promise<unknown>).then === 'function') {
+        await queryResult;
+      }
+
+      try {
+        const legacy = window.require('WAWebGroupQueryAndUpdate') as
+          | ((input: { id: string }) => Promise<unknown> | unknown)
+          | undefined;
+        if (typeof legacy === 'function') {
+          const legacyResult = legacy({ id: gid });
+          if (legacyResult && typeof (legacyResult as Promise<unknown>).then === 'function') {
+            await legacyResult;
+          }
+        }
+      } catch {
+        // optional — not all WA Web builds expose this module
+      }
+    }
+
+    async function trySyncChatHistory(gid: string): Promise<void> {
+      try {
+        const chatModel = (await window.WWebJS.getChat(gid, { getAsModel: true })) as {
+          syncHistory?: () => Promise<unknown>;
+        } | null;
+        if (chatModel && typeof chatModel.syncHistory === 'function') {
+          await chatModel.syncHistory();
+        }
+      } catch {
+        // optional repair path
+      }
+    }
+
     let chat = (await window.WWebJS.getChat(gid, { getAsModel: false })) as ChatRef | null;
     if (!chat?.groupMetadata) {
       return { skip: true as const, reason: 'not_group' };
-    }
-
-    await window
-      .require('WAWebGroupQueryJob')
-      .queryAndUpdateGroupMetadataById({ id: gid });
-
-    chat = ((await window.WWebJS.getChat(gid, { getAsModel: false })) as ChatRef | null) ?? chat;
-    if (!chat?.groupMetadata) {
-      return { skip: true as const, reason: 'metadata_missing' };
     }
 
     const mePrefs = window.require('WAWebUserPrefsMeUser') as {
@@ -98,22 +140,59 @@ export async function scrapeWhatsAppGroupFromStore(
     const mePn = mePrefs.getMaybeMePnUser?.();
     const meLid = mePrefs.getMaybeMeLidUser?.();
 
-    let participants = listParticipants(chat);
+    const retryDelaysMs = delays;
+    let participants: SerializedParticipant[] = [];
     let meEntry: SerializedParticipant | undefined;
-    for (const p of participants) {
-      const pid = p.id ?? p;
-      if (sameParticipant(pid, mePn) || sameParticipant(pid, meLid)) {
-        meEntry = p;
-        break;
+
+    for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
+      await refreshGroupMetadata(gid);
+
+      if (attempt >= 2) {
+        await trySyncChatHistory(gid);
       }
-    }
 
-    if (participants.length > 0 && !meEntry) {
-      return { skip: true as const, reason: 'not_member' };
-    }
+      chat = ((await window.WWebJS.getChat(gid, { getAsModel: false })) as ChatRef | null) ?? chat;
+      if (!chat?.groupMetadata) {
+        if (attempt === retryDelaysMs.length - 1) {
+          return { skip: true as const, reason: 'metadata_missing' };
+        }
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, retryDelaysMs[attempt]);
+        });
+        continue;
+      }
 
-    if (participants.length === 0) {
-      return { skip: true as const, reason: 'empty_participants' };
+      participants = listParticipants(chat);
+      meEntry = undefined;
+      for (const p of participants) {
+        const pid = p.id ?? p;
+        if (sameParticipant(pid, mePn) || sameParticipant(pid, meLid)) {
+          meEntry = p;
+          break;
+        }
+      }
+
+      if (participants.length === 0) {
+        if (attempt === retryDelaysMs.length - 1) {
+          return { skip: true as const, reason: 'empty_participants' };
+        }
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, retryDelaysMs[attempt]);
+        });
+        continue;
+      }
+
+      if (participants.length > 0 && !meEntry) {
+        return { skip: true as const, reason: 'not_member' };
+      }
+
+      if (participants.length > 1) break;
+
+      if (attempt < retryDelaysMs.length - 1) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, retryDelaysMs[attempt]);
+        });
+      }
     }
 
     let isAdmin = false;
@@ -141,5 +220,5 @@ export async function scrapeWhatsAppGroupFromStore(
       admin_count: adminCount,
       owner_count: ownerCount,
     };
-  }, groupId);
+  }, groupId, retryDelaysMs);
 }

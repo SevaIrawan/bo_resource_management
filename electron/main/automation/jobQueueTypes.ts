@@ -1,0 +1,117 @@
+export type AutomationJobAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
+
+export type AutomationJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export type AutomationJobRunnerState = 'idle' | 'running' | 'paused';
+
+export type Platform = 'whatsapp' | 'telegram';
+
+export interface AutomationJobPayload {
+  groupName?: string;
+  groupId?: string;
+  groupLink?: string;
+  inviteLink?: string;
+  targets?: string[];
+  description?: string;
+  hideChatHistory?: boolean;
+  initialParticipants?: string[];
+  adminRights?: Record<string, boolean>;
+  /** Batch create: total groups in one queue row */
+  totalToCreate?: number;
+  perRun?: number;
+  startFrom?: number;
+  groupNamePrefix?: string;
+  batchIndex?: number;
+  batchTotal?: number;
+  joinSequenceIndex?: number;
+  createGroupSettings?: {
+    messagesAdminsOnly?: boolean;
+    addMembersAdminsOnly?: boolean;
+    infoAdminsOnly?: boolean;
+  };
+}
+
+export interface AutomationJobProgress {
+  current: number;
+  total: number;
+  label?: string;
+}
+
+export interface AutomationJobDelayConfig {
+  between_groups_sec?: number;
+  between_targets_sec?: number;
+  after_create_sec?: number;
+  flood_wait_extra_sec?: number;
+  max_floodwait_auto_sleep_sec?: number;
+  invite_export_retries?: number;
+  invite_export_retry_sec?: number;
+  jitter_percent?: number;
+  pause_between_runs_min_sec?: number;
+  pause_between_runs_max_sec?: number;
+  invite_delay_min_sec?: number;
+  invite_delay_max_sec?: number;
+  invite_batch_every?: number;
+  invite_batch_delay_min_sec?: number;
+  invite_batch_delay_max_sec?: number;
+  resolve_entity_max_attempts?: number;
+  max_admin_slots?: number;
+}
+
+export interface AutomationJobRecord {
+  id: string;
+  brandName: string;
+  platform: Platform;
+  accountId: string;
+  accountName: string;
+  sessionId: string;
+  action: AutomationJobAction;
+  status: AutomationJobStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  error?: string;
+  message?: string;
+  progress?: AutomationJobProgress;
+  payload: AutomationJobPayload;
+  storedSessionString?: string | null;
+  expectedPhone?: string;
+  delay?: AutomationJobDelayConfig;
+  /** Antrian menunggu; tidak di-dispatch selama true. */
+  paused?: boolean;
+}
+
+export interface AutomationJobEnqueueInput {
+  brandName: string;
+  platform: Platform;
+  accountId: string;
+  accountName: string;
+  sessionId: string;
+  action: AutomationJobAction;
+  payload: AutomationJobPayload;
+  storedSessionString?: string | null;
+  expectedPhone?: string;
+  delay?: AutomationJobDelayConfig;
+}
+
+export interface AutomationJobQueueSnapshot {
+  jobs: AutomationJobRecord[];
+  runnerState: AutomationJobRunnerState;
+  /** @deprecated use runningJobIds */
+  runningJobId: string | null;
+  runningJobIds: string[];
+  maxConcurrent: number;
+  runningCount: number;
+  queuedCount: number;
+}
+
+export interface AutomationJobListFilter {
+  brandName?: string;
+  platform?: Platform;
+}
+
+interface PersistedQueueState {
+  jobs: AutomationJobRecord[];
+  runnerPaused: boolean;
+}
+
+export type { PersistedQueueState };

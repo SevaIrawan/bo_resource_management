@@ -1,3 +1,5 @@
+import type { AutomationJobDelayConfig } from '@/types/automationJob';
+
 export const WHATSAPP_WORKER_SETTINGS_STORAGE_KEY = 'rm_worker_settings_whatsapp';
 export const TELEGRAM_WORKER_SETTINGS_STORAGE_KEY = 'rm_worker_settings_telegram';
 
@@ -374,6 +376,65 @@ export function workerSettingsSummary(settings: PlatformWorkerSettings): string 
 
 export function notifyWorkerPlatformSettingsChanged(): void {
   window.dispatchEvent(new Event('rm-worker-settings-changed'));
+}
+
+/** Map TG admin rights → sidecar set_admin payload. */
+export function toTelegramAdminRightsPayload(
+  settings: PlatformWorkerSettings,
+): Record<string, boolean> {
+  const r = settings.createGroup.telegramAdminRights;
+  return {
+    change_info: r.changeInfo,
+    post_messages: r.postMessages,
+    edit_messages: r.editMessages,
+    delete_messages: r.deleteMessages,
+    ban_users: r.banUsers,
+    invite_users: r.inviteUsers,
+    pin_messages: r.pinMessages,
+    add_admins: r.addAdmins,
+    manage_call: r.manageCall,
+    anonymous: r.anonymous,
+    delete_stories: r.deleteStories,
+  };
+}
+
+function jitterPercentFromHumanProfile(profile: HumanDelayProfile): number {
+  if (profile === 'off') return 0;
+  if (profile === 'fast') return 15;
+  return 35;
+}
+
+export type AutomationDelayAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
+
+/** Map Settings worker delay → automation IPC payload (frozen at enqueue). */
+export function toAutomationDelayConfig(
+  settings: PlatformWorkerSettings,
+  action?: AutomationDelayAction,
+): AutomationJobDelayConfig {
+  const betweenTargetsSec =
+    action === 'set_admin'
+      ? settings.setAdmin.betweenTargetsSec
+      : settings.standard.betweenTargetsSec;
+
+  return {
+    between_groups_sec: settings.standard.betweenGroupsSec,
+    between_targets_sec: betweenTargetsSec,
+    after_create_sec: settings.standard.afterCreateSec,
+    flood_wait_extra_sec: settings.standard.floodWaitExtraSec,
+    max_floodwait_auto_sleep_sec: settings.standard.maxFloodwaitAutoSleepSec,
+    invite_export_retries: settings.inviteLink.inviteExportRetries,
+    invite_export_retry_sec: settings.inviteLink.inviteExportRetrySec,
+    jitter_percent: jitterPercentFromHumanProfile(settings.standard.humanProfile),
+    pause_between_runs_min_sec: settings.standard.pauseBetweenRunsMinLow * 60,
+    pause_between_runs_max_sec: settings.standard.pauseBetweenRunsMinHigh * 60,
+    invite_delay_min_sec: settings.inviteLink.delayMinSec,
+    invite_delay_max_sec: settings.inviteLink.delayMaxSec,
+    invite_batch_every: settings.inviteLink.batchEvery,
+    invite_batch_delay_min_sec: settings.inviteLink.batchDelayMinSec,
+    invite_batch_delay_max_sec: settings.inviteLink.batchDelayMaxSec,
+    resolve_entity_max_attempts: settings.setAdmin.resolveEntityMaxAttempts,
+    max_admin_slots: settings.setAdmin.maxAdminSlots,
+  };
 }
 
 /** Export shape compatible with learning telegram config.json (subset). */

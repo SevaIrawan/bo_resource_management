@@ -30,6 +30,11 @@ export function isScrapeCancelled(sessionId: string): boolean {
   return activeSessionId === sessionId && cancelled;
 }
 
+/** Job queue: cek apakah sesi sedang dipakai scraper (global mono v1.0.19). */
+export function isScrapeActiveForSession(sessionId: string): boolean {
+  return activeSessionId === sessionId;
+}
+
 export function throwIfScrapeCancelled(sessionId: string): void {
   if (isScrapeCancelled(sessionId)) {
     throw new ScrapeCancelledError();

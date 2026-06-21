@@ -202,6 +202,64 @@ declare global {
           result?: Record<string, unknown>;
         }>;
       };
+      jobQueue?: {
+        getSnapshot: (filter?: {
+          brandName?: string;
+          platform?: Platform;
+        }) => Promise<{
+          jobs: Array<{
+            id: string;
+            brandName: string;
+            platform: Platform;
+            accountId: string;
+            accountName: string;
+            sessionId: string;
+            action: 'create_group' | 'set_admin' | 'join_by_invite_link';
+            status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+            createdAt: string;
+            startedAt?: string;
+            finishedAt?: string;
+            error?: string;
+            message?: string;
+            paused?: boolean;
+            payload: Record<string, unknown>;
+          }>;
+          runnerState: 'idle' | 'running' | 'paused';
+          runningJobId: string | null;
+          runningJobIds: string[];
+          maxConcurrent: number;
+          runningCount: number;
+          queuedCount: number;
+        }>;
+        enqueue: (input: {
+          brandName: string;
+          platform: Platform;
+          accountId: string;
+          accountName: string;
+          sessionId: string;
+          action: 'create_group' | 'set_admin' | 'join_by_invite_link';
+          payload: Record<string, unknown>;
+          storedSessionString?: string | null;
+          expectedPhone?: string;
+          delay?: Record<string, number | undefined>;
+        }) => Promise<
+          | { ok: true; job: { id: string } }
+          | { ok: false; error?: string }
+        >;
+        cancel: (jobId: string) => Promise<{ ok: boolean }>;
+        run: (jobId: string) => Promise<{ ok: boolean }>;
+        pauseJob: (jobId: string) => Promise<{ ok: boolean }>;
+        removeJobs: (jobIds: string[]) => Promise<{ ok: boolean; removed?: number }>;
+        clearCompleted: (filter?: {
+          brandName?: string;
+          platform?: Platform;
+        }) => Promise<{ ok: boolean; removed?: number }>;
+        setPaused: (paused: boolean) => Promise<{
+          ok: boolean;
+          runnerState?: 'idle' | 'running' | 'paused';
+        }>;
+        onChanged: (callback: () => void) => () => void;
+      };
       onSessionInvalid?: (
         callback: (payload: {
           sessionId: string;

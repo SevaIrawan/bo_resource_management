@@ -10,7 +10,6 @@ import { useMonitoringTab } from '@/hooks/useMonitoringTab';
 import { useMonitoringPending } from '@/hooks/useMonitoringPending';
 import { assertRmSchema } from '@/lib/assertRmSchema';
 import { getErrorMessage } from '@/lib/errorMessage';
-import { withTimeout } from '@/lib/withTimeout';
 import { loadAccountMonitoringGroups } from '@/lib/loadAccountMonitoring';
 import { clearMasterDailyLoadCache } from '@/lib/masterDailyLoadCache';
 import { buildTicketSummariesForUser } from '@/lib/buildTicketSummariesFromEngine';
@@ -84,7 +83,6 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     reportingReloadDebounceRef.current = setTimeout(() => {
       reportingReloadDebounceRef.current = null;
       window.dispatchEvent(new Event('rm-reporting-reload'));
-      window.dispatchEvent(new Event('rm-operations-reload'));
     }, 500);
   }, []);
 
@@ -128,11 +126,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       const summaries = await buildTicketSummariesForUser(dataUserId);
       setTicketSummaries(summaries);
       await reloadTicketHandles(summaries);
-      const loadedGroups = await withTimeout(
-        loadAccountMonitoringGroups(dataUserId),
-        120_000,
-        'Load accounts',
-      );
+      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
       setGroups(loadedGroups);
       scheduleReportingReload();
     } catch (e) {
@@ -143,20 +137,20 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     }
   }, [user?.id, user?.userName, reloadTicketHandles, reportError, scheduleReportingReload, t]);
 
-  const patchAccountGridFromDb = useCallback(async (dbAccountId: string, uiAccountId?: string) => {
+  const patchAccountGridFromDb = useCallback(async (dbAccountId: string) => {
     const snapshot = await new Promise<AccountBrandGroup[]>((resolve) => {
       setGroups((current) => {
         resolve(current);
         return current;
       });
     });
-    const patched = await patchAccountGridAfterDailyWrite(snapshot, dbAccountId, uiAccountId);
+    const patched = await patchAccountGridAfterDailyWrite(snapshot, dbAccountId);
     setGroups((prev) => mergeGroupsAccountMetrics(prev, patched));
   }, []);
 
   /** Reconcile + grid + ticket + reporting setelah daily/master berubah (scrape/realtime). */
   const refreshAccountAfterDailyWrite = useCallback(
-    async (dbAccountId: string, uiAccountId?: string) => {
+    async (dbAccountId: string) => {
       if (accountRefreshBusyRef.current.has(dbAccountId)) {
         pendingAccountRefreshRef.current.add(dbAccountId);
         return;
@@ -165,7 +159,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       ticketSyncLockedRef.current = true;
       try {
         await reconcileTicketsForAccountFromDb(dbAccountId);
-        await patchAccountGridFromDb(dbAccountId, uiAccountId);
+        await patchAccountGridFromDb(dbAccountId);
         await setTicketSummariesFromEngine();
         scheduleReportingReload();
       } finally {
@@ -173,7 +167,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         ticketSyncLockedRef.current = false;
         if (pendingAccountRefreshRef.current.has(dbAccountId)) {
           pendingAccountRefreshRef.current.delete(dbAccountId);
-          void refreshAccountAfterDailyWrite(dbAccountId, uiAccountId);
+          void refreshAccountAfterDailyWrite(dbAccountId);
         }
       }
     },
@@ -182,9 +176,9 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   /** Reconcile DB dulu, lalu reload kartu Issue + reporting (kontrak 150−146=4 ticket). */
   const refreshIssues = useCallback(
-    async (dbAccountId?: string, uiAccountId?: string) => {
+    async (dbAccountId?: string) => {
       if (dbAccountId) {
-        await refreshAccountAfterDailyWrite(dbAccountId, uiAccountId);
+        await refreshAccountAfterDailyWrite(dbAccountId);
         return;
       }
       if (user?.id) {
@@ -211,16 +205,11 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     [notifyPendingDataUpdate, refreshAccountAfterDailyWrite],
   );
 
-  /** Realtime master/daily — reconcile penuh jika tidak sedang post-scrape lock. */
+  /** Realtime master/daily — reload kartu Issue dari engine DB terbaru + reporting. */
   const scheduleIssueRefreshFromData = useCallback(() => {
     scheduleReportingReload();
-    if (ticketReloadDebounceRef.current) clearTimeout(ticketReloadDebounceRef.current);
-    ticketReloadDebounceRef.current = setTimeout(() => {
-      ticketReloadDebounceRef.current = null;
-      if (ticketSyncLockedRef.current || ticketReconcileBusyRef.current) return;
-      void runTicketReconcile();
-    }, 500);
-  }, [runTicketReconcile, scheduleReportingReload]);
+    void setTicketSummariesFromEngine();
+  }, [scheduleReportingReload, setTicketSummariesFromEngine]);
 
   const loadTicketsStaged = useCallback(
     async (options?: { force?: boolean }) => {
@@ -282,11 +271,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       await assertRmSchema();
       const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
 
-      const loadedGroups = await withTimeout(
-        loadAccountMonitoringGroups(dataUserId),
-        120_000,
-        'Load accounts',
-      );
+      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
       if (seq !== reloadAllSeqRef.current) return;
       setGroups(loadedGroups);
     } catch (e) {
@@ -324,8 +309,6 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         await runTicketReconcile();
       } else if (activeTab === 'reporting') {
         window.dispatchEvent(new Event('rm-reporting-reload'));
-      } else if (activeTab === 'operations') {
-        window.dispatchEvent(new Event('rm-operations-reload'));
       } else {
         await reloadAll();
       }
@@ -337,7 +320,6 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     registerFullRefreshHandler(async () => {
       await reloadAll();
       window.dispatchEvent(new Event('rm-reporting-reload'));
-      window.dispatchEvent(new Event('rm-operations-reload'));
     });
     return () => registerFullRefreshHandler(null);
   }, [registerFullRefreshHandler, reloadAll]);
@@ -377,11 +359,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     if (!user?.id) return;
     try {
       const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
-      const loadedGroups = await withTimeout(
-        loadAccountMonitoringGroups(dataUserId),
-        120_000,
-        'Load accounts',
-      );
+      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
       setGroups(loadedGroups);
     } catch {
       /* tetap tampilkan data lama */

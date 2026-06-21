@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { useDarkSelectMenu } from '@/components/ui/useDarkSelectMenu';
 
 export interface DarkSelectOption {
   value: string;
@@ -15,6 +16,7 @@ export interface DarkSelectProps {
   className?: string;
   triggerClassName?: string;
   menuAlign?: 'left' | 'right';
+  disabled?: boolean;
 }
 
 export function DarkSelect({
@@ -25,49 +27,65 @@ export function DarkSelect({
   className,
   triggerClassName,
   menuAlign = 'left',
+  disabled = false,
 }: DarkSelectProps) {
-  const [open, setOpen] = useState(false);
+  const { phase, isOpen, isVisible, close, toggle } = useDarkSelectMenu();
   const wrapRef = useRef<HTMLDivElement>(null);
   const selected = options.find((opt) => opt.value === value);
 
   useEffect(() => {
-    if (!open) return;
+    if (!isOpen) return;
     function onPointerDown(event: MouseEvent) {
       if (wrapRef.current?.contains(event.target as Node)) return;
-      setOpen(false);
+      close();
     }
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [open]);
+  }, [close, isOpen]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!isOpen) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') close();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open]);
+  }, [close, isOpen]);
+
+  function selectOption(next: string) {
+    close();
+    if (next !== value) onChange(next);
+  }
 
   return (
     <div className={cn('dark-select-wrap', className)} ref={wrapRef}>
       <button
         type="button"
-        className={cn('dark-select-trigger', triggerClassName)}
+        className={cn('dark-select-trigger', triggerClassName, disabled && 'dark-select-trigger--disabled')}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        aria-disabled={disabled || undefined}
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          toggle();
+        }}
       >
         <span className="dark-select-trigger-label">{selected?.label ?? value}</span>
         <ChevronDown
-          className={cn('dark-select-trigger-icon', open && 'dark-select-trigger-icon--open')}
+          className={cn('dark-select-trigger-icon', isOpen && 'dark-select-trigger-icon--open')}
           aria-hidden
         />
       </button>
-      {open ? (
+      {isVisible && !disabled ? (
         <ul
-          className={cn('dark-select-menu', menuAlign === 'right' && 'dark-select-menu--align-right')}
+          className={cn(
+            'dark-select-menu',
+            menuAlign === 'right' && 'dark-select-menu--align-right',
+            (phase === 'open' || phase === 'opening') && 'dark-select-menu--open',
+            phase === 'closing' && 'dark-select-menu--closing',
+          )}
           role="listbox"
           aria-label={ariaLabel}
           onMouseDown={(event) => event.stopPropagation()}
@@ -82,9 +100,9 @@ export function DarkSelect({
                   'dark-select-menu-item',
                   value === opt.value && 'dark-select-menu-item--active',
                 )}
-                onClick={() => {
-                  onChange(opt.value);
-                  setOpen(false);
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  selectOption(opt.value);
                 }}
               >
                 {opt.label}

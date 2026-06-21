@@ -52,6 +52,7 @@ export async function runTelegramAutomation(payload: AutomationRunPayload): Prom
       groupName: payload.groupName.trim(),
       description: payload.description ?? '',
       hideChatHistory: payload.hideChatHistory === true,
+      batchIndex: payload.batchIndex ?? 1,
     });
   }
 
@@ -94,6 +95,7 @@ export async function runTelegramAutomation(payload: AutomationRunPayload): Prom
     return postTelegramAutomation(payload.sessionId, `/telegram/automation/join-invite/${sid}`, {
       ...base,
       inviteLink: payload.inviteLink.trim(),
+      joinSequenceIndex: payload.joinSequenceIndex ?? 1,
     });
   }
 
@@ -102,5 +104,74 @@ export async function runTelegramAutomation(payload: AutomationRunPayload): Prom
     action: payload.action,
     message: `Unknown action: ${payload.action}`,
     errorCode: 'UNKNOWN_ACTION',
+  };
+}
+
+export async function runTelegramCreateGroupBatch(
+  payload: AutomationRunPayload,
+  onProgress: (current: number, total: number, label: string) => void,
+): Promise<AutomationRunResult> {
+  const totalTarget = Math.max(1, Math.floor(Number(payload.totalToCreate) || 1));
+  const perRun = Math.max(1, Math.floor(Number(payload.perRun) || totalTarget));
+  const startFrom = Math.max(1, Math.floor(Number(payload.startFrom) || 1));
+  const prefix = (payload.groupNamePrefix ?? payload.groupName ?? '').trim();
+
+  if (!prefix) {
+    return {
+      status: 'error',
+      action: 'create_group',
+      message: 'groupName required',
+      errorCode: 'INVALID_PAYLOAD',
+    };
+  }
+
+  let created = 0;
+  let nextNum = startFrom;
+  const failed: string[] = [];
+  onProgress(0, totalTarget, prefix);
+
+  while (created < totalTarget) {
+    const sliceSize = Math.min(perRun, totalTarget - created);
+
+    for (let i = 0; i < sliceSize; i += 1) {
+      const num = nextNum + i;
+      const groupName = totalTarget > 1 ? `${prefix} ${num}`.trim() : prefix;
+      onProgress(created, totalTarget, groupName);
+
+      const result = await runTelegramAutomation({
+        ...payload,
+        action: 'create_group',
+        groupName,
+        batchIndex: created + 1,
+      });
+
+      if (result.status === 'ok') {
+        created += 1;
+        onProgress(created, totalTarget, groupName);
+      } else {
+        failed.push(`${groupName}: ${result.message ?? 'failed'}`);
+      }
+    }
+
+    nextNum += sliceSize;
+    if (created >= totalTarget) break;
+
+    const minSec = payload.delay?.pause_between_runs_min_sec ?? 45 * 60;
+    const maxSec = payload.delay?.pause_between_runs_max_sec ?? 65 * 60;
+    const low = Math.min(minSec, maxSec);
+    const high = Math.max(minSec, maxSec);
+    const pauseSec = high <= low ? low : low + Math.floor(Math.random() * (high - low + 1));
+    await new Promise((resolve) => setTimeout(resolve, pauseSec * 1000));
+  }
+
+  return {
+    status: created > 0 ? 'ok' : 'error',
+    action: 'create_group',
+    message:
+      failed.length > 0
+        ? `${created}/${totalTarget} created (${failed.length} failed)`
+        : `${created}/${totalTarget} created`,
+    errorCode: created > 0 ? undefined : 'CREATE_GROUP_BATCH_FAILED',
+    result: { success: created, total: totalTarget, failed },
   };
 }

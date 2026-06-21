@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+﻿import { contextBridge, ipcRenderer } from 'electron';
 
 type Platform = 'whatsapp' | 'telegram';
 type LoginMode = 'qr' | 'phone';
@@ -207,6 +207,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
       adminRights?: Record<string, boolean>;
       inviteLink?: string;
     }) => ipcRenderer.invoke('automation:run', payload),
+  },
+  jobQueue: {
+    getSnapshot: (filter?: { brandName?: string; platform?: Platform }) =>
+      ipcRenderer.invoke('jobQueue:getSnapshot', filter),
+    enqueue: (input: {
+      brandName: string;
+      platform: Platform;
+      accountId: string;
+      accountName: string;
+      sessionId: string;
+      action: 'create_group' | 'set_admin' | 'join_by_invite_link';
+      payload: Record<string, unknown>;
+      storedSessionString?: string | null;
+      expectedPhone?: string;
+      delay?: Record<string, number | undefined>;
+    }) => ipcRenderer.invoke('jobQueue:enqueue', input),
+    cancel: (jobId: string) => ipcRenderer.invoke('jobQueue:cancel', jobId),
+    run: (jobId: string) => ipcRenderer.invoke('jobQueue:run', jobId),
+    pauseJob: (jobId: string) => ipcRenderer.invoke('jobQueue:pauseJob', jobId),
+    removeJobs: (jobIds: string[]) => ipcRenderer.invoke('jobQueue:removeJobs', jobIds),
+    clearCompleted: (filter?: { brandName?: string; platform?: Platform }) =>
+      ipcRenderer.invoke('jobQueue:clearCompleted', filter),
+    setPaused: (paused: boolean) => ipcRenderer.invoke('jobQueue:setPaused', paused),
+    onChanged: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('jobQueue:changed', listener);
+      return () => ipcRenderer.removeListener('jobQueue:changed', listener);
+    },
   },
   onSessionInvalid: (
     callback: (payload: { sessionId: string; platform: Platform; message?: string }) => void,

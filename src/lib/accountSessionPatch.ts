@@ -54,14 +54,9 @@ export function patchAccountSnapshotInGroups(
   });
 }
 
-export function findAccountInGroups(
-  groups: AccountBrandGroup[],
-  accountId: string,
-  alternateIds: string[] = [],
-) {
-  const ids = new Set([accountId, ...alternateIds].filter(Boolean));
+export function findAccountInGroups(groups: AccountBrandGroup[], accountId: string) {
   for (const group of groups) {
-    const account = group.accounts.find((row) => ids.has(row.id));
+    const account = group.accounts.find((row) => row.id === accountId);
     if (account) return { group, account };
   }
   return null;

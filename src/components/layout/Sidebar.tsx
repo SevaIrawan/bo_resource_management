@@ -17,7 +17,7 @@ const ICONS = {
 
 const NAV_LABEL_KEYS: Record<(typeof NAV_ITEMS)[number]['id'], string> = {
   'group-monitoring': 'nav.groupMonitoring',
-  admin: 'nav.admin',
+  settings: 'nav.settings',
 };
 
 export function Sidebar() {
@@ -27,7 +27,7 @@ export function Sidebar() {
   const { isAdmin } = usePermissions();
   const navigate = useNavigate();
 
-  const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.id !== 'admin');
+  const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.id !== 'settings');
 
   function handleLogout() {
     logout();

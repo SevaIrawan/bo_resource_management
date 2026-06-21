@@ -64,6 +64,14 @@ const checks = [
     ok: en.includes('workerWhatsApp') && en.includes('workerTelegram') && en.includes('workerCommon'),
   },
   {
+    name: 'Delay config wired to automation (invite + set admin + human jitter)',
+    ok:
+      config.includes('invite_delay_min_sec') &&
+      config.includes('max_admin_slots') &&
+      config.includes('jitterPercentFromHumanProfile') &&
+      /action === 'set_admin'[\s\S]*setAdmin\.betweenTargetsSec/.test(config),
+  },
+  {
     name: 'Export learning shape includes delay + rights',
     ok:
       config.includes('toTelegramLearningConfigShape') &&

@@ -1,8 +1,7 @@
 import pkg from 'whatsapp-web.js';
-import { HUMAN_SETTLE_MEDIUM_MS, HUMAN_SETTLE_SHORT_MS } from '../lib/networkRetry';
 import { withWhatsAppClient } from '../platformLogin/whatsapp';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
-import type { AutomationRunPayload, AutomationRunResult } from './types';
+import type { AutomationRunPayload, AutomationRunResult, WaCreateGroupSettings } from './types';
 
 const { Client } = pkg;
 
@@ -67,16 +66,23 @@ async function assertWhatsAppAccount(
   }
 }
 
-async function resolveInviteLink(
-  chat: { getInviteCode?: () => Promise<string> },
-): Promise<string | null> {
-  try {
-    if (typeof chat.getInviteCode !== 'function') return null;
-    const code = await chat.getInviteCode();
-    if (!code) return null;
-    return `https://chat.whatsapp.com/${code}`;
-  } catch {
-    return null;
+async function applyWaCreateGroupSettings(
+  chat: {
+    setMessagesAdminsOnly?: (value: boolean) => Promise<boolean>;
+    setAddMembersAdminsOnly?: (value: boolean) => Promise<boolean>;
+    setInfoAdminsOnly?: (value: boolean) => Promise<boolean>;
+  },
+  settings?: WaCreateGroupSettings,
+): Promise<void> {
+  if (!settings) return;
+  if (typeof chat.setMessagesAdminsOnly === 'function') {
+    await chat.setMessagesAdminsOnly(Boolean(settings.messagesAdminsOnly));
+  }
+  if (typeof chat.setAddMembersAdminsOnly === 'function') {
+    await chat.setAddMembersAdminsOnly(Boolean(settings.addMembersAdminsOnly));
+  }
+  if (typeof chat.setInfoAdminsOnly === 'function') {
+    await chat.setInfoAdminsOnly(Boolean(settings.infoAdminsOnly));
   }
 }
 
@@ -94,6 +100,12 @@ async function runCreateGroup(
     };
   }
 
+  const batchIndex = Math.max(1, Math.floor(payload.batchIndex ?? 1));
+  if (batchIndex > 1) {
+    const betweenSec = payload.delay?.between_groups_sec ?? 120;
+    await sleep(jitterMs(betweenSec * 1000, payload.delay?.jitter_percent));
+  }
+
   await waitForWhatsAppStoreReady(client);
   const participants = (payload.initialParticipants ?? [])
     .map(toWaParticipantId)
@@ -109,22 +121,39 @@ async function runCreateGroup(
     };
   }
 
-  await sleep(jitterMs(HUMAN_SETTLE_MEDIUM_MS, payload.delay?.jitter_percent));
-
   const gid =
     created.gid?._serialized ??
     (created as { id?: { _serialized?: string } }).id?._serialized ??
     '';
+
   const chat = gid ? await client.getChatById(gid) : null;
-  const inviteLink = chat ? await resolveInviteLink(chat as { getInviteCode?: () => Promise<string> }) : null;
+  if (chat && 'groupMetadata' in chat) {
+    try {
+      await applyWaCreateGroupSettings(
+        chat as {
+          setMessagesAdminsOnly?: (value: boolean) => Promise<boolean>;
+          setAddMembersAdminsOnly?: (value: boolean) => Promise<boolean>;
+          setInfoAdminsOnly?: (value: boolean) => Promise<boolean>;
+        },
+        payload.createGroupSettings,
+      );
+    } catch (err) {
+      console.warn('[wa-automation] apply create group settings failed:', err);
+    }
+  }
+
+  const afterCreateSec = payload.delay?.after_create_sec ?? 90;
+  await sleep(jitterMs(afterCreateSec * 1000, payload.delay?.jitter_percent));
+
+  const groupId = gid.replace(/@g\.us$/i, '');
 
   return {
     status: 'ok',
     action: 'create_group',
+    message: groupId ? `${groupName} (${groupId})` : groupName,
     result: {
-      group_id: gid.replace(/@g\.us$/i, ''),
+      group_id: groupId,
       group_name: groupName,
-      invite_link: inviteLink,
       participant_count: participants.length,
     },
   };
@@ -167,11 +196,13 @@ async function runSetAdmin(
   }
 
   const participantIds = targets.map(toWaParticipantId);
+  const maxSlots = Math.max(1, Math.floor(payload.delay?.max_admin_slots ?? 5));
+  const limitedIds = participantIds.slice(0, maxSlots);
   const promoted: string[] = [];
   const errors: Array<{ target: string; error: string }> = [];
 
-  for (let i = 0; i < participantIds.length; i += 1) {
-    const target = participantIds[i];
+  for (let i = 0; i < limitedIds.length; i += 1) {
+    const target = limitedIds[i];
     try {
       await chat.promoteParticipants([target]);
       promoted.push(target);
@@ -181,7 +212,7 @@ async function runSetAdmin(
         error: err instanceof Error ? err.message : String(err),
       });
     }
-    if (i < participantIds.length - 1) {
+    if (i < limitedIds.length - 1) {
       const baseSec = (payload.delay?.between_targets_sec ?? 3) * 1000;
       await sleep(jitterMs(baseSec, payload.delay?.jitter_percent));
     }
@@ -190,10 +221,40 @@ async function runSetAdmin(
   return {
     status: promoted.length ? 'ok' : 'error',
     action: 'set_admin',
-    message: promoted.length ? undefined : 'No targets promoted',
+    message: promoted.length
+      ? `Promoted ${promoted.length}/${limitedIds.length} in ${chatId.replace(/@g\.us$/i, '')}`
+      : 'No targets promoted',
     errorCode: promoted.length ? undefined : 'SET_ADMIN_FAILED',
     result: { promoted, errors, group_id: chatId.replace(/@g\.us$/i, '') },
   };
+}
+
+function randomBetweenSec(minSec: number, maxSec: number): number {
+  const low = Math.min(minSec, maxSec);
+  const high = Math.max(minSec, maxSec);
+  if (high <= low) return low;
+  return low + Math.random() * (high - low);
+}
+
+async function applyJoinInviteDelay(payload: AutomationRunPayload): Promise<void> {
+  const delay = payload.delay;
+  const seq = Math.max(1, Math.floor(payload.joinSequenceIndex ?? 1));
+  const batchEvery = Math.max(1, Math.floor(delay?.invite_batch_every ?? 10));
+
+  if (seq > 1 && batchEvery > 0 && seq % batchEvery === 0) {
+    const sec = randomBetweenSec(
+      delay?.invite_batch_delay_min_sec ?? 180,
+      delay?.invite_batch_delay_max_sec ?? 360,
+    );
+    await sleep(jitterMs(sec * 1000, delay?.jitter_percent));
+    return;
+  }
+
+  const sec = randomBetweenSec(
+    delay?.invite_delay_min_sec ?? 30,
+    delay?.invite_delay_max_sec ?? 60,
+  );
+  await sleep(jitterMs(sec * 1000, delay?.jitter_percent));
 }
 
 async function runJoinByInviteLink(
@@ -221,7 +282,7 @@ async function runJoinByInviteLink(
   }
 
   await waitForWhatsAppStoreReady(client);
-  await sleep(jitterMs(HUMAN_SETTLE_SHORT_MS, payload.delay?.jitter_percent));
+  await applyJoinInviteDelay(payload);
 
   try {
     const chatId = await client.acceptInvite(code);
@@ -254,8 +315,97 @@ async function runJoinByInviteLink(
   }
 }
 
+function pauseBetweenRunsMs(delay?: AutomationRunPayload['delay']): number {
+  const minSec = delay?.pause_between_runs_min_sec ?? 45 * 60;
+  const maxSec = delay?.pause_between_runs_max_sec ?? 65 * 60;
+  const low = Math.min(minSec, maxSec);
+  const high = Math.max(minSec, maxSec);
+  if (high <= low) return low * 1000;
+  const picked = low + Math.floor(Math.random() * (high - low + 1));
+  return picked * 1000;
+}
+
+export async function runWhatsAppCreateGroupBatch(
+  payload: AutomationRunPayload,
+  onProgress: (current: number, total: number, label: string) => void,
+): Promise<AutomationRunResult> {
+  const totalTarget = Math.max(1, Math.floor(Number(payload.totalToCreate) || 1));
+  const perRun = Math.max(1, Math.floor(Number(payload.perRun) || totalTarget));
+  const startFrom = Math.max(1, Math.floor(Number(payload.startFrom) || 1));
+  const prefix = (payload.groupNamePrefix ?? payload.groupName ?? '').trim();
+
+  if (!prefix) {
+    return {
+      status: 'error',
+      action: 'create_group',
+      message: 'groupName required',
+      errorCode: 'INVALID_PAYLOAD',
+    };
+  }
+
+  return withWhatsAppClient(
+    payload.sessionId,
+    async (client) => {
+      await assertWhatsAppAccount(client, payload.expectedPhone);
+      let created = 0;
+      let nextNum = startFrom;
+      const failed: string[] = [];
+
+      onProgress(0, totalTarget, prefix);
+
+      while (created < totalTarget) {
+        const sliceSize = Math.min(perRun, totalTarget - created);
+
+        for (let i = 0; i < sliceSize; i += 1) {
+          const num = nextNum + i;
+          const groupName = totalTarget > 1 ? `${prefix} ${num}`.trim() : prefix;
+          const batchIndex = created + 1;
+
+          onProgress(created, totalTarget, groupName);
+
+          const result = await runCreateGroup(client, {
+            ...payload,
+            groupName,
+            batchIndex,
+          });
+
+          if (result.status === 'ok') {
+            created += 1;
+            onProgress(created, totalTarget, groupName);
+          } else {
+            failed.push(`${groupName}: ${result.message ?? 'failed'}`);
+          }
+        }
+
+        nextNum += sliceSize;
+
+        if (created >= totalTarget) break;
+
+        console.log(
+          `[wa-automation] batch slice done ${created}/${totalTarget}; pause before next slice`,
+        );
+        await sleep(pauseBetweenRunsMs(payload.delay));
+      }
+
+      return {
+        status: created > 0 ? 'ok' : 'error',
+        action: 'create_group',
+        message:
+          failed.length > 0
+            ? `${created}/${totalTarget} created (${failed.length} failed)`
+            : `${created}/${totalTarget} created`,
+        errorCode: created > 0 ? undefined : 'CREATE_GROUP_BATCH_FAILED',
+        result: { success: created, total: totalTarget, failed },
+      };
+    },
+    { purpose: 'operation' },
+  );
+}
+
 export async function runWhatsAppAutomation(payload: AutomationRunPayload): Promise<AutomationRunResult> {
-  return withWhatsAppClient(payload.sessionId, async (client) => {
+  return withWhatsAppClient(
+    payload.sessionId,
+    async (client) => {
     await assertWhatsAppAccount(client, payload.expectedPhone);
 
     if (payload.action === 'create_group') {
@@ -274,5 +424,7 @@ export async function runWhatsAppAutomation(payload: AutomationRunPayload): Prom
       message: `Unknown action: ${payload.action}`,
       errorCode: 'UNKNOWN_ACTION',
     };
-  });
+  },
+    { purpose: 'operation' },
+  );
 }

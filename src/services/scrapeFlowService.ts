@@ -16,7 +16,7 @@ import { runAccountScraper } from '@/lib/runAccountScraper';
 import {
   markAccountLoginGrace,
   markAccountScrapeGrace,
-  isAccountInSessionGrace,
+  isAccountInLoginGrace,
 } from '@/lib/sessionRealtimePolicy';
 import { invalidateUserSessionOnDeviceFailure } from '@/lib/userActionSession';
 import { scrapeFailureNeedsLoginModal } from '@/lib/scrapeErrorUi';
@@ -80,7 +80,7 @@ export async function executeScrapeRun(input: {
   });
 
   const skipProbe =
-    input.skipDeviceCheck === true || isAccountInSessionGrace(account.id);
+    input.skipDeviceCheck === true || isAccountInLoginGrace(account.id);
 
   if (!skipProbe) {
     const deviceCheck = await checkDeviceSessionForValidColumn({

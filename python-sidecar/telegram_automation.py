@@ -25,6 +25,7 @@ from telethon.tl.functions.channels import TogglePreHistoryHiddenRequest
 from telethon.tl.types import Channel, ChatAdminRights, User
 
 from telegram_human_delay import (
+    apply_join_invite_delay,
     flood_wait_seconds,
     max_floodwait_auto_sleep,
     merge_delay,
@@ -120,6 +121,7 @@ def _admin_rights_from_payload(raw: dict | None) -> ChatAdminRights:
         "add_admins": True,
         "anonymous": False,
         "manage_call": True,
+        "delete_stories": False,
     }
     for key in fields:
         if key in raw:
@@ -165,15 +167,35 @@ async def _export_invite_link(client, channel, delay_cfg: dict) -> str:
     return peer
 
 
-async def _resolve_group_entity(client, *, group_id: str | None, group_link: str | None):
-    if group_link and group_link.strip():
-        return await client.get_entity(group_link.strip())
-    gid = (group_id or "").strip()
-    if gid:
+async def _resolve_group_entity(
+    client,
+    *,
+    group_id: str | None,
+    group_link: str | None,
+    delay_cfg: dict | None = None,
+):
+    delay_cfg = merge_delay(delay_cfg)
+    max_attempts = max(1, int(delay_cfg.get("resolve_entity_max_attempts", 3)))
+    last_err: Exception | None = None
+
+    for attempt in range(1, max_attempts + 1):
         try:
-            return await client.get_entity(int(gid))
-        except ValueError:
-            return await client.get_entity(gid)
+            if group_link and group_link.strip():
+                return await client.get_entity(group_link.strip())
+            gid = (group_id or "").strip()
+            if gid:
+                try:
+                    return await client.get_entity(int(gid))
+                except ValueError:
+                    return await client.get_entity(gid)
+            raise ValueError("GROUP_TARGET_REQUIRED: group_id or group_link required")
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+            if attempt < max_attempts:
+                await sleep_key(delay_cfg, "invite_export_retry_sec", default=3.0)
+
+    if last_err:
+        raise last_err
     raise ValueError("GROUP_TARGET_REQUIRED: group_id or group_link required")
 
 
@@ -195,6 +217,7 @@ async def run_create_group(
     group_name: str,
     description: str = "",
     hide_chat_history: bool = False,
+    batch_index: int = 1,
     session_string: str | None = None,
     expected_phone: str | None = None,
     delay: dict | None = None,
@@ -206,6 +229,7 @@ async def run_create_group(
 
     delay_cfg = merge_delay(delay)
     about = (description or "").strip()[:255]
+    batch_idx = max(1, int(batch_index or 1))
 
     async with tg_session_lock(session_id):
         client, prep_err = await _prepare_session(session_id, session_string, expected_phone)
@@ -214,6 +238,9 @@ async def run_create_group(
             return prep_err
 
         try:
+            if batch_idx > 1:
+                await sleep_key(delay_cfg, "between_groups_sec", default=90.0)
+
             created = await client(
                 CreateChannelRequest(title=name, about=about, megagroup=True)
             )
@@ -266,6 +293,8 @@ async def run_set_admin(
 
     delay_cfg = merge_delay(delay)
     rights = _admin_rights_from_payload(admin_rights)
+    max_slots = max(1, int(delay_cfg.get("max_admin_slots", 5)))
+    normalized = normalized[:max_slots]
 
     async with tg_session_lock(session_id):
         client, prep_err = await _prepare_session(session_id, session_string, expected_phone)
@@ -274,7 +303,12 @@ async def run_set_admin(
             return prep_err
 
         try:
-            entity = await _resolve_group_entity(client, group_id=group_id, group_link=group_link)
+            entity = await _resolve_group_entity(
+                client,
+                group_id=group_id,
+                group_link=group_link,
+                delay_cfg=delay_cfg,
+            )
         except Exception as exc:  # noqa: BLE001
             return _err(action, f"Cannot resolve group: {exc}", error_code="GROUP_NOT_FOUND")
 
@@ -346,6 +380,7 @@ async def run_join_by_invite_link(
     session_id: str,
     *,
     invite_link: str,
+    join_sequence_index: int = 1,
     session_string: str | None = None,
     expected_phone: str | None = None,
     delay: dict | None = None,
@@ -362,6 +397,8 @@ async def run_join_by_invite_link(
         if prep_err:
             prep_err["action"] = action
             return prep_err
+
+        await apply_join_invite_delay(delay_cfg, join_sequence_index)
 
         try:
             invite_hash = extract_invite_hash(link)

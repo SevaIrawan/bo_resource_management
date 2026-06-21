@@ -71,7 +71,16 @@ WA promote has no granular rights in whatsapp-web.js — only delay.
 - TG: `learning Script Worker/telegram/Master/` + `human_delay.py`
 - WA: whatsapp-web.js `GroupChat` — 3 group permission toggles only
 
-## Wire to worker (roadmap)
+## Wire to worker
 
-`readWhatsAppWorkerSettings()` / `readTelegramWorkerSettings()`  
-Export: `toTelegramLearningConfigShape()` / `toWhatsAppWorkerConfigShape()`
+Settings are read in the renderer at **enqueue** time via `readWhatsAppWorkerSettings()` / `readTelegramWorkerSettings()` and frozen on each job as `delay` + payload fields.
+
+| Section | Wired to |
+|---------|----------|
+| Standard delays + human profile jitter | create_group batch, set_admin between targets (via `setAdmin.betweenTargetsSec`), TG flood-wait |
+| Create group toggles | WA `applyWaCreateGroupSettings`; TG `hideChatHistory` + `adminRights` on set_admin |
+| Invite by link | join throttle (`invite_delay_*`, batch rest), `maxPerRun` at enqueue |
+| Set admin | `betweenTargetsSec`, `maxAdminSlots`, `resolveEntityMaxAttempts` (TG) |
+| Leave & delete | Not yet — no job type in queue |
+
+Export shapes: `toTelegramLearningConfigShape()` / `toWhatsAppWorkerConfigShape()` for reference scripts.

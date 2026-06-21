@@ -866,20 +866,13 @@ async function probeWhatsAppSessionLinkedInner(
   if (existing) {
     try {
       const state = await existing.client.getState();
-      const link = classifyWaSocketState(state);
-      if (link === 'linked') {
-        return waStateProbeResult(state);
-      }
-      if (link === 'unlinked') {
-        return waStateProbeResult(state);
+      const immediate = waStateProbeResult(state);
+      if (immediate.valid || classifyWaSocketState(state) === 'unlinked') {
+        return immediate;
       }
       return pollWaLinkedAfterInit(existing.client, Math.min(8_000, SESSION_CHECK_TIMEOUT_MS));
-    } catch (error) {
-      return {
-        valid: false,
-        message:
-          error instanceof Error ? error.message : 'WA_LINK_LOADING:existing_probe_error',
-      };
+    } catch {
+      await destroyWhatsAppSession(sessionId);
     }
   }
 

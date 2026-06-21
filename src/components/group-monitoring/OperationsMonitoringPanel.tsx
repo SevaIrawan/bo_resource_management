@@ -3,6 +3,7 @@ import {
   ContentNestedPanel,
 } from '@/components/group-monitoring/ContentAreaCard';
 import { OperationsBrandCardList } from '@/components/group-monitoring/OperationsBrandCardList';
+import { OperationsGlobalJobQueuePanel } from '@/components/group-monitoring/OperationsGlobalJobQueuePanel';
 import { OperationsSlicerHeader } from '@/components/group-monitoring/OperationsSlicerHeader';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -19,7 +20,7 @@ import {
 } from '@/lib/operationsFilters';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-/** Tab Operations — brand cards; filter & badge count independen dari tab Account. */
+/** Tab Operations — bookmark Overview (stock) | Job Queue (antrian + join). */
 export function OperationsMonitoringPanel() {
   const { t } = useLanguage();
   const { groups, loading } = useGroupMonitoring();
@@ -83,6 +84,17 @@ export function OperationsMonitoringPanel() {
     [groups, filters],
   );
 
+  const brandList = (
+    <OperationsBrandCardList
+      groups={visibleGroups}
+      activePlatform={filters.platform}
+      masterCounts={masterCounts}
+      stockCounts={stockCounts}
+      avgNdByLine={avgNdByLine}
+      operationsPolicyByBrand={operationsPolicyByBrand}
+    />
+  );
+
   return (
     <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">
       <section className="content-area-shell flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
@@ -97,25 +109,32 @@ export function OperationsMonitoringPanel() {
         </header>
 
         <div className="content-area-body flex min-h-0 flex-1 flex-col overflow-hidden">
-          <ContentNestedPanel className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
-            {loading ? (
-              <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>
-            ) : visibleGroups.length === 0 ? (
-              <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
-                <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
-                <p className="ticket-empty-desc">{t('groupMonitoring.noFilterMatchDesc')}</p>
-              </div>
-            ) : (
-              <OperationsBrandCardList
-                groups={visibleGroups}
-                activePlatform={filters.platform}
-                masterCounts={masterCounts}
-                stockCounts={stockCounts}
-                avgNdByLine={avgNdByLine}
-                operationsPolicyByBrand={operationsPolicyByBrand}
-              />
-            )}
-          </ContentNestedPanel>
+          {filters.bookmark === 'job_queue' ? (
+            <div className="operations-job-queue-view flex min-h-0 flex-1 flex-col overflow-hidden">
+              {loading ? (
+                <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>
+              ) : (
+                <OperationsGlobalJobQueuePanel
+                  groups={groups}
+                  platform={filters.platform}
+                  brandFilter="all"
+                />
+              )}
+            </div>
+          ) : (
+            <ContentNestedPanel className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
+              {loading ? (
+                <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>
+              ) : visibleGroups.length === 0 ? (
+                <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
+                  <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
+                  <p className="ticket-empty-desc">{t('groupMonitoring.noFilterMatchDesc')}</p>
+                </div>
+              ) : (
+                brandList
+              )}
+            </ContentNestedPanel>
+          )}
         </div>
       </section>
     </div>

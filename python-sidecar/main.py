@@ -87,6 +87,7 @@ class ScrapeBody(BaseModel):
     expectedPhone: str | None = None
 
 class AutomationDelayBody(BaseModel):
+    between_groups_sec: float | None = None
     between_targets_sec: float | None = None
     after_create_sec: float | None = None
     flood_wait_extra_sec: float | None = None
@@ -94,11 +95,21 @@ class AutomationDelayBody(BaseModel):
     invite_export_retries: int | None = None
     invite_export_retry_sec: float | None = None
     jitter_percent: float | None = None
+    pause_between_runs_min_sec: float | None = None
+    pause_between_runs_max_sec: float | None = None
+    invite_delay_min_sec: float | None = None
+    invite_delay_max_sec: float | None = None
+    invite_batch_every: int | None = None
+    invite_batch_delay_min_sec: float | None = None
+    invite_batch_delay_max_sec: float | None = None
+    resolve_entity_max_attempts: int | None = None
+    max_admin_slots: int | None = None
 
 class CreateGroupBody(BaseModel):
     groupName: str = Field(min_length=1)
     description: str = ""
     hideChatHistory: bool = False
+    batchIndex: int = 1
     sessionString: str | None = None
     expectedPhone: str | None = None
     delay: AutomationDelayBody | None = None
@@ -114,6 +125,7 @@ class SetAdminBody(BaseModel):
 
 class JoinInviteBody(BaseModel):
     inviteLink: str = Field(min_length=8)
+    joinSequenceIndex: int = 1
     sessionString: str | None = None
     expectedPhone: str | None = None
     delay: AutomationDelayBody | None = None
@@ -204,6 +216,7 @@ async def telegram_automation_create_group(session_id: str, body: CreateGroupBod
         group_name=body.groupName,
         description=body.description,
         hide_chat_history=body.hideChatHistory,
+        batch_index=body.batchIndex,
         session_string=body.sessionString,
         expected_phone=body.expectedPhone,
         delay=_delay_dict(body.delay),
@@ -227,6 +240,7 @@ async def telegram_automation_join_invite(session_id: str, body: JoinInviteBody)
     return await run_join_by_invite_link(
         session_id,
         invite_link=body.inviteLink,
+        join_sequence_index=body.joinSequenceIndex,
         session_string=body.sessionString,
         expected_phone=body.expectedPhone,
         delay=_delay_dict(body.delay),

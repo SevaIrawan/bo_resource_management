@@ -36,6 +36,7 @@ import type { AccountBrandGroup, AccountBrandRow, AccountProcessAction } from '@
 import type { Platform } from '@/types/database';
 import {
   applyDailyMetricsAfterLogin,
+  fetchBrandIdForAccount,
   persistSessionAfterLogin,
   recoverLoginMetricsIfPersisted,
   resolvePostLoginModalStep,
@@ -78,7 +79,7 @@ interface SyncTarget {
 interface UseAccountSyncFlowOptions {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   userId?: string | null;
-  onTicketsReload?: (dbAccountId: string, uiAccountId?: string) => void | Promise<void>;
+  onTicketsReload?: (dbAccountId: string) => void | Promise<void>;
   canOperatePlatform?: boolean;
   /** i18n dari parent — hindari hook tambahan di dalam custom hook. */
   translate: (key: string) => string;
@@ -499,7 +500,6 @@ export function useAccountSyncFlow({
           await applyResult(groupId, account.id, outcome.invalidResult, {
             masterTotal: outcome.masterJoined,
           });
-          await onTicketsReload?.(outcome.dbAccountId, account.id);
           unlockUserAction(account.id);
           patchRowProcessAction(groupId, account.id, 'sync');
           showLoginModal(
@@ -530,7 +530,10 @@ export function useAccountSyncFlow({
           setSyncMessage(outcome.syncMessage);
           setStep(outcome.modalStep);
 
-          await onTicketsReload?.(outcome.dbAccountId, account.id);
+          const brandId = await fetchBrandIdForAccount(outcome.dbAccountId);
+          if (brandId) {
+            await onTicketsReload?.(outcome.dbAccountId);
+          }
           return;
         }
 
@@ -717,7 +720,6 @@ export function useAccountSyncFlow({
         if (outcome.kind === 'invalidated-login') {
           updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
           await applyResult(groupId, account.id, outcome.invalidResult);
-          await onTicketsReload?.(outcome.dbAccountId, account.id);
           unlockUserAction(account.id);
           patchRowProcessAction(groupId, account.id, 'sync');
           holdRowStateForLogin = true;
@@ -790,7 +792,7 @@ export function useAccountSyncFlow({
 
         setStep('idle');
         if (dbAccountId) {
-          await onTicketsReload?.(dbAccountId, account.id);
+          await onTicketsReload?.(dbAccountId);
         }
       } catch (error) {
         const message = getErrorMessage(error, 'SCRAPER_FAILED');
@@ -982,7 +984,10 @@ export function useAccountSyncFlow({
       );
       setSyncMessage(metrics.syncMessage);
 
-      await onTicketsReload?.(dbAccountId, account.id);
+      const brandId = await fetchBrandIdForAccount(dbAccountId);
+      if (brandId) {
+        await onTicketsReload?.(dbAccountId);
+      }
     } catch (error) {
       const recovered = await recoverLoginMetricsIfPersisted({
         persistedToDb,

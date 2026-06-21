@@ -6,19 +6,13 @@ import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 /** Groups/Admin di UI = hitung dari `group_scrape_daily` (account_id), bukan snapshot. */
 export async function patchGroupsFromDailyInState(
   groups: AccountBrandGroup[],
-  lookupAccountId: string,
-  dbAccountId?: string,
+  accountId: string,
 ): Promise<AccountBrandGroup[]> {
-  const metricsAccountId = dbAccountId ?? lookupAccountId;
-  const found = findAccountInGroups(
-    groups,
-    lookupAccountId,
-    dbAccountId && dbAccountId !== lookupAccountId ? [dbAccountId] : [],
-  );
+  const found = findAccountInGroups(groups, accountId);
   if (!found) return groups;
 
   const { result, master } = await buildMetricsFromScrapeDaily({
-    accountId: metricsAccountId,
+    accountId: found.account.id,
     brand: found.account.brandName,
     platform: found.account.platform,
     sessionValid: found.account.sessionStatus === 'valid',
@@ -27,7 +21,7 @@ export async function patchGroupsFromDailyInState(
 
   return groups.map((group) =>
     group.id === found.group.id
-      ? applySyncResultToGroup(group, found.account.id, result, {
+      ? applySyncResultToGroup(group, accountId, result, {
           masterTotal: master.joinedInMaster,
         })
       : group,

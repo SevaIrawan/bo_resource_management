@@ -3,6 +3,7 @@ export type AutomationAction = 'create_group' | 'set_admin' | 'join_by_invite_li
 export type Platform = 'whatsapp' | 'telegram';
 
 export interface AutomationDelayConfig {
+  between_groups_sec?: number;
   between_targets_sec?: number;
   after_create_sec?: number;
   flood_wait_extra_sec?: number;
@@ -10,6 +11,22 @@ export interface AutomationDelayConfig {
   invite_export_retries?: number;
   invite_export_retry_sec?: number;
   jitter_percent?: number;
+  /** Learning run_create_until_done — jeda antar batch (detik). */
+  pause_between_runs_min_sec?: number;
+  pause_between_runs_max_sec?: number;
+  invite_delay_min_sec?: number;
+  invite_delay_max_sec?: number;
+  invite_batch_every?: number;
+  invite_batch_delay_min_sec?: number;
+  invite_batch_delay_max_sec?: number;
+  resolve_entity_max_attempts?: number;
+  max_admin_slots?: number;
+}
+
+export interface WaCreateGroupSettings {
+  messagesAdminsOnly?: boolean;
+  addMembersAdminsOnly?: boolean;
+  infoAdminsOnly?: boolean;
 }
 
 export interface AutomationRunPayload {
@@ -24,6 +41,14 @@ export interface AutomationRunPayload {
   description?: string;
   hideChatHistory?: boolean;
   initialParticipants?: string[];
+  /** 1-based index in batch (for between_groups delay before 2+) */
+  batchIndex?: number;
+  totalToCreate?: number;
+  /** Learning group.per_run — max grup per slice dalam satu job. */
+  perRun?: number;
+  startFrom?: number;
+  groupNamePrefix?: string;
+  createGroupSettings?: WaCreateGroupSettings;
   /** set_admin */
   groupId?: string;
   groupLink?: string;
@@ -31,6 +56,7 @@ export interface AutomationRunPayload {
   adminRights?: Record<string, boolean>;
   /** join_by_invite_link */
   inviteLink?: string;
+  joinSequenceIndex?: number;
 }
 
 export interface AutomationRunResult {

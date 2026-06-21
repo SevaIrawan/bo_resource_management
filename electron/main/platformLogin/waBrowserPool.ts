@@ -37,6 +37,10 @@ export async function withWaBrowserSlot<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+export function getMaxWaBrowserSlots(): number {
+  return readMaxSlots();
+}
+
 export function getWaBrowserPoolStats(): { inUse: number; waiting: number; max: number } {
   return {
     inUse: slotsInUse,

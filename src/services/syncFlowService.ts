@@ -14,10 +14,8 @@ import { recordSyncActivity } from '@/lib/syncActivityLog';
 import { isRowMisaligned, postSyncModalStep, type PostSyncModalStep } from '@/lib/accountSyncUiFlow';
 import { sessionColumnRoute } from '@/lib/sessionColumnFlowSpec';
 import { completeSyncAfterLiveSession, type SyncSuccessPayload } from '@/lib/syncAccountFlow';
-import { buildMetricsFromScrapeDaily } from '@/lib/accountSyncData';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import { verifyUserSessionForAction } from '@/lib/verifyUserSessionAction';
-import { isAccountInSessionGrace } from '@/lib/sessionRealtimePolicy';
 import {
   buildLogoutMetricsForUserAction,
   invalidateUserSessionOnDeviceFailure,
@@ -234,17 +232,13 @@ export async function executeSyncCheck(input: {
 
   await backfillPlatformSessionIfNeeded({ userId, account, dbAccountId });
 
-  const skipDeviceProbe = isAccountInSessionGrace(account.id);
-
-  const deviceCheck = skipDeviceProbe
-    ? ({ ok: true } as const)
-    : await checkDeviceSessionForValidColumn({
-        sessionId: account.id,
-        platform: account.platform,
-        dbAccountId,
-        action: 'sync',
-        hasDailyToday: hasDaily,
-      });
+  const deviceCheck = await checkDeviceSessionForValidColumn({
+    sessionId: account.id,
+    platform: account.platform,
+    dbAccountId,
+    action: 'sync',
+    hasDailyToday: hasDaily,
+  });
 
   if (!deviceCheck.ok) {
     if (deviceCheck.busy) {
@@ -291,37 +285,25 @@ export async function executeSyncCheck(input: {
       ),
     );
 
-    let result = syncPayload.result;
-    if (syncPayload.hasDailyToday) {
-      const fromDaily = await buildMetricsFromScrapeDaily({
-        accountId: dbAccountId,
-        brand: account.brandName,
-        platform: account.platform,
-        sessionValid: true,
-        forceFresh: true,
-      });
-      result = fromDaily.result;
-    }
-
     const syncedAt = new Date().toISOString();
     const updatedAccount: AccountBrandRow = {
       ...account,
-      ...result,
+      ...syncPayload.result,
       joinedInMaster: syncPayload.masterJoined,
       status: 'active',
       sessionStatus: 'valid',
-      isMisaligned: isRowMisaligned(result),
+      isMisaligned: isRowMisaligned(syncPayload.result),
     };
 
     return {
       kind: 'success',
       dbAccountId,
-      result,
+      result: syncPayload.result,
       masterJoined: syncPayload.masterJoined,
       syncedAt,
       syncMessage: syncPayload.syncMessage,
       modalStep: postSyncModalStep({
-        result,
+        result: syncPayload.result,
         deviceGroupCount: syncPayload.deviceGroupCount,
         hasDailyToday: syncPayload.hasDailyToday,
       }),

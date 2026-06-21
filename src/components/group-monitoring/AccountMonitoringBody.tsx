@@ -32,7 +32,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     userId: user?.id ?? null,
     canOperatePlatform,
     translate: t,
-    onTicketsReload: (dbAccountId, uiAccountId) => refreshIssues(dbAccountId, uiAccountId),
+    onTicketsReload: (dbAccountId) => refreshIssues(dbAccountId),
   });
 
   const removeSlot = useRemoveAccountFromSlot(onGroupsChange, user?.id, canManageStructure);
@@ -42,7 +42,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     if (sync.processingAccountId) {
       ids.add(sync.processingAccountId);
     }
-    if (sync.processingDbAccountId) {
+    if (sync.processingDbAccountId && sync.processingAccountId) {
       ids.add(sync.processingDbAccountId);
     }
     if (sync.step === 'platform-login' && sync.target?.account.id) {

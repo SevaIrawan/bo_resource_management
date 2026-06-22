@@ -160,6 +160,15 @@ export function jobQueueGroupName(job: AutomationJobRecord): string {
   return '—';
 }
 
+/** Modal VIEW create group — nama prefix saja, tanpa rentang (1–5). */
+export function jobQueueCreateGroupViewName(job: AutomationJobRecord): string {
+  const prefix =
+    job.payload.groupNamePrefix?.trim() ||
+    job.payload.groupName?.trim() ||
+    job.progress?.label?.trim();
+  return prefix || '—';
+}
+
 /** Total grup dalam satu job akun (join / set admin). */
 export function jobQueueBatchTotalText(job: AutomationJobRecord): string {
   const total = accountJobStepTotal(job);
@@ -244,7 +253,6 @@ export function jobQueueStatusClass(job: AutomationJobRecord): string {
 
 export function jobQueueCanRun(job: AutomationJobRecord): boolean {
   if (job.status === 'running' || job.status === 'completed') return false;
-  if (job.status === 'queued' && !job.paused) return false;
   return job.status === 'queued' || job.status === 'failed' || job.status === 'cancelled';
 }
 
@@ -259,6 +267,180 @@ export function jobQueueCanCancel(job: AutomationJobRecord): boolean {
 
 export function jobQueueCanDelete(_job: AutomationJobRecord): boolean {
   return true;
+}
+
+/** Satu tombol per status: completed→VIEW, running→PAUSE+CANCEL, queue/failed→RUN. */
+export type JobQueueRowActionMode = 'view' | 'run' | 'active';
+
+export function jobQueueRowActionMode(job: AutomationJobRecord): JobQueueRowActionMode {
+  if (job.status === 'completed') return 'view';
+  if (job.status === 'running') return 'active';
+  return 'run';
+}
+
+export function jobQueueViewSubtitle(
+  job: AutomationJobRecord,
+  t: (key: string) => string,
+): string {
+  return [t(jobQueueActionKey(job.action)), job.brandName, t(jobQueueStatusKey(job.status))].join(
+    ' · ',
+  );
+}
+
+export function jobQueueViewResultSummary(
+  job: AutomationJobRecord,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (job.status === 'failed' && job.error) return job.error;
+  return jobQueueResultText(job, t);
+}
+
+export type JobQueueViewTableColumnId =
+  | 'groupName'
+  | 'groupId'
+  | 'inviteLink'
+  | 'targetJoin'
+  | 'targetAdmin'
+  | 'count'
+  | 'status';
+
+export interface JobQueueViewTableRow {
+  key: string;
+  groupName: string;
+  groupId: string;
+  inviteLink: string;
+  targetJoin: string;
+  targetAdmin: string;
+  count: string;
+  status: string;
+}
+
+const VIEW_COL_I18N: Record<JobQueueViewTableColumnId, string> = {
+  groupName: 'operations.jobQueue.viewColGroupName',
+  groupId: 'operations.jobQueue.viewColGroupId',
+  inviteLink: 'operations.jobQueue.viewColInviteLink',
+  targetJoin: 'operations.jobQueue.viewColTargetJoin',
+  targetAdmin: 'operations.jobQueue.viewColTargetAdmin',
+  count: 'operations.jobQueue.viewColCount',
+  status: 'operations.jobQueue.viewColStatus',
+};
+
+export function jobQueueViewTableColumnIds(
+  job: AutomationJobRecord,
+): JobQueueViewTableColumnId[] {
+  if (job.action === 'create_group') {
+    return ['groupName', 'count', 'status'];
+  }
+  if (job.action === 'set_admin') {
+    return ['groupName', 'groupId', 'inviteLink', 'targetAdmin', 'status'];
+  }
+  return ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
+}
+
+function jobQueueViewRowStatusLabel(
+  job: AutomationJobRecord,
+  rowIndex: number,
+  t: (key: string) => string,
+): string {
+  if (job.status === 'completed') {
+    return t('operations.jobQueue.statusCompleted');
+  }
+  if (job.status === 'failed') {
+    const done = Math.max(0, job.progress?.current ?? 0);
+    if (rowIndex < done) {
+      return t('operations.jobQueue.statusCompleted');
+    }
+    return t('operations.jobQueue.statusFailed');
+  }
+  if (job.status === 'cancelled') {
+    return t('operations.jobQueue.statusCancelled');
+  }
+  return t(jobQueueStatusKey(job.status));
+}
+
+function resolveTargetAdminLabel(job: AutomationJobRecord): string {
+  const names = job.payload.targetAccountNames?.filter(Boolean);
+  if (names?.length) return names.join(', ');
+  const phones = job.payload.targets?.filter(Boolean);
+  if (phones?.length) return phones.join(', ');
+  return '—';
+}
+
+function resolveInviteLink(group: {
+  inviteLink?: string;
+  groupLink?: string;
+}): string {
+  return group.inviteLink?.trim() || group.groupLink?.trim() || '—';
+}
+
+export function jobQueueViewTableRows(
+  job: AutomationJobRecord,
+  t: (key: string) => string,
+): JobQueueViewTableRow[] {
+  if (job.action === 'create_group') {
+    const total = Math.max(1, Math.floor(Number(job.payload.totalToCreate) || 1));
+    const count =
+      job.status === 'completed' || job.status === 'failed'
+        ? String(job.progress?.current ?? total)
+        : String(total);
+    return [
+      {
+        key: 'create-batch',
+        groupName: jobQueueCreateGroupViewName(job),
+        groupId: '—',
+        inviteLink: '—',
+        targetJoin: '—',
+        targetAdmin: '—',
+        count,
+        status: jobQueueViewRowStatusLabel(job, 0, t),
+      },
+    ];
+  }
+
+  const groups = job.payload.groups ?? [];
+  const targetAdmin = resolveTargetAdminLabel(job);
+
+  if (job.action === 'set_admin') {
+    return groups.map((group, index) => ({
+      key: group.groupId || String(index),
+      groupName: group.groupName?.trim() || group.groupId || '—',
+      groupId: group.groupId || '—',
+      inviteLink: resolveInviteLink(group),
+      targetJoin: '—',
+      targetAdmin,
+      count: '—',
+      status: jobQueueViewRowStatusLabel(job, index, t),
+    }));
+  }
+
+  return groups.map((group, index) => ({
+    key: group.groupId || String(index),
+    groupName: group.groupName?.trim() || group.groupId || '—',
+    groupId: group.groupId || '—',
+    inviteLink: resolveInviteLink(group),
+    targetJoin: job.accountName,
+    targetAdmin: '—',
+    count: '—',
+    status: jobQueueViewRowStatusLabel(job, index, t),
+  }));
+}
+
+export function jobQueueViewTableColumnLabel(
+  columnId: JobQueueViewTableColumnId,
+  t: (key: string) => string,
+): string {
+  return t(VIEW_COL_I18N[columnId]);
+}
+
+export function jobQueueViewMetaText(
+  job: AutomationJobRecord,
+  t: (key: string) => string,
+): string {
+  const parts = [`${t('operations.jobQueue.colCreated')}: ${formatJobQueueWhen(job.createdAt)}`];
+  if (job.finishedAt) {
+    parts.push(`${t('operations.jobQueue.viewDetailFinished')}: ${formatJobQueueWhen(job.finishedAt)}`);
+  }
+  return parts.join(' · ');
 }
 
 export function jobQueueStatusKey(status: AutomationJobStatus): string {

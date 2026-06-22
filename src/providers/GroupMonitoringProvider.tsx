@@ -32,6 +32,7 @@ import {
 } from '@/lib/ticketWorkflowLocal';
 import type { TicketSummaryGroup } from '@/lib/ticketGroups';
 import { patchAccountGridAfterDailyWrite } from '@/lib/patchAccountGridAfterDailyWrite';
+import { dispatchMonitoringReloadAfterDailyWrite } from '@/lib/monitoringRealtimeEvents';
 import { mergeGroupsAccountMetrics } from '@/lib/mergeMonitoringGroups';
 import { reconcileOpenTicketsForUser, reconcileTicketsForAccountFromDb } from '@/lib/reconcileTickets';
 import { computeAccountKpis, computeTicketKpis } from '@/lib/monitoringKpis';
@@ -161,7 +162,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         await reconcileTicketsForAccountFromDb(dbAccountId);
         await patchAccountGridFromDb(dbAccountId);
         await setTicketSummariesFromEngine();
-        scheduleReportingReload();
+        dispatchMonitoringReloadAfterDailyWrite();
       } finally {
         accountRefreshBusyRef.current.delete(dbAccountId);
         ticketSyncLockedRef.current = false;
@@ -171,7 +172,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         }
       }
     },
-    [patchAccountGridFromDb, scheduleReportingReload, setTicketSummariesFromEngine],
+    [patchAccountGridFromDb, setTicketSummariesFromEngine],
   );
 
   /** Reconcile DB dulu, lalu reload kartu Issue + reporting (kontrak 150−146=4 ticket). */

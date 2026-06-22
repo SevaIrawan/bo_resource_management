@@ -20,8 +20,9 @@ import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { patchAccountSessionInGroups } from '@/lib/accountSessionPatch';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
 import {
-  isAccountInLoginGrace,
   markAccountLoginGrace,
+  markAccountScrapeGrace,
+  isAccountInLoginGrace,
 } from '@/lib/sessionRealtimePolicy';
 import { postLoginDetectTimeoutMs } from '@/config/syncScraperPolicy';
 import { recordSessionActivityStatus } from '@/lib/recordSessionActivity';
@@ -36,7 +37,6 @@ import type { AccountBrandGroup, AccountBrandRow, AccountProcessAction } from '@
 import type { Platform } from '@/types/database';
 import {
   applyDailyMetricsAfterLogin,
-  fetchBrandIdForAccount,
   persistSessionAfterLogin,
   recoverLoginMetricsIfPersisted,
   resolvePostLoginModalStep,
@@ -60,6 +60,7 @@ import {
 } from '@/lib/userActionGate';
 import { resolveAccountExecuteBlock } from '@/lib/automationJobQueueClient';
 import { CLEAR_SESSION_REASON, clearAccountSession } from '@/lib/clearAccountSession';
+import { isScrapeAbortMessage } from '@/lib/scrapeErrorUi';
 
 export type SyncFlowStep =
   | 'idle'
@@ -75,6 +76,8 @@ interface SyncTarget {
   groupId: string;
   account: AccountBrandRow;
   dbAccountId?: string;
+  /** Modal Scrape now setelah login (bukan setelah sync valid). */
+  scrapePromptPostLogin?: boolean;
 }
 
 interface UseAccountSyncFlowOptions {
@@ -104,7 +107,7 @@ function patchAccountPhone(
 }
 
 function isScrapeCancelledMessage(message: string): boolean {
-  return message.includes('SCRAPER_CANCELLED');
+  return isScrapeAbortMessage(message);
 }
 
 function normalizeSyncErrorMessage(message: string): string {
@@ -138,6 +141,7 @@ export function useAccountSyncFlow({
   const [loginModalEpoch, setLoginModalEpoch] = useState(0);
   const scrapeSessionByAccountRef = useRef<Map<string, string>>(new Map());
   const processingDbAccountIdRef = useRef<string | null>(null);
+  const scrapeUserCancelledRef = useRef(false);
   const [processingDbAccountId, setProcessingDbAccountId] = useState<string | null>(null);
   const [scrapeProgressBySession, setScrapeProgressBySession] = useState<
     Record<string, UiScrapeProgress>
@@ -146,6 +150,8 @@ export function useAccountSyncFlow({
 
   useEffect(() => {
     const unsub = window.electronAPI?.scraper?.onProgress?.((payload) => {
+      if (scrapeUserCancelledRef.current) return;
+
       const current = payload.current ?? 0;
       const total = payload.total ?? 0;
       const percent =
@@ -527,6 +533,7 @@ export function useAccountSyncFlow({
         }
 
         if (outcome.kind === 'success') {
+          markAccountLoginGrace(account.id);
           await applyResult(groupId, account.id, outcome.result, {
             masterTotal: outcome.masterJoined,
             lastSyncAt: outcome.syncedAt,
@@ -539,14 +546,10 @@ export function useAccountSyncFlow({
             groupId,
             account: outcome.updatedAccount,
             dbAccountId: outcome.dbAccountId,
+            scrapePromptPostLogin: false,
           });
           setSyncMessage(outcome.syncMessage);
           setStep(outcome.modalStep);
-
-          const brandId = await fetchBrandIdForAccount(outcome.dbAccountId);
-          if (brandId) {
-            await onTicketsReload?.(outcome.dbAccountId);
-          }
           return;
         }
 
@@ -564,7 +567,6 @@ export function useAccountSyncFlow({
       canOperatePlatform,
       clearRowProcessing,
       dismissSyncModals,
-      onTicketsReload,
       patchRowProcessAction,
       setRowProcessing,
       showLoginModal,
@@ -650,16 +652,28 @@ export function useAccountSyncFlow({
   );
 
   const runScrapeInBackground = useCallback(
-    async (override?: SyncTarget, options?: { skipDeviceCheck?: boolean }) => {
+    async (
+      override?: SyncTarget,
+      options?: { skipDeviceCheck?: boolean; trustedSession?: boolean },
+    ) => {
       const ctx = override ?? target;
       if (!ctx || !userId) return;
 
+      scrapeUserCancelledRef.current = false;
       const { groupId, account } = ctx;
 
       const executeBlock = await resolveAccountExecuteBlock(account);
       if (executeBlock) {
         showSyncError(executeBlock, groupId, account);
         return;
+      }
+
+      const trustedSession =
+        options?.trustedSession === true || options?.skipDeviceCheck === true;
+
+      if (trustedSession) {
+        markAccountLoginGrace(account.id);
+        markAccountScrapeGrace(account.id);
       }
 
       const lock = tryLockUserAction(account.id, 'scraper');
@@ -728,6 +742,7 @@ export function useAccountSyncFlow({
           account,
           dbAccountId,
           skipDeviceCheck: options?.skipDeviceCheck === true,
+          trustedSession,
           onSessionProbeComplete: skipProbe
             ? undefined
             : () => {
@@ -736,7 +751,7 @@ export function useAccountSyncFlow({
               },
         });
 
-        if (outcome.kind === 'invalidated-login') {
+        if (outcome.kind === 'invalidated-login' && !trustedSession) {
           updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
           await applyResult(groupId, account.id, outcome.invalidResult);
           unlockUserAction(account.id);
@@ -767,7 +782,7 @@ export function useAccountSyncFlow({
         }
 
         if (outcome.kind === 'error') {
-          if (outcome.needsLogin && outcome.dbAccountId) {
+          if (outcome.needsLogin && outcome.dbAccountId && !trustedSession) {
             updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
             unlockUserAction(account.id);
             patchRowProcessAction(groupId, account.id, 'sync');
@@ -822,8 +837,10 @@ export function useAccountSyncFlow({
       } catch (error) {
         const message = getErrorMessage(error, 'SCRAPER_FAILED');
         if (isScrapeCancelledMessage(message)) {
-          setTarget({ groupId, account, dbAccountId: dbAccountId || undefined });
-          setStep('scrape-cancelled');
+          if (!scrapeUserCancelledRef.current) {
+            setTarget({ groupId, account, dbAccountId: dbAccountId || undefined });
+            setStep('scrape-cancelled');
+          }
           return;
         }
         showSyncError(message, groupId, account);
@@ -851,13 +868,26 @@ export function useAccountSyncFlow({
     ],
   );
 
-  const confirmScrapePrompt = useCallback(() => {
+  const confirmScrapePrompt = useCallback(async () => {
     if (!target) return;
-    const scrapeTarget = target;
+    const { groupId, account } = target;
+
+    const executeBlock = await resolveAccountExecuteBlock(account);
+    if (executeBlock) {
+      showSyncError(executeBlock, groupId, account);
+      return;
+    }
+
+    markAccountLoginGrace(account.id);
+    markAccountScrapeGrace(account.id);
     setStep('idle');
     setSyncMessage(null);
-    void runScrapeInBackground(scrapeTarget, { skipDeviceCheck: true });
-  }, [runScrapeInBackground, target]);
+    setRowProcessing(groupId, account.id, 'scraper', 'scraper');
+    void runScrapeInBackground(target, {
+      skipDeviceCheck: true,
+      trustedSession: true,
+    });
+  }, [runScrapeInBackground, setRowProcessing, showSyncError, target]);
 
   const dismissScrapePrompt = useCallback(() => {
     dismissSyncModals();
@@ -882,8 +912,13 @@ export function useAccountSyncFlow({
   const confirmCancelScrape = useCallback(async () => {
     if (!target || !userId) return;
 
-    const { account } = target;
-    setStep('idle');
+    const { groupId, account } = target;
+    scrapeUserCancelledRef.current = true;
+
+    unlockUserAction(account.id);
+    clearScrapeProgress(account.id);
+    clearRowProcessing(groupId, account.id);
+    setStep('scrape-cancelled');
 
     try {
       let dbAccountId =
@@ -907,9 +942,9 @@ export function useAccountSyncFlow({
         platform: account.platform,
       });
     } catch {
-      // Scrape loop akan reject SCRAPER_CANCELLED; modal sukses dari catch runScrapeInBackground.
+      // UI sudah dibersihkan; main process force-stop Chrome via scraper:cancel.
     }
-  }, [target, userId]);
+  }, [clearRowProcessing, clearScrapeProgress, target, userId]);
 
   const dismissScrapeCancelled = useCallback(() => {
     setStep('idle');
@@ -971,7 +1006,7 @@ export function useAccountSyncFlow({
     const startPostLoginScrape = (updatedAccount: AccountBrandRow) => {
       void runScrapeInBackground(
         { groupId, account: updatedAccount, dbAccountId },
-        { skipDeviceCheck: true },
+        { skipDeviceCheck: true, trustedSession: true },
       );
     };
 
@@ -995,7 +1030,12 @@ export function useAccountSyncFlow({
       });
 
       const updatedAccount = metrics.updatedAccount;
-      setTarget({ groupId, account: updatedAccount, dbAccountId });
+      setTarget({
+        groupId,
+        account: updatedAccount,
+        dbAccountId,
+        scrapePromptPostLogin: true,
+      });
 
       if (savedIntent === 'scraper') {
         clearRowProcessing(groupId, account.id);
@@ -1014,11 +1054,6 @@ export function useAccountSyncFlow({
         }),
       );
       setSyncMessage(metrics.syncMessage);
-
-      const brandId = await fetchBrandIdForAccount(dbAccountId);
-      if (brandId) {
-        await onTicketsReload?.(dbAccountId);
-      }
     } catch (error) {
       const recovered = await recoverLoginMetricsIfPersisted({
         persistedToDb,
@@ -1060,7 +1095,6 @@ export function useAccountSyncFlow({
     applyResult,
     clearRowProcessing,
     loginIntent,
-    onTicketsReload,
     runScrapeInBackground,
     setRowProcessing,
     showSyncError,

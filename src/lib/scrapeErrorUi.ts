@@ -36,7 +36,6 @@ export function isDeviceSessionDeadMessage(message: string | undefined): boolean
   return scrapeFailureNeedsLoginModal(message);
 }
 
-/** Apakah gagal scrape harus buka modal login (session benar-benar mati). */
 export function scrapeFailureNeedsLoginModal(message: string): boolean {
   if (isDeviceBusyMessage(message)) return false;
   const lower = message.toLowerCase();
@@ -51,5 +50,17 @@ export function scrapeFailureNeedsLoginModal(message: string): boolean {
     lower.includes('unlink') ||
     lower.includes('session invalid') ||
     lower.includes('device_not_connected')
+  );
+}
+
+export function isScrapeAbortMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  if (message.includes('SCRAPER_CANCELLED')) return true;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('target closed') ||
+    lower.includes('session closed') ||
+    lower.includes('protocol error') ||
+    lower.includes('browser has disconnected')
   );
 }

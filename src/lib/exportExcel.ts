@@ -12,6 +12,12 @@ import type { GroupStockBucket } from '@/types/groupStock';
 import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
+import type {
+  JobQueueViewTableColumnId,
+  JobQueueViewTableRow,
+} from '@/lib/operationsJobQueueUi';
+import type { AutomationJobAction } from '@/types/automationJob';
+
 function stamp() {
   const now = new Date();
   const y = now.getFullYear();
@@ -242,6 +248,34 @@ export function exportReportingMatrixExcel(input: {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, reportingSheetLabel(input.meta));
   saveWorkbook(workbook, reportingExportFileName(input.meta));
+}
+
+/** Job queue VIEW modal — kolom sama dengan tabel detail per task type. */
+export function exportJobQueueViewExcel(input: {
+  accountName: string;
+  action: AutomationJobAction;
+  columns: JobQueueViewTableColumnId[];
+  columnLabels: string[];
+  rows: JobQueueViewTableRow[];
+}) {
+  const actionPart =
+    input.action === 'join_by_invite_link'
+      ? 'join'
+      : input.action === 'create_group'
+        ? 'create'
+        : 'set-admin';
+  const sheet = XLSX.utils.json_to_sheet(
+    input.rows.map((row) => {
+      const record: Record<string, string> = {};
+      input.columns.forEach((col, index) => {
+        record[input.columnLabels[index]] = row[col];
+      });
+      return record;
+    }),
+  );
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Job result');
+  saveWorkbook(workbook, rmExportFileName(`${input.accountName}_job-${actionPart}`));
 }
 
 export function exportAllTicketGroupsExcel(

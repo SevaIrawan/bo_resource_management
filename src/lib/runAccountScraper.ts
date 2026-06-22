@@ -2,6 +2,7 @@ import { writeScrapeDailyRows, type ScrapedGroupPayload } from '@/lib/accountScr
 import { dedupeScrapedGroupsByGroupId } from '@/lib/dedupeScrapedGroups';
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
+import { isScrapeAbortMessage } from '@/lib/scrapeErrorUi';
 import { withNetworkRetry } from '@/lib/networkRetry';
 import { finishScrapeRun, startScrapeRun } from '@/lib/scrapeRuns';
 import {
@@ -48,6 +49,7 @@ function countAdminGroupsOnDevice(groups: ScrapedGroupPayload[]): number {
   return groups.filter((g) => g.is_admin === 'yes').length;
 }
 
+/** Satu pintu scrape renderer: Sync Now + kolom Run → Electron `scraper:run`. */
 export async function runAccountScraper(input: RunAccountScraperInput): Promise<ScrapeRunCounts> {
   const api = window.electronAPI?.scraper;
 
@@ -81,14 +83,12 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
   });
 
   try {
-    const result = await withNetworkRetry('Scrape groups', () =>
-      api.run({
-        sessionId: deviceSessionId,
-        platform: input.account.platform,
-        storedSessionString,
-        expectedPhone: input.account.phoneNumber?.trim() || undefined,
-      }),
-    );
+    const result = await api.run({
+      sessionId: deviceSessionId,
+      platform: input.account.platform,
+      storedSessionString,
+      expectedPhone: input.account.phoneNumber?.trim() || undefined,
+    });
 
     const scrapedGroups = dedupeScrapedGroupsByGroupId(result.groups as ScrapedGroupPayload[]);
     const scrapeWrite = await writeScrapeDailyRows({
@@ -151,7 +151,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     return { deviceGroupCount, deviceAdminCount, masterCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Scrape failed';
-    const cancelled = message.includes('SCRAPER_CANCELLED');
+    const cancelled = isScrapeAbortMessage(message);
     if (runId) {
       await finishScrapeRun({
         runId,

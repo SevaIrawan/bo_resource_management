@@ -48,7 +48,7 @@ export function SyncScrapeConfirmModal({
       : t('groupMonitoring.sync.postLoginScrapePendingMessage')
     : rescrape
       ? t('groupMonitoring.sync.rescrapeMessage', { account: accountName })
-      : t('groupMonitoring.sync.noDataMessage');
+      : t('groupMonitoring.sync.postSyncScrapeMessage');
 
   return (
     <BrandModalRoot onBackdropClick={onClose}>

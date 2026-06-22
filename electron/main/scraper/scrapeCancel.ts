@@ -45,3 +45,17 @@ export function throwIfScrapeCancelled(sessionId: string): void {
     throw new ScrapeCancelledError();
   }
 }
+
+/** Cancel scrape = stop total: flag + lepas Chrome WA (sama cancel-count). */
+export async function abortActiveScrape(
+  sessionId: string,
+  platform: 'whatsapp' | 'telegram',
+): Promise<void> {
+  if (activeSessionId === sessionId) {
+    cancelled = true;
+  }
+  if (platform === 'whatsapp') {
+    const { forceReleaseWhatsAppForLogin } = await import('../platformLogin/whatsapp');
+    await forceReleaseWhatsAppForLogin(sessionId, { urgent: true, fast: true }).catch(() => undefined);
+  }
+}

@@ -396,10 +396,12 @@ export function OperationsJobQueueAddBar({
     try {
       const groups = draft.groupIds.map((groupId) => {
         const group = superAdminGroups.find((row) => row.groupId === groupId);
+        const inviteLink = group?.inviteLink?.trim() || undefined;
         return {
           groupId,
           groupName: group?.groupName ?? groupId,
-          groupLink: platform === 'telegram' ? group?.inviteLink ?? undefined : undefined,
+          inviteLink,
+          groupLink: platform === 'telegram' ? inviteLink : undefined,
         };
       });
 
@@ -414,6 +416,7 @@ export function OperationsJobQueueAddBar({
         payload: {
           groups,
           targets,
+          targetAccountNames: targetAccounts.map((row) => row.accountName),
           adminRights:
             platform === 'telegram' ? toTelegramAdminRightsPayload(workerSettings) : undefined,
         },

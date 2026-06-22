@@ -1,5 +1,6 @@
 import pkg from 'whatsapp-web.js';
 import { withWhatsAppClient } from '../platformLogin/whatsapp';
+import { fetchWhatsAppGroupInviteLink } from '../scraper/whatsappGroupInviteLink';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
 import { withPromiseTimeout } from './promiseTimeout';
 import { resolveJoinGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
@@ -185,6 +186,7 @@ async function runCreateGroup(
   await sleep(jitterMs(afterCreateSec * 1000, payload.delay?.jitter_percent));
 
   const groupId = gid.replace(/@g\.us$/i, '');
+  const invite_link = gid ? await fetchWhatsAppGroupInviteLink(client, gid) : null;
 
   return {
     status: 'ok',
@@ -193,6 +195,7 @@ async function runCreateGroup(
     result: {
       group_id: groupId,
       group_name: groupName,
+      invite_link,
       participant_count: participants.length,
     },
   };

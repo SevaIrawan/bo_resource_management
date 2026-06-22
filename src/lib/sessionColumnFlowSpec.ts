@@ -8,6 +8,7 @@ import type { SessionUiStatus } from '@/types/accountMonitoringUi';
  * - "Modal utama" pada jalur INVALID = modal login; tutup (X/backdrop) = batalkan scan, kolom Session tidak berubah.
  * - Jalur VALID + SYNC: tidak ada modal login; langsung backend lalu Now/Later atau resume-empty.
  * - resume-empty hanya bila 0 grup (device/DB/brand); Now/Later bila ada data yang bisa di-scrape.
+ * - Ticket / Reporting / Stock: reload hanya setelah scrape tulis daily (bukan setelah sync probe saja).
  * - VALID + RUN/SYNC: probe device tetap jalan; gagal → login meski badge grid masih valid.
  * - Login FAIL: WA auto-QR; TG error + pesan (tanpa auto-loop QR).
  * - VALID + tombol X (Clear Session, hover row/kolom): WA purge disk + TG stop sidecar + DB invalid → badge Invalid; Sync berikutnya `open_login`.

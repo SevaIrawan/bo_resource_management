@@ -135,7 +135,7 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
         open={step === 'scrape-prompt'}
         accountName={target?.account.accountName ?? ''}
         platform={target?.account.platform}
-        postLogin
+        postLogin={Boolean(target?.scrapePromptPostLogin)}
         postLoginCountsReady={postLoginCountsReady}
         onClose={dismissScrapePrompt}
         onConfirm={confirmScrapePrompt}

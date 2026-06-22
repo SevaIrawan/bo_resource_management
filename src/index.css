@@ -3468,6 +3468,75 @@
     border-top: 1px solid rgba(255, 255, 255, 0.06);
   }
 
+  /* Job queue VIEW — lebar penuh selaras group-links modal */
+  .brand-modal-panel.brand-modal-panel--job-queue-detail {
+    display: flex;
+    flex-direction: column;
+    width: min(92vw, 72rem);
+    max-width: 96vw;
+    height: fit-content;
+    max-height: 96vh;
+    box-sizing: border-box;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .brand-modal-header {
+    flex-shrink: 0;
+    align-items: flex-start;
+    padding: 0.75rem 1.25rem;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .brand-modal-header-main {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .brand-modal-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    gap: 0.625rem;
+    padding: 0.75rem 1.25rem 1rem;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .group-links-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    max-height: min(70vh, calc(96vh - 11rem));
+    overflow: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.375rem;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .group-links-table th,
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .group-links-table td {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .group-links-table__id {
+    max-width: none;
+    white-space: nowrap;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .group-links-table__link a {
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .group-links-table__status {
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .brand-modal-panel.brand-modal-panel--job-queue-detail .brand-modal-actions {
+    flex-shrink: 0;
+    margin-top: 0.25rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
   .group-links-table--master-detail .group-links-table__num {
     text-align: right;
     white-space: nowrap;

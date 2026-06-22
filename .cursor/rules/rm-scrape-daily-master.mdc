@@ -1,0 +1,47 @@
+---
+description: Scrape → daily → master → UI (data nyata device)
+alwaysApply: true
+---
+
+# Pipeline scrape (WAJIB)
+
+```
+Device (WA Electron / TG sidecar)
+  → runAccountScraper → writeScrapeDailyRows
+      → DELETE daily (account_id)
+      → INSERT group_scrape_daily (invite_link, counts, is_admin, …)
+      → rebuildBrandGroupsMaster (RPC rm_rebuild_brand_groups_master)
+  → reconcileTickets + realtime UI
+```
+
+# WA scrape — dua fase
+
+1. **Fase 1 (paralel, pool 12):** metadata dari store — `scrapeWhatsAppGroupFromStore`
+2. **Fase 2 (serial + delay):** `getInviteCode` hanya grup admin — **jangan paralel** pada satu Puppeteer client
+
+Delay: `WA_SCRAPE_GROUP_DELAY_MS` + jitter (`waInviteExportDelayMs`).
+
+# Field dari device — bukan UI
+
+| Field | WA | TG |
+|-------|----|----|
+| invite_link | `getInviteCode` / `fetchWhatsAppGroupInviteLink` (admin) | `_resolve_invite_link` / `_export_invite_link` |
+| counts, is_admin | `scrapeWhatsAppGroupFromStore` | `telegram_scraper.py` |
+
+Master hanya baris dengan `rm_invite_link_is_valid`. Modal group link = **baca** `group_scrape_daily` — jangan "perbaiki" modal tanpa perbaiki scrape/DB.
+
+# Operations (job queue) — device nyata
+
+- **Join**: link dari `groups_master` (`loadMissingMasterGroupsJoinSnapshot`) → `acceptInvite`
+- **Create group**: `createGroup` di device + export invite link
+- **Set admin**: `promoteParticipants` (WA) / Telethon promote (TG)
+
+Validator: `npm run validate:real-operations-data`
+
+# Realtime setelah scrape
+
+1. Tulis daily + rebuild master
+2. `reconcileTicketsForAccountFromDb(accountId)`
+3. `refreshIssues` / reload ticket + grid
+
+Reporting tab = read-only Supabase, `dedupeDailyRowsByGroupIdKeepLatest`, reload `rm-reporting-reload`.

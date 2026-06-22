@@ -108,6 +108,19 @@ const implChecks = [
       );
     })(),
   },
+  {
+    name: 'Scrape pipeline: daily INSERT invite_link + rebuild master RPC',
+    ok: (() => {
+      const scraper = read('src/lib/accountScraper.ts');
+      const wa = read('electron/main/scraper/whatsappScrape.ts');
+      return (
+        scraper.includes('invite_link: group.invite_link') &&
+        scraper.includes('rebuildBrandGroupsMaster') &&
+        scraper.includes('DELETE daily') &&
+        wa.includes('fetchWhatsAppGroupInviteLink')
+      );
+    })(),
+  },
 ];
 
 let failed = 0;

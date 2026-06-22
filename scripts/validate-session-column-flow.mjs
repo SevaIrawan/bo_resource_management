@@ -3,6 +3,15 @@
  * Jalankan: node scripts/validate-session-column-flow.mjs
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+function read(rel) {
+  return readFileSync(join(root, rel), 'utf8');
+}
+
 function sessionColumnRoute(sessionStatus) {
   return sessionStatus === 'invalid' ? 'open_login' : 'check_device';
 }
@@ -53,8 +62,46 @@ const uiChecks = [
   ['Login modal uses attemptRestore=false (fast QR)', true],
   ['After login: close login modal → update group+admin → prompt', true],
   ['0 grup → resume-empty; else Now/Later', true],
-  ['WA login fail: auto QR; TG: error (no auto-loop)', true],
+  ['Ticket/reconcile hanya setelah scrape (bukan sync probe)', true],
+  ['Scraper Now: gate dulu, baru setRowProcessing', true],
+  ['Daily write → reporting + operations reload', true],
 ];
+
+const fileChecks = [
+  {
+    label: 'Sync sukses tidak panggil onTicketsReload',
+    file: 'src/hooks/useAccountSyncFlow.ts',
+    pass: (src) => {
+      const idx = src.indexOf("if (outcome.kind === 'success')");
+      const syncBlock = idx >= 0 ? src.slice(idx, idx + 900) : '';
+      return (
+        syncBlock.length > 0 &&
+        !syncBlock.includes('onTicketsReload') &&
+        syncBlock.includes('setStep(outcome.modalStep)') &&
+        src.includes('confirmScrapePrompt = useCallback(async') &&
+        src.includes('await onTicketsReload?.(dbAccountId)')
+      );
+    },
+  },
+  {
+    label: 'refreshAccountAfterDailyWrite dispatch monitoring reload',
+    file: 'src/providers/GroupMonitoringProvider.tsx',
+    pass: (src) => src.includes('dispatchMonitoringReloadAfterDailyWrite()'),
+  },
+  {
+    label: 'Scrape skip warm bila trustedSession',
+    file: 'src/services/scrapeFlowService.ts',
+    pass: (src) => /!input\.skipDeviceCheck && !input\.trustedSession/.test(src),
+  },
+];
+
+console.log('\n--- Cek file (otomatis) ---');
+for (const check of fileChecks) {
+  const src = read(check.file);
+  const ok = check.pass(src);
+  console.log(`${ok ? '✓' : '✗'} ${check.label}`);
+  if (!ok) failed++;
+}
 
 console.log('\n--- Implementasi (cek manual di repo) ---');
 for (const [label, expected] of uiChecks) {

@@ -10,9 +10,10 @@ import { validateTelegramSession, validateWhatsAppSession } from './validateSess
 import { normalizeScrapeResult } from './scrapeOutput';
 import { runWhatsAppScrape } from './whatsappScrape';
 import {
+  abortActiveScrape,
   clearActiveScrape,
+  isScrapeCancelled,
   registerActiveScrape,
-  requestScrapeCancel,
   ScrapeCancelledError,
 } from './scrapeCancel';
 import { cancelTelegramScrape } from './telegramScrape';
@@ -110,7 +111,7 @@ export function registerScraperIpc() {
     try {
       return await work;
     } catch (error) {
-      if (error instanceof ScrapeCancelledError) {
+      if (error instanceof ScrapeCancelledError || isScrapeCancelled(payload.sessionId)) {
         throw new Error('SCRAPER_CANCELLED');
       }
       throw error;
@@ -124,11 +125,11 @@ export function registerScraperIpc() {
   ipcMain.handle(
     'scraper:cancel',
     async (_event, payload: { sessionId: string; platform: Platform }) => {
-      const signalled = requestScrapeCancel(payload.sessionId);
+      await abortActiveScrape(payload.sessionId, payload.platform);
       if (payload.platform === 'telegram') {
         await cancelTelegramScrape(payload.sessionId).catch(() => undefined);
       }
-      return { ok: signalled };
+      return { ok: true };
     },
   );
 

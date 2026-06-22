@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { OperationsJobQueueDetailModal } from '@/components/group-monitoring/OperationsJobQueueDetailModal';
 import { ScraperStatusMarquee } from '@/components/group-monitoring/ScraperStatusMarquee';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -11,6 +12,7 @@ import {
   jobQueueCanDelete,
   jobQueueCanPause,
   jobQueueCanRun,
+  jobQueueRowActionMode,
   jobQueueEmptyKey,
   jobQueueGroupName,
   jobQueueBatchTotalText,
@@ -43,6 +45,12 @@ export function OperationsJobQueueTable({
 }: OperationsJobQueueTableProps) {
   const { t } = useLanguage();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [viewJobId, setViewJobId] = useState<string | null>(null);
+
+  const viewJob = useMemo(
+    () => jobs.find((job) => job.id === viewJobId) ?? null,
+    [jobs, viewJobId],
+  );
 
   const columns = buildQueueColumns(taskType, showBrand);
   const deletableJobs = useMemo(() => jobs.filter((job) => jobQueueCanDelete(job)), [jobs]);
@@ -141,7 +149,12 @@ export function OperationsJobQueueTable({
                       col.key === 'actions' && 'operations-job-queue-actions-cell',
                     )}
                   >
-                    {col.render(job, t, { onRun, onPause, onCancel })}
+                    {col.render(job, t, {
+                      onRun,
+                      onPause,
+                      onCancel,
+                      onView: (jobId) => setViewJobId(jobId),
+                    })}
                   </td>
                 ))}
               </tr>
@@ -149,6 +162,7 @@ export function OperationsJobQueueTable({
           )}
         </tbody>
       </table>
+      <OperationsJobQueueDetailModal job={viewJob} onClose={() => setViewJobId(null)} />
     </div>
   );
 }
@@ -157,6 +171,7 @@ type JobQueueRowHandlers = {
   onRun?: (jobId: string) => void;
   onPause?: (jobId: string) => void;
   onCancel?: (jobId: string) => void;
+  onView?: (jobId: string) => void;
 };
 
 type QueueColumnDef = {
@@ -178,21 +193,44 @@ function JobQueueRowActions({
   t: (key: string) => string;
   handlers: JobQueueRowHandlers;
 }) {
-  const { onRun, onPause, onCancel } = handlers;
-  const canRun = jobQueueCanRun(job) && Boolean(onRun);
+  const { onRun, onPause, onCancel, onView } = handlers;
+  const mode = jobQueueRowActionMode(job);
+
+  if (mode === 'view') {
+    return (
+      <div className="operations-job-queue-row-actions">
+        <button
+          type="button"
+          className="operations-job-queue-btn operations-job-queue-btn--row"
+          onClick={() => onView?.(job.id)}
+        >
+          {t('operations.jobQueue.actionView')}
+        </button>
+      </div>
+    );
+  }
+
+  if (mode === 'run') {
+    const canRun = jobQueueCanRun(job) && Boolean(onRun);
+    return (
+      <div className="operations-job-queue-row-actions">
+        <button
+          type="button"
+          className="operations-job-queue-btn operations-job-queue-btn--row"
+          disabled={!canRun}
+          onClick={() => onRun?.(job.id)}
+        >
+          {t('operations.jobQueue.actionRun')}
+        </button>
+      </div>
+    );
+  }
+
   const canPause = jobQueueCanPause(job) && Boolean(onPause);
   const canCancel = jobQueueCanCancel(job) && Boolean(onCancel);
 
   return (
     <div className="operations-job-queue-row-actions">
-      <button
-        type="button"
-        className="operations-job-queue-btn operations-job-queue-btn--row"
-        disabled={!canRun}
-        onClick={() => onRun?.(job.id)}
-      >
-        {t('operations.jobQueue.actionRun')}
-      </button>
       <button
         type="button"
         className="operations-job-queue-btn operations-job-queue-btn--row"

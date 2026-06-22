@@ -16,23 +16,28 @@ export type WhatsAppGroupScrapeOptions = {
 const FULL_RETRY_DELAYS_MS = [500, 900, 1400, 2000, 2800, 3600];
 const QUICK_RETRY_DELAYS_MS = [350, 650, 1000];
 
-/**
- * Satu grup: refresh metadata dari server WA (queryAndUpdateGroupMetadataById),
- * baca participant + admin LID-aware. Skip jika sudah tidak member.
- */
-export async function scrapeWhatsAppGroupFromStore(
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetriablePuppeteerEvaluateError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes('protocolerror') ||
+    lower.includes('callfunctionon timed out') ||
+    lower.includes('detached frame') ||
+    lower.includes('execution context was destroyed') ||
+    lower.includes('target closed') ||
+    lower.includes('session closed')
+  );
+}
+
+async function evaluateWhatsAppGroupFromStore(
   client: Client,
   groupId: string,
-  options?: WhatsAppGroupScrapeOptions,
+  retryDelaysMs: number[],
 ): Promise<WhatsAppGroupScrapeStoreResult> {
-  assertWhatsAppScrapeClient(client);
-
-  const maxAttempts = Math.max(1, Math.min(6, options?.maxAttempts ?? FULL_RETRY_DELAYS_MS.length));
-  const retryDelaysMs =
-    maxAttempts <= QUICK_RETRY_DELAYS_MS.length
-      ? QUICK_RETRY_DELAYS_MS.slice(0, maxAttempts)
-      : FULL_RETRY_DELAYS_MS.slice(0, maxAttempts);
-
   return client.pupPage.evaluate(
     async (gid, delays: number[]) => {
     function widSerialized(w: unknown): string {
@@ -221,4 +226,38 @@ export async function scrapeWhatsAppGroupFromStore(
       owner_count: ownerCount,
     };
   }, groupId, retryDelaysMs);
+}
+
+/**
+ * Satu grup: refresh metadata dari server WA (queryAndUpdateGroupMetadataById),
+ * baca participant + admin LID-aware. Skip jika sudah tidak member.
+ */
+export async function scrapeWhatsAppGroupFromStore(
+  client: Client,
+  groupId: string,
+  options?: WhatsAppGroupScrapeOptions,
+): Promise<WhatsAppGroupScrapeStoreResult> {
+  assertWhatsAppScrapeClient(client);
+
+  const maxAttempts = Math.max(1, Math.min(6, options?.maxAttempts ?? FULL_RETRY_DELAYS_MS.length));
+  const retryDelaysMs =
+    maxAttempts <= QUICK_RETRY_DELAYS_MS.length
+      ? QUICK_RETRY_DELAYS_MS.slice(0, maxAttempts)
+      : FULL_RETRY_DELAYS_MS.slice(0, maxAttempts);
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      assertWhatsAppScrapeClient(client);
+      return await evaluateWhatsAppGroupFromStore(client, groupId, retryDelaysMs);
+    } catch (error) {
+      lastError = error;
+      if (!isRetriablePuppeteerEvaluateError(error) || attempt >= maxAttempts - 1) {
+        throw error;
+      }
+      await sleep(retryDelaysMs[attempt] ?? 1500);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('WA_STORE_EVALUATE_FAILED');
 }

@@ -45,6 +45,9 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     if (sync.processingDbAccountId && sync.processingAccountId) {
       ids.add(sync.processingDbAccountId);
     }
+    if (sync.step === 'scrape-prompt' && sync.target?.account.id) {
+      ids.add(sync.target.account.id);
+    }
     if (sync.step === 'platform-login' && sync.target?.account.id) {
       ids.add(sync.target.account.id);
     }

@@ -52,10 +52,35 @@ const checks = [
     ok: waCount.includes('runPooled') && waCount.includes('countWhatsAppGroupsQuick'),
   },
   {
-    name: 'WA scrape getChats sequential per group',
+    name: 'WA scrape store + runPooled (sama countWhatsApp)',
     ok:
-      waScrape.includes('scrapeAllWhatsAppGroups') &&
-      read('electron/main/scraper/whatsappScrapeGroups.ts').includes('getChats'),
+      waScrape.includes('scrapeWhatsAppGroupFromStore') &&
+      waScrape.includes('runPooled') &&
+      waScrape.includes('listWhatsAppGroupIds') &&
+      !waScrape.includes('getChats'),
+  },
+  {
+    name: 'WA scrape: invite serial (bukan paralel di pool)',
+    ok:
+      waScrape.includes('Export invite link') &&
+      waScrape.includes('waInviteExportDelayMs') &&
+      !/runPooled[\s\S]{0,400}fetchWhatsAppGroupInviteLink/.test(waScrape),
+  },
+  {
+    name: 'WA scrape metadata concurrency capped',
+    ok:
+      scaleElectron.includes('WA_SCRAPE_METADATA_CONCURRENCY') &&
+      waScrape.includes('WA_SCRAPE_METADATA_CONCURRENCY'),
+  },
+  {
+    name: 'WA puppeteer protocolTimeout configured',
+    ok: read('electron/main/platformLogin/waPuppeteerChrome.ts').includes('protocolTimeout'),
+  },
+  {
+    name: 'WA store evaluate retry on ProtocolError',
+    ok: read('electron/main/scraper/whatsappGroupScrapeStore.ts').includes(
+      'isRetriablePuppeteerEvaluateError',
+    ),
   },
   {
     name: 'Telegram count quick (iter_dialogs tanpa full scrape)',

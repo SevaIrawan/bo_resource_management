@@ -19,7 +19,7 @@ import {
   isAccountInLoginGrace,
 } from '@/lib/sessionRealtimePolicy';
 import { invalidateUserSessionOnDeviceFailure } from '@/lib/userActionSession';
-import { scrapeFailureNeedsLoginModal } from '@/lib/scrapeErrorUi';
+import { scrapeFailureNeedsLoginModal, isScrapeAbortMessage } from '@/lib/scrapeErrorUi';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
@@ -69,6 +69,8 @@ export async function executeScrapeRun(input: {
   account: AccountBrandRow;
   dbAccountId: string;
   skipDeviceCheck?: boolean;
+  /** Session baru diverifikasi (sync/login) — jangan invalidate DB dari gagal scrape sementara. */
+  trustedSession?: boolean;
   onSessionProbeComplete?: () => void;
 }): Promise<ScrapeRunOutcome> {
   const { account, userId, dbAccountId } = input;
@@ -189,6 +191,14 @@ export async function executeScrapeRun(input: {
   } catch (error) {
     const message = getErrorMessage(error, 'SCRAPER_FAILED');
 
+    if (isScrapeAbortMessage(message)) {
+      return { kind: 'error', message: 'SCRAPER_CANCELLED', needsLogin: false };
+    }
+
+    if (input.trustedSession) {
+      return { kind: 'error', message, needsLogin: false };
+    }
+
     if (scrapeFailureNeedsLoginModal(message)) {
       const { accountId: dbForLogin } = await resolveDbAccountForRow({ userId, account }).catch(
         () => ({ accountId: account.id, matchedBy: 'none' as const }),
@@ -233,6 +243,7 @@ export async function runScrapeFlow(input: {
   account: AccountBrandRow;
   dbAccountId: string;
   skipDeviceCheck?: boolean;
+  trustedSession?: boolean;
   onSessionProbeComplete?: () => void;
 }): Promise<ScrapeRunOutcome> {
   await backfillPlatformSessionIfNeeded({
@@ -241,18 +252,21 @@ export async function runScrapeFlow(input: {
     dbAccountId: input.dbAccountId,
   });
 
-  await warmSessionIfStored({
-    sessionId: input.account.id,
-    platform: input.account.platform,
-    accountId: input.dbAccountId,
-    userId: input.userId,
-  });
+  if (!input.skipDeviceCheck && !input.trustedSession) {
+    await warmSessionIfStored({
+      sessionId: input.account.id,
+      platform: input.account.platform,
+      accountId: input.dbAccountId,
+      userId: input.userId,
+    });
+  }
 
   return executeScrapeRun({
     userId: input.userId,
     account: input.account,
     dbAccountId: input.dbAccountId,
     skipDeviceCheck: input.skipDeviceCheck === true,
+    trustedSession: input.trustedSession === true,
     onSessionProbeComplete: input.onSessionProbeComplete,
   });
 }

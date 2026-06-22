@@ -110,3 +110,13 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     - Full Admin per akun: master brand+platform + status admin/join dari daily terbaru (`fetchAccountGroupLinks` keepLatest).
     Realtime wajib: saat `group_scrape_daily`, `groups_master`, scrape selesai, atau registry berubah → `scheduleReportingReload` → `rm-reporting-reload` → `ReportingMonitoringPanel.loadReport()` (debounce 500ms). UI harus menampilkan data terbaru tanpa asumsi stale.
     Implementasi: `loadJoinGroupReport.ts`, `ReportingMonitoringPanel.tsx`, `GroupMonitoringProvider.scheduleReportingReload`, `useRealtimeMonitoring`.
+
+17. DATA NYATA — SCRAPE & OPERATIONS (wajib, tanpa mock/dummy/fake)
+    Semua path scrape + job queue WAJIB data dari sesi WA/TG live — BUKAN mock, dummy, placeholder DB, atau hardcode null untuk field device.
+    - Scrape WA/TG: `group_id`, `group_name`, `member_count`, `admin_count`, `is_admin`, `invite_link` dari device/sidecar (`getInviteCode` / `_export_invite_link` / `_resolve_invite_link`).
+    - Tulis DB: `writeScrapeDailyRows` → DELETE daily akun → INSERT `group_scrape_daily` → `rebuildBrandGroupsMaster` (RPC `rm_rebuild_brand_groups_master`, hanya link valid masuk master).
+    - Join job: `inviteLink` dari `groups_master` via `loadMissingMasterGroupsJoinSnapshot` — `client.acceptInvite` / sidecar join.
+    - Create group: grup dibuat di device; WA `fetchWhatsAppGroupInviteLink`, TG `_export_invite_link`.
+    - Set admin: `promoteParticipants` (WA) / Telethon promote (TG) — target dari payload nyata.
+    - UI (modal group link, reporting, ticket) = read-only dari Supabase; jangan “perbaiki” tampilan tanpa perbaiki layer scrape/write DB.
+    Validator: `npm run validate:real-operations-data`.

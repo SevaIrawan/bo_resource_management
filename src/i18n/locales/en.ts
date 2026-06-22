@@ -200,6 +200,15 @@ export const en = {
       actionRun: 'RUN',
       actionPause: 'PAUSE',
       actionCancel: 'CANCEL',
+      actionView: 'VIEW',
+      viewColGroupName: 'Group name',
+      viewColGroupId: 'Group ID',
+      viewColInviteLink: 'Invite link',
+      viewColTargetJoin: 'Target join',
+      viewColTargetAdmin: 'Target admin',
+      viewColCount: 'Count',
+      viewColStatus: 'Status',
+      viewDetailFinished: 'Finished',
       deleteSelected: 'Delete selected rows',
       setup: 'Setup',
       setupSave: 'Save to queue',
@@ -465,6 +474,8 @@ export const en = {
     },
     sync: {
       noDataMessage: 'No scrape data yet. Run scraper?',
+      postSyncScrapeMessage:
+        'Session OK — device counts are updated. Save the full group list to the database now?',
       notNow: 'Later',
       scrapeNow: 'Run scraper',
       cancelRunConfirmMessage:

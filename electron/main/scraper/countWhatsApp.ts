@@ -14,7 +14,7 @@ import {
   DEVICE_GROUP_TARGET_MAX,
   QUICK_COUNT_STORE_WAIT_MS,
   runPooled,
-  WA_GROUP_PROCESS_CONCURRENCY,
+  WA_SCRAPE_METADATA_CONCURRENCY,
 } from './deviceGroupScale';
 import { emitScrapeProgress } from './scrapeProgress';
 
@@ -88,7 +88,7 @@ async function countFromConnectedClient(
 
   const scanIds = groupIds.slice(0, DEVICE_GROUP_TARGET_MAX);
 
-  const adminFlags = await runPooled(scanIds, WA_GROUP_PROCESS_CONCURRENCY, async (groupId, index) => {
+  const adminFlags = await runPooled(scanIds, WA_SCRAPE_METADATA_CONCURRENCY, async (groupId, index) => {
     const core = await scrapeWhatsAppGroupFromStore(client, groupId);
     if ('skip' in core) return false;
 

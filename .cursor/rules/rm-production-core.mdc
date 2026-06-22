@@ -1,0 +1,33 @@
+---
+description: Resource Management — produksi nyata, multi-akun, ticket, diagnosa
+alwaysApply: true
+---
+
+# Produksi Nyata (bukan sandbox)
+
+- Live multi-akun 100+ WA/TG, Supabase realtime, installer cross-platform.
+- **DILARANG**: mock, dummy, fake data, hardcode null untuk field device di scrape/operations.
+- **DILARANG**: diagnosa tanpa fakta (kode, log, DB flow, pernyataan user terkonfirmasi).
+- **WAJIB** sebelum jawab bug: trace end-to-end (`Read`, `Grep`), pisahkan fakta vs hipotesis, `npm run validate:*` jika ada.
+- Jika user sudah konfirmasi fakta ("sudah Scraper") — percaya, cari bug di layer lain.
+
+# Multi-akun
+
+- Device key: `resolveDeviceSessionId()` — WA LocalAuth `clientId`/UUID DB; TG UUID akun.
+- WA: satu profil per akun, lock per `sessionId`, pool max ~4 Chrome (`waBrowserPool.ts`).
+- Jangan dua Puppeteer untuk akun sama. TG: sidecar `SESSIONS[session_id]`.
+- Issue/KPI hanya grup/admin — **bukan** login/logout session.
+
+# Ticket — 5 tipe saja (master vs daily per akun)
+
+1. `daily_junk_group` — daily>master (group_id di daily tidak di master)
+2. `missing_group` — master>daily (belum join)
+3. `not_admin` — sudah join, belum admin
+4. `duplicate_group_id` — id sama, nama beda
+5. `duplicate_group_name` — id beda, nama sama
+
+Tidak ada `group_count_mismatch`. Implementasi: `reconcileTickets.ts`.
+
+# Bahasa
+
+- User pakai Indonesia → jawab Indonesia.

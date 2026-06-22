@@ -32,6 +32,7 @@ export interface AutomationJobPayload {
   batchIndex?: number;
   batchTotal?: number;
   joinSequenceIndex?: number;
+  targetAccountNames?: string[];
   createGroupSettings?: {
     messagesAdminsOnly?: boolean;
     addMembersAdminsOnly?: boolean;

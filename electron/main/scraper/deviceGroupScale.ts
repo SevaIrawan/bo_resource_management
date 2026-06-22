@@ -13,6 +13,15 @@ export const QUICK_COUNT_STORE_WAIT_MS = 20_000;
 /** Batas aman daftar grup dari store WA Web (satu pass di browser). */
 export const WA_STORE_GROUP_LIST_CAP = 6000;
 
+/** Scrape metadata — evaluate berat; jangan 12 paralel di satu Puppeteer page. */
+export const WA_SCRAPE_METADATA_CONCURRENCY = Math.max(
+  1,
+  Math.min(
+    12,
+    Math.floor(Number(process.env.RM_WA_SCRAPE_METADATA_CONCURRENCY) || 4),
+  ),
+);
+
 /** Scrape / admin detail — paralel terbatas (count full admin scan). */
 export const WA_GROUP_PROCESS_CONCURRENCY = 12;
 
@@ -26,12 +35,18 @@ export const WA_SCRAPE_GROUP_JITTER_MS = Math.max(
   Math.floor(Number(process.env.RM_WA_SCRAPE_GROUP_JITTER_MS) || 400),
 );
 
+/** Jeda antar export invite link (serial — selaras learning scraper). */
+export function waInviteExportDelayMs(): number {
+  if (WA_SCRAPE_GROUP_JITTER_MS <= 0) return WA_SCRAPE_GROUP_DELAY_MS;
+  return WA_SCRAPE_GROUP_DELAY_MS + Math.floor(Math.random() * WA_SCRAPE_GROUP_JITTER_MS);
+}
+
 const COUNT_BASE_MS = 120_000;
 const COUNT_PER_GROUP_MS = 30;
 const COUNT_MAX_MS = 1_200_000;
 
 const SCRAPE_BASE_MS = 120_000;
-const SCRAPE_PER_GROUP_MS = 2_500;
+const SCRAPE_PER_GROUP_MS = 3_500;
 const SCRAPE_MAX_MS = 3_600_000;
 
 /** Mirror `src/config/syncScraperPolicy.ts` — angka nyata Y/X, cap 3000, tanpa floor 500. */

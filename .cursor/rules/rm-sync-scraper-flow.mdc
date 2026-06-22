@@ -1,0 +1,37 @@
+---
+description: Sync, Run Scraper, login QR — alur kolom session
+alwaysApply: true
+---
+
+# Sync & Run Scraper (logic_sync_scraper.txt)
+
+- Metrik: GROUP (Y/X) + ADMIN (Y/X). Grup dari device, bukan isi pesan.
+- **VALID** Sync: probe device → update grid → [Now|Later] atau resume-empty.
+- **INVALID**: login → sukses → auto-scrape (tanpa Now/Later).
+- **RUN Scraper**: VALID langsung scrape; INVALID login dulu.
+- **Later** = tutup modal, **tidak** scrape. **Cancel scrape** = stop total.
+
+# Kolom Scraper
+
+- INVALID: "Use Sync to log in first"
+- VALID+MATCH: timestamp; VALID+NOT MATCH: RUN + timestamp
+- RUNNING: progress bar + marquee
+- Selesai: update group+admin + timestamp; lalu reconcile ticket
+
+# Telegram QR (jangan regresi)
+
+- Scan sukses → UI `ready`, bukan 500/JSON parse
+- `_finalize_qr_login_if_live`: jangan cancel wait_task prematur
+- Poll retry, jangan stop pada error sementara
+- Sebelum merge: `npm run validate:telegram-login`
+
+# Engine tunggal grid + ticket + modal
+
+- `accountMasterDailyCompare.ts` — Y/X, dedupe group_id raw
+- `buildTicketSummariesFromEngine.ts` — kartu Issue
+- `fetchAccountGroupLinks` — modal Admin vs master (X saja)
+- `fetchAccountDailyGroupLinks` — modal Groups on account (daily)
+
+# Sebelum edit scrape/sync/automation
+
+Trace: `useAccountSyncFlow` → `scrapeFlowService` → `runAccountScraper` → `electron/main/scraper` → `accountScraper.writeScrapeDailyRows`

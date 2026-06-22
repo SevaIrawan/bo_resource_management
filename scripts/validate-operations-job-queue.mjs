@@ -165,6 +165,18 @@ const checks = [
     })(),
   },
   {
+    name: 'Real data: WA scrape + create ambil invite_link device',
+    ok: (() => {
+      const scrape = read('electron/main/scraper/whatsappScrape.ts');
+      const wa = read('electron/main/automation/waAutomation.ts');
+      return (
+        scrape.includes('fetchWhatsAppGroupInviteLink') &&
+        !scrape.includes('invite_link: null') &&
+        wa.includes('fetchWhatsAppGroupInviteLink')
+      );
+    })(),
+  },
+  {
     name: 'Add bar: one enqueue per account (groups batch)',
     ok: (() => {
       const add = read('src/components/group-monitoring/OperationsJobQueueAddBar.tsx');

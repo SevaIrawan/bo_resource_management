@@ -36,6 +36,8 @@ export interface AutomationJobPayload {
   batchTotal?: number;
   /** Join batch: 1-based index for invite-link throttle (Settings → Invite by link). */
   joinSequenceIndex?: number;
+  /** Set admin — nama akun target (selaras kolom TARGET ADMIN di modal VIEW). */
+  targetAccountNames?: string[];
   createGroupSettings?: {
     messagesAdminsOnly?: boolean;
     addMembersAdminsOnly?: boolean;

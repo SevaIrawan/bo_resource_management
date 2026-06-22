@@ -58,6 +58,7 @@ export function waClientPuppeteerOptions(): {
   headless: boolean;
   executablePath: string;
   args: string[];
+  protocolTimeout: number;
 } {
   const args = [
     '--headless=new',
@@ -86,6 +87,10 @@ export function waClientPuppeteerOptions(): {
     headless: true,
     executablePath: resolveWaChromeExecutable(),
     args,
+    protocolTimeout: Math.max(
+      180_000,
+      Math.floor(Number(process.env.RM_WA_PROTOCOL_TIMEOUT_MS) || 600_000),
+    ),
   };
 }
 

@@ -8,13 +8,22 @@ export type ScrapedGroupPayload = {
   owner_count: number;
 };
 
-/** Satu baris per `group_id` — output scraper tidak boleh dobel. */
+/** Satu baris per `group_id` — prefer baris dengan invite_link jika duplikat. */
 export function dedupeScrapedGroupsByGroupId(groups: ScrapedGroupPayload[]): ScrapedGroupPayload[] {
   const map = new Map<string, ScrapedGroupPayload>();
   for (const group of groups) {
     const gid = String(group.group_id ?? '').trim();
     if (!gid) continue;
-    map.set(gid, { ...group, group_id: gid });
+    const prev = map.get(gid);
+    if (!prev) {
+      map.set(gid, { ...group, group_id: gid });
+      continue;
+    }
+    const prevLink = prev.invite_link?.trim();
+    const nextLink = group.invite_link?.trim();
+    if (!prevLink && nextLink) {
+      map.set(gid, { ...group, group_id: gid });
+    }
   }
   return [...map.values()];
 }

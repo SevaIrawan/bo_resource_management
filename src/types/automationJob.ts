@@ -2,6 +2,14 @@ import type { Platform } from '@/types/database';
 
 export type AutomationJobAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
 
+/** Satu entri grup dalam job per-akun (join / set admin). */
+export interface AutomationJobGroupItem {
+  groupId: string;
+  groupName?: string;
+  inviteLink?: string;
+  groupLink?: string;
+}
+
 export type AutomationJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export type AutomationJobRunnerState = 'idle' | 'running' | 'paused';
@@ -11,6 +19,8 @@ export interface AutomationJobPayload {
   groupId?: string;
   groupLink?: string;
   inviteLink?: string;
+  /** Semua grup untuk job per-akun (join / set admin). */
+  groups?: AutomationJobGroupItem[];
   targets?: string[];
   description?: string;
   hideChatHistory?: boolean;
@@ -106,6 +116,10 @@ export interface AutomationJobQueueSnapshot {
   maxConcurrent: number;
   runningCount: number;
   queuedCount: number;
+  /** true jika ada job queued/running — blok Sync/Scraper di tab Account. */
+  blockingExecutes: boolean;
+  settlingSessionIds: string[];
+  globalScrapeActive: boolean;
 }
 
 export interface AutomationJobListFilter {

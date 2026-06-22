@@ -1,13 +1,16 @@
-import { isScrapeActiveForSession } from '../scraper/scrapeCancel';
-import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
+import { isScrapeActiveForSession, isGlobalScrapeInFlight } from '../scraper/scrapeCancel';
+import { isSessionSettling, markSessionSettleAfterJob } from './jobQueueSettle';
+import { accountJobStepTotal } from './jobQueueBatchHelpers';
 import { runAutomationAction, withAutomationAccountLock } from './index';
 import type { AutomationJobRecord } from './jobQueueTypes';
 import type { AutomationRunPayload, AutomationRunResult } from './types';
 import { runTelegramCreateGroupBatch } from './tgAutomationClient';
 import { runWhatsAppCreateGroupBatch } from './waAutomation';
+import { withJobTimeout } from './promiseTimeout';
 import {
   broadcastJobQueueChanged,
   consumeJobStopRequest,
+  failStaleRunningJobs,
   getRunningJobCount,
   getRunnerState,
   markJobFinished,
@@ -20,6 +23,19 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let tickInProgress = false;
 let tickPending = false;
 
+/** Jeda antar akun di antrian (user spec: 60s). */
+const BETWEEN_ACCOUNT_DELAY_MS = 60_000;
+
+const STALE_RUNNING_MS = 30 * 60 * 1000;
+
+const JOB_TIMEOUT_BASE_MS: Record<string, number> = {
+  join_by_invite_link: 20 * 60 * 1000,
+  set_admin: 25 * 60 * 1000,
+  create_group: 90 * 60 * 1000,
+};
+
+const JOB_TIMEOUT_PER_STEP_MS = 5 * 60 * 1000;
+
 function batchTotal(job: AutomationJobRecord): number {
   return Math.max(1, Math.floor(Number(job.payload.totalToCreate) || 1));
 }
@@ -28,12 +44,30 @@ function isCreateGroupBatch(job: AutomationJobRecord): boolean {
   return job.action === 'create_group' && batchTotal(job) > 1;
 }
 
-function batchSuccessCount(result: AutomationRunResult): number {
+function jobTimeoutMs(job: AutomationJobRecord): number {
+  const steps = accountJobStepTotal(job);
+  const base = JOB_TIMEOUT_BASE_MS[job.action] ?? 20 * 60 * 1000;
+  return Math.max(base, steps * JOB_TIMEOUT_PER_STEP_MS);
+}
+
+function batchSuccessCount(result: AutomationRunResult, job: AutomationJobRecord): number {
   const raw = result.result?.success;
   const n = Number(raw);
   if (Number.isFinite(n) && n >= 0) return Math.floor(n);
-  const match = result.message?.match(/^(\d+)\/(\d+)\s+created/i);
-  return match ? Number(match[1]) : 0;
+
+  const joined = result.message?.match(/^(\d+)\/(\d+)\s+joined/i);
+  if (joined) return Number(joined[1]);
+
+  const promoted = result.message?.match(/Promoted\s+(\d+)/i);
+  if (promoted) return Number(promoted[1]);
+
+  const created = result.message?.match(/^(\d+)\/(\d+)\s+created/i);
+  if (created) return Number(created[1]);
+
+  if (result.status === 'ok' && job.action !== 'create_group') {
+    return accountJobStepTotal(job);
+  }
+  return 0;
 }
 
 function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
@@ -60,6 +94,7 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
     adminRights: job.payload.adminRights,
     inviteLink: job.payload.inviteLink,
     joinSequenceIndex: job.payload.joinSequenceIndex,
+    groups: job.payload.groups,
   };
 }
 
@@ -77,35 +112,58 @@ async function runCreateGroupBatchJob(job: AutomationJobRecord): Promise<Automat
   });
 }
 
+async function runAccountAutomationJob(job: AutomationJobRecord): Promise<AutomationRunResult> {
+  const onProgress = (current: number, total: number, label: string) => {
+    updateJobProgress(job.id, { current, total, label });
+  };
+
+  return withJobTimeout(
+    runAutomationAction(jobToRunPayload(job), onProgress),
+    jobTimeoutMs(job),
+    job.action,
+  );
+}
+
 async function runSingleJob(job: AutomationJobRecord): Promise<void> {
   if (!markJobRunning(job.id)) return;
 
   const batch = isCreateGroupBatch(job);
-  if (batch) {
-    const total = batchTotal(job);
-    updateJobProgress(job.id, {
-      current: 0,
-      total,
-      label: job.payload.groupNamePrefix ?? job.payload.groupName,
-    });
-  }
+  const stepTotal = accountJobStepTotal(job);
+  updateJobProgress(job.id, {
+    current: 0,
+    total: stepTotal,
+    label: job.payload.groupNamePrefix ?? job.payload.groupName ?? job.accountName,
+  });
+
+  let finishedRun = false;
 
   try {
-    const result = batch
-      ? await runCreateGroupBatchJob(job)
-      : await withAutomationAccountLock(job.sessionId, () =>
-          runAutomationAction(jobToRunPayload(job)),
-        );
+    const result = batch ? await runCreateGroupBatchJob(job) : await runAccountAutomationJob(job);
 
     if (consumeJobStopRequest(job.id)) {
       return;
     }
 
-    const success = batch ? batchSuccessCount(result) : 0;
-    const total = batch ? batchTotal(job) : 0;
+    finishedRun = true;
+    const success = batchSuccessCount(result, job);
+    const total = stepTotal;
     const message = result.message ?? (batch ? `${success}/${total} created` : 'OK');
 
+    updateJobProgress(job.id, {
+      current: success,
+      total,
+      label: job.payload.groupName ?? job.accountName,
+    });
+
     if (result.status === 'ok') {
+      if (success < total && (job.action === 'join_by_invite_link' || job.action === 'set_admin')) {
+        markJobFinished(job.id, 'failed', {
+          message,
+          batchSuccess: success,
+          error: message,
+        });
+        return;
+      }
       if (batch && success < total) {
         markJobFinished(job.id, 'failed', {
           message,
@@ -115,23 +173,30 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
         return;
       }
       markJobFinished(job.id, 'completed', {
-        message,
-        batchSuccess: batch ? success : undefined,
+        message:
+          job.action === 'join_by_invite_link'
+            ? `Success ${success} group(s)`
+            : job.action === 'set_admin'
+              ? `Success ${success} group(s)`
+              : message,
+        batchSuccess: success,
       });
       return;
     }
 
     markJobFinished(job.id, 'failed', {
       message,
-      batchSuccess: batch ? success : undefined,
+      batchSuccess: success,
       error: result.errorCode ?? message ?? 'AUTOMATION_ERROR',
     });
   } catch (error) {
+    finishedRun = true;
     markJobFinished(job.id, 'failed', {
       error: error instanceof Error ? error.message : 'AUTOMATION_EXCEPTION',
     });
   } finally {
-    scheduleRunnerTick(0);
+    markSessionSettleAfterJob(job.sessionId);
+    scheduleRunnerTick(finishedRun ? BETWEEN_ACCOUNT_DELAY_MS : 0);
   }
 }
 
@@ -145,30 +210,30 @@ async function runnerTick(): Promise<void> {
   try {
     if (getRunnerState() === 'paused') return;
 
-    const max = getMaxConcurrentAutomationJobs();
-    const slots = max - getRunningJobCount();
-    if (slots <= 0) return;
+    if (failStaleRunningJobs(STALE_RUNNING_MS) > 0) {
+      scheduleRunnerTick(0);
+    }
 
-    const candidates = pickQueuedJobsForDispatch(slots);
+    if (getRunningJobCount() > 0) return;
+
+    const candidates = pickQueuedJobsForDispatch(1);
     if (candidates.length === 0) return;
 
-    let scrapeBlocked = false;
-    let dispatched = 0;
-
-    for (const job of candidates) {
-      if (isScrapeActiveForSession(job.sessionId)) {
-        scrapeBlocked = true;
-        continue;
-      }
-      dispatched += 1;
-      void runSingleJob(job);
+    const job = candidates[0];
+    if (isGlobalScrapeInFlight()) {
+      scheduleRunnerRetry(3000);
+      return;
+    }
+    if (isSessionSettling(job.sessionId)) {
+      scheduleRunnerRetry(1000);
+      return;
+    }
+    if (isScrapeActiveForSession(job.sessionId)) {
+      scheduleRunnerRetry(3000);
+      return;
     }
 
-    if (scrapeBlocked && dispatched === 0) {
-      scheduleRunnerRetry(3000);
-    } else if (scrapeBlocked) {
-      scheduleRunnerRetry(3000);
-    }
+    void runSingleJob(job);
   } finally {
     tickInProgress = false;
     if (tickPending) {
@@ -198,4 +263,3 @@ export function notifyRunnerStateChanged(): void {
   broadcastJobQueueChanged();
   scheduleRunnerTick(0);
 }
-

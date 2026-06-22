@@ -58,6 +58,9 @@ function resolveAlertMessage(
   if (code === 'OPERATION_ALREADY_RUNNING') {
     return t('groupMonitoring.accountCard.operationAlreadyRunning');
   }
+  if (code === 'JOB_QUEUE_EXECUTE_FULL') {
+    return t('operations.jobQueue.executeFull');
+  }
   if (code === 'SCRAPER_WRITE_FAILED' || code === 'SCRAPER_FAILED') {
     return t('groupMonitoring.sync.scraperFailed');
   }

@@ -222,6 +222,7 @@ declare global {
             error?: string;
             message?: string;
             paused?: boolean;
+            progress?: { current: number; total: number; label?: string };
             payload: Record<string, unknown>;
           }>;
           runnerState: 'idle' | 'running' | 'paused';
@@ -230,6 +231,9 @@ declare global {
           maxConcurrent: number;
           runningCount: number;
           queuedCount: number;
+          blockingExecutes: boolean;
+          settlingSessionIds: string[];
+          globalScrapeActive: boolean;
         }>;
         enqueue: (input: {
           brandName: string;

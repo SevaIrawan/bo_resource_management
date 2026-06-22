@@ -51,10 +51,15 @@ const checks = [
       addBar.includes('operations-job-queue-field--readonly'),
   },
   {
-    name: 'Queue table has Group and Result columns',
-    ok:
-      read('src/components/group-monitoring/OperationsJobQueueTable.tsx').includes('colGroup') &&
-      read('src/components/group-monitoring/OperationsJobQueueTable.tsx').includes('colResult'),
+    name: 'Queue table: Progress only (no Result column)',
+    ok: (() => {
+      const table = read('src/components/group-monitoring/OperationsJobQueueTable.tsx');
+      return (
+        table.includes('colJoinedTotal') &&
+        table.includes('colProgress') &&
+        !table.includes("key: 'result'")
+      );
+    })(),
   },
   {
     name: 'Create group: wired via SETUP modal + worker settings',
@@ -108,8 +113,7 @@ const checks = [
       const auto = read('electron/main/automation/index.ts');
       return (
         auto.includes("ipcMain.handle('jobQueue:enqueue'") &&
-        auto.includes('scheduleRunnerTick(0)') &&
-        auto.includes('getRunnerState()')
+        auto.includes('scheduleRunnerTick(0)')
       );
     })(),
   },
@@ -122,13 +126,22 @@ const checks = [
     })(),
   },
   {
-    name: 'Electron: scrape per session (bukan global mono)',
+    name: 'Electron: scrape/session guard for job queue',
     ok: (() => {
+      const cancel = read('electron/main/scraper/scrapeCancel.ts');
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
       const scraper = read('electron/main/scraper/index.ts');
+      const guard = read('electron/main/automation/jobQueueGuard.ts');
+      const settle = read('electron/main/automation/jobQueueSettle.ts');
       return (
-        scraper.includes('scrapeRunsBySession') &&
-        scraper.includes('SCRAPER_SESSION_BUSY') &&
-        !scraper.includes('SCRAPER_GLOBAL_BUSY')
+        cancel.includes('isGlobalScrapeInFlight') &&
+        cancel.includes('isScrapeActiveForSession') &&
+        runner.includes('isGlobalScrapeInFlight') &&
+        runner.includes('isSessionSettling') &&
+        runner.includes('markSessionSettleAfterJob') &&
+        guard.includes('assertAccountExecuteAllowed') &&
+        scraper.includes('assertAccountExecuteAllowed') &&
+        settle.includes('POST_JOB_SETTLE_MS')
       );
     })(),
   },
@@ -137,8 +150,48 @@ const checks = [
     ok: read('electron/main/automation/jobQueueTypes.ts').includes('adminRights'),
   },
   {
-    name: 'Renderer: job queue client IPC',
-    ok: read('src/lib/automationJobQueueClient.ts').includes('enqueueAutomationJob'),
+    name: 'Join/set_admin: progress + job timeout',
+    ok: (() => {
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const wa = read('electron/main/automation/waAutomation.ts');
+      const ui = read('src/lib/operationsJobQueueUi.ts');
+      return (
+        runner.includes('withJobTimeout') &&
+        runner.includes('failStaleRunningJobs') &&
+        wa.includes('withPromiseTimeout') &&
+        wa.includes('acceptInvite') &&
+        ui.includes('isJobQueueStepInProgress')
+      );
+    })(),
+  },
+  {
+    name: 'Add bar: one enqueue per account (groups batch)',
+    ok: (() => {
+      const add = read('src/components/group-monitoring/OperationsJobQueueAddBar.tsx');
+      return add.includes('groupsByAccount') && add.includes('payload: { groups }');
+    })(),
+  },
+  {
+    name: 'Sync probe: no warm before gate (single Chrome path)',
+    ok: (() => {
+      const session = read('src/lib/userActionSession.ts');
+      return session.includes('gateDeviceSession') && !session.includes('warmSessionIfStored');
+    })(),
+  },
+  {
+    name: 'Renderer: job queue client + execute blocking',
+    ok: (() => {
+      const client = read('src/lib/automationJobQueueClient.ts');
+      const sync = read('src/hooks/useAccountSyncFlow.ts');
+      const autoSync = read('src/hooks/useAutoAccountSync.ts');
+      return (
+        client.includes('enqueueAutomationJob') &&
+        client.includes('resolveAccountExecuteBlock') &&
+        client.includes('isHeavyDeviceExecuteBlocked') &&
+        sync.includes('resolveAccountExecuteBlock') &&
+        autoSync.includes('isHeavyDeviceExecuteBlocked')
+      );
+    })(),
   },
 ];
 

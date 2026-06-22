@@ -1,5 +1,9 @@
 import { TABLES } from '@/config/tables';
 import { dedupeDailyRowsByGroupIdKeepLatest } from '@/lib/dedupeScrapeDaily';
+import {
+  computeAccountTicketBreakdown,
+  loadMasterDailyForAccount,
+} from '@/lib/accountMasterDailyCompare';
 import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import type { Platform } from '@/types/database';
 
@@ -52,42 +56,9 @@ export async function loadSuperAdminGroupsForSetAdmin(input: {
     .sort((a, b) => a.groupName.localeCompare(b.groupName));
 }
 
-async function loadTargetAdminGroupIdsByAccount(input: {
-  accountIds: string[];
-  brandName: string;
-  platform: Platform;
-}): Promise<Map<string, Set<string>>> {
-  const brand = input.brandName.trim();
-  const adminByGroup = new Map<string, Set<string>>();
-  const accountIds = input.accountIds.filter(Boolean);
-  if (!brand || accountIds.length === 0) return adminByGroup;
-
-  await Promise.all(
-    accountIds.map(async (accountId) => {
-      const daily = dedupeDailyRowsByGroupIdKeepLatest(
-        await fetchAllSupabaseRows<DailyAdminRow>(
-          TABLES.groupScrapeDaily,
-          'group_id, group_name, invite_link, is_admin, brand, platform, scraped_at',
-          [{ column: 'account_id', value: accountId }],
-        ),
-      );
-
-      for (const row of daily) {
-        if (row.is_admin !== 'yes') continue;
-        if (String(row.brand ?? '').trim() !== brand || row.platform !== input.platform) continue;
-        const groupId = String(row.group_id ?? '').trim();
-        if (!groupId) continue;
-        if (!adminByGroup.has(groupId)) adminByGroup.set(groupId, new Set());
-        adminByGroup.get(groupId)!.add(accountId);
-      }
-    }),
-  );
-
-  return adminByGroup;
-}
-
 /**
- * Owner-admin groups where at least one target is not admin yet (latest daily).
+ * Owner-admin groups where target sudah join (ada di daily master brand) tapi belum admin.
+ * Selaras ticket not_admin — bukan grup yang target belum join sama sekali.
  */
 export async function filterSetAdminGroupsForTargets(input: {
   ownerGroups: SuperAdminGroupForSetAdmin[];
@@ -96,15 +67,27 @@ export async function filterSetAdminGroupsForTargets(input: {
   platform: Platform;
 }): Promise<SuperAdminGroupForSetAdmin[]> {
   const targetAccountIds = input.targetAccountIds.filter(Boolean);
-  if (targetAccountIds.length === 0) return [];
+  if (targetAccountIds.length === 0 || input.ownerGroups.length === 0) return [];
 
-  const targetAdminByGroup = await loadTargetAdminGroupIdsByAccount({
-    accountIds: targetAccountIds,
-    brandName: input.brandName,
-    platform: input.platform,
-  });
+  const ownerGroupIds = new Set(input.ownerGroups.map((group) => group.groupId));
+  const eligibleGroupIds = new Set<string>();
 
-  return input.ownerGroups.filter((group) =>
-    targetAccountIds.some((targetId) => !targetAdminByGroup.get(group.groupId)?.has(targetId)),
+  await Promise.all(
+    targetAccountIds.map(async (targetId) => {
+      const { masterRows, dailyRows } = await loadMasterDailyForAccount({
+        accountId: targetId,
+        brandName: input.brandName,
+        platform: input.platform,
+      });
+      const breakdown = computeAccountTicketBreakdown(masterRows, dailyRows);
+      for (const row of breakdown.notAdmin) {
+        const groupId = row.groupId.trim();
+        if (groupId && ownerGroupIds.has(groupId)) {
+          eligibleGroupIds.add(groupId);
+        }
+      }
+    }),
   );
+
+  return input.ownerGroups.filter((group) => eligibleGroupIds.has(group.groupId));
 }

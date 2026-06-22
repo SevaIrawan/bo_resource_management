@@ -1,5 +1,7 @@
 export type AutomationAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
 
+export type AutomationProgressCallback = (current: number, total: number, label: string) => void;
+
 export type Platform = 'whatsapp' | 'telegram';
 
 export interface AutomationDelayConfig {
@@ -57,6 +59,12 @@ export interface AutomationRunPayload {
   /** join_by_invite_link */
   inviteLink?: string;
   joinSequenceIndex?: number;
+  groups?: Array<{
+    groupId: string;
+    groupName?: string;
+    inviteLink?: string;
+    groupLink?: string;
+  }>;
 }
 
 export interface AutomationRunResult {

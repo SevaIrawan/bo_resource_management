@@ -1,5 +1,12 @@
 export type AutomationJobAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
 
+export interface AutomationJobGroupItem {
+  groupId: string;
+  groupName?: string;
+  inviteLink?: string;
+  groupLink?: string;
+}
+
 export type AutomationJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export type AutomationJobRunnerState = 'idle' | 'running' | 'paused';
@@ -11,6 +18,7 @@ export interface AutomationJobPayload {
   groupId?: string;
   groupLink?: string;
   inviteLink?: string;
+  groups?: AutomationJobGroupItem[];
   targets?: string[];
   description?: string;
   hideChatHistory?: boolean;
@@ -102,6 +110,11 @@ export interface AutomationJobQueueSnapshot {
   maxConcurrent: number;
   runningCount: number;
   queuedCount: number;
+  blockingExecutes: boolean;
+  /** sessionId device — jeda post-job automation (5s). */
+  settlingSessionIds: string[];
+  /** Scraper penuh aktif di PC — selaras job queue runner. */
+  globalScrapeActive: boolean;
 }
 
 export interface AutomationJobListFilter {

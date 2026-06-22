@@ -6,16 +6,18 @@ import { useLanguage } from '@/hooks/useLanguage';
 import {
   formatJobQueueWhen,
   isJobQueueBatchInProgress,
+  isJobQueueStepInProgress,
   jobQueueCanCancel,
   jobQueueCanDelete,
   jobQueueCanPause,
   jobQueueCanRun,
   jobQueueEmptyKey,
   jobQueueGroupName,
+  jobQueueBatchTotalText,
+  jobQueueProgressPercent,
   jobQueueResultText,
   jobQueueStatusClass,
   jobQueueStatusLabel,
-  jobQueueTargetsText,
   type JobQueueTaskType,
 } from '@/lib/operationsJobQueueUi';
 import type { AutomationJobRecord } from '@/types/automationJob';
@@ -135,7 +137,7 @@ export function OperationsJobQueueTable({
                     key={col.key}
                     className={cn(
                       col.key === 'created' && 'tabular-nums',
-                      (col.key === 'result' || col.key === 'progress') && 'operations-job-queue-detail',
+                      col.key === 'progress' && 'operations-job-queue-detail',
                       col.key === 'actions' && 'operations-job-queue-actions-cell',
                     )}
                   >
@@ -211,16 +213,53 @@ function JobQueueRowActions({
   );
 }
 
+function JobQueueProgressCell({
+  job,
+  t,
+}: {
+  job: AutomationJobRecord;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  const stepActive = isJobQueueStepInProgress(job);
+  const pct = jobQueueProgressPercent(job);
+  const detail = jobQueueResultText(job, t);
+
+  if (!stepActive) {
+    return <span>{detail}</span>;
+  }
+
+  return (
+    <div className="operations-job-queue-progress">
+      <div
+        className="operations-job-queue-progress-bar"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={detail}
+      >
+        <div className="operations-job-queue-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="operations-job-queue-progress-label">{detail}</span>
+    </div>
+  );
+}
+
 function buildQueueColumns(taskType: JobQueueTaskType, showBrand: boolean): QueueColumnDef[] {
   const statusCol: QueueColumnDef = {
     key: 'status',
     labelKey: 'operations.jobQueue.colStatus',
     render: (job, t) => {
+      const stepInProgress = isJobQueueStepInProgress(job);
       const batchInProgress = isJobQueueBatchInProgress(job);
       const statusLabel = jobQueueStatusLabel(job, t);
       return (
         <span className={cn('operations-job-status', jobQueueStatusClass(job))}>
-          {batchInProgress ? <ScraperStatusMarquee label={statusLabel} /> : statusLabel}
+          {stepInProgress || batchInProgress ? (
+            <ScraperStatusMarquee label={statusLabel} />
+          ) : (
+            statusLabel
+          )}
         </span>
       );
     },
@@ -250,16 +289,10 @@ function buildQueueColumns(taskType: JobQueueTaskType, showBrand: boolean): Queu
     render: (job, t, handlers) => <JobQueueRowActions job={job} t={t} handlers={handlers} />,
   };
 
-  const resultCol: QueueColumnDef = {
-    key: 'result',
-    labelKey: 'operations.jobQueue.colResult',
-    render: (job) => jobQueueResultText(job),
-  };
-
   const progressCol: QueueColumnDef = {
     key: 'progress',
     labelKey: 'operations.jobQueue.colProgress',
-    render: (job) => jobQueueResultText(job),
+    render: (job, t) => <JobQueueProgressCell job={job} t={t} />,
   };
 
   const joinCols: QueueColumnDef[] = [
@@ -267,12 +300,12 @@ function buildQueueColumns(taskType: JobQueueTaskType, showBrand: boolean): Queu
     ...(showBrand ? [brandCol] : []),
     accountCol,
     {
-      key: 'group',
-      labelKey: 'operations.jobQueue.colGroup',
-      render: (job) => jobQueueGroupName(job),
+      key: 'joined',
+      labelKey: 'operations.jobQueue.colJoinedTotal',
+      render: (job) => jobQueueBatchTotalText(job),
     },
+    progressCol,
     createdCol,
-    resultCol,
     actionsCol,
   ];
 
@@ -285,8 +318,8 @@ function buildQueueColumns(taskType: JobQueueTaskType, showBrand: boolean): Queu
       labelKey: 'operations.jobQueue.colBatch',
       render: (job) => jobQueueGroupName(job),
     },
-    createdCol,
     progressCol,
+    createdCol,
     actionsCol,
   ];
 
@@ -295,17 +328,12 @@ function buildQueueColumns(taskType: JobQueueTaskType, showBrand: boolean): Queu
     ...(showBrand ? [brandCol] : []),
     accountCol,
     {
-      key: 'group',
-      labelKey: 'operations.jobQueue.colGroup',
-      render: (job) => jobQueueGroupName(job),
+      key: 'setAdmin',
+      labelKey: 'operations.jobQueue.colSetAdminTotal',
+      render: (job) => jobQueueBatchTotalText(job),
     },
-    {
-      key: 'targets',
-      labelKey: 'operations.jobQueue.colTargets',
-      render: (job) => jobQueueTargetsText(job),
-    },
+    progressCol,
     createdCol,
-    resultCol,
     actionsCol,
   ];
 

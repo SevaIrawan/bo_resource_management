@@ -1,7 +1,20 @@
 import pkg from 'whatsapp-web.js';
 import { withWhatsAppClient } from '../platformLogin/whatsapp';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
-import type { AutomationRunPayload, AutomationRunResult, WaCreateGroupSettings } from './types';
+import { withPromiseTimeout } from './promiseTimeout';
+import { resolveJoinGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
+import type {
+  AutomationProgressCallback,
+  AutomationRunPayload,
+  AutomationRunResult,
+  WaCreateGroupSettings,
+} from './types';
+
+const WA_ACCEPT_INVITE_TIMEOUT_MS = 120_000;
+const WA_CHAT_LOOKUP_TIMEOUT_MS = 90_000;
+const WA_PROMOTE_TIMEOUT_MS = 90_000;
+const WA_DETACHED_FRAME_RETRY_MS = 1_200;
+const WA_DETACHED_FRAME_MAX_ATTEMPTS = 3;
 
 const { Client } = pkg;
 
@@ -41,6 +54,32 @@ function normalizeGroupChatId(groupId: string): string {
   if (!value) return value;
   if (value.includes('@')) return value;
   return `${value}@g.us`;
+}
+
+function isDetachedFrameError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+  return lower.includes('navigating frame was detached') || lower.includes('detached frame');
+}
+
+async function withDetachedFrameRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < WA_DETACHED_FRAME_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (!isDetachedFrameError(error) || attempt === WA_DETACHED_FRAME_MAX_ATTEMPTS - 1) {
+        throw error;
+      }
+      console.warn(`[wa-automation] ${label} detached frame — retry ${attempt + 1}`);
+      await sleep(WA_DETACHED_FRAME_RETRY_MS * (attempt + 1));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
 }
 
 function extractWaInviteCode(link: string): string | null {
@@ -162,6 +201,8 @@ async function runCreateGroup(
 async function runSetAdmin(
   client: InstanceType<typeof Client>,
   payload: AutomationRunPayload,
+  onProgress?: AutomationProgressCallback,
+  options?: { skipStoreReady?: boolean },
 ): Promise<AutomationRunResult> {
   const targets = (payload.targets ?? []).map((t) => t.trim()).filter(Boolean);
   if (!targets.length) {
@@ -183,9 +224,14 @@ async function runSetAdmin(
     };
   }
 
-  await waitForWhatsAppStoreReady(client);
+  if (!options?.skipStoreReady) {
+    await waitForWhatsAppStoreReady(client);
+  }
+  onProgress?.(0, targets.length, 'Loading group…');
   const chatId = normalizeGroupChatId(groupRef);
-  const chat = await client.getChatById(chatId);
+  const chat = await withDetachedFrameRetry('getChatById', () =>
+    withPromiseTimeout(client.getChatById(chatId), WA_CHAT_LOOKUP_TIMEOUT_MS, 'getChatById'),
+  );
   if (!chat.isGroup) {
     return {
       status: 'error',
@@ -203,9 +249,17 @@ async function runSetAdmin(
 
   for (let i = 0; i < limitedIds.length; i += 1) {
     const target = limitedIds[i];
+    onProgress?.(i, limitedIds.length, `Promote ${target.replace(/@.*/, '')}`);
     try {
-      await chat.promoteParticipants([target]);
+      await withDetachedFrameRetry('promoteParticipants', () =>
+        withPromiseTimeout(
+          chat.promoteParticipants([target]),
+          WA_PROMOTE_TIMEOUT_MS,
+          'promoteParticipants',
+        ),
+      );
       promoted.push(target);
+      onProgress?.(i + 1, limitedIds.length, `Promoted ${target.replace(/@.*/, '')}`);
     } catch (err) {
       errors.push({
         target,
@@ -223,7 +277,7 @@ async function runSetAdmin(
     action: 'set_admin',
     message: promoted.length
       ? `Promoted ${promoted.length}/${limitedIds.length} in ${chatId.replace(/@g\.us$/i, '')}`
-      : 'No targets promoted',
+      : errors[0]?.error ?? 'No targets promoted',
     errorCode: promoted.length ? undefined : 'SET_ADMIN_FAILED',
     result: { promoted, errors, group_id: chatId.replace(/@g\.us$/i, '') },
   };
@@ -260,6 +314,7 @@ async function applyJoinInviteDelay(payload: AutomationRunPayload): Promise<void
 async function runJoinByInviteLink(
   client: InstanceType<typeof Client>,
   payload: AutomationRunPayload,
+  onProgress?: AutomationProgressCallback,
 ): Promise<AutomationRunResult> {
   const link = payload.inviteLink?.trim();
   if (!link) {
@@ -282,11 +337,24 @@ async function runJoinByInviteLink(
   }
 
   await waitForWhatsAppStoreReady(client);
+  onProgress?.(0, 1, 'Waiting before join…');
   await applyJoinInviteDelay(payload);
 
+  onProgress?.(0, 1, 'Accepting invite link…');
   try {
-    const chatId = await client.acceptInvite(code);
-    const chat = chatId ? await client.getChatById(chatId) : null;
+    const chatId = await withPromiseTimeout(
+      client.acceptInvite(code),
+      WA_ACCEPT_INVITE_TIMEOUT_MS,
+      'acceptInvite',
+    );
+    const chat = chatId
+      ? await withPromiseTimeout(
+          client.getChatById(chatId),
+          WA_CHAT_LOOKUP_TIMEOUT_MS,
+          'getChatById',
+        )
+      : null;
+    onProgress?.(1, 1, chat?.name?.trim() || 'Joined');
     return {
       status: 'ok',
       action: 'join_by_invite_link',
@@ -402,29 +470,125 @@ export async function runWhatsAppCreateGroupBatch(
   );
 }
 
-export async function runWhatsAppAutomation(payload: AutomationRunPayload): Promise<AutomationRunResult> {
+export async function runWhatsAppAutomation(
+  payload: AutomationRunPayload,
+  onProgress?: AutomationProgressCallback,
+): Promise<AutomationRunResult> {
+  const joinGroups = payload.action === 'join_by_invite_link' ? resolveJoinGroups(payload) : [];
+  const adminGroups = payload.action === 'set_admin' ? resolveSetAdminGroups(payload) : [];
+
+  if (payload.action === 'join_by_invite_link' && joinGroups.length > 0) {
+    return withWhatsAppClient(
+      payload.sessionId,
+      async (client) => {
+        await assertWhatsAppAccount(client, payload.expectedPhone);
+        let success = 0;
+        const failed: string[] = [];
+        for (let i = 0; i < joinGroups.length; i += 1) {
+          const group = joinGroups[i];
+          onProgress?.(i, joinGroups.length, group.groupName ?? group.groupId);
+          const result = await runJoinByInviteLink(
+            client,
+            {
+              ...payload,
+              groupId: group.groupId,
+              groupName: group.groupName,
+              inviteLink: group.inviteLink,
+              joinSequenceIndex: i + 1,
+            },
+            onProgress,
+          );
+          if (result.status === 'ok') {
+            success += 1;
+            onProgress?.(i + 1, joinGroups.length, group.groupName ?? 'Joined');
+          } else {
+            failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+          }
+        }
+        return {
+          status: success > 0 ? 'ok' : 'error',
+          action: 'join_by_invite_link',
+          message: `${success}/${joinGroups.length} joined`,
+          errorCode: success > 0 ? undefined : 'JOIN_BATCH_FAILED',
+          result: { success, total: joinGroups.length, failed },
+        };
+      },
+      { purpose: 'operation' },
+    );
+  }
+
+  if (payload.action === 'set_admin' && adminGroups.length > 0) {
+    return withWhatsAppClient(
+      payload.sessionId,
+      async (client) => {
+        await assertWhatsAppAccount(client, payload.expectedPhone);
+        await waitForWhatsAppStoreReady(client);
+        let success = 0;
+        const failed: string[] = [];
+        for (let i = 0; i < adminGroups.length; i += 1) {
+          const group = adminGroups[i];
+          onProgress?.(i, adminGroups.length, group.groupName ?? group.groupId);
+          const result = await runSetAdmin(
+            client,
+            {
+              ...payload,
+              groupId: group.groupId,
+              groupName: group.groupName,
+              groupLink: group.groupLink,
+            },
+            onProgress,
+            { skipStoreReady: true },
+          );
+          if (result.status === 'ok') {
+            success += 1;
+            onProgress?.(i + 1, adminGroups.length, group.groupName ?? 'Done');
+          } else {
+            failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+          }
+          if (i < adminGroups.length - 1) {
+            const sec = randomBetweenSec(
+              payload.delay?.invite_delay_min_sec ?? 5,
+              payload.delay?.invite_delay_max_sec ?? 12,
+            );
+            await sleep(jitterMs(sec * 1000, payload.delay?.jitter_percent));
+          }
+        }
+        return {
+          status: success > 0 ? 'ok' : 'error',
+          action: 'set_admin',
+          message: `Promoted targets in ${success}/${adminGroups.length} groups`,
+          errorCode: success > 0 ? undefined : 'SET_ADMIN_BATCH_FAILED',
+          result: { success, total: adminGroups.length, failed },
+        };
+      },
+      { purpose: 'operation' },
+    );
+  }
+
+  onProgress?.(0, 1, 'Opening WhatsApp…');
+
   return withWhatsAppClient(
     payload.sessionId,
     async (client) => {
-    await assertWhatsAppAccount(client, payload.expectedPhone);
+      await assertWhatsAppAccount(client, payload.expectedPhone);
 
-    if (payload.action === 'create_group') {
-      return runCreateGroup(client, payload);
-    }
-    if (payload.action === 'set_admin') {
-      return runSetAdmin(client, payload);
-    }
-    if (payload.action === 'join_by_invite_link') {
-      return runJoinByInviteLink(client, payload);
-    }
+      if (payload.action === 'create_group') {
+        return runCreateGroup(client, payload);
+      }
+      if (payload.action === 'set_admin') {
+        return runSetAdmin(client, payload, onProgress);
+      }
+      if (payload.action === 'join_by_invite_link') {
+        return runJoinByInviteLink(client, payload, onProgress);
+      }
 
-    return {
-      status: 'error',
-      action: payload.action,
-      message: `Unknown action: ${payload.action}`,
-      errorCode: 'UNKNOWN_ACTION',
-    };
-  },
+      return {
+        status: 'error',
+        action: payload.action,
+        message: `Unknown action: ${payload.action}`,
+        errorCode: 'UNKNOWN_ACTION',
+      };
+    },
     { purpose: 'operation' },
   );
 }

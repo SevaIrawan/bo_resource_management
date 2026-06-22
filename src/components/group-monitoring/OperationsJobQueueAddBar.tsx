@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DarkSelect } from '@/components/ui/DarkSelect';
-import { DarkMultiSelect } from '@/components/ui/DarkMultiSelect';
 import {
   OperationsJobQueueSetupModal,
   type JobQueueCreateGroupDraft,
@@ -12,6 +11,7 @@ import {
   fetchJobQueueSnapshot,
   subscribeJobQueueChanged,
 } from '@/lib/automationJobQueueClient';
+import { automationJobBusyGroupIdSet } from '@/lib/automationJobBusyGroups';
 import { loadMissingMasterGroupsJoinSnapshot } from '@/lib/loadMissingMasterGroupsForJoin';
 import {
   loadSuperAdminGroupsForSetAdmin,
@@ -80,7 +80,7 @@ export function OperationsJobQueueAddBar({
   }, [groups, platform]);
 
   const [selectedBrand, setSelectedBrand] = useState('');
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [superAdminAccountId, setSuperAdminAccountId] = useState('');
   const [joinableGroups, setJoinableGroups] = useState<MissingMasterGroupForJoin[]>([]);
   const [joinGroupAccountIds, setJoinGroupAccountIds] = useState<Record<string, string[]>>({});
@@ -111,7 +111,7 @@ export function OperationsJobQueueAddBar({
   );
 
   useEffect(() => {
-    setSelectedAccountIds([]);
+    setSelectedAccountId('');
     setSuperAdminAccountId('');
     setJoinableGroups([]);
     setJoinGroupAccountIds({});
@@ -119,18 +119,11 @@ export function OperationsJobQueueAddBar({
   }, [activeBrand, platform]);
 
   useEffect(() => {
-    setSelectedAccountIds((prev) => {
-      const next = prev.filter((id) => validAccounts.some((row) => row.id === id));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [validAccounts]);
-
-  useEffect(() => {
     if (taskType === 'set_admin') return;
-    if (selectedAccountIds.length > 0) return;
+    if (selectedAccountId && validAccounts.some((row) => row.id === selectedAccountId)) return;
     const first = validAccounts[0];
-    if (first) setSelectedAccountIds([first.id]);
-  }, [taskType, selectedAccountIds.length, validAccounts]);
+    setSelectedAccountId(first?.id ?? '');
+  }, [taskType, selectedAccountId, validAccounts]);
 
   useEffect(() => {
     if (taskType !== 'set_admin') return;
@@ -140,7 +133,10 @@ export function OperationsJobQueueAddBar({
   }, [taskType, superAdminAccountId, validAccounts]);
 
   const reloadMissingGroups = useCallback(async () => {
-    const accountIds = selectedAccountIds.filter((id) => validAccounts.some((row) => row.id === id));
+    const accountIds =
+      selectedAccountId && validAccounts.some((row) => row.id === selectedAccountId)
+        ? [selectedAccountId]
+        : [];
     if (!activeBrand || accountIds.length === 0) {
       setJoinableGroups([]);
       setJoinGroupAccountIds({});
@@ -165,15 +161,10 @@ export function OperationsJobQueueAddBar({
 
       accountIds.forEach((accountId, index) => {
         const snapshot = snapshots[index];
-        const busyGroupIds = new Set(
-          (queueSnapshot?.jobs ?? [])
-            .filter(
-              (job) =>
-                job.accountId === accountId &&
-                (job.status === 'queued' || job.status === 'running') &&
-                job.payload.groupId,
-            )
-            .map((job) => String(job.payload.groupId)),
+        const busyGroupIds = automationJobBusyGroupIdSet(queueSnapshot?.jobs ?? [], (job) =>
+          job.accountId === accountId &&
+          job.action === 'join_by_invite_link' &&
+          (job.status === 'queued' || job.status === 'running'),
         );
         for (const row of snapshot.joinable) {
           if (busyGroupIds.has(row.groupId)) continue;
@@ -194,7 +185,7 @@ export function OperationsJobQueueAddBar({
     } finally {
       setLoadingJoinGroups(false);
     }
-  }, [activeBrand, platform, selectedAccountIds, setupOpen, t, validAccounts]);
+  }, [activeBrand, platform, selectedAccountId, setupOpen, t, validAccounts]);
 
   const reloadSuperAdminGroups = useCallback(async () => {
     if (!activeBrand || !superAdminAccountId) {
@@ -216,16 +207,10 @@ export function OperationsJobQueueAddBar({
         platform,
       });
       const queueSnapshot = await fetchJobQueueSnapshot({ brandName: activeBrand, platform });
-      const busyGroupIds = new Set(
-        (queueSnapshot?.jobs ?? [])
-          .filter(
-            (job) =>
-              job.accountId === superAdminAccountId &&
-              job.action === 'set_admin' &&
-              (job.status === 'queued' || job.status === 'running') &&
-              job.payload.groupId,
-          )
-          .map((job) => String(job.payload.groupId)),
+      const busyGroupIds = automationJobBusyGroupIdSet(queueSnapshot?.jobs ?? [], (job) =>
+        job.accountId === superAdminAccountId &&
+        job.action === 'set_admin' &&
+        (job.status === 'queued' || job.status === 'running'),
       );
       const available = rows.filter((row) => !busyGroupIds.has(row.groupId));
       setSuperAdminGroups(available);
@@ -254,10 +239,10 @@ export function OperationsJobQueueAddBar({
     });
   }, [taskType, reloadMissingGroups, reloadSuperAdminGroups]);
 
-  const selectedAccounts = useMemo(
-    () => validAccounts.filter((row) => selectedAccountIds.includes(row.id)),
-    [selectedAccountIds, validAccounts],
-  );
+  const selectedAccounts = useMemo(() => {
+    const account = validAccounts.find((row) => row.id === selectedAccountId);
+    return account ? [account] : [];
+  }, [selectedAccountId, validAccounts]);
 
   const superAdminAccount = validAccounts.find((row) => row.id === superAdminAccountId);
 
@@ -267,59 +252,65 @@ export function OperationsJobQueueAddBar({
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
     const maxPerRun = workerSettings.inviteLink.maxPerRun;
-    const joinIndexByAccount = new Map<string, number>();
-    const queuedByAccount = new Map<string, number>();
+
+    const groupsByAccount = new Map<
+      string,
+      Array<{ groupId: string; groupName: string; inviteLink: string }>
+    >();
+
+    for (const groupId of groupIds) {
+      const group = joinableGroups.find((row) => row.groupId === groupId);
+      if (!group) continue;
+
+      const eligibleIds = new Set(joinGroupAccountIds[group.groupId] ?? []);
+      for (const account of selectedAccounts) {
+        if (!eligibleIds.has(account.id)) continue;
+        const list = groupsByAccount.get(account.id) ?? [];
+        list.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          inviteLink: group.inviteLink,
+        });
+        groupsByAccount.set(account.id, list);
+      }
+    }
 
     setSubmitting(true);
-    let queued = 0;
-    let lastGroupName = '';
+    let queuedAccounts = 0;
+    let totalGroups = 0;
 
     try {
-      for (const groupId of groupIds) {
-        const group = joinableGroups.find((row) => row.groupId === groupId);
-        if (!group) continue;
+      for (const account of selectedAccounts) {
+        let groups = groupsByAccount.get(account.id) ?? [];
+        if (groups.length === 0) continue;
+        if (maxPerRun > 0) groups = groups.slice(0, maxPerRun);
 
-        const eligibleIds = new Set(joinGroupAccountIds[group.groupId] ?? []);
-        const accountsToQueue = selectedAccounts.filter((account) => eligibleIds.has(account.id));
-        if (accountsToQueue.length === 0) continue;
-
-        for (const account of accountsToQueue) {
-          const accountQueued = queuedByAccount.get(account.id) ?? 0;
-          if (maxPerRun > 0 && accountQueued >= maxPerRun) continue;
-
-          const joinSequenceIndex = (joinIndexByAccount.get(account.id) ?? 0) + 1;
-          joinIndexByAccount.set(account.id, joinSequenceIndex);
-          queuedByAccount.set(account.id, accountQueued + 1);
-
-          const ctx = await buildAutomationJobRunContext(account, 'join_by_invite_link');
-          const result = await enqueueAutomationJob({
-            brandName: activeBrand,
-            platform,
-            accountId: account.id,
-            accountName: account.accountName,
-            sessionId: ctx.sessionId,
-            action: 'join_by_invite_link',
-            payload: {
-              groupId: group.groupId,
-              groupName: group.groupName,
-              inviteLink: group.inviteLink,
-              joinSequenceIndex,
-            },
-            storedSessionString: ctx.storedSessionString,
-            expectedPhone: ctx.expectedPhone,
-            delay: ctx.delay,
-          });
-          if (!result.ok) {
-            return returnEnqueueError(result.error, t, setFeedback);
-          }
-          queued += 1;
-          lastGroupName = group.groupName;
+        const ctx = await buildAutomationJobRunContext(account, 'join_by_invite_link');
+        const result = await enqueueAutomationJob({
+          brandName: activeBrand,
+          platform,
+          accountId: account.id,
+          accountName: account.accountName,
+          sessionId: ctx.sessionId,
+          action: 'join_by_invite_link',
+          payload: { groups },
+          storedSessionString: ctx.storedSessionString,
+          expectedPhone: ctx.expectedPhone,
+          delay: ctx.delay,
+        });
+        if (!result.ok) {
+          return returnEnqueueError(result.error, t, setFeedback);
         }
+        queuedAccounts += 1;
+        totalGroups += groups.length;
       }
 
-      if (queued > 0) {
+      if (queuedAccounts > 0) {
         await reloadMissingGroups();
-        return t('operations.jobQueue.queuedJoinBatchOk', { count: queued, group: lastGroupName });
+        return t('operations.jobQueue.queuedJoinAccountsOk', {
+          accounts: queuedAccounts,
+          groups: totalGroups,
+        });
       }
       return null;
     } finally {
@@ -402,41 +393,40 @@ export function OperationsJobQueueAddBar({
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
 
     setSubmitting(true);
-    let queued = 0;
     try {
-      const ctx = await buildAutomationJobRunContext(superAdminAccount, 'set_admin');
-      for (const groupId of draft.groupIds) {
+      const groups = draft.groupIds.map((groupId) => {
         const group = superAdminGroups.find((row) => row.groupId === groupId);
-        const result = await enqueueAutomationJob({
-          brandName: activeBrand,
-          platform,
-          accountId: superAdminAccount.id,
-          accountName: superAdminAccount.accountName,
-          sessionId: ctx.sessionId,
-          action: 'set_admin',
-          payload: {
-            groupId,
-            groupName: group?.groupName ?? groupId,
-            groupLink: platform === 'telegram' ? group?.inviteLink ?? undefined : undefined,
-            targets,
-            adminRights:
-              platform === 'telegram' ? toTelegramAdminRightsPayload(workerSettings) : undefined,
-          },
-          storedSessionString: ctx.storedSessionString,
-          expectedPhone: ctx.expectedPhone,
-          delay: ctx.delay,
-        });
-        if (!result.ok) {
-          return returnEnqueueError(result.error, t, setFeedback);
-        }
-        queued += 1;
+        return {
+          groupId,
+          groupName: group?.groupName ?? groupId,
+          groupLink: platform === 'telegram' ? group?.inviteLink ?? undefined : undefined,
+        };
+      });
+
+      const ctx = await buildAutomationJobRunContext(superAdminAccount, 'set_admin');
+      const result = await enqueueAutomationJob({
+        brandName: activeBrand,
+        platform,
+        accountId: superAdminAccount.id,
+        accountName: superAdminAccount.accountName,
+        sessionId: ctx.sessionId,
+        action: 'set_admin',
+        payload: {
+          groups,
+          targets,
+          adminRights:
+            platform === 'telegram' ? toTelegramAdminRightsPayload(workerSettings) : undefined,
+        },
+        storedSessionString: ctx.storedSessionString,
+        expectedPhone: ctx.expectedPhone,
+        delay: ctx.delay,
+      });
+      if (!result.ok) {
+        return returnEnqueueError(result.error, t, setFeedback);
       }
 
-      if (queued > 0) {
-        await reloadSuperAdminGroups();
-        return t('operations.jobQueue.queuedSetAdminOk', { count: queued });
-      }
-      return null;
+      await reloadSuperAdminGroups();
+      return t('operations.jobQueue.queuedSetAdminOk', { count: groups.length });
     } finally {
       setSubmitting(false);
     }
@@ -459,8 +449,8 @@ export function OperationsJobQueueAddBar({
     if (taskType === 'set_admin') {
       return Boolean(superAdminAccountId && superAdminAccount);
     }
-    return selectedAccountIds.length > 0 && selectedAccounts.length > 0;
-  }, [activeBrand, selectedAccountIds.length, selectedAccounts.length, superAdminAccount, superAdminAccountId, taskType]);
+    return Boolean(selectedAccountId && selectedAccounts.length > 0);
+  }, [activeBrand, selectedAccountId, selectedAccounts.length, superAdminAccount, superAdminAccountId, taskType]);
 
   const brandSelectDisabled = submitting;
   const accountSelectDisabled = submitting;
@@ -557,18 +547,15 @@ export function OperationsJobQueueAddBar({
             {platformAccounts.length === 0 ? (
               <span className="operations-schedule-join-empty">{t('operations.jobQueue.noAccounts')}</span>
             ) : (
-              <DarkMultiSelect
-                values={selectedAccountIds}
-                onChange={setSelectedAccountIds}
+              <DarkSelect
+                value={selectedAccountId}
+                onChange={setSelectedAccountId}
                 options={accountSelectOptions}
                 disabledValues={invalidAccountIds}
                 ariaLabel={t('operations.jobQueue.account')}
                 triggerClassName="account-slicer-select operations-job-queue-select"
                 disabled={accountSelectDisabled}
-                closeOnSelect={false}
-                selectAllLabel={t('operations.jobQueue.selectAll')}
-                placeholder={t('operations.jobQueue.pickAccounts')}
-                summaryLabel={(count) => t('operations.jobQueue.accountsSelected', { count })}
+                placeholder={t('operations.jobQueue.pickAccount')}
               />
             )}
           </div>

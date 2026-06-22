@@ -63,16 +63,65 @@ export function isCreateGroupBatchJob(job: AutomationJobRecord): boolean {
   return job.action === 'create_group' && total > 1;
 }
 
+export function isAccountBatchJob(job: AutomationJobRecord): boolean {
+  if (isCreateGroupBatchJob(job)) return true;
+  const groupCount = job.payload.groups?.length ?? 0;
+  return (
+    (job.action === 'join_by_invite_link' || job.action === 'set_admin') && groupCount > 1
+  );
+}
+
+export function accountJobStepTotal(job: AutomationJobRecord): number {
+  if (job.progress?.total && job.progress.total > 0) return job.progress.total;
+  if (job.payload.groups?.length) return job.payload.groups.length;
+  if (isCreateGroupBatchJob(job)) {
+    return Math.max(1, Math.floor(Number(job.payload.totalToCreate) || 1));
+  }
+  return 1;
+}
+
 export function isJobQueueBatchInProgress(job: AutomationJobRecord): boolean {
-  if (!isCreateGroupBatchJob(job)) return false;
-  return job.status === 'queued' || job.status === 'running';
+  if (job.status !== 'queued' && job.status !== 'running') return false;
+  return isAccountBatchJob(job);
+}
+
+export function isJobQueueStepInProgress(job: AutomationJobRecord): boolean {
+  if (job.status !== 'queued' && job.status !== 'running') return false;
+  if (isAccountBatchJob(job)) return true;
+  if (
+    (job.action === 'join_by_invite_link' || job.action === 'set_admin') &&
+    Boolean(job.progress)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function jobQueueStepProgress(
+  job: AutomationJobRecord,
+): { current: number; total: number; label?: string } | null {
+  if (!job.progress) return null;
+  if (isCreateGroupBatchJob(job)) return job.progress;
+  if (job.action === 'join_by_invite_link' || job.action === 'set_admin') {
+    return job.progress;
+  }
+  return null;
+}
+
+export function jobQueueProgressPercent(job: AutomationJobRecord): number {
+  const step = jobQueueStepProgress(job);
+  if (!step || step.total <= 0) return 0;
+  return Math.min(100, Math.round((step.current / step.total) * 100));
 }
 
 export function jobQueueBatchProgress(job: AutomationJobRecord): { current: number; total: number } | null {
+  if (job.progress && job.progress.total > 0) {
+    return { current: job.progress.current, total: job.progress.total };
+  }
+  const total = accountJobStepTotal(job);
+  if (total > 1) return { current: 0, total };
   if (!isCreateGroupBatchJob(job)) return null;
-  const total = Math.max(1, Math.floor(Number(job.payload.totalToCreate) || 1));
-  const current = job.progress?.current ?? 0;
-  return { current, total };
+  return { current: 0, total };
 }
 
 export function formatJobQueueWhen(iso?: string): string {
@@ -101,9 +150,20 @@ export function jobQueueGroupName(job: AutomationJobRecord): string {
     const end = start + total - 1;
     return total > 1 ? `${prefix} (${start}–${end})` : prefix;
   }
+  const groups = job.payload.groups;
+  if (groups?.length) {
+    if (groups.length === 1) return groups[0].groupName ?? groups[0].groupId ?? '1';
+    return String(groups.length);
+  }
   if (job.payload.groupName) return job.payload.groupName;
   if (job.payload.groupId) return job.payload.groupId;
   return '—';
+}
+
+/** Total grup dalam satu job akun (join / set admin). */
+export function jobQueueBatchTotalText(job: AutomationJobRecord): string {
+  const total = accountJobStepTotal(job);
+  return total > 0 ? String(total) : '—';
 }
 
 export function jobQueueStatusLabel(
@@ -114,10 +174,20 @@ export function jobQueueStatusLabel(
     return t('operations.jobQueue.statusJobPaused');
   }
   const batch = jobQueueBatchProgress(job);
-  if (batch && (job.status === 'queued' || job.status === 'running')) {
+  const step = jobQueueStepProgress(job);
+  if (job.status === 'running' && batch) {
     return t('operations.jobQueue.statusProcess', {
       current: batch.current,
       total: batch.total,
+    });
+  }
+  if (step && job.status === 'running' && step.label?.trim()) {
+    return step.label.trim();
+  }
+  if (step && job.status === 'running') {
+    return t('operations.jobQueue.statusProcess', {
+      current: step.current,
+      total: step.total,
     });
   }
   return t(jobQueueStatusKey(job.status));
@@ -133,14 +203,29 @@ export function jobQueueActionLabel(
   return t(jobQueueActionKey(job.action));
 }
 
-export function jobQueueResultText(job: AutomationJobRecord): string {
+export function jobQueueResultText(
+  job: AutomationJobRecord,
+  t?: (key: string, vars?: Record<string, string | number>) => string,
+): string {
   if (job.status === 'failed' && job.error) return job.error;
   const batch = jobQueueBatchProgress(job);
-  if (batch && (job.status === 'running' || job.status === 'queued')) {
-    return `${batch.current}/${batch.total}`;
+  const step = jobQueueStepProgress(job);
+  const progress = batch ?? step;
+  if (progress && (job.status === 'running' || job.status === 'queued')) {
+    if (step?.label?.trim()) return `${progress.current}/${progress.total} — ${step.label.trim()}`;
+    if (t) {
+      return t('operations.jobQueue.resultProgress', {
+        current: progress.current,
+        total: progress.total,
+      });
+    }
+    return `${progress.current}/${progress.total}`;
   }
   if (job.message && job.message !== 'OK') return job.message;
   if (batch && job.status === 'completed') {
+    if (t && (job.action === 'join_by_invite_link' || job.action === 'set_admin')) {
+      return t('operations.jobQueue.resultSuccessGroups', { count: batch.current });
+    }
     return `${batch.current}/${batch.total} created`;
   }
   if (job.status === 'completed') return 'OK';
@@ -151,7 +236,7 @@ export function jobQueueStatusClass(job: AutomationJobRecord): string {
   if (job.status === 'queued' && job.paused) {
     return 'operations-job-status--paused';
   }
-  if (isJobQueueBatchInProgress(job)) {
+  if (isJobQueueStepInProgress(job)) {
     return OPERATIONS_JOB_STATUS_CLASS.running;
   }
   return OPERATIONS_JOB_STATUS_CLASS[job.status];

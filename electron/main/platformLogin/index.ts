@@ -8,6 +8,7 @@ import {
   shutdownSidecar,
 } from './telegramSidecar';
 import { tryRestorePlatformSession } from './restore';
+import { assertAccountExecuteAllowed } from '../automation/jobQueueGuard';
 import {
   clearWhatsAppLocalAuth,
   forceReleaseWhatsAppForLogin,
@@ -162,6 +163,12 @@ export function registerPlatformLoginIpc() {
         storedSessionString?: string | null;
       },
     ) => {
+      try {
+        assertAccountExecuteAllowed(payload.sessionId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'EXECUTE_BLOCKED';
+        return { ready: false, message };
+      }
       const win = getWindow();
       return tryRestorePlatformSession(win, payload);
     },

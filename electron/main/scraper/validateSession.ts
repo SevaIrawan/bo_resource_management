@@ -5,18 +5,6 @@ import {
 } from '../platformLogin/whatsapp';
 import { SESSION_CHECK_TIMEOUT_MS } from './deviceGroupScale';
 
-function withSessionCheckTimeout<T>(promise: Promise<T>): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(
-        () => reject(new Error('SESSION_CHECK_TIMEOUT')),
-        SESSION_CHECK_TIMEOUT_MS,
-      );
-    }),
-  ]);
-}
-
 export async function validateTelegramSession(
   sessionId: string,
   storedSessionString?: string | null,
@@ -57,7 +45,7 @@ export async function validateTelegramSession(
   }
 }
 
-/** WA: 1 akun, getState — tidak baca 1925 grup, timeout tetap 20s. */
+/** WA: 1 akun, getState — timeout di probeWhatsAppSessionLinked (bukan race ganda di sini). */
 export async function validateWhatsAppSession(
   sessionId: string,
   _options?: { strict?: boolean },
@@ -66,15 +54,9 @@ export async function validateWhatsAppSession(
   message?: string;
 }> {
   try {
-    return await withSessionCheckTimeout(probeWhatsAppSessionLinked(sessionId));
+    return await probeWhatsAppSessionLinked(sessionId);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'WhatsApp validate failed';
-    if (
-      message.includes('SESSION_CHECK_TIMEOUT') ||
-      message.toLowerCase().includes('session check timed out')
-    ) {
-      return { valid: false, message: 'Session check timed out' };
-    }
     await forceReleaseWhatsAppForLogin(sessionId, { urgent: true, fast: true }).catch(
       () => undefined,
     );

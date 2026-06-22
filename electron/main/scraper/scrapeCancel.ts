@@ -35,6 +35,11 @@ export function isScrapeActiveForSession(sessionId: string): boolean {
   return activeSessionId === sessionId;
 }
 
+/** Scraper penuh sedang jalan di PC — job queue tunggu (hindari bentrok pool Chrome). */
+export function isGlobalScrapeInFlight(): boolean {
+  return activeSessionId !== null;
+}
+
 export function throwIfScrapeCancelled(sessionId: string): void {
   if (isScrapeCancelled(sessionId)) {
     throw new ScrapeCancelledError();

@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { runTelegramAutomation } from './tgAutomationClient';
-import type { AutomationRunPayload, AutomationRunResult } from './types';
+import type { AutomationRunPayload, AutomationRunResult, AutomationProgressCallback } from './types';
 import { runWhatsAppAutomation } from './waAutomation';
 import type {
   AutomationJobEnqueueInput,
@@ -33,13 +33,16 @@ export function withAutomationAccountLock<T>(sessionId: string, fn: () => Promis
   return next;
 }
 
-export async function runAutomationAction(payload: AutomationRunPayload): Promise<AutomationRunResult> {
+export async function runAutomationAction(
+  payload: AutomationRunPayload,
+  onProgress?: AutomationProgressCallback,
+): Promise<AutomationRunResult> {
   return withAutomationAccountLock(payload.sessionId, async () => {
     if (payload.platform === 'telegram') {
-      return runTelegramAutomation(payload);
+      return runTelegramAutomation(payload, onProgress);
     }
     if (payload.platform === 'whatsapp') {
-      return runWhatsAppAutomation(payload);
+      return runWhatsAppAutomation(payload, onProgress);
     }
     return {
       status: 'error',

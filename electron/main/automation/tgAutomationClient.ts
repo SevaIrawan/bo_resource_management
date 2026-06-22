@@ -1,6 +1,7 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
 import { withNetworkRetry } from '../lib/networkRetry';
-import type { AutomationRunPayload, AutomationRunResult } from './types';
+import { resolveJoinGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
+import type { AutomationRunPayload, AutomationRunResult, AutomationProgressCallback } from './types';
 
 async function postTelegramAutomation(
   sessionId: string,
@@ -30,7 +31,10 @@ async function postTelegramAutomation(
   });
 }
 
-export async function runTelegramAutomation(payload: AutomationRunPayload): Promise<AutomationRunResult> {
+export async function runTelegramAutomation(
+  payload: AutomationRunPayload,
+  onProgress?: AutomationProgressCallback,
+): Promise<AutomationRunResult> {
   const sid = encodeURIComponent(payload.sessionId);
   const base = {
     sessionString: payload.storedSessionString ?? undefined,
@@ -66,7 +70,8 @@ export async function runTelegramAutomation(payload: AutomationRunPayload): Prom
         errorCode: 'INVALID_PAYLOAD',
       };
     }
-    if (!payload.groupId?.trim() && !payload.groupLink?.trim()) {
+    const groups = resolveSetAdminGroups(payload);
+    if (groups.length === 0) {
       return {
         status: 'error',
         action: payload.action,
@@ -74,17 +79,42 @@ export async function runTelegramAutomation(payload: AutomationRunPayload): Prom
         errorCode: 'INVALID_PAYLOAD',
       };
     }
-    return postTelegramAutomation(payload.sessionId, `/telegram/automation/set-admin/${sid}`, {
-      ...base,
-      targets,
-      groupId: payload.groupId?.trim() || undefined,
-      groupLink: payload.groupLink?.trim() || undefined,
-      adminRights: payload.adminRights ?? undefined,
-    });
+
+    let success = 0;
+    const failed: string[] = [];
+    for (let i = 0; i < groups.length; i += 1) {
+      const group = groups[i];
+      onProgress?.(i, groups.length, group.groupName ?? group.groupId);
+      const result = await postTelegramAutomation(
+        payload.sessionId,
+        `/telegram/automation/set-admin/${sid}`,
+        {
+          ...base,
+          targets,
+          groupId: group.groupId,
+          groupLink: group.groupLink,
+          adminRights: payload.adminRights ?? undefined,
+        },
+      );
+      if (result.status === 'ok') {
+        success += 1;
+        onProgress?.(i + 1, groups.length, group.groupName ?? 'Done');
+      } else {
+        failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+      }
+    }
+    return {
+      status: success > 0 ? 'ok' : 'error',
+      action: 'set_admin',
+      message: `Promoted targets in ${success}/${groups.length} groups`,
+      errorCode: success > 0 ? undefined : 'SET_ADMIN_BATCH_FAILED',
+      result: { success, total: groups.length, failed },
+    };
   }
 
   if (payload.action === 'join_by_invite_link') {
-    if (!payload.inviteLink?.trim()) {
+    const groups = resolveJoinGroups(payload);
+    if (groups.length === 0) {
       return {
         status: 'error',
         action: payload.action,
@@ -92,11 +122,35 @@ export async function runTelegramAutomation(payload: AutomationRunPayload): Prom
         errorCode: 'INVALID_PAYLOAD',
       };
     }
-    return postTelegramAutomation(payload.sessionId, `/telegram/automation/join-invite/${sid}`, {
-      ...base,
-      inviteLink: payload.inviteLink.trim(),
-      joinSequenceIndex: payload.joinSequenceIndex ?? 1,
-    });
+
+    let success = 0;
+    const failed: string[] = [];
+    for (let i = 0; i < groups.length; i += 1) {
+      const group = groups[i];
+      onProgress?.(i, groups.length, group.groupName ?? group.groupId);
+      const result = await postTelegramAutomation(
+        payload.sessionId,
+        `/telegram/automation/join-invite/${sid}`,
+        {
+          ...base,
+          inviteLink: group.inviteLink,
+          joinSequenceIndex: i + 1,
+        },
+      );
+      if (result.status === 'ok') {
+        success += 1;
+        onProgress?.(i + 1, groups.length, group.groupName ?? 'Joined');
+      } else {
+        failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+      }
+    }
+    return {
+      status: success > 0 ? 'ok' : 'error',
+      action: 'join_by_invite_link',
+      message: `${success}/${groups.length} joined`,
+      errorCode: success > 0 ? undefined : 'JOIN_BATCH_FAILED',
+      result: { success, total: groups.length, failed },
+    };
   }
 
   return {

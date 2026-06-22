@@ -76,21 +76,17 @@ async function probeSessionLinked(input: {
 /**
  * Sync / Run: probe valid/invalid — 1 akun, getState saja.
  * Busy/timeout tidak invalidate DB; hanya UNPAIRED / logout / mati di HP.
+ * (logic_sync_scraper.txt BAGIAN 7)
  */
 async function gateUserActionSession(
   input: {
     sessionId: string;
     platform: Platform;
     accountId: string;
-    skipWarmProbe?: boolean;
   },
   _hasStored: boolean,
   _mode: DeviceSessionGateMode,
 ): Promise<DeviceSessionGateResult> {
-  if (input.skipWarmProbe) {
-    return { ok: true };
-  }
-
   const probe = await probeSessionLinked(input);
   if (probe.valid) {
     return { ok: true };
@@ -106,7 +102,6 @@ export async function gateDeviceSession(
     accountId: string;
     uiSessionStatus: SessionUiStatus;
     hasDaily?: boolean;
-    skipWarmProbe?: boolean;
   },
   mode: DeviceSessionGateMode = 'scrape',
 ): Promise<DeviceSessionGateResult> {

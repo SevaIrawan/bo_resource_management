@@ -6,6 +6,13 @@ import {
 /** Client WA masih nyala / sync / timeout — bukan unlink di HP. */
 export function isDeviceBusyMessage(message: string | undefined): boolean {
   if (!message) return false;
+  if (
+    message === 'SESSION_SETTLING' ||
+    message === 'SCRAPER_GLOBAL_BUSY' ||
+    message === 'JOB_QUEUE_EXECUTE_FULL'
+  ) {
+    return true;
+  }
   if (isWaLinkLoadingProbeMessage(message)) return true;
   const lower = message.toLowerCase();
   return (

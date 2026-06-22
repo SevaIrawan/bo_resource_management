@@ -19,13 +19,16 @@ export async function requireLiveDeviceSession(
     return { ok: false, message: 'SCRAPER_DESKTOP_REQUIRED' };
   }
 
+  if (input.skipWarmProbe) {
+    return { ok: true };
+  }
+
   const gate = await gateDeviceSession(
     {
       sessionId: input.sessionId,
       platform: input.platform,
       accountId: input.accountId,
       uiSessionStatus: input.uiSessionStatus ?? 'valid',
-      skipWarmProbe: input.skipWarmProbe,
     },
     'scrape',
   );

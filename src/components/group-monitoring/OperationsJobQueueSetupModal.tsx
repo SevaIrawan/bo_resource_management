@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
-import { DarkMultiSelect } from '@/components/ui/DarkMultiSelect';
+import { DarkSelect } from '@/components/ui/DarkSelect';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import {
   readTelegramWorkerSettings,
@@ -88,9 +88,7 @@ export function OperationsJobQueueSetupModal({
   const [selectedSetAdminGroupIds, setSelectedSetAdminGroupIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [selectedSetAdminTargetAccountIds, setSelectedSetAdminTargetAccountIds] = useState<
-    string[]
-  >([]);
+  const [selectedSetAdminTargetAccountId, setSelectedSetAdminTargetAccountId] = useState('');
   const [eligibleSetAdminGroups, setEligibleSetAdminGroups] = useState<SuperAdminGroupForSetAdmin[]>(
     [],
   );
@@ -141,14 +139,14 @@ export function OperationsJobQueueSetupModal({
     setCreateTotalToCreate('10');
     setCreateStartFrom('1');
     setSelectedSetAdminGroupIds(new Set());
-    setSelectedSetAdminTargetAccountIds([]);
+    setSelectedSetAdminTargetAccountId('');
     setEligibleSetAdminGroups([]);
   }, [open, taskType, activeBrand]);
 
   useEffect(() => {
     if (!open || taskType !== 'set_admin') return;
 
-    if (selectedSetAdminTargetAccountIds.length === 0) {
+    if (!selectedSetAdminTargetAccountId) {
       setEligibleSetAdminGroups([]);
       setFilteringSetAdminGroups(false);
       return;
@@ -159,7 +157,7 @@ export function OperationsJobQueueSetupModal({
 
     void filterSetAdminGroupsForTargets({
       ownerGroups: superAdminGroups,
-      targetAccountIds: selectedSetAdminTargetAccountIds,
+      targetAccountIds: [selectedSetAdminTargetAccountId],
       brandName: activeBrand,
       platform,
     })
@@ -183,7 +181,7 @@ export function OperationsJobQueueSetupModal({
     activeBrand,
     open,
     platform,
-    selectedSetAdminTargetAccountIds,
+    selectedSetAdminTargetAccountId,
     superAdminGroups,
     taskType,
   ]);
@@ -259,13 +257,13 @@ export function OperationsJobQueueSetupModal({
         setSaveError(t('operations.jobQueue.setAdminSelectGroup'));
         return;
       }
-      if (selectedSetAdminTargetAccountIds.length === 0) {
+      if (!selectedSetAdminTargetAccountId) {
         setSaveError(t('operations.jobQueue.setAdminSelectTargetAccount'));
         return;
       }
       message = await onSaveSetAdmin({
         groupIds: [...selectedSetAdminGroupIds],
-        targetAccountIds: selectedSetAdminTargetAccountIds,
+        targetAccountIds: [selectedSetAdminTargetAccountId],
       });
     }
 
@@ -299,7 +297,7 @@ export function OperationsJobQueueSetupModal({
   const canSaveSetAdmin =
     Boolean(superAdminAccount) &&
     selectedSetAdminGroupIds.size > 0 &&
-    selectedSetAdminTargetAccountIds.length > 0;
+    selectedSetAdminTargetAccountId;
 
   const saveDisabled =
     saving ||
@@ -470,10 +468,10 @@ export function OperationsJobQueueSetupModal({
                 {setAdminTargetOptions.length === 0 ? (
                   <span className="operations-schedule-join-empty">{t('operations.jobQueue.noAccounts')}</span>
                 ) : (
-                  <DarkMultiSelect
-                    values={selectedSetAdminTargetAccountIds}
-                    onChange={(values) => {
-                      setSelectedSetAdminTargetAccountIds(values);
+                  <DarkSelect
+                    value={selectedSetAdminTargetAccountId}
+                    onChange={(value) => {
+                      setSelectedSetAdminTargetAccountId(value);
                       setSelectedSetAdminGroupIds(new Set());
                     }}
                     options={setAdminTargetOptions}
@@ -481,10 +479,7 @@ export function OperationsJobQueueSetupModal({
                     ariaLabel={t('operations.jobQueue.setAdminTargetAccounts')}
                     triggerClassName="account-slicer-select operations-job-queue-select"
                     disabled={saving}
-                    closeOnSelect={false}
-                    selectAllLabel={t('operations.jobQueue.selectAll')}
-                    placeholder={t('operations.jobQueue.pickAccounts')}
-                    summaryLabel={(count) => t('operations.jobQueue.accountsSelected', { count })}
+                    placeholder={t('operations.jobQueue.pickAccount')}
                   />
                 )}
               </div>
@@ -502,7 +497,7 @@ export function OperationsJobQueueSetupModal({
                               loadingSetAdminGroupList ||
                               eligibleSetAdminGroups.length === 0 ||
                               saving ||
-                              selectedSetAdminTargetAccountIds.length === 0
+                              selectedSetAdminTargetAccountId === ''
                             }
                           />
                           <span>{t('operations.jobQueue.selectAll')}</span>
@@ -519,7 +514,7 @@ export function OperationsJobQueueSetupModal({
                           {t('operations.jobQueue.loadingMissing')}
                         </td>
                       </tr>
-                    ) : selectedSetAdminTargetAccountIds.length === 0 ? (
+                    ) : !selectedSetAdminTargetAccountId ? (
                       <tr>
                         <td colSpan={2} className="operations-job-queue-empty">
                           {t('operations.jobQueue.setAdminSelectTargetFirst')}

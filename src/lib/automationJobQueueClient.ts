@@ -1,8 +1,10 @@
+import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import type {
   AutomationJobEnqueueInput,
   AutomationJobListFilter,
   AutomationJobQueueSnapshot,
 } from '@/types/automationJob';
+import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 
 function jobQueueApi() {
   return window.electronAPI?.jobQueue;
@@ -14,6 +16,52 @@ export async function fetchJobQueueSnapshot(
   const api = jobQueueApi()?.getSnapshot;
   if (!api) return null;
   return api(filter);
+}
+
+/** True when queued/running jobs block Sync & Scraper on the Account tab. */
+export async function isAutomationJobQueueBlockingExecutes(): Promise<boolean> {
+  const snapshot = await fetchJobQueueSnapshot();
+  return Boolean(snapshot?.blockingExecutes);
+}
+
+/** Job queue aktif atau scraper penuh sedang jalan — skip auto-sync cycle. */
+export async function isHeavyDeviceExecuteBlocked(): Promise<boolean> {
+  const snapshot = await fetchJobQueueSnapshot();
+  if (!snapshot) return false;
+  return Boolean(snapshot.blockingExecutes || snapshot.globalScrapeActive);
+}
+
+export type AccountExecuteBlockCode = 'JOB_QUEUE_EXECUTE_FULL' | 'SESSION_CHECK_BUSY';
+
+/** Pre-check Sync/Run — selaras main `resolveAccountExecuteBlockReason`. */
+export async function resolveAccountExecuteBlock(
+  account: AccountBrandRow,
+): Promise<AccountExecuteBlockCode | null> {
+  const snapshot = await fetchJobQueueSnapshot();
+  if (!snapshot) return null;
+  if (snapshot.blockingExecutes) return 'JOB_QUEUE_EXECUTE_FULL';
+  if (snapshot.globalScrapeActive) return 'SESSION_CHECK_BUSY';
+
+  const deviceSessionId = await resolveDeviceSessionId({
+    sessionId: account.id,
+    platform: account.platform,
+    accountId: account.id,
+  });
+  if (snapshot.settlingSessionIds.includes(deviceSessionId)) {
+    return 'SESSION_CHECK_BUSY';
+  }
+  return null;
+}
+
+export async function isAccountSessionSettling(account: AccountBrandRow): Promise<boolean> {
+  const snapshot = await fetchJobQueueSnapshot();
+  if (!snapshot?.settlingSessionIds.length) return false;
+  const deviceSessionId = await resolveDeviceSessionId({
+    sessionId: account.id,
+    platform: account.platform,
+    accountId: account.id,
+  });
+  return snapshot.settlingSessionIds.includes(deviceSessionId);
 }
 
 export async function enqueueAutomationJob(

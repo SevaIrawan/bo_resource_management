@@ -12,6 +12,8 @@ export interface DarkSelectProps {
   value: string;
   onChange: (value: string) => void;
   options: DarkSelectOption[];
+  disabledValues?: string[];
+  placeholder?: string;
   id?: string;
   ariaLabel?: string;
   className?: string;
@@ -24,6 +26,8 @@ export function DarkSelect({
   value,
   onChange,
   options,
+  disabledValues = [],
+  placeholder,
   id,
   ariaLabel,
   className,
@@ -33,7 +37,9 @@ export function DarkSelect({
 }: DarkSelectProps) {
   const { phase, isOpen, isVisible, close, toggle } = useDarkSelectMenu();
   const wrapRef = useRef<HTMLDivElement>(null);
+  const disabledSet = new Set(disabledValues);
   const selected = options.find((opt) => opt.value === value);
+  const triggerLabel = selected?.label ?? (value || placeholder || '');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -75,7 +81,7 @@ export function DarkSelect({
           toggle();
         }}
       >
-        <span className="dark-select-trigger-label">{selected?.label ?? value}</span>
+        <span className="dark-select-trigger-label">{triggerLabel}</span>
         <ChevronDown
           className={cn('dark-select-trigger-icon', isOpen && 'dark-select-trigger-icon--open')}
           aria-hidden
@@ -93,25 +99,32 @@ export function DarkSelect({
           aria-label={ariaLabel}
           onMouseDown={(event) => event.stopPropagation()}
         >
-          {options.map((opt) => (
+          {options.map((opt) => {
+            const optionDisabled = disabledSet.has(opt.value);
+            return (
             <li key={opt.value} role="presentation">
               <button
                 type="button"
                 role="option"
                 aria-selected={value === opt.value}
+                aria-disabled={optionDisabled || undefined}
+                disabled={optionDisabled}
                 className={cn(
                   'dark-select-menu-item',
                   value === opt.value && 'dark-select-menu-item--active',
+                  optionDisabled && 'dark-select-menu-item--disabled',
                 )}
                 onMouseDown={(event) => {
                   event.preventDefault();
+                  if (optionDisabled) return;
                   selectOption(opt.value);
                 }}
               >
                 {opt.label}
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
     </div>

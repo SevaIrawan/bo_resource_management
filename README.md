@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.21` (lihat `package.json`)
+**Versi saat ini:** `1.0.22` (lihat `package.json`)
+
+**Rilis 1.0.22:** Operations job queue per-akun (join/set admin batch), guard Sync/Scrape vs antrian + settle post-job, tabel queue tanpa kolom Result, perbaikan session probe overlap.
 
 **Rilis 1.0.21:** edit akun (pensil) — label, phone, location MY/KH sync DB + grid; kolom Location + migrasi Supabase `031`; WA scrape sequential per grup dengan delay.
 

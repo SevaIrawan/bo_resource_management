@@ -3,6 +3,9 @@ import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
+import { accountJobStepTotal, isJobQueueBlockingExecutes } from './jobQueueBatchHelpers';
+import { listSettlingSessionIds, markSessionSettleAfterJob } from './jobQueueSettle';
+import { isGlobalScrapeInFlight } from '../scraper/scrapeCancel';
 import type {
   AutomationJobEnqueueInput,
   AutomationJobListFilter,
@@ -104,16 +107,19 @@ function buildQueueStats() {
   return {
     runningJobIds: runningJobs.map((job) => job.id),
     runningJobId: runningJobs[0]?.id ?? null,
-    maxConcurrent: getMaxConcurrentAutomationJobs(),
+    maxConcurrent: 1,
     runningCount: runningJobs.length,
     queuedCount: getQueuedJobCount(),
+    blockingExecutes: isJobQueueBlockingExecutes(jobs),
+    settlingSessionIds: listSettlingSessionIds(),
+    globalScrapeActive: isGlobalScrapeInFlight(),
   };
 }
 
 export function getJobQueueSnapshot(filter?: AutomationJobListFilter): AutomationJobQueueSnapshot {
   ensureLoaded();
   const filtered = filter ? jobs.filter((job) => matchesFilter(job, filter)) : [...jobs];
-  filtered.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  filtered.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   return {
     jobs: filtered,
     runnerState: getRunnerState(),
@@ -131,54 +137,14 @@ export function setRunnerPaused(paused: boolean): AutomationJobRunnerState {
 export function enqueueAutomationJob(input: AutomationJobEnqueueInput): AutomationJobRecord {
   ensureLoaded();
 
-  const targetGroupId = input.payload.groupId?.trim();
-  if (targetGroupId) {
-    const duplicateGroup = jobs.some(
-      (job) =>
-        job.accountId === input.accountId &&
-        (job.status === 'queued' || job.status === 'running') &&
-        job.payload.groupId?.trim() === targetGroupId,
-    );
-    if (duplicateGroup) {
-      throw new Error('JOB_ALREADY_QUEUED_FOR_GROUP');
-    }
-  } else if (input.action === 'create_group') {
-    const total = Math.max(1, Math.floor(input.payload.totalToCreate ?? 1));
-    if (total > 1) {
-      const duplicateBatch = jobs.some(
-        (job) =>
-          job.action === 'create_group' &&
-          job.accountId === input.accountId &&
-          (job.status === 'queued' || job.status === 'running') &&
-          (job.payload.totalToCreate ?? 1) > 1,
-      );
-      if (duplicateBatch) {
-        throw new Error('JOB_ALREADY_QUEUED_FOR_ACCOUNT');
-      }
-    } else {
-      const groupName = input.payload.groupName?.trim();
-      if (groupName) {
-        const duplicateName = jobs.some(
-          (job) =>
-            job.action === 'create_group' &&
-            job.accountId === input.accountId &&
-            (job.status === 'queued' || job.status === 'running') &&
-            job.payload.groupName?.trim() === groupName,
-        );
-        if (duplicateName) {
-          throw new Error('JOB_ALREADY_QUEUED_FOR_GROUP');
-        }
-      }
-    }
-  } else {
-    const duplicateAccount = jobs.some(
-      (job) =>
-        job.accountId === input.accountId &&
-        (job.status === 'queued' || job.status === 'running'),
-    );
-    if (duplicateAccount) {
-      throw new Error('JOB_ALREADY_QUEUED_FOR_ACCOUNT');
-    }
+  const duplicateAccount = jobs.some(
+    (job) =>
+      job.accountId === input.accountId &&
+      job.action === input.action &&
+      (job.status === 'queued' || job.status === 'running'),
+  );
+  if (duplicateAccount) {
+    throw new Error('JOB_ALREADY_QUEUED_FOR_ACCOUNT');
   }
 
   const totalToCreate = Math.max(1, Math.floor(Number(input.payload.totalToCreate) || 1));
@@ -186,6 +152,11 @@ export function enqueueAutomationJob(input: AutomationJobEnqueueInput): Automati
     1,
     Math.floor(Number(input.payload.perRun) || totalToCreate),
   );
+  const stepTotal =
+    input.action === 'create_group'
+      ? totalToCreate
+      : Math.max(1, input.payload.groups?.length ?? (input.payload.inviteLink || input.payload.groupId ? 1 : 1));
+
   const created: AutomationJobRecord = {
     id: randomUUID(),
     brandName: input.brandName,
@@ -204,10 +175,7 @@ export function enqueueAutomationJob(input: AutomationJobEnqueueInput): Automati
     storedSessionString: input.storedSessionString ?? null,
     expectedPhone: input.expectedPhone,
     delay: input.delay,
-    progress:
-      input.action === 'create_group' && totalToCreate > 1
-        ? { current: 0, total: totalToCreate, label: input.payload.groupNamePrefix ?? input.payload.groupName }
-        : undefined,
+    progress: { current: 0, total: stepTotal, label: input.payload.groupNamePrefix ?? input.payload.groupName },
   };
   jobs.push(created);
   persist();
@@ -275,6 +243,7 @@ export function pauseAutomationJob(jobId: string): boolean {
       job.status = 'queued';
       job.paused = true;
       delete job.startedAt;
+      markSessionSettleAfterJob(job.sessionId);
       changed = true;
     }
   });
@@ -298,6 +267,7 @@ export function cancelAutomationJob(jobId: string): boolean {
       job.status = 'cancelled';
       job.paused = false;
       job.finishedAt = new Date().toISOString();
+      markSessionSettleAfterJob(job.sessionId);
       changed = true;
     }
   });
@@ -329,6 +299,7 @@ export function removeAutomationJobs(jobIds: string[]): number {
       if (!idSet.has(job.id)) return true;
       if (job.status === 'running') {
         requestJobStop(job.id, 'cancel');
+        markSessionSettleAfterJob(job.sessionId);
       }
       removed += 1;
       return false;
@@ -340,25 +311,16 @@ export function removeAutomationJobs(jobIds: string[]): number {
   return removed;
 }
 
-/** FIFO — max `limit` job queued, satu akun tidak dobel dispatch. */
-export function pickQueuedJobsForDispatch(limit: number): AutomationJobRecord[] {
+/** FIFO — satu job global (satu akun); antrian akun berikutnya menunggu. */
+export function pickQueuedJobsForDispatch(_limit: number): AutomationJobRecord[] {
   ensureLoaded();
-  if (limit <= 0) return [];
+  if (getRunningJobCount() > 0) return [];
 
-  const busyAccountIds = new Set(listRunningJobs().map((job) => job.accountId));
-  const picked: AutomationJobRecord[] = [];
-  const queued = jobs
+  const next = jobs
     .filter((job) => job.status === 'queued' && !job.paused)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
 
-  for (const job of queued) {
-    if (picked.length >= limit) break;
-    if (busyAccountIds.has(job.accountId)) continue;
-    busyAccountIds.add(job.accountId);
-    picked.push(job);
-  }
-
-  return picked;
+  return next ? [next] : [];
 }
 
 export function markJobRunning(jobId: string): boolean {
@@ -368,17 +330,43 @@ export function markJobRunning(jobId: string): boolean {
     if (!job || job.status !== 'queued') return;
     job.status = 'running';
     job.startedAt = new Date().toISOString();
-    if (job.action === 'create_group' && (job.payload.totalToCreate ?? 1) > 1) {
-      const total = job.payload.totalToCreate ?? 1;
-      job.progress = job.progress ?? {
-        current: 0,
-        total,
-        label: job.payload.groupNamePrefix ?? job.payload.groupName,
-      };
+    const stepTotal = accountJobStepTotal(job);
+    job.progress = job.progress ?? {
+      current: 0,
+      total: stepTotal,
+      label: job.payload.groupNamePrefix ?? job.payload.groupName ?? job.accountName,
+    };
+    if (job.progress.total !== stepTotal) {
+      job.progress.total = stepTotal;
     }
     started = true;
   });
   return started;
+}
+
+export function isJobQueueBlockingOtherExecutes(): boolean {
+  ensureLoaded();
+  return isJobQueueBlockingExecutes(jobs);
+}
+
+/** Jobs stuck in running (browser hang) — fail so queue can continue. */
+export function failStaleRunningJobs(maxAgeMs: number): number {
+  let failed = 0;
+  const now = Date.now();
+  touch(() => {
+    for (const job of jobs) {
+      if (job.status !== 'running' || !job.startedAt) continue;
+      const age = now - new Date(job.startedAt).getTime();
+      if (age <= maxAgeMs) continue;
+      job.status = 'failed';
+      job.finishedAt = new Date().toISOString();
+      job.error = 'JOB_STALE_TIMEOUT';
+      job.message = 'Job exceeded maximum runtime — cancelled automatically';
+      markSessionSettleAfterJob(job.sessionId);
+      failed += 1;
+    }
+  });
+  return failed;
 }
 
 export function updateJobProgress(
@@ -404,6 +392,7 @@ export function markJobFinished(
     job.status = status;
     job.finishedAt = new Date().toISOString();
     job.error = detail?.error;
+    markSessionSettleAfterJob(job.sessionId);
 
     const batchTotal = Math.max(1, Math.floor(Number(job.payload.totalToCreate) || 1));
     const isCreateBatch = job.action === 'create_group' && batchTotal > 1;

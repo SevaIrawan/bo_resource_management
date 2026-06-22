@@ -6,7 +6,6 @@ import { hasStoredPlatformSession } from '@/lib/sessionAvailability';
 import { markPlatformSessionSynced } from '@/lib/platformSessions';
 import { readLatestSessionUiStatus } from '@/lib/sessionUiFromDatabase';
 import { isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
-import { warmSessionIfStored } from '@/lib/warmPlatformSession';
 import type { Platform } from '@/types/database';
 
 export type UserSessionGateMode = 'sync' | 'scrape';
@@ -41,7 +40,7 @@ function reloginCodeForAccount(
 }
 
 /**
- * Sync / Run: DB baris akun → warm device → probe → valid lanjut / mati → login.
+ * Sync / Run: DB valid → warm device → probe → lanjut / busy / login.
  */
 export async function checkUserActionDeviceSession(input: {
   sessionId: string;
@@ -61,19 +60,12 @@ export async function checkUserActionDeviceSession(input: {
     };
   }
 
-  await warmSessionIfStored({
-    sessionId: input.sessionId,
-    platform: input.platform,
-    accountId: input.dbAccountId,
-  });
-
   const gate = await gateDeviceSession(
     {
       sessionId: input.sessionId,
       platform: input.platform,
       accountId: input.dbAccountId,
       uiSessionStatus: 'valid',
-      skipWarmProbe: false,
     },
     input.mode,
   );

@@ -58,6 +58,7 @@ import {
   unlockUserAction,
   userActionLockErrorCode,
 } from '@/lib/userActionGate';
+import { resolveAccountExecuteBlock } from '@/lib/automationJobQueueClient';
 import { CLEAR_SESSION_REASON, clearAccountSession } from '@/lib/clearAccountSession';
 
 export type SyncFlowStep =
@@ -429,6 +430,12 @@ export function useAccountSyncFlow({
         return;
       }
 
+      const executeBlock = await resolveAccountExecuteBlock(account);
+      if (executeBlock) {
+        showSyncError(executeBlock, groupId, account);
+        return;
+      }
+
       if (accountMissingRequiredPhone(account.platform, account.phoneNumber)) {
         setTarget({ groupId, account });
         setCheckError(null);
@@ -481,7 +488,13 @@ export function useAccountSyncFlow({
 
         if (outcome.kind === 'device_busy') {
           stopLoading();
-          showSyncError('SESSION_CHECK_BUSY', groupId, account);
+          showSyncError(
+            outcome.message === 'JOB_QUEUE_EXECUTE_FULL'
+              ? 'JOB_QUEUE_EXECUTE_FULL'
+              : 'SESSION_CHECK_BUSY',
+            groupId,
+            account,
+          );
           return;
         }
 
@@ -643,6 +656,12 @@ export function useAccountSyncFlow({
 
       const { groupId, account } = ctx;
 
+      const executeBlock = await resolveAccountExecuteBlock(account);
+      if (executeBlock) {
+        showSyncError(executeBlock, groupId, account);
+        return;
+      }
+
       const lock = tryLockUserAction(account.id, 'scraper');
       if (!lock.ok) {
         showSyncError(userActionLockErrorCode(lock), groupId, account);
@@ -737,7 +756,13 @@ export function useAccountSyncFlow({
         if (outcome.kind === 'device_busy') {
           unlockUserAction(account.id);
           clearRowProcessing(groupId, account.id);
-          showSyncError('SESSION_CHECK_BUSY', groupId, account);
+          showSyncError(
+            outcome.message === 'JOB_QUEUE_EXECUTE_FULL'
+              ? 'JOB_QUEUE_EXECUTE_FULL'
+              : 'SESSION_CHECK_BUSY',
+            groupId,
+            account,
+          );
           return;
         }
 
@@ -905,6 +930,12 @@ export function useAccountSyncFlow({
 
       if (!window.electronAPI?.isElectron) {
         showSyncError('SCRAPER_DESKTOP_REQUIRED', groupId, account);
+        return;
+      }
+
+      const executeBlock = await resolveAccountExecuteBlock(account);
+      if (executeBlock) {
+        showSyncError(executeBlock, groupId, account);
         return;
       }
 

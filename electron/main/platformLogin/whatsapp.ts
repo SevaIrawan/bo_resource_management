@@ -855,6 +855,21 @@ async function pollWaLinkedAfterInit(
   return last;
 }
 
+async function releaseProbeSessionUnlessConnected(sessionId: string): Promise<void> {
+  const entry = sessions.get(sessionId);
+  if (!entry) return;
+  try {
+    const state = await entry.client.getState();
+    if (state === 'CONNECTED') {
+      entry.loggedIn = true;
+      return;
+    }
+  } catch {
+    // destroy below
+  }
+  await destroyWhatsAppSession(sessionId);
+}
+
 /**
  * Cek session WA — 1 akun, `getState()` saja.
  * Boleh buka Chrome minimal; tidak baca daftar grup; tidak `waitForWhatsAppStoreReady`.
@@ -862,6 +877,8 @@ async function pollWaLinkedAfterInit(
 async function probeWhatsAppSessionLinkedInner(
   sessionId: string,
 ): Promise<{ valid: boolean; message: string }> {
+  const deadline = Date.now() + SESSION_CHECK_TIMEOUT_MS;
+
   const existing = sessions.get(sessionId);
   if (existing) {
     try {
@@ -870,7 +887,7 @@ async function probeWhatsAppSessionLinkedInner(
       if (immediate.valid || classifyWaSocketState(state) === 'unlinked') {
         return immediate;
       }
-      return pollWaLinkedAfterInit(existing.client, Math.min(8_000, SESSION_CHECK_TIMEOUT_MS));
+      return pollWaLinkedAfterInit(existing.client, Math.max(1_000, deadline - Date.now()));
     } catch {
       await destroyWhatsAppSession(sessionId);
     }
@@ -885,15 +902,14 @@ async function probeWhatsAppSessionLinkedInner(
   sessions.set(sessionId, { client, mode: 'qr', forwardQrToUi: false });
   try {
     await withWaBrowserSlot(() => client.initialize());
-    const pollMs = Math.max(3_000, SESSION_CHECK_TIMEOUT_MS - 2_000);
-    return await pollWaLinkedAfterInit(client, pollMs);
+    return await pollWaLinkedAfterInit(client, Math.max(1_000, deadline - Date.now()));
   } catch (error) {
     return {
       valid: false,
       message: error instanceof Error ? error.message : 'WA session check failed',
     };
   } finally {
-    await destroyWhatsAppSession(sessionId);
+    await releaseProbeSessionUnlessConnected(sessionId);
   }
 }
 

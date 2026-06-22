@@ -21,6 +21,11 @@ import {
   clearCountAbort,
   registerCountAbort,
 } from './countGroupsCancel';
+import {
+  assertAccountExecuteAllowed,
+  accountExecuteBusyProbeResult,
+} from '../automation/jobQueueGuard';
+import { scheduleRunnerTick } from '../automation/jobQueueRunner';
 
 type Platform = 'whatsapp' | 'telegram';
 
@@ -58,6 +63,7 @@ export function registerScraperIpc() {
   let scrapeRunInFlight: Promise<unknown> | null = null;
 
   ipcMain.handle('scraper:run', async (_event, payload: ScrapeRunPayload) => {
+    assertAccountExecuteAllowed(payload.sessionId);
     if (scrapeRunInFlight) {
       throw new Error('SCRAPER_GLOBAL_BUSY: Another scrape is already running on this PC.');
     }
@@ -111,6 +117,7 @@ export function registerScraperIpc() {
     } finally {
       clearActiveScrape(payload.sessionId);
       if (scrapeRunInFlight === work) scrapeRunInFlight = null;
+      scheduleRunnerTick(0);
     }
   });
 
@@ -126,6 +133,7 @@ export function registerScraperIpc() {
   );
 
   ipcMain.handle('scraper:count-groups', async (_event, payload: CountGroupsPayload) => {
+    assertAccountExecuteAllowed(payload.sessionId);
     registerCountAbort(payload.sessionId);
     try {
       if (payload.platform === 'telegram') {
@@ -150,6 +158,10 @@ export function registerScraperIpc() {
   );
 
   ipcMain.handle('scraper:validate-session', async (_event, payload: CountGroupsPayload) => {
+    if (payload.strict) {
+      const busy = accountExecuteBusyProbeResult(payload.sessionId);
+      if (busy) return busy;
+    }
     try {
       if (payload.platform === 'telegram') {
         return validateTelegramSession(payload.sessionId, payload.storedSessionString);

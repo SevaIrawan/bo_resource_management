@@ -109,12 +109,10 @@ const RM_TABLES_ACCOUNT_CASCADE = [
 ];
 
 const REMOVE_EXPLICIT = [
-  ['ticketIssueHandles', 'resource_management_ticket_issue_handles', 'account_id'],
   ['syncActivityLogs', 'resource_management_sync_activity_logs', 'account_id'],
   ['scrapeRuns', 'resource_management_scrape_runs', 'account_id'],
   ['groupScrapeDaily', 'resource_management_group_scrape_daily', 'account_id + brand'],
   ['groupsMaster', 'resource_management_groups_master', 'brand'],
-  ['tickets', 'resource_management_tickets', 'brand_id'],
   ['accountSnapshots', 'resource_management_account_snapshots', 'brand_id'],
   ['messagingAccounts', 'resource_management_messaging_accounts', 'brand_id'],
   ['brands', 'resource_management_brands', 'id'],
@@ -280,16 +278,14 @@ console.log(
 console.log('\n--- Urutan hapus DB (removeBrandCompletely) ---');
 const steps = [
   '1. deactivateMessagingAccount (device WA/TG + DB session invalid)',
-  '2. ticket_issue_handles BY account_id',
-  '3. sync_activity_logs BY account_id',
-  '4. scrape_runs BY account_id',
-  '5. group_scrape_daily BY account_id',
-  '6. group_scrape_daily BY brand (teks)',
-  '7. groups_master BY brand (teks)',
-  '8. tickets BY brand_id',
-  '9. account_snapshots BY brand_id',
-  '10. messaging_accounts BY brand_id → CASCADE sessions + session_logs',
-  '11. brands BY id',
+  '2. sync_activity_logs BY account_id',
+  '3. scrape_runs BY account_id',
+  '4. group_scrape_daily BY account_id',
+  '5. group_scrape_daily BY brand (teks)',
+  '6. groups_master BY brand (teks)',
+  '7. account_snapshots BY brand_id',
+  '8. messaging_accounts BY brand_id → CASCADE sessions + session_logs',
+  '9. brands BY id',
 ];
 for (const s of steps) console.log(s);
 

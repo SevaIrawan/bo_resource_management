@@ -6,7 +6,6 @@ import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
 import { RemoveBrandModal } from '@/components/group-monitoring/RemoveBrandModal';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import { addAccountToGroup, createEmptyBrandGroup, patchAccountDetailsInGroups } from '@/lib/accountBrandUtils';
 import { commitAccountDetailsEdit } from '@/lib/commitAccountDetailsEdit';
@@ -34,7 +33,6 @@ export function AccountBrandCardList({
   const { user } = useAuth();
   const { t } = useLanguage();
   const { canManageStructure, canOperatePlatform } = usePermissions();
-  const { refreshIssues } = useGroupMonitoring();
   const [modalOpen, setModalOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<AccountBrandGroup | null>(null);
   const [removeSaving, setRemoveSaving] = useState(false);
@@ -153,7 +151,6 @@ export function AccountBrandCardList({
 
       onGroupsChange((prev) => prev.filter((g) => g.id !== group.id));
       setRemoveTarget(null);
-      void refreshIssues();
     } catch (error) {
       setRemoveError(getErrorMessage(error, t('groupMonitoring.removeBrandFailed')));
     } finally {

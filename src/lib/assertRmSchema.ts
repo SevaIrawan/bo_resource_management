@@ -9,7 +9,7 @@ import { RM_ACTIVE_TABLES, TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
 
 export const RM_SCHEMA_HINT =
-  'SCHEMA_OUTDATED: Instal baru → 003 + 017 + 020 + 023 + 026 + 030. DB lama → 018 (sekali) + 020 + 023 + 026 + 030.';
+  'SCHEMA_OUTDATED: Instal baru → 003 + 017 + 020 + 023 + 030. DB lama → 018 (sekali) + 020 + 023 + 030.';
 
 function isSchemaError(message: string | undefined): boolean {
   if (!message) return false;
@@ -46,11 +46,6 @@ export async function assertRmSchema(): Promise<void> {
     { table: TABLES.groupScrapeDaily, select: DAILY_GROUP_SELECT },
     { table: TABLES.groupsMaster, select: MASTER_GROUP_SELECT },
     { table: TABLES.accountSnapshots, select: ACCOUNT_SNAPSHOT_SELECT },
-    { table: TABLES.tickets, select: 'id, account_id, ticket_type, status' },
-    {
-      table: TABLES.ticketIssueHandles,
-      select: 'issue_id, account_id, task_status, start_task, end_task, remark',
-    },
   ];
 
   if (probes.length !== RM_ACTIVE_TABLES.length) {

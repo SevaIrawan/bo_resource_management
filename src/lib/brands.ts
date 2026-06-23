@@ -104,7 +104,6 @@ export async function removeBrandCompletely(input: {
     );
   }
 
-  await deleteRowsInAccountChunks(TABLES.ticketIssueHandles, 'account_id', accountIds);
   await deleteRowsInAccountChunks(TABLES.syncActivityLogs, 'account_id', accountIds);
   await deleteRowsInAccountChunks(TABLES.scrapeRuns, 'account_id', accountIds);
   await deleteRowsInAccountChunks(TABLES.groupScrapeDaily, 'account_id', accountIds);
@@ -120,12 +119,6 @@ export async function removeBrandCompletely(input: {
     .delete()
     .eq('brand', brandKey);
   if (masterError) throw masterError;
-
-  const { error: ticketsError } = await supabase
-    .from(TABLES.tickets)
-    .delete()
-    .eq('brand_id', input.brandId);
-  if (ticketsError) throw ticketsError;
 
   const { error: snapshotsError } = await supabase
     .from(TABLES.accountSnapshots)

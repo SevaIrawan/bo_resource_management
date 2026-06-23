@@ -21,21 +21,18 @@ const checks = [
   { name: 'installUpdate IPC', ok: read('electron/preload/index.ts').includes('installUpdate') },
   { name: 'i18n updateNow / dataUpdatesPending', ok: i18n.includes('updateNow') && i18n.includes('dataUpdatesPending') },
   {
-    name: 'Post-login reconcile tickets',
+    name: 'Post-scrape refresh grid akun',
     ok: (() => {
       const syncFlow = read('src/hooks/useAccountSyncFlow.ts');
-      return (
-        syncFlow.includes('await onTicketsReload?.(dbAccountId') &&
-        syncFlow.includes('await onTicketsReload?.(outcome.dbAccountId, account.id)')
-      );
+      return syncFlow.includes('await onAccountGridRefresh?.(dbAccountId');
     })(),
   },
   {
-    name: 'Load app: ticket engine + reconcile saat refresh tab Ticket',
+    name: 'Provider: refreshAccountAfterDailyWrite patch grid + reporting',
     ok:
-      read('src/providers/GroupMonitoringProvider.tsx').includes('runTicketReconcile') &&
-      read('src/providers/GroupMonitoringProvider.tsx').includes('reconcileOpenTicketsForUser') &&
-      read('src/providers/GroupMonitoringProvider.tsx').includes('buildTicketSummariesForUser'),
+      read('src/providers/GroupMonitoringProvider.tsx').includes('refreshAccountAfterDailyWrite') &&
+      read('src/providers/GroupMonitoringProvider.tsx').includes('patchAccountGridFromDb') &&
+      !read('src/providers/GroupMonitoringProvider.tsx').includes('reconcileOpenTicketsForUser'),
   },
 ];
 

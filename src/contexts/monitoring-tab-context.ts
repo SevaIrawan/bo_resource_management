@@ -8,8 +8,6 @@ export type MonitoringFullRefreshHandler = () => Promise<void>;
 export interface MonitoringTabContextValue {
   tab: MonitoringTab;
   setTab: (tab: MonitoringTab) => void;
-  ticketCount: number;
-  setTicketCount: (count: number) => void;
   refreshActiveTab: () => Promise<void>;
   refreshAllMonitoring: () => Promise<void>;
   registerRefreshHandler: (handler: MonitoringRefreshHandler | null) => void;

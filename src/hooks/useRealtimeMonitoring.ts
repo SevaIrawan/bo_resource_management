@@ -13,18 +13,12 @@ import type { Dispatch, SetStateAction } from 'react';
 interface UseRealtimeMonitoringOptions {
   userId: string | null;
   enabled: boolean;
-  /** Jangan patch UI dari realtime saat sync/scrape berjalan (cegah flash). */
   suspendAccountIds?: string[];
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
-  /** Tabel tickets berubah — muat ulang open ticket saja (tanpa reconcile penuh). */
-  onTicketsChange: () => void;
-  /** Master/daily/scrape berubah — reconcile issue dari data terbaru. */
-  onIssueReconcile?: () => void;
-  /** Daily satu akun berubah — reconcile akun itu + reload issue. */
   onAccountDailyChanged?: (accountId: string) => void;
   onRegistryChange: () => void;
-  /** Tandai tombol Refresh (notifikasi) — pembaruan diterapkan lewat Update Now / Refresh. */
   onDataChangeNotice?: () => void;
+  onMasterDataChanged?: () => void;
 }
 
 type GroupsMasterRow = {
@@ -52,26 +46,23 @@ export function useRealtimeMonitoring({
   enabled,
   suspendAccountIds = [],
   onGroupsChange,
-  onTicketsChange,
-  onIssueReconcile,
   onAccountDailyChanged,
   onRegistryChange,
   onDataChangeNotice,
+  onMasterDataChanged,
 }: UseRealtimeMonitoringOptions) {
   const onGroupsChangeRef = useRef(onGroupsChange);
-  const onTicketsChangeRef = useRef(onTicketsChange);
-  const onIssueReconcileRef = useRef(onIssueReconcile);
   const onAccountDailyChangedRef = useRef(onAccountDailyChanged);
   const onRegistryChangeRef = useRef(onRegistryChange);
   const onDataChangeNoticeRef = useRef(onDataChangeNotice);
+  const onMasterDataChangedRef = useRef(onMasterDataChanged);
   const suspendedRef = useRef(suspendAccountIds);
 
   onGroupsChangeRef.current = onGroupsChange;
-  onTicketsChangeRef.current = onTicketsChange;
-  onIssueReconcileRef.current = onIssueReconcile;
   onAccountDailyChangedRef.current = onAccountDailyChanged;
   onRegistryChangeRef.current = onRegistryChange;
   onDataChangeNoticeRef.current = onDataChangeNotice;
+  onMasterDataChangedRef.current = onMasterDataChanged;
   suspendedRef.current = suspendAccountIds;
 
   const notifyChange = () => {
@@ -114,7 +105,7 @@ export function useRealtimeMonitoring({
           }
           const patched = working;
           onGroupsChangeRef.current((current) => mergeGroupsAccountMetrics(current, patched));
-          onIssueReconcileRef.current?.();
+          onMasterDataChangedRef.current?.();
           notifyChange();
         })();
         return latest;
@@ -150,15 +141,6 @@ export function useRealtimeMonitoring({
           if (suspendedRef.current.includes(row.account_id)) return;
 
           onGroupsChangeRef.current((prev) => patchAccountSnapshotInGroups(prev, row));
-          onIssueReconcileRef.current?.();
-          notifyChange();
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: TABLES.tickets },
-        () => {
-          onTicketsChangeRef.current();
           notifyChange();
         },
       )
@@ -192,7 +174,6 @@ export function useRealtimeMonitoring({
           ) {
             onAccountDailyChangedRef.current?.(accountId);
           }
-          onTicketsChangeRef.current();
           notifyChange();
         },
       )

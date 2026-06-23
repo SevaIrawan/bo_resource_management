@@ -48,12 +48,13 @@ const checks = [
   {
     name: 'removeBrandCompletely bersihkan semua tabel terkait',
     ok:
-      brandsTs.includes('ticketIssueHandles') &&
       brandsTs.includes('syncActivityLogs') &&
       brandsTs.includes('groupScrapeDaily') &&
       brandsTs.includes('groupsMaster') &&
       brandsTs.includes('accountSnapshots') &&
-      brandsTs.includes('scrapeRuns'),
+      brandsTs.includes('scrapeRuns') &&
+      !brandsTs.includes('ticketIssueHandles') &&
+      !brandsTs.includes('TABLES.tickets'),
   },
   {
     name: 'Modal remove brand = pola RemoveAccountModal',

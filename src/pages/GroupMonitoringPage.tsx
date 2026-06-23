@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { AccountMonitoringBody } from '@/components/group-monitoring/AccountMonitoringBody';
 import { OperationsMonitoringPanel } from '@/components/group-monitoring/OperationsMonitoringPanel';
 import { ReportingMonitoringPanel } from '@/components/group-monitoring/ReportingMonitoringPanel';
-import { TicketMonitoringBody } from '@/components/group-monitoring/TicketMonitoringBody';
 import { ContentAreaCard } from '@/components/group-monitoring/ContentAreaCard';
 import { KpiGrid } from '@/components/group-monitoring/KpiGrid';
 import { useMonitoringTab } from '@/hooks/useMonitoringTab';
@@ -12,7 +11,7 @@ import type { AccountViewMode } from '@/types/accountMonitoringUi';
 
 function GroupMonitoringContent() {
   const { tab } = useMonitoringTab();
-  const { accountKpis, ticketKpis } = useGroupMonitoring();
+  const { accountKpis } = useGroupMonitoring();
   const [accountViewMode, setAccountViewMode] = useState<AccountViewMode>('card');
 
   if (tab === 'reporting') {
@@ -33,18 +32,13 @@ function GroupMonitoringContent() {
 
   return (
     <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">
-      <KpiGrid items={tab === 'ticket' ? ticketKpis : accountKpis} />
+      <KpiGrid items={accountKpis} />
 
       <ContentAreaCard
-        tab={tab}
         accountViewMode={accountViewMode}
         onAccountViewModeChange={setAccountViewMode}
       >
-        {tab === 'ticket' ? (
-          <TicketMonitoringBody />
-        ) : (
-          <AccountMonitoringBody viewMode={accountViewMode} />
-        )}
+        <AccountMonitoringBody viewMode={accountViewMode} />
       </ContentAreaCard>
     </div>
   );

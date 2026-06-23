@@ -18,5 +18,3 @@ export { MASTER_GROUP_SELECT };
 
 export const DAILY_PHONE_SELECT = 'id, phone_number, scrape_date, account_id';
 
-export const TICKET_SELECT =
-  'id, account_id, brand_id, platform, ticket_type, status, description, group_link, group_id, group_name, created_at, resolved_at, metadata, resource_management_messaging_accounts(label, phone_number, metadata), resource_management_brands(name)';

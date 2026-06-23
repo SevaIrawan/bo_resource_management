@@ -1,11 +1,7 @@
 import type { KpiItem } from '@/config/groupMonitoringKpis';
-import type { TicketSummaryGroup } from '@/lib/ticketGroups';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 
-export function computeAccountKpis(
-  groups: AccountBrandGroup[],
-  openTicketIssues = 0,
-): KpiItem[] {
+export function computeAccountKpis(groups: AccountBrandGroup[]): KpiItem[] {
   const brands = groups.length;
   const accounts = groups.reduce((n, g) => n + g.accounts.length, 0);
   const active = groups.reduce(
@@ -22,23 +18,5 @@ export function computeAccountKpis(
     { value: accounts, labelKey: 'kpi.account.accounts' },
     { value: active, labelKey: 'kpi.account.active', tone: 'success' },
     { value: aligned, labelKey: 'kpi.account.aligned', tone: 'success' },
-    { value: openTicketIssues, labelKey: 'kpi.account.openTickets', tone: 'danger' },
-  ];
-}
-
-/** KPI dari issue ringkas (satu kartu per acc+brand+jenis), bukan jumlah baris DB. */
-export function computeTicketKpis(summaries: TicketSummaryGroup[]): KpiItem[] {
-  const open = summaries.length;
-  const missingGroup = summaries.filter((t) => t.ticketType === 'missing_group').length;
-  const notAdmin = summaries.filter((t) => t.ticketType === 'not_admin').length;
-  const accountsInvolved = new Set(summaries.map((t) => t.accountName)).size;
-  const brandsInvolved = new Set(summaries.map((t) => t.brandName)).size;
-
-  return [
-    { value: open, labelKey: 'kpi.ticket.open', tone: 'danger' },
-    { value: missingGroup, labelKey: 'kpi.ticket.missingGroup', tone: 'danger' },
-    { value: notAdmin, labelKey: 'kpi.ticket.notAdmin', tone: 'warning' },
-    { value: accountsInvolved, labelKey: 'kpi.ticket.accountsInvolved' },
-    { value: brandsInvolved, labelKey: 'kpi.ticket.brandsInvolved' },
   ];
 }

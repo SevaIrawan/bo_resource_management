@@ -27,7 +27,6 @@ const STATIC_VALIDATORS = [
   'validate-release-version.mjs',
   'validate-brand-card-filter.mjs',
   'validate-brand-remove-detail.mjs',
-  'validate-ticket-reconcile.mjs',
   'validate-cross-platform-build.mjs',
   'validate-installer-electron-config.mjs',
   'validate-user-permissions.mjs',

@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.23` (lihat `package.json`)
+**Versi saat ini:** `1.0.24` (lihat `package.json`)
+
+**Rilis 1.0.24:** Hapus tab Ticketing & modul issue (UI, reconcile, script validator); migrasi Supabase drop semua tabel `resource_management_ticket_*`.
 
 **Rilis 1.0.23:** Scrape WA ambil invite link dari device (daily→master), stabilitas Puppeteer (protocolTimeout, concurrency, retry), job queue VIEW/export, validator data nyata.
 

@@ -1,38 +1,47 @@
-/** Mirror src/lib/accountMasterDailyCompare.ts — satu sumber logika audit live. */
+/**
+ * Mirror computeAccountTicketBreakdown + bookmarkMetricsFromBreakdown (src/lib/accountMasterDailyCompare.ts).
+ * Dipakai validator live grid — bukan modul Ticketing DB.
+ */
 
-export function dedupeDailyRowsByGroupId(rows) {
+function dedupeDailyRowsByGroupId(rows) {
   const map = new Map();
   for (const row of rows) {
     const gid = String(row.group_id ?? '').trim();
-    if (gid) map.set(gid, row);
+    if (!gid) continue;
+    map.set(gid, row);
   }
   return [...map.values()];
+}
+
+function buildRawGroupIdSet(rows) {
+  const set = new Set();
+  for (const r of rows) {
+    const gid = String(r.group_id ?? '').trim();
+    if (gid) set.add(gid);
+  }
+  return set;
 }
 
 function normalizeGroupNameForMatch(name) {
   return String(name ?? '').trim().toLowerCase();
 }
 
-function buildRawSet(rows) {
-  const s = new Set();
-  for (const r of rows) {
-    const gid = String(r.group_id ?? '').trim();
-    if (gid) s.add(gid);
-  }
-  return s;
+function isDailyGroupIdInMaster(dailyGroupId, masterIdSet) {
+  const gid = String(dailyGroupId ?? '').trim();
+  return gid ? masterIdSet.has(gid) : false;
 }
 
-function isInSet(gid, set) {
-  return set.has(String(gid ?? '').trim());
+function isMasterGroupIdInDaily(masterGroupId, dailyIdSet) {
+  const gid = String(masterGroupId ?? '').trim();
+  return gid ? dailyIdSet.has(gid) : false;
 }
 
-/** Identik computeAccountTicketBreakdown di app. */
 export function computeAccountTicketBreakdown(masterRows, dailyRows) {
   const dailyDeduped = dedupeDailyRowsByGroupId(dailyRows);
   const masterDeduped = dedupeDailyRowsByGroupId(masterRows);
 
-  const masterIdSet = buildRawSet(masterDeduped);
-  const dailyIdSet = buildRawSet(dailyDeduped);
+  const masterIdSet = buildRawGroupIdSet(masterDeduped);
+  const dailyIdSet = buildRawGroupIdSet(dailyDeduped);
 
   const dailyByGid = new Map();
   for (const d of dailyDeduped) {
@@ -49,8 +58,12 @@ export function computeAccountTicketBreakdown(masterRows, dailyRows) {
   const junk = [];
   for (const d of dailyDeduped) {
     const gid = String(d.group_id ?? '').trim();
-    if (!gid || isInSet(gid, masterIdSet)) continue;
-    junk.push({ groupId: gid, groupName: d.group_name, groupLink: d.invite_link });
+    if (!gid || isDailyGroupIdInMaster(gid, masterIdSet)) continue;
+    junk.push({
+      groupId: gid,
+      groupName: d.group_name,
+      groupLink: d.invite_link,
+    });
   }
 
   const missing = [];
@@ -62,8 +75,12 @@ export function computeAccountTicketBreakdown(masterRows, dailyRows) {
     const gid = String(m.group_id ?? '').trim();
     if (!gid) continue;
 
-    if (!isInSet(gid, dailyIdSet)) {
-      missing.push({ groupId: gid, groupName: m.group_name, groupLink: m.invite_link });
+    if (!isMasterGroupIdInDaily(gid, dailyIdSet)) {
+      missing.push({
+        groupId: gid,
+        groupName: m.group_name,
+        groupLink: m.invite_link,
+      });
       continue;
     }
 
@@ -83,7 +100,7 @@ export function computeAccountTicketBreakdown(masterRows, dailyRows) {
   for (const d of dailyDeduped) {
     const gid = String(d.group_id ?? '').trim();
     const gname = String(d.group_name ?? '').trim();
-    if (!gid || !isInSet(gid, masterIdSet)) continue;
+    if (!gid || !isDailyGroupIdInMaster(gid, masterIdSet)) continue;
 
     const canon = masterByRawGid.get(gid);
     if (!canon) continue;
@@ -106,7 +123,7 @@ export function computeAccountTicketBreakdown(masterRows, dailyRows) {
     const gnameNorm = normalizeGroupNameForMatch(d.group_name);
     if (!gid || !gnameNorm) continue;
 
-    if (isInSet(gid, masterIdSet)) {
+    if (isDailyGroupIdInMaster(gid, masterIdSet)) {
       const canon = masterByRawGid.get(gid);
       const canonNameNorm = normalizeGroupNameForMatch(canon?.group_name);
       if (canonNameNorm && canonNameNorm !== gnameNorm) continue;
@@ -146,13 +163,6 @@ export function bookmarkMetricsFromBreakdown(b) {
     groupsTotal: b.masterX,
     adminCurrent: b.adminInMaster,
     adminTotal: b.masterX,
-    junk: b.junk.length,
-    missing: b.missing.length,
-    notAdmin: b.notAdmin.length,
-    duplicateGroupId: b.duplicateGroupId.length,
-    duplicateGroupName: b.duplicateGroupName.length,
-    gapYMinusX: b.dailyY - b.masterX,
-    junkMinusMissing: b.junk.length - b.missing.length,
-    notAdminFromJoined: b.joinedInMaster - b.adminInMaster,
+    joinedInMaster: b.joinedInMaster,
   };
 }

@@ -25,7 +25,7 @@ const specChecks = [
   ['probe device meski grid valid', /meski.*valid|grid masih/i.test(spec)],
   ['sync pending tampil —', /pending.*—|sync_state/i.test(spec)],
   ['timestamp tanpa (Terbaru)', /timestamp|MATCH/i.test(spec) && !/\(Terbaru\)/.test(spec)],
-  ['satu engine grid/ticket/modal group link', /accountMasterDailyCompare|buildTicketSummariesFromEngine|fetchAccountGroupLinks/i.test(spec)],
+  ['satu engine grid/modal group link', /accountMasterDailyCompare|fetchAccountGroupLinks/i.test(spec)],
 ];
 
 const implChecks = [
@@ -90,9 +90,9 @@ const implChecks = [
       read('src/components/group-monitoring/PlatformLoginModal.tsx').includes('refreshQrManual'),
   },
   {
-    name: 'ticket reconcile setelah sync/scrape (await refreshIssues)',
+    name: 'scrape sukses refresh grid akun (onAccountGridRefresh)',
     ok:
-      /await onTicketsReload\?\.\(dbAccountId\)/.test(syncFlow) &&
+      /await onAccountGridRefresh\?\.\(dbAccountId\)/.test(syncFlow) &&
       syncFlow.includes("outcome.kind === 'success'"),
   },
   {

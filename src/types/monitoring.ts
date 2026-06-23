@@ -1,1 +1,1 @@
-export type MonitoringTab = 'account' | 'operations' | 'ticket' | 'reporting';
+export type MonitoringTab = 'account' | 'operations' | 'reporting';

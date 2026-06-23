@@ -7,24 +7,18 @@ export type { MonitoringTab };
 interface MonitoringTabsProps {
   value: MonitoringTab;
   onChange: (value: MonitoringTab) => void;
-  ticketCount?: number;
 }
 
-/** Urutan tab: Account → Operations → Ticketing → Reporting */
-const TAB_IDS: MonitoringTab[] = ['account', 'operations', 'ticket', 'reporting'];
+/** Urutan tab: Account → Operations → Reporting */
+const TAB_IDS: MonitoringTab[] = ['account', 'operations', 'reporting'];
 
 const TAB_LABEL_KEYS: Record<MonitoringTab, string> = {
   account: 'tabs.account',
   operations: 'tabs.operations',
-  ticket: 'tabs.ticket',
   reporting: 'tabs.reporting',
 };
 
-export function MonitoringTabs({
-  value,
-  onChange,
-  ticketCount = 0,
-}: MonitoringTabsProps) {
+export function MonitoringTabs({ value, onChange }: MonitoringTabsProps) {
   const { t } = useLanguage();
 
   return (
@@ -32,7 +26,6 @@ export function MonitoringTabs({
       {TAB_IDS.map((id) => {
         const isActive = value === id;
         const label = t(TAB_LABEL_KEYS[id]);
-        const showTicketBadge = id === 'ticket' && ticketCount > 0;
 
         return (
           <button
@@ -43,7 +36,6 @@ export function MonitoringTabs({
               'monitoring-tab-btn inline-flex items-center gap-0.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
               id === 'account' && 'monitoring-tab-btn--account',
               id === 'operations' && 'monitoring-tab-btn--operations',
-              id === 'ticket' && 'monitoring-tab-btn--ticket',
               id === 'reporting' && 'monitoring-tab-btn--reporting',
               isActive
                 ? 'bg-bg-shell text-text-primary shadow-sm'
@@ -51,11 +43,6 @@ export function MonitoringTabs({
             )}
           >
             {label}
-            {showTicketBadge ? (
-              <span className="monitoring-tab-badge" aria-label={String(ticketCount)}>
-                ({ticketCount})
-              </span>
-            ) : null}
           </button>
         );
       })}

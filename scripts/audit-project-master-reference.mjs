@@ -205,18 +205,11 @@ check('TG login QR endpoint (not /qr/{id})', () => {
     : fail('qr/start endpoint missing');
 });
 
-check('TicketType enum', () => {
-  const t = read('src/types/database.ts');
-  for (const type of [
-    'missing_group',
-    'not_admin',
-    'duplicate_group_id',
-    'duplicate_group_name',
-    'daily_junk_group',
-  ]) {
-    if (!t.includes(`'${type}'`)) return fail(`TicketType ${type} missing`);
-  }
-  return ok('TicketType values in database.ts');
+check('Monitoring tabs (account, operations, reporting)', () => {
+  const t = read('src/types/monitoring.ts');
+  return t.includes("'account' | 'operations' | 'reporting'") && !t.includes("'ticket'")
+    ? ok('MonitoringTab tanpa ticket')
+    : fail('MonitoringTab masih punya ticket');
 });
 
 check('accountNeedsRelogin', () => {
@@ -240,11 +233,11 @@ check('tables.ts RM tables', () => {
     'resource_management_messaging_accounts',
     'resource_management_platform_sessions',
     'resource_management_group_scrape_daily',
-    'resource_management_tickets',
   ];
   for (const table of expected) {
     if (!t.includes(table)) return fail(`tables.ts missing ${table}`);
   }
+  if (t.includes('resource_management_tickets')) return fail('tables.ts masih punya tickets');
   return ok('TABLES constants present');
 });
 

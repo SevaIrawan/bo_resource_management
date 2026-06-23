@@ -1,5 +1,5 @@
 /**
- * LIVE audit: metrik grid (engine = ticket) vs isi DB Supabase.
+ * LIVE audit: metrik grid (engine master↔daily) vs isi DB Supabase.
  * TIDAK ubah app/DB — baca saja.
  *
  * Usage:
@@ -14,7 +14,7 @@ import { fetchAllRows } from './lib/supabaseFetch.mjs';
 import {
   computeAccountTicketBreakdown,
   bookmarkMetricsFromBreakdown,
-} from './lib/ticketCompareCore.mjs';
+} from './lib/accountCompareCore.mjs';
 
 const TABLES = {
   messagingAccounts: 'resource_management_messaging_accounts',
@@ -170,7 +170,7 @@ async function main() {
 
   console.log(`Grid vs DB live — ${filtered.length} akun (env: ${envPath})\n`);
   console.log(
-    'Kolom grid dari engine (sama ticket): On device=dailyY, In brand=joinedInMaster/X\n',
+    'Kolom grid dari engine: On device=dailyY, In brand=joinedInMaster/X\n',
   );
 
   const warnings = [];

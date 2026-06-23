@@ -18,7 +18,6 @@ interface DashboardProvidersProps {
 export function DashboardProviders({ children }: DashboardProvidersProps) {
   const [collapsed, setCollapsed] = useState(SIDEBAR_DEFAULT_COLLAPSED);
   const [tab, setTab] = useState<MonitoringTab>('account');
-  const [ticketCount, setTicketCount] = useState(0);
   const [hasPendingDataUpdate, setHasPendingDataUpdate] = useState(false);
   const refreshHandlerRef = useRef<MonitoringRefreshHandler | null>(null);
   const fullRefreshHandlerRef = useRef<MonitoringFullRefreshHandler | null>(null);
@@ -63,8 +62,6 @@ export function DashboardProviders({ children }: DashboardProvidersProps) {
     () => ({
       tab,
       setTab,
-      ticketCount,
-      setTicketCount,
       refreshActiveTab,
       refreshAllMonitoring,
       registerRefreshHandler,
@@ -72,7 +69,6 @@ export function DashboardProviders({ children }: DashboardProvidersProps) {
     }),
     [
       tab,
-      ticketCount,
       refreshActiveTab,
       refreshAllMonitoring,
       registerRefreshHandler,

@@ -62,14 +62,14 @@ const uiChecks = [
   ['Login modal uses attemptRestore=false (fast QR)', true],
   ['After login: close login modal → update group+admin → prompt', true],
   ['0 grup → resume-empty; else Now/Later', true],
-  ['Ticket/reconcile hanya setelah scrape (bukan sync probe)', true],
+  ['Grid refresh hanya setelah scrape (bukan sync probe)', true],
   ['Scraper Now: gate dulu, baru setRowProcessing', true],
   ['Daily write → reporting + operations reload', true],
 ];
 
 const fileChecks = [
   {
-    label: 'Sync sukses tidak panggil onTicketsReload',
+    label: 'Scrape sukses panggil onAccountGridRefresh',
     file: 'src/hooks/useAccountSyncFlow.ts',
     pass: (src) => {
       const idx = src.indexOf("if (outcome.kind === 'success')");
@@ -79,7 +79,7 @@ const fileChecks = [
         !syncBlock.includes('onTicketsReload') &&
         syncBlock.includes('setStep(outcome.modalStep)') &&
         src.includes('confirmScrapePrompt = useCallback(async') &&
-        src.includes('await onTicketsReload?.(dbAccountId)')
+        src.includes('await onAccountGridRefresh?.(dbAccountId)')
       );
     },
   },

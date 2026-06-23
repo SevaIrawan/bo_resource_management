@@ -1,9 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { AccountGroupLinkRow } from '@/lib/accountGroupLinks';
 import type { GroupLinksViewMode } from '@/components/group-monitoring/GroupLinksPickerModal';
-import type { TicketDetailLine } from '@/lib/ticketGroups';
-import { ticketGroupToExportRows } from '@/lib/ticketExportRows';
-import { ticketTypeExportLabel, type TicketSummaryGroup } from '@/lib/ticketGroups';
 import type { JoinGroupMatrixRow, ReportingAccountRef } from '@/lib/loadJoinGroupReport';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { OperationsStockDetailRow } from '@/lib/loadOperationsStockBucketDetails';
@@ -137,20 +134,6 @@ export function exportAllAccountsExcel(groups: AccountBrandGroup[]) {
   saveWorkbook(workbook, rmExportFileName('all-accounts'));
 }
 
-/** Export satu issue (semua baris detail dalam kelompok acc+brand+jenis). */
-export function exportTicketGroupExcel(
-  group: TicketSummaryGroup,
-  typeLabel = ticketTypeExportLabel(group.ticketType),
-  formatNote?: (line: TicketDetailLine) => string,
-) {
-  const sheet = XLSX.utils.json_to_sheet(
-    ticketGroupToExportRows(group, typeLabel, formatNote),
-  );
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, 'Issue detail');
-  saveWorkbook(workbook, rmExportFileName(group.accountName));
-}
-
 export type ReportingExportBookmark = 'full_group' | 'full_admin';
 
 /** Metadata slicer aktif — dipakai nama file & validasi export reporting. */
@@ -276,23 +259,4 @@ export function exportJobQueueViewExcel(input: {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Job result');
   saveWorkbook(workbook, rmExportFileName(`${input.accountName}_job-${actionPart}`));
-}
-
-export function exportAllTicketGroupsExcel(
-  groups: TicketSummaryGroup[],
-  resolveTypeLabel: (group: TicketSummaryGroup) => string = (g) =>
-    ticketTypeExportLabel(g.ticketType),
-  formatNote?: (group: TicketSummaryGroup, line: TicketDetailLine) => string,
-) {
-  const rows = groups.flatMap((group) =>
-    ticketGroupToExportRows(
-      group,
-      resolveTypeLabel(group),
-      formatNote ? (line) => formatNote(group, line) : undefined,
-    ),
-  );
-  const sheet = XLSX.utils.json_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, 'All issues');
-  saveWorkbook(workbook, rmExportFileName('all-tickets'));
 }

@@ -14,8 +14,6 @@ export const TABLES = {
   /** Metrik bisnis harian — line = brand RM, bukan tabel RM core. */
   newRegister: 'new_register',
   accountSnapshots: 'resource_management_account_snapshots',
-  tickets: 'resource_management_tickets',
-  ticketIssueHandles: 'resource_management_ticket_issue_handles',
 } as const;
 
 /** Tabel RM + Realtime publication (017). */
@@ -24,8 +22,6 @@ export const RM_REALTIME_TABLES = [
   TABLES.platformSessionLogs,
   TABLES.accountSnapshots,
   TABLES.scrapeRuns,
-  TABLES.tickets,
-  TABLES.ticketIssueHandles,
   TABLES.messagingAccounts,
   TABLES.brands,
   TABLES.groupsMaster,
@@ -42,8 +38,6 @@ export const RM_ACTIVE_TABLES = [
   TABLES.groupScrapeDaily,
   TABLES.groupsMaster,
   TABLES.accountSnapshots,
-  TABLES.tickets,
-  TABLES.ticketIssueHandles,
 ] as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

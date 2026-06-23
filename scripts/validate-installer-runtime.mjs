@@ -1,5 +1,5 @@
 /**
- * Kontrak runtime yang harus tetap benar di installer (QR, skala 3000 grup, ticket reconcile).
+ * Kontrak runtime yang harus tetap benar di installer (QR, skala 3000 grup, post-login sync).
  */
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -10,7 +10,6 @@ const scripts = [
   'validate-wa-qr-login-flow.mjs',
   'validate-device-group-scale.mjs',
   'validate-post-login-sync.mjs',
-  'validate-ticket-reconcile.mjs',
   'validate-telegram-login-flow.mjs',
   'validate-multi-account-wa.mjs',
 ];

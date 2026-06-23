@@ -83,7 +83,7 @@ interface SyncTarget {
 interface UseAccountSyncFlowOptions {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   userId?: string | null;
-  onTicketsReload?: (dbAccountId: string) => void | Promise<void>;
+  onAccountGridRefresh?: (dbAccountId: string) => void | Promise<void>;
   canOperatePlatform?: boolean;
   /** i18n dari parent — hindari hook tambahan di dalam custom hook. */
   translate: (key: string) => string;
@@ -121,7 +121,7 @@ function normalizeSyncErrorMessage(message: string): string {
 export function useAccountSyncFlow({
   onGroupsChange,
   userId,
-  onTicketsReload,
+  onAccountGridRefresh,
   canOperatePlatform = true,
   translate: t,
 }: UseAccountSyncFlowOptions) {
@@ -832,7 +832,7 @@ export function useAccountSyncFlow({
 
         setStep('idle');
         if (dbAccountId) {
-          await onTicketsReload?.(dbAccountId);
+          await onAccountGridRefresh?.(dbAccountId);
         }
       } catch (error) {
         const message = getErrorMessage(error, 'SCRAPER_FAILED');
@@ -856,7 +856,7 @@ export function useAccountSyncFlow({
       applyResult,
       clearScrapeProgress,
       clearRowProcessing,
-      onTicketsReload,
+      onAccountGridRefresh,
       patchRowProcessAction,
       setRowProcessing,
       showLoginModal,

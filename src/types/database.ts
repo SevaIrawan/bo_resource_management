@@ -165,27 +165,3 @@ export interface BrandStandardGroup {
   sort_order: number;
   created_at: string;
 }
-
-export type TicketType =
-  | 'missing_group'
-  | 'not_admin'
-  | 'duplicate_group_id'
-  | 'duplicate_group_name'
-  | 'daily_junk_group';
-export type TicketStatus = 'open' | 'resolved' | 'dismissed';
-
-export interface Ticket {
-  id: string;
-  account_id: string;
-  brand_id: string;
-  platform: Platform;
-  ticket_type: TicketType;
-  status: TicketStatus;
-  description: string;
-  group_link: string | null;
-  group_id: string | null;
-  group_name: string | null;
-  created_at: string;
-  resolved_at: string | null;
-  metadata: Record<string, unknown>;
-}

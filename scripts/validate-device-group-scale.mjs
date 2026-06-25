@@ -10,14 +10,17 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const scaleElectron = read('electron/main/scraper/deviceGroupScale.ts');
 const scalePolicy = read('src/config/syncScraperPolicy.ts');
-const scaleRenderer = read('src/lib/deviceGroupScale.ts');
 const loginFlow = read('src/services/loginFlowService.ts');
 const syncFlow = read('src/services/syncFlowService.ts');
 const waCount = read('electron/main/scraper/countWhatsApp.ts');
 const waScrape = read('electron/main/scraper/whatsappScrape.ts');
 const tgPy = read('python-sidecar/telegram_scraper.py');
-
 const tgScrape = read('electron/main/scraper/telegramScrape.ts');
+
+const executeSyncCheckBody = syncFlow.slice(
+  syncFlow.indexOf('export async function executeSyncCheck'),
+  syncFlow.indexOf('export async function recordSyncCheckActivity'),
+);
 
 const checks = [
   {
@@ -41,10 +44,15 @@ const checks = [
       tgPy.includes('get_scrape_progress'),
   },
   {
-    name: 'Detect sync timeout tetap (bukan skala grup)',
+    name: 'Manual sync valid: probe session saja (tanpa device count)',
     ok:
-      scalePolicy.includes('syncDetect') &&
-      syncFlow.includes('syncDetectTimeoutMs') &&
+      !executeSyncCheckBody.includes('detectGroupsAndBuildSyncPayload') &&
+      !executeSyncCheckBody.includes('syncDetectTimeoutMs'),
+  },
+  {
+    name: 'Post-login detect timeout tetap (bukan skala grup)',
+    ok:
+      scalePolicy.includes('postLoginDetect') &&
       loginFlow.includes('postLoginDetectTimeoutMs'),
   },
   {
@@ -87,11 +95,8 @@ const checks = [
     ok: tgPy.includes('_count_groups_quick') && tgPy.includes('quick: bool'),
   },
   {
-    name: 'Post-login & manual sync pakai quickDeviceCount',
-    ok:
-      /quickDeviceCount:\s*true/.test(syncFlow) &&
-      /quickDeviceCount:\s*true/.test(loginFlow) &&
-      (syncFlow.match(/quickDeviceCount:\s*true/g) ?? []).length >= 1,
+    name: 'Post-login pakai quickDeviceCount (bukan manual sync valid)',
+    ok: /quickDeviceCount:\s*true/.test(loginFlow),
   },
 ];
 

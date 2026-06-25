@@ -134,12 +134,12 @@ const checks = [
       const guard = read('electron/main/automation/jobQueueGuard.ts');
       const settle = read('electron/main/automation/jobQueueSettle.ts');
       return (
-        cancel.includes('isGlobalScrapeInFlight') &&
         cancel.includes('isScrapeActiveForSession') &&
-        runner.includes('isGlobalScrapeInFlight') &&
+        runner.includes('isScrapeActiveForSession') &&
         runner.includes('isSessionSettling') &&
         runner.includes('markSessionSettleAfterJob') &&
         guard.includes('assertAccountExecuteAllowed') &&
+        guard.includes('isAccountJobQueueBusy') &&
         scraper.includes('assertAccountExecuteAllowed') &&
         settle.includes('POST_JOB_SETTLE_MS')
       );

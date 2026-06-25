@@ -236,6 +236,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('jobQueue:changed', listener);
     },
   },
+  executeSlots: {
+    tryAcquire: (accountId: string, kind: 'sync' | 'scraper') =>
+      ipcRenderer.invoke('executeSlots:tryAcquire', accountId, kind),
+    release: (accountId: string) => ipcRenderer.invoke('executeSlots:release', accountId),
+    acquireOrWait: (accountId: string, kind: 'sync' | 'scraper') =>
+      ipcRenderer.invoke('executeSlots:acquireOrWait', accountId, kind),
+    getStats: () => ipcRenderer.invoke('executeSlots:getStats'),
+    onChanged: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('executeSlots:changed', listener);
+      return () => ipcRenderer.removeListener('executeSlots:changed', listener);
+    },
+  },
   onSessionInvalid: (
     callback: (payload: { sessionId: string; platform: Platform; message?: string }) => void,
   ) => {

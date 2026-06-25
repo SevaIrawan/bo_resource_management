@@ -86,6 +86,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     const result = await api.run({
       sessionId: deviceSessionId,
       platform: input.account.platform,
+      accountId,
       storedSessionString,
       expectedPhone: input.account.phoneNumber?.trim() || undefined,
     });

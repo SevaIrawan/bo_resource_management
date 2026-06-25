@@ -94,6 +94,7 @@ async function scrapeWhatsAppGroupsFromStore(input: {
     const core = await scrapeWhatsAppGroupFromStore(input.client, groupId);
     if ('skip' in core) {
       skipped += 1;
+      console.warn(`[wa-scrape] skip group ${groupId}: ${core.reason}`);
       return null;
     }
 
@@ -220,7 +221,7 @@ async function runWhatsAppScrapeInner(
           elapsedMs,
         };
       },
-      { freshBoot: true, storeWaitMs: 120_000 },
+      { storeWaitMs: 120_000 },
     );
   } catch (error) {
     if (isScrapeCancelled(sessionId)) {

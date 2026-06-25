@@ -118,10 +118,14 @@ export interface AutomationJobQueueSnapshot {
   maxConcurrent: number;
   runningCount: number;
   queuedCount: number;
-  /** true jika ada job queued/running — blok Sync/Scraper di tab Account. */
+  /** @deprecated global block dihapus — gunakan busyAccountIds per akun. */
   blockingExecutes: boolean;
+  busyAccountIds: string[];
   settlingSessionIds: string[];
   globalScrapeActive: boolean;
+  executeSlotsActive: number;
+  executeSlotsMax: number;
+  executeSlotsQueued: number;
 }
 
 export interface AutomationJobListFilter {

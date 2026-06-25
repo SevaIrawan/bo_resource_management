@@ -43,13 +43,9 @@ const checks = [
     ok: scraperSrc.includes('dbAccountId?: string') && scraperSrc.includes('input.dbAccountId'),
   },
   {
-    name: 'writeScrapeDailyRows DELETE daily by account_id before INSERT',
-    ok: scraperPolicy.includes(".delete()") && scraperPolicy.includes(".eq('account_id', input.accountId)"),
-  },
-  {
-    name: 'writeScrapeDailyRows rebuild master + invalidate cache',
+    name: 'writeScrapeDailyRows atomik rm_commit_account_scrape + invalidate cache',
     ok:
-      scraperPolicy.includes('rebuildBrandGroupsMaster') &&
+      scraperPolicy.includes("rpc('rm_commit_account_scrape'") &&
       scraperPolicy.includes('invalidateMasterDailyCacheForScrape'),
   },
   {

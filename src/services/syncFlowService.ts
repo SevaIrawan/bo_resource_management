@@ -2,7 +2,7 @@
  * Sync / session-column routing — acuan logic_sync_scraper.txt + sessionColumnFlowSpec.
  * Satu modul: routing INVALID/VALID, probe device, payload sync.
  */
-import { syncDetectTimeoutMs, SYNC_SCRAPER_POLICY } from '@/config/syncScraperPolicy';
+import { SYNC_SCRAPER_POLICY } from '@/config/syncScraperPolicy';
 import { todayScrapeDate } from '@/lib/accountMonitoringEngine';
 import {
   fetchHasDailyData,
@@ -20,9 +20,6 @@ import {
   buildLogoutMetricsForUserAction,
   invalidateUserSessionOnDeviceFailure,
 } from '@/lib/userActionSession';
-import { cancelDeviceGroupCount } from '@/lib/runAccountCount';
-import { withNetworkRetry } from '@/lib/networkRetry';
-import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import type { AccountBrandRow, SessionUiStatus } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
@@ -270,56 +267,41 @@ export async function executeSyncCheck(input: {
 
   input.onSessionProbeComplete?.();
 
-  try {
-    const syncPayload = await withNetworkRetry('Manual sync', () =>
-      withTimeout(
-        detectGroupsAndBuildSyncPayload({
-          userId,
-          account,
-          dbAccountId,
-          brandStandardHint: brandX,
-          quickDeviceCount: true,
-        }),
-        syncDetectTimeoutMs(),
-        'Manual sync',
-      ),
-    );
+  const syncedAt = new Date().toISOString();
+  /** Kontrak Case 3: sync valid = probe session saja; grid metrik hanya dari scrape / DB. */
+  const result: AccountSyncResult = {
+    groupsCurrent: account.groupsCurrent,
+    groupsTotal: brandX,
+    adminCurrent: account.adminCurrent,
+    adminTotal: brandX,
+    sessionStatus: 'valid',
+  };
 
-    const syncedAt = new Date().toISOString();
-    const updatedAccount: AccountBrandRow = {
-      ...account,
-      ...syncPayload.result,
-      joinedInMaster: syncPayload.masterJoined,
-      status: 'active',
-      sessionStatus: 'valid',
-      isMisaligned: isRowMisaligned(syncPayload.result),
-    };
+  const updatedAccount: AccountBrandRow = {
+    ...account,
+    status: 'active',
+    sessionStatus: 'valid',
+    syncState: 'synced',
+    isMisaligned: isRowMisaligned(result),
+  };
 
-    return {
-      kind: 'success',
-      dbAccountId,
-      result: syncPayload.result,
-      masterJoined: syncPayload.masterJoined,
-      syncedAt,
-      syncMessage: syncPayload.syncMessage,
-      modalStep: postSyncModalStep({
-        result: syncPayload.result,
-        deviceGroupCount: syncPayload.deviceGroupCount,
-        hasDailyToday: syncPayload.hasDailyToday,
-      }),
-      updatedAccount,
-    };
-  } catch (error) {
-    if (error instanceof OperationTimeoutError) {
-      void cancelDeviceGroupCount({
-        sessionId: account.id,
-        platform: account.platform,
-        accountId: dbAccountId,
-      });
-      return { kind: 'error', code: 'SYNC_TIMED_OUT' };
-    }
-    return { kind: 'error', code: 'SYNC_FAILED' };
-  }
+  return {
+    kind: 'success',
+    dbAccountId,
+    result,
+    masterJoined: master.joinedInMaster,
+    syncedAt,
+    syncMessage:
+      account.platform === 'telegram'
+        ? 'Telegram session valid.'
+        : 'WhatsApp session valid.',
+    modalStep: postSyncModalStep({
+      result,
+      deviceGroupCount: hasDaily ? account.groupsCurrent : 0,
+      hasDailyToday: hasDaily,
+    }),
+    updatedAccount,
+  };
 }
 
 export async function recordSyncCheckActivity(input: {

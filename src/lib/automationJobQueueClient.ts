@@ -18,38 +18,69 @@ export async function fetchJobQueueSnapshot(
   return api(filter);
 }
 
-/** True when queued/running jobs block Sync & Scraper on the Account tab. */
-export async function isAutomationJobQueueBlockingExecutes(): Promise<boolean> {
-  const snapshot = await fetchJobQueueSnapshot();
-  return Boolean(snapshot?.blockingExecutes);
+function isAccountJobActive(
+  jobs: AutomationJobQueueSnapshot['jobs'],
+  accountId: string,
+): boolean {
+  return jobs.some(
+    (job) =>
+      job.accountId === accountId &&
+      (job.status === 'running' || (job.status === 'queued' && !job.paused)),
+  );
 }
 
-/** Job queue aktif atau scraper penuh sedang jalan — skip auto-sync cycle. */
-export async function isHeavyDeviceExecuteBlocked(): Promise<boolean> {
+/** True when this account has queued/running job — isolasi per akun (kontrak). */
+export async function isAccountAutomationJobBusy(accountId: string): Promise<boolean> {
   const snapshot = await fetchJobQueueSnapshot();
   if (!snapshot) return false;
-  return Boolean(snapshot.blockingExecutes || snapshot.globalScrapeActive);
+  return isAccountJobActive(snapshot.jobs, accountId);
 }
 
-export type AccountExecuteBlockCode = 'JOB_QUEUE_EXECUTE_FULL' | 'SESSION_CHECK_BUSY';
+/** @deprecated Gunakan isAccountAutomationJobBusy(accountId). */
+export async function isAutomationJobQueueBlockingExecutes(): Promise<boolean> {
+  return false;
+}
 
-/** Pre-check Sync/Run — selaras main `resolveAccountExecuteBlockReason`. */
+/** @deprecated — gunakan isHeavyDeviceExecuteBlockedForAccount(accountId). */
+export async function isHeavyDeviceExecuteBlocked(): Promise<boolean> {
+  return false;
+}
+
+/** Job queue aktif pada akun yang sama — skip auto-sync cycle untuk akun itu saja. */
+export async function isHeavyDeviceExecuteBlockedForAccount(
+  accountId: string,
+): Promise<boolean> {
+  const snapshot = await fetchJobQueueSnapshot();
+  if (!snapshot) return false;
+  return isAccountJobActive(snapshot.jobs, accountId);
+}
+
+export type AccountExecuteBlockCode =
+  | 'JOB_QUEUE_EXECUTE_FULL'
+  | 'SESSION_CHECK_BUSY'
+  | 'EXECUTE_SLOTS_FULL';
+
+/** Pre-check Sync/Run — blok hanya akun yang sama (kontrak cross-account bebas). */
 export async function resolveAccountExecuteBlock(
   account: AccountBrandRow,
 ): Promise<AccountExecuteBlockCode | null> {
   const snapshot = await fetchJobQueueSnapshot();
   if (!snapshot) return null;
-  if (snapshot.blockingExecutes) return 'JOB_QUEUE_EXECUTE_FULL';
-  if (snapshot.globalScrapeActive) return 'SESSION_CHECK_BUSY';
+
+  if (isAccountJobActive(snapshot.jobs, account.id)) {
+    return 'JOB_QUEUE_EXECUTE_FULL';
+  }
 
   const deviceSessionId = await resolveDeviceSessionId({
     sessionId: account.id,
     platform: account.platform,
     accountId: account.id,
   });
+
   if (snapshot.settlingSessionIds.includes(deviceSessionId)) {
     return 'SESSION_CHECK_BUSY';
   }
+
   return null;
 }
 

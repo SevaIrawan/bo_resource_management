@@ -52,6 +52,9 @@ function resolveAlertMessage(
   if (code === 'SESSION_CHECK_BUSY') {
     return t('groupMonitoring.sync.sessionCheckBusy');
   }
+  if (code === 'EXECUTE_SLOTS_FULL') {
+    return t('groupMonitoring.sync.executeSlotsQueued');
+  }
   if (code === 'OPERATION_GLOBAL_BUSY') {
     return t('groupMonitoring.accountCard.operationGlobalBusy');
   }

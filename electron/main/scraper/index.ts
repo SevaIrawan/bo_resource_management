@@ -26,6 +26,7 @@ import {
   assertAccountExecuteAllowed,
   accountExecuteBusyProbeResult,
 } from '../automation/jobQueueGuard';
+import { getJobQueueSnapshot } from '../automation/jobQueueStore';
 import { scheduleRunnerTick } from '../automation/jobQueueRunner';
 
 type Platform = 'whatsapp' | 'telegram';
@@ -33,20 +34,19 @@ type Platform = 'whatsapp' | 'telegram';
 export interface ScrapeRunPayload {
   sessionId: string;
   platform: Platform;
+  /** UUID baris grid — guard slot per akun (kontrak multi-akun). */
+  accountId?: string;
   storedSessionString?: string | null;
-  /** Pastikan session = nomor akun grid (WA + TG phone login). */
   expectedPhone?: string;
 }
 
 export interface CountGroupsPayload {
   sessionId: string;
   platform: Platform;
+  accountId?: string;
   storedSessionString?: string | null;
-  /** true = WA harus CONNECTED; TG harus authorized (bukan disk/DB saja). */
   strict?: boolean;
-  /** Setelah login QR WA — hitung grup cepat, admin diisi saat scraper penuh. */
   quick?: boolean;
-  /** Baru scan QR — pakai client login yang masih hidup, tanpa cold-boot. */
   reuseLiveLogin?: boolean;
 }
 
@@ -60,56 +60,50 @@ export interface ScrapedGroupRow {
   owner_count: number;
 }
 
+function guardAccountExecute(sessionId: string, accountId?: string): void {
+  const jobs = getJobQueueSnapshot().jobs;
+  assertAccountExecuteAllowed(sessionId, accountId ?? sessionId, jobs);
+}
+
 export function registerScraperIpc() {
-  let scrapeRunInFlight: Promise<unknown> | null = null;
-
   ipcMain.handle('scraper:run', async (_event, payload: ScrapeRunPayload) => {
-    assertAccountExecuteAllowed(payload.sessionId);
-    if (scrapeRunInFlight) {
-      throw new Error('SCRAPER_GLOBAL_BUSY: Another scrape is already running on this PC.');
-    }
-
+    guardAccountExecute(payload.sessionId, payload.accountId);
     registerActiveScrape(payload.sessionId);
 
-    const work = (async () => {
-    const raw =
-      payload.platform === 'telegram'
-        ? await runTelegramScrape(
-            payload.sessionId,
-            payload.storedSessionString,
-            payload.expectedPhone,
-          )
-        : await runWhatsAppScrape(payload.sessionId, payload.expectedPhone);
-
-    const groups = normalizeScrapeResult(raw.groups);
-    if (!groups.length) {
-      const hint =
-        typeof (raw as { hint?: string }).hint === 'string'
-          ? (raw as { hint: string }).hint
-          : undefined;
-      const tgUser =
-        typeof (raw as { telegramUser?: string }).telegramUser === 'string'
-          ? (raw as { telegramUser: string }).telegramUser
-          : undefined;
-      if (payload.platform === 'telegram' && hint === 'ZERO_GROUPS_ON_ACCOUNT') {
-        throw new Error(
-          `SCRAPER_NO_GROUPS: Telegram @${tgUser ?? 'unknown'} — tidak ada grup di akun ini. Login ulang jika salah akun.`,
-        );
-      }
-      if (payload.platform === 'whatsapp') {
-        throw new Error(
-          'SCRAPER_NO_GROUPS: WhatsApp tidak mengembalikan grup. Pastikan sudah CONNECTED dan coba lagi.',
-        );
-      }
-      throw new Error('SCRAPER_NO_GROUPS');
-    }
-
-    return { ...raw, groups, count: groups.length };
-    })();
-
-    scrapeRunInFlight = work;
     try {
-      return await work;
+      const raw =
+        payload.platform === 'telegram'
+          ? await runTelegramScrape(
+              payload.sessionId,
+              payload.storedSessionString,
+              payload.expectedPhone,
+            )
+          : await runWhatsAppScrape(payload.sessionId, payload.expectedPhone);
+
+      const groups = normalizeScrapeResult(raw.groups);
+      if (!groups.length) {
+        const hint =
+          typeof (raw as { hint?: string }).hint === 'string'
+            ? (raw as { hint: string }).hint
+            : undefined;
+        const tgUser =
+          typeof (raw as { telegramUser?: string }).telegramUser === 'string'
+            ? (raw as { telegramUser: string }).telegramUser
+            : undefined;
+        if (payload.platform === 'telegram' && hint === 'ZERO_GROUPS_ON_ACCOUNT') {
+          throw new Error(
+            `SCRAPER_NO_GROUPS: Telegram @${tgUser ?? 'unknown'} — tidak ada grup di akun ini. Login ulang jika salah akun.`,
+          );
+        }
+        if (payload.platform === 'whatsapp') {
+          throw new Error(
+            'SCRAPER_NO_GROUPS: WhatsApp tidak mengembalikan grup. Pastikan sudah CONNECTED dan coba lagi.',
+          );
+        }
+        throw new Error('SCRAPER_NO_GROUPS');
+      }
+
+      return { ...raw, groups, count: groups.length };
     } catch (error) {
       if (error instanceof ScrapeCancelledError || isScrapeCancelled(payload.sessionId)) {
         throw new Error('SCRAPER_CANCELLED');
@@ -117,7 +111,6 @@ export function registerScraperIpc() {
       throw error;
     } finally {
       clearActiveScrape(payload.sessionId);
-      if (scrapeRunInFlight === work) scrapeRunInFlight = null;
       scheduleRunnerTick(0);
     }
   });
@@ -134,7 +127,7 @@ export function registerScraperIpc() {
   );
 
   ipcMain.handle('scraper:count-groups', async (_event, payload: CountGroupsPayload) => {
-    assertAccountExecuteAllowed(payload.sessionId);
+    guardAccountExecute(payload.sessionId, payload.accountId);
     registerCountAbort(payload.sessionId);
     try {
       if (payload.platform === 'telegram') {
@@ -160,7 +153,12 @@ export function registerScraperIpc() {
 
   ipcMain.handle('scraper:validate-session', async (_event, payload: CountGroupsPayload) => {
     if (payload.strict) {
-      const busy = accountExecuteBusyProbeResult(payload.sessionId);
+      const jobs = getJobQueueSnapshot().jobs;
+      const busy = accountExecuteBusyProbeResult(
+        payload.sessionId,
+        payload.accountId ?? payload.sessionId,
+        jobs,
+      );
       if (busy) return busy;
     }
     try {

@@ -30,6 +30,7 @@ export async function probePlatformSession(input: {
     return await api({
       sessionId,
       platform: input.platform,
+      accountId: input.accountId,
       storedSessionString,
       strict: input.strict,
     });

@@ -1,4 +1,4 @@
-import { isScrapeActiveForSession, isGlobalScrapeInFlight } from '../scraper/scrapeCancel';
+import { isScrapeActiveForSession } from '../scraper/scrapeCancel';
 import { isSessionSettling, markSessionSettleAfterJob } from './jobQueueSettle';
 import { accountJobStepTotal } from './jobQueueBatchHelpers';
 import { runAutomationAction, withAutomationAccountLock } from './index';
@@ -7,6 +7,10 @@ import type { AutomationRunPayload, AutomationRunResult } from './types';
 import { runTelegramCreateGroupBatch } from './tgAutomationClient';
 import { runWhatsAppCreateGroupBatch } from './waAutomation';
 import { withJobTimeout } from './promiseTimeout';
+import {
+  releaseExecuteSlot,
+  tryAcquireExecuteSlot,
+} from './executeSlotPool';
 import {
   broadcastJobQueueChanged,
   consumeJobStopRequest,
@@ -18,13 +22,11 @@ import {
   pickQueuedJobsForDispatch,
   updateJobProgress,
 } from './jobQueueStore';
+import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
 
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let tickInProgress = false;
 let tickPending = false;
-
-/** Jeda antar akun di antrian (user spec: 60s). */
-const BETWEEN_ACCOUNT_DELAY_MS = 60_000;
 
 const STALE_RUNNING_MS = 30 * 60 * 1000;
 
@@ -125,7 +127,16 @@ async function runAccountAutomationJob(job: AutomationJobRecord): Promise<Automa
 }
 
 async function runSingleJob(job: AutomationJobRecord): Promise<void> {
-  if (!markJobRunning(job.id)) return;
+  const slot = tryAcquireExecuteSlot(job.accountId, 'job');
+  if (!slot.ok) {
+    scheduleRunnerRetry(slot.reason === 'same_account' ? 1000 : 1500);
+    return;
+  }
+
+  if (!markJobRunning(job.id)) {
+    releaseExecuteSlot(job.accountId);
+    return;
+  }
 
   const batch = isCreateGroupBatch(job);
   const stepTotal = accountJobStepTotal(job);
@@ -135,8 +146,6 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
     label: job.payload.groupNamePrefix ?? job.payload.groupName ?? job.accountName,
   });
 
-  let finishedRun = false;
-
   try {
     const result = batch ? await runCreateGroupBatchJob(job) : await runAccountAutomationJob(job);
 
@@ -144,7 +153,6 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       return;
     }
 
-    finishedRun = true;
     const success = batchSuccessCount(result, job);
     const total = stepTotal;
     const message = result.message ?? (batch ? `${success}/${total} created` : 'OK');
@@ -190,13 +198,13 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       error: result.errorCode ?? message ?? 'AUTOMATION_ERROR',
     });
   } catch (error) {
-    finishedRun = true;
     markJobFinished(job.id, 'failed', {
       error: error instanceof Error ? error.message : 'AUTOMATION_EXCEPTION',
     });
   } finally {
     markSessionSettleAfterJob(job.sessionId);
-    scheduleRunnerTick(finishedRun ? BETWEEN_ACCOUNT_DELAY_MS : 0);
+    releaseExecuteSlot(job.accountId);
+    scheduleRunnerTick(0);
   }
 }
 
@@ -214,26 +222,25 @@ async function runnerTick(): Promise<void> {
       scheduleRunnerTick(0);
     }
 
-    if (getRunningJobCount() > 0) return;
+    const maxConcurrent = getMaxConcurrentAutomationJobs();
+    const running = getRunningJobCount();
+    const available = maxConcurrent - running;
+    if (available <= 0) return;
 
-    const candidates = pickQueuedJobsForDispatch(1);
+    const candidates = pickQueuedJobsForDispatch(available);
     if (candidates.length === 0) return;
 
-    const job = candidates[0];
-    if (isGlobalScrapeInFlight()) {
-      scheduleRunnerRetry(3000);
-      return;
+    for (const job of candidates) {
+      if (isScrapeActiveForSession(job.sessionId)) {
+        scheduleRunnerRetry(1500);
+        continue;
+      }
+      if (isSessionSettling(job.sessionId)) {
+        scheduleRunnerRetry(1000);
+        continue;
+      }
+      void runSingleJob(job);
     }
-    if (isSessionSettling(job.sessionId)) {
-      scheduleRunnerRetry(1000);
-      return;
-    }
-    if (isScrapeActiveForSession(job.sessionId)) {
-      scheduleRunnerRetry(3000);
-      return;
-    }
-
-    void runSingleJob(job);
   } finally {
     tickInProgress = false;
     if (tickPending) {

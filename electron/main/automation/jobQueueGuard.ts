@@ -1,22 +1,26 @@
-import { isGlobalScrapeInFlight } from '../scraper/scrapeCancel';
-import { isJobQueueBlockingOtherExecutes } from './jobQueueStore';
+import { isScrapeActiveForSession } from '../scraper/scrapeCancel';
+import { isAccountJobQueueBusy } from './jobQueueBatchHelpers';
 import { isSessionSettling } from './jobQueueSettle';
+import type { AutomationJobRecord } from './jobQueueTypes';
 
 export const JOB_QUEUE_EXECUTE_FULL_MESSAGE = 'JOB_QUEUE_EXECUTE_FULL';
 export const SESSION_SETTLING_MESSAGE = 'SESSION_SETTLING';
-export const SCRAPER_GLOBAL_BUSY_MESSAGE = 'SCRAPER_GLOBAL_BUSY';
 
 export type AccountExecuteBlockReason =
   | typeof JOB_QUEUE_EXECUTE_FULL_MESSAGE
-  | typeof SESSION_SETTLING_MESSAGE
-  | typeof SCRAPER_GLOBAL_BUSY_MESSAGE;
+  | typeof SESSION_SETTLING_MESSAGE;
 
-export function resolveAccountExecuteBlockReason(sessionId: string): AccountExecuteBlockReason | null {
-  if (isJobQueueBlockingOtherExecutes()) {
+/** Blok hanya isolasi per akun — slot execute dipegang renderer/runner, bukan di guard IPC. */
+export function resolveAccountExecuteBlockReason(
+  sessionId: string,
+  accountId: string,
+  jobs: AutomationJobRecord[],
+): AccountExecuteBlockReason | null {
+  if (isAccountJobQueueBusy(jobs, accountId)) {
     return JOB_QUEUE_EXECUTE_FULL_MESSAGE;
   }
-  if (isGlobalScrapeInFlight()) {
-    return SCRAPER_GLOBAL_BUSY_MESSAGE;
+  if (isScrapeActiveForSession(sessionId)) {
+    return JOB_QUEUE_EXECUTE_FULL_MESSAGE;
   }
   if (isSessionSettling(sessionId)) {
     return SESSION_SETTLING_MESSAGE;
@@ -24,29 +28,23 @@ export function resolveAccountExecuteBlockReason(sessionId: string): AccountExec
   return null;
 }
 
-/** Main-process guard — selaras renderer `getAccountExecuteBlockReason`. */
-export function assertAccountExecuteAllowed(sessionId: string): void {
-  const reason = resolveAccountExecuteBlockReason(sessionId);
+export function assertAccountExecuteAllowed(
+  sessionId: string,
+  accountId: string,
+  jobs: AutomationJobRecord[],
+): void {
+  const reason = resolveAccountExecuteBlockReason(sessionId, accountId, jobs);
   if (reason) {
     throw new Error(reason);
   }
 }
 
-/** @deprecated use assertAccountExecuteAllowed(sessionId) */
-export function assertJobQueueNotBlockingExecutes(): void {
-  if (isJobQueueBlockingOtherExecutes()) {
-    throw new Error(JOB_QUEUE_EXECUTE_FULL_MESSAGE);
-  }
-}
-
 export function accountExecuteBusyProbeResult(
   sessionId: string,
+  accountId: string,
+  jobs: AutomationJobRecord[],
 ): { valid: false; message: string } | null {
-  const reason = resolveAccountExecuteBlockReason(sessionId);
+  const reason = resolveAccountExecuteBlockReason(sessionId, accountId, jobs);
   if (!reason) return null;
   return { valid: false, message: reason };
-}
-
-export function jobQueueBusyProbeResult(): { valid: false; message: string } {
-  return { valid: false, message: JOB_QUEUE_EXECUTE_FULL_MESSAGE };
 }

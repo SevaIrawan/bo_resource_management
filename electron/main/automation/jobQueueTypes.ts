@@ -112,10 +112,14 @@ export interface AutomationJobQueueSnapshot {
   runningCount: number;
   queuedCount: number;
   blockingExecutes: boolean;
+  busyAccountIds: string[];
   /** sessionId device — jeda post-job automation (5s). */
   settlingSessionIds: string[];
-  /** Scraper penuh aktif di PC — selaras job queue runner. */
+  /** Scrape aktif di PC (informasi; tidak blok global). */
   globalScrapeActive: boolean;
+  executeSlotsActive: number;
+  executeSlotsMax: number;
+  executeSlotsQueued: number;
 }
 
 export interface AutomationJobListFilter {

@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.24` (lihat `package.json`)
+**Versi saat ini:** `1.0.25` (lihat `package.json`)
+
+**Rilis 1.0.25:** Kontrak GM Sync/Run/Scrape — slot execute 4 akun paralel, scrape commit atomik (`rm_commit_account_scrape`), sync valid tanpa double device read, perbaikan guard IPC & tombol Run.
 
 **Rilis 1.0.24:** Hapus tab Ticketing & modul issue (UI, reconcile, script validator); migrasi Supabase drop semua tabel `resource_management_ticket_*`.
 

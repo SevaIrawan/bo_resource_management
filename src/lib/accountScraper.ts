@@ -1,4 +1,3 @@
-import { SCRAPER_WRITE_TABLE } from '@/config/scraperPolicy';
 import { MESSAGING_ACCOUNT_MATCH_SELECT } from '@/config/dbColumns';
 import { TABLES } from '@/config/tables';
 import {
@@ -17,7 +16,6 @@ import {
 import { dedupeScrapedGroupsByGroupId } from '@/lib/dedupeScrapedGroups';
 import type { ScrapedGroupPayload } from '@/lib/dedupeScrapedGroups';
 import { invalidateMasterDailyCacheForScrape } from '@/lib/masterDailyLoadCache';
-import { rebuildBrandGroupsMaster } from '@/lib/syncMasterAfterScrape';
 import { getSupabase } from '@/lib/supabase';
 import type { Platform } from '@/types/database';
 import type { MessagingAccount } from '@/types/database';
@@ -203,8 +201,7 @@ function buildScrapeRows(input: {
 
 /**
  * Pipeline setiap scrape:
- * scrape → DELETE daily (account_id) → INSERT daily (device penuh)
- * → rebuild master brand+platform (dedupe + link valid)
+ * scrape device → RPC rm_commit_account_scrape (DELETE daily + INSERT + rebuild master, atomik)
  */
 export async function writeScrapeDailyRows(input: {
   accountId: string;
@@ -229,15 +226,6 @@ export async function writeScrapeDailyRows(input: {
     throw new Error('PHONE_MISSING');
   }
 
-  const { error: deleteDailyError } = await supabase
-    .from(SCRAPER_WRITE_TABLE)
-    .delete()
-    .eq('account_id', input.accountId);
-
-  if (deleteDailyError) {
-    throw new Error(`SCRAPER_DB_DELETE_DAILY: ${deleteDailyError.message}`);
-  }
-
   const rows = buildScrapeRows({
     accountId: input.accountId,
     platform: input.platform,
@@ -249,16 +237,22 @@ export async function writeScrapeDailyRows(input: {
     groups: uniqueGroups,
   });
 
-  const { error: insertError } = await supabase.from(SCRAPER_WRITE_TABLE).insert(rows);
-  if (insertError) {
-    throw new Error(`SCRAPER_DB_WRITE: ${insertError.message}`);
+  const brand = input.brand.trim();
+  const { data, error } = await supabase.rpc('rm_commit_account_scrape', {
+    p_account_id: input.accountId,
+    p_brand: brand,
+    p_platform: input.platform,
+    p_rows: rows,
+  });
+
+  if (error) {
+    throw new Error(`SCRAPER_DB_COMMIT: ${error.message}`);
   }
 
-  const brand = input.brand.trim();
-  const { masterInserted } = await rebuildBrandGroupsMaster({
-    brand,
-    platform: input.platform,
-  });
+  const commit = (data ?? {}) as {
+    daily_count?: number;
+    master_inserted?: number;
+  };
 
   invalidateMasterDailyCacheForScrape({
     accountId: input.accountId,
@@ -267,8 +261,8 @@ export async function writeScrapeDailyRows(input: {
   });
 
   return {
-    count: rows.length,
-    masterCount: masterInserted,
+    count: commit.daily_count ?? rows.length,
+    masterCount: commit.master_inserted ?? 0,
     scrapeDate,
     scrapedAt,
   };

@@ -5,39 +5,41 @@ export class ScrapeCancelledError extends Error {
   }
 }
 
-let activeSessionId: string | null = null;
-let cancelled = false;
+const activeSessionIds = new Set<string>();
+const cancelledBySession = new Map<string, boolean>();
 
 export function registerActiveScrape(sessionId: string): void {
-  activeSessionId = sessionId;
-  cancelled = false;
+  activeSessionIds.add(sessionId);
+  cancelledBySession.set(sessionId, false);
 }
 
 export function clearActiveScrape(sessionId: string): void {
-  if (activeSessionId === sessionId) {
-    activeSessionId = null;
-    cancelled = false;
-  }
+  activeSessionIds.delete(sessionId);
+  cancelledBySession.delete(sessionId);
 }
 
 export function requestScrapeCancel(sessionId: string): boolean {
-  if (activeSessionId !== sessionId) return false;
-  cancelled = true;
+  if (!activeSessionIds.has(sessionId)) return false;
+  cancelledBySession.set(sessionId, true);
   return true;
 }
 
 export function isScrapeCancelled(sessionId: string): boolean {
-  return activeSessionId === sessionId && cancelled;
+  return activeSessionIds.has(sessionId) && cancelledBySession.get(sessionId) === true;
 }
 
-/** Job queue: cek apakah sesi sedang dipakai scraper (global mono v1.0.19). */
+/** Job queue / guard per akun — scrape aktif hanya untuk sesi ini. */
 export function isScrapeActiveForSession(sessionId: string): boolean {
-  return activeSessionId === sessionId;
+  return activeSessionIds.has(sessionId);
 }
 
-/** Scraper penuh sedang jalan di PC — job queue tunggu (hindari bentrok pool Chrome). */
+/** @deprecated Kontrak multi-akun: jangan blok semua akun. Pakai areExecuteSlotsFull / per-session. */
 export function isGlobalScrapeInFlight(): boolean {
-  return activeSessionId !== null;
+  return activeSessionIds.size > 0;
+}
+
+export function getActiveScrapeSessionCount(): number {
+  return activeSessionIds.size;
 }
 
 export function throwIfScrapeCancelled(sessionId: string): void {
@@ -51,8 +53,8 @@ export async function abortActiveScrape(
   sessionId: string,
   platform: 'whatsapp' | 'telegram',
 ): Promise<void> {
-  if (activeSessionId === sessionId) {
-    cancelled = true;
+  if (activeSessionIds.has(sessionId)) {
+    cancelledBySession.set(sessionId, true);
   }
   if (platform === 'whatsapp') {
     const { forceReleaseWhatsAppForLogin } = await import('../platformLogin/whatsapp');

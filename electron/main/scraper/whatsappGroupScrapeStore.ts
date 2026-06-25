@@ -29,7 +29,9 @@ function isRetriablePuppeteerEvaluateError(error: unknown): boolean {
     lower.includes('detached frame') ||
     lower.includes('execution context was destroyed') ||
     lower.includes('target closed') ||
-    lower.includes('session closed')
+    lower.includes('session closed') ||
+    lower.includes("reading 'getchat'") ||
+    lower.includes('wwebjs')
   );
 }
 
@@ -40,6 +42,10 @@ async function evaluateWhatsAppGroupFromStore(
 ): Promise<WhatsAppGroupScrapeStoreResult> {
   return client.pupPage.evaluate(
     async (gid, delays: number[]) => {
+    if (typeof window.WWebJS?.getChat !== 'function') {
+      return { skip: true as const, reason: 'store_not_ready' };
+    }
+
     function widSerialized(w: unknown): string {
       if (!w || typeof w !== 'object') return String(w ?? '').trim();
       const o = w as { _serialized?: string; id?: { _serialized?: string } };

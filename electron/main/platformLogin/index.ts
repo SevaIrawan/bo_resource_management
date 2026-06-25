@@ -9,6 +9,7 @@ import {
 } from './telegramSidecar';
 import { tryRestorePlatformSession } from './restore';
 import { assertAccountExecuteAllowed } from '../automation/jobQueueGuard';
+import { getJobQueueSnapshot } from '../automation/jobQueueStore';
 import {
   clearWhatsAppLocalAuth,
   forceReleaseWhatsAppForLogin,
@@ -164,7 +165,12 @@ export function registerPlatformLoginIpc() {
       },
     ) => {
       try {
-        assertAccountExecuteAllowed(payload.sessionId);
+        const jobs = getJobQueueSnapshot().jobs;
+        assertAccountExecuteAllowed(
+          payload.sessionId,
+          payload.sessionId,
+          jobs,
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : 'EXECUTE_BLOCKED';
         return { ready: false, message };

@@ -328,7 +328,12 @@ function ScraperColumnCell({
     );
   }
 
-  if (row.syncState === 'synced' && row.isMisaligned && (onRunScraper || operateLocked)) {
+  const canRunScraper =
+    row.sessionStatus === 'valid' &&
+    row.syncState !== 'pending' &&
+    (onRunScraper || operateLocked);
+
+  if (canRunScraper) {
     return (
       <div className="brand-scraper-cell-stack">
         {operateLocked ? (
@@ -358,7 +363,7 @@ function ScraperColumnCell({
     );
   }
 
-  if (row.syncState === 'synced' && canShowLastUpdate && !row.isMisaligned) {
+  if (row.syncState === 'synced' && canShowLastUpdate) {
     return (
       <div className="brand-scraper-cell-stack">
         <time className="brand-scraper-last-update-time" dateTime={row.lastSyncAt ?? undefined}>
@@ -368,7 +373,7 @@ function ScraperColumnCell({
     );
   }
 
-  // pending / belum synced: tampilan netral (—); standby penuh mengikuti valid/invalid/running.
+  // pending / belum synced: tampilan netral (—)
   return <span className="brand-account-slot-muted text-xs">—</span>;
 }
 

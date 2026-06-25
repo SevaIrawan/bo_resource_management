@@ -121,6 +121,7 @@ declare global {
         run: (payload: {
           sessionId: string;
           platform: Platform;
+          accountId?: string;
           storedSessionString?: string | null;
           expectedPhone?: string;
         }) => Promise<{
@@ -141,6 +142,7 @@ declare global {
         countGroups: (payload: {
           sessionId: string;
           platform: Platform;
+          accountId?: string;
           storedSessionString?: string | null;
           quick?: boolean;
           reuseLiveLogin?: boolean;
@@ -153,6 +155,7 @@ declare global {
     validateSession: (payload: {
       sessionId: string;
       platform: Platform;
+      accountId?: string;
       storedSessionString?: string | null;
       strict?: boolean;
     }) => Promise<{ valid: boolean; message?: string }>;
@@ -232,8 +235,12 @@ declare global {
           runningCount: number;
           queuedCount: number;
           blockingExecutes: boolean;
+          busyAccountIds: string[];
           settlingSessionIds: string[];
           globalScrapeActive: boolean;
+          executeSlotsActive: number;
+          executeSlotsMax: number;
+          executeSlotsQueued: number;
         }>;
         enqueue: (input: {
           brandName: string;
@@ -261,6 +268,27 @@ declare global {
         setPaused: (paused: boolean) => Promise<{
           ok: boolean;
           runnerState?: 'idle' | 'running' | 'paused';
+        }>;
+        onChanged: (callback: () => void) => () => void;
+      };
+      executeSlots?: {
+        tryAcquire: (
+          accountId: string,
+          kind: 'sync' | 'scraper',
+        ) => Promise<{ ok: true } | { ok: false; reason: 'same_account' | 'slots_full' }>;
+        release: (accountId: string) => Promise<{ ok: boolean }>;
+        acquireOrWait: (
+          accountId: string,
+          kind: 'sync' | 'scraper',
+        ) => Promise<
+          | { ok: true; queued: boolean }
+          | { ok: false; reason: 'same_account' }
+        >;
+        getStats: () => Promise<{
+          maxConcurrent: number;
+          activeCount: number;
+          queuedCount: number;
+          activeAccountIds: string[];
         }>;
         onChanged: (callback: () => void) => () => void;
       };

@@ -57,6 +57,7 @@ export async function countDeviceGroups(
     return await api({
       sessionId,
       platform: input.platform,
+      accountId: input.accountId,
       storedSessionString,
       quick: options?.quick,
       reuseLiveLogin: options?.reuseLiveLogin,

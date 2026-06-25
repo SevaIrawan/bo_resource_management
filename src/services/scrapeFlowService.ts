@@ -44,6 +44,8 @@ export type ScrapeRunOutcome =
       masterJoined: number;
       scrapedAt: string;
       brandX: number;
+      /** true = login/sync barusan — update Session+Status; false = session sudah valid sebelum scrape. */
+      updateSession: boolean;
     };
 
 export async function resolveScrapeLoginIfNeeded(input: {
@@ -71,6 +73,8 @@ export async function executeScrapeRun(input: {
   skipDeviceCheck?: boolean;
   /** Session baru diverifikasi (sync/login) — jangan invalidate DB dari gagal scrape sementara. */
   trustedSession?: boolean;
+  /** Kontrak tabel: had login → update Session+Status setelah scrape sukses. */
+  updateSessionOnSuccess?: boolean;
   onSessionProbeComplete?: () => void;
 }): Promise<ScrapeRunOutcome> {
   const { account, userId, dbAccountId } = input;
@@ -187,6 +191,7 @@ export async function executeScrapeRun(input: {
       masterJoined: master.joinedInMaster,
       scrapedAt: new Date().toISOString(),
       brandX,
+      updateSession: input.updateSessionOnSuccess === true,
     };
   } catch (error) {
     const message = getErrorMessage(error, 'SCRAPER_FAILED');
@@ -244,6 +249,7 @@ export async function runScrapeFlow(input: {
   dbAccountId: string;
   skipDeviceCheck?: boolean;
   trustedSession?: boolean;
+  updateSessionOnSuccess?: boolean;
   onSessionProbeComplete?: () => void;
 }): Promise<ScrapeRunOutcome> {
   await backfillPlatformSessionIfNeeded({
@@ -267,6 +273,7 @@ export async function runScrapeFlow(input: {
     dbAccountId: input.dbAccountId,
     skipDeviceCheck: input.skipDeviceCheck === true,
     trustedSession: input.trustedSession === true,
+    updateSessionOnSuccess: input.updateSessionOnSuccess === true,
     onSessionProbeComplete: input.onSessionProbeComplete,
   });
 }

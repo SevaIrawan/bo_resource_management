@@ -220,7 +220,7 @@ export const en = {
       resultProgress: '{{current}}/{{total}} groups',
       resultSuccessGroups: 'Success {{count}} group(s)',
       executeFull:
-        'Job queue is busy. Sync and Scraper are blocked until all queued tasks finish. You can browse other tabs, but cannot start new executions.',
+        'Job queue is running on this account. Wait until it finishes before Sync or Run.',
       inviteLink: 'Invite link',
       inviteLinkPlaceholder: 'https://chat.whatsapp.com/… or t.me/+…',
       account: 'Account',
@@ -382,7 +382,7 @@ export const en = {
       scraperRunning: 'Reading groups…',
       scraperBootWa: 'Opening WhatsApp for scrape…',
       scraperBootTg: 'Opening Telegram for scrape…',
-      operationGlobalBusy: 'Another account is busy — only one Sync/Run at a time on this PC.',
+      operationGlobalBusy: 'This account already has a task running.',
       operationAlreadyRunning: 'Sync or scrape already running for this account.',
       scraperIdle: 'Aligned',
       syncRunning: 'Syncing…',
@@ -570,6 +570,8 @@ export const en = {
         'Device session is still starting on this PC (up to ~2 min). Tap Sync again — your Telegram/WhatsApp link on the phone is unchanged.',
       sessionCheckBusy:
         'Session is still connecting on this PC. Wait a few seconds and tap Sync or Run again — your WhatsApp/Telegram link on the phone is unchanged.',
+      executeSlotsQueued:
+        'All execute slots are busy (max 4). Your action is queued and will start automatically.',
       sessionValidMessageTg: 'Telegram OK. Counts updated.',
       sessionValidMessageWa: 'WhatsApp OK. Counts updated.',
       sessionValidDetail:

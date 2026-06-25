@@ -7,7 +7,7 @@ import {
 } from '@/lib/runAutoSyncAccount';
 import { sessionCheckTimeoutMs, syncDetectTimeoutMs } from '@/config/syncScraperPolicy';
 import {
-  isHeavyDeviceExecuteBlocked,
+  isHeavyDeviceExecuteBlockedForAccount,
   isAccountSessionSettling,
 } from '@/lib/automationJobQueueClient';
 import { withTimeout } from '@/lib/withTimeout';
@@ -58,15 +58,12 @@ export function useAutoAccountSync({
     setIsRunning(true);
 
     try {
-      if (await isHeavyDeviceExecuteBlocked()) {
-        return;
-      }
-
       const entries = flattenAccounts(groupsRef.current);
       const suspended = new Set(suspendRef.current);
 
       for (const { group, account } of entries) {
         if (suspended.has(account.id)) continue;
+        if (await isHeavyDeviceExecuteBlockedForAccount(account.id)) continue;
         if (await isAccountSessionSettling(account)) continue;
 
         const output = await withTimeout(

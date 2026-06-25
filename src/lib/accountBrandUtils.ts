@@ -159,18 +159,38 @@ export function applySyncResultToGroup(
     masterTotal?: number;
     lastSyncAt?: string | null;
     preserveActionProcess?: boolean;
+    /** Scrape sukses tanpa login — jangan ubah status/session kolom grid. */
+    preserveSession?: boolean;
+    /** Sync/Later kontrak — hanya Session+Status (+ syncState), metrik grid tidak berubah. */
+    sessionOnly?: boolean;
   },
 ): AccountBrandGroup {
   const accounts = group.accounts.map((account) => {
     if (account.id !== accountId) return account;
 
-    const isMisaligned = isMisalignedFromSyncResult(result);
     const lastSyncAt =
       options?.lastSyncAt !== undefined ? options.lastSyncAt : account.lastSyncAt;
 
+    if (options?.sessionOnly) {
+      return {
+        ...account,
+        status: 'active' as const,
+        sessionStatus: 'valid' as const,
+        syncState: 'synced' as const,
+        lastSyncAt,
+        actionProcess: options?.preserveActionProcess ? account.actionProcess : null,
+      };
+    }
+
+    const isMisaligned = isMisalignedFromSyncResult(result);
+
     return {
       ...account,
-      status: result.sessionStatus === 'valid' ? ('active' as const) : ('logout' as const),
+      status: options?.preserveSession
+        ? account.status
+        : result.sessionStatus === 'valid'
+          ? ('active' as const)
+          : ('logout' as const),
       groupsCurrent: result.groupsCurrent,
       groupsTotal: result.groupsTotal,
       joinedInMaster:
@@ -179,7 +199,7 @@ export function applySyncResultToGroup(
           : account.joinedInMaster,
       adminCurrent: result.adminCurrent,
       adminTotal: result.adminTotal,
-      sessionStatus: result.sessionStatus,
+      sessionStatus: options?.preserveSession ? account.sessionStatus : result.sessionStatus,
       actionProcess: options?.preserveActionProcess ? account.actionProcess : null,
       syncState: 'synced' as const,
       isMisaligned,

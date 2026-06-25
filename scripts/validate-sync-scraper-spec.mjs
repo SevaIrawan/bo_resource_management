@@ -90,10 +90,11 @@ const implChecks = [
       read('src/components/group-monitoring/PlatformLoginModal.tsx').includes('refreshQrManual'),
   },
   {
-    name: 'scrape sukses refresh grid akun (onAccountGridRefresh)',
+    name: 'Scrape sukses: applyResult grid (kontrak §5 — tanpa refresh DB terpisah)',
     ok:
-      /await onAccountGridRefresh\?\.\(dbAccountId\)/.test(syncFlow) &&
-      syncFlow.includes("outcome.kind === 'success'"),
+      syncFlow.includes("outcome.kind === 'success'") &&
+      syncFlow.includes('applyResult(groupId, account.id, outcome.result') &&
+      !/await onAccountGridRefresh\?\.\(dbAccountId\)/.test(syncFlow),
   },
   {
     name: 'Modal Admin vs master: fetchAccountGroupLinks master-only + dedupe',
@@ -109,17 +110,43 @@ const implChecks = [
     })(),
   },
   {
-    name: 'Scrape pipeline: daily INSERT invite_link + rebuild master RPC',
+    name: 'Scrape pipeline: invite_link + rm_commit_account_scrape atomik',
     ok: (() => {
       const scraper = read('src/lib/accountScraper.ts');
       const wa = read('electron/main/scraper/whatsappScrape.ts');
       return (
         scraper.includes('invite_link: group.invite_link') &&
-        scraper.includes('rebuildBrandGroupsMaster') &&
-        scraper.includes('DELETE daily') &&
-        wa.includes('fetchWhatsAppGroupInviteLink')
+        scraper.includes("rpc('rm_commit_account_scrape'") &&
+        !wa.includes('freshBoot: true')
       );
     })(),
+  },
+  {
+    name: 'Kontrak: execute slot pool max 4 + IPC (cursor-prompt-gm-master)',
+    ok: (() => {
+      const pool = read('electron/main/automation/executeSlotPool.ts');
+      const gate = read('src/lib/userActionGate.ts');
+      const client = read('src/lib/executeSlotClient.ts');
+      return (
+        pool.includes('getMaxWaBrowserSlots') &&
+        gate.includes('MAX_EXECUTE_SLOTS = 4') &&
+        client.includes('acquireOrWait')
+      );
+    })(),
+  },
+  {
+    name: 'Kontrak: scrape error tahan slot sampai modal ditutup',
+    ok:
+      syncFlow.includes('deferSlotRelease = true') &&
+      syncFlow.includes('releaseExecuteSlot(target.account.id)'),
+  },
+  {
+    name: 'Kontrak: sync valid sessionOnly sebelum modal Now/Later',
+    ok: syncFlow.includes('sessionOnly: true'),
+  },
+  {
+    name: 'Kontrak: job queue per-akun (bukan global block)',
+    ok: read('src/lib/automationJobQueueClient.ts').includes('isAccountJobActive'),
   },
 ];
 

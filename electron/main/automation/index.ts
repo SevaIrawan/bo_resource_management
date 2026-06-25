@@ -18,6 +18,12 @@ import {
   setRunnerPaused,
 } from './jobQueueStore';
 import { notifyRunnerStateChanged, scheduleRunnerTick } from './jobQueueRunner';
+import {
+  getExecuteSlotStats,
+  releaseExecuteSlot,
+  tryAcquireExecuteSlot,
+  waitForExecuteSlot,
+} from './executeSlotPool';
 
 const accountLocks = new Map<string, Promise<unknown>>();
 
@@ -108,6 +114,33 @@ export function registerAutomationIpc(): void {
     if (!paused) scheduleRunnerTick(0);
     return { ok: true, runnerState };
   });
+
+  ipcMain.handle(
+    'executeSlots:tryAcquire',
+    (_event, accountId: string, kind: 'sync' | 'scraper' | 'job') =>
+      tryAcquireExecuteSlot(accountId, kind),
+  );
+
+  ipcMain.handle('executeSlots:release', (_event, accountId: string) => {
+    releaseExecuteSlot(accountId);
+    scheduleRunnerTick(0);
+    return { ok: true };
+  });
+
+  ipcMain.handle(
+    'executeSlots:acquireOrWait',
+    async (_event, accountId: string, kind: 'sync' | 'scraper' | 'job') => {
+      const immediate = tryAcquireExecuteSlot(accountId, kind);
+      if (immediate.ok) return { ok: true as const, queued: false };
+      if (immediate.reason === 'same_account') {
+        return { ok: false as const, reason: 'same_account' as const };
+      }
+      await waitForExecuteSlot(accountId, kind);
+      return { ok: true as const, queued: true };
+    },
+  );
+
+  ipcMain.handle('executeSlots:getStats', () => getExecuteSlotStats());
 
   setRunnerPaused(false);
   scheduleRunnerTick(0);

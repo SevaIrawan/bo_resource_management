@@ -54,10 +54,10 @@ import {
   runScrapeFlow,
 } from '@/services/scrapeFlowService';
 import {
-  tryLockUserAction,
-  unlockUserAction,
-  userActionLockErrorCode,
-} from '@/lib/userActionGate';
+  acquireExecuteSlot,
+  executeSlotErrorCode,
+  releaseExecuteSlot,
+} from '@/lib/executeSlotClient';
 import { resolveAccountExecuteBlock } from '@/lib/automationJobQueueClient';
 import { CLEAR_SESSION_REASON, clearAccountSession } from '@/lib/clearAccountSession';
 import { isScrapeAbortMessage } from '@/lib/scrapeErrorUi';
@@ -269,13 +269,20 @@ export function useAccountSyncFlow({
       });
       clearRowProcessing(target.groupId, target.account.id);
     }
+    if (target?.account.id) {
+      void releaseExecuteSlot(target.account.id);
+      clearScrapeProgress(target.account.id);
+      if (processingAccountId === target.account.id) {
+        clearRowProcessing(target.groupId, target.account.id);
+      }
+    }
     dismissSyncModals();
     setTarget(null);
     setProcessingAccountId(null);
     setProcessingDbAccountId(null);
     processingDbAccountIdRef.current = null;
     setProcessingAction(null);
-  }, [clearRowProcessing, dismissSyncModals, step, target]);
+  }, [clearRowProcessing, clearScrapeProgress, dismissSyncModals, processingAccountId, step, target]);
 
   const applyResult = useCallback(
     async (
@@ -286,6 +293,8 @@ export function useAccountSyncFlow({
         masterTotal?: number;
         lastSyncAt?: string | null;
         preserveActionProcess?: boolean;
+        preserveSession?: boolean;
+        sessionOnly?: boolean;
       },
     ) => {
       const snapshotPending: Array<{
@@ -303,7 +312,11 @@ export function useAccountSyncFlow({
             : 0;
 
         if (group?.dbBrandId && account) {
-          snapshotPending.push({ account, brandId: group.dbBrandId, brandStandard });
+          if (meta?.sessionOnly) {
+            snapshotPending.push({ account, brandId: group.dbBrandId, brandStandard });
+          } else if (!meta?.preserveSession) {
+            snapshotPending.push({ account, brandId: group.dbBrandId, brandStandard });
+          }
         }
 
         return patchBrandGroup(prev, groupId, (g) => {
@@ -311,6 +324,8 @@ export function useAccountSyncFlow({
             masterTotal: meta?.masterTotal,
             lastSyncAt: meta?.lastSyncAt,
             preserveActionProcess: meta?.preserveActionProcess,
+            preserveSession: meta?.preserveSession,
+            sessionOnly: meta?.sessionOnly,
           });
           return rebuildGroupMetrics(next);
         });
@@ -331,19 +346,23 @@ export function useAccountSyncFlow({
           }
         }
         if (resolvedBrandId) {
+          const snapshotResult = meta?.sessionOnly
+            ? {
+                groupsCurrent: snap.account.groupsCurrent,
+                groupsTotal: snap.account.groupsTotal,
+                adminCurrent: snap.account.adminCurrent,
+                adminTotal: snap.account.adminTotal,
+                sessionStatus: 'valid' as const,
+              }
+            : result;
           await upsertAccountSnapshot({
             account: {
               ...snap.account,
-              status: result.sessionStatus === 'valid' ? 'active' : 'logout',
-              sessionStatus: result.sessionStatus,
-              groupsCurrent: result.groupsCurrent,
-              groupsTotal: result.groupsTotal,
-              adminCurrent: result.adminCurrent,
-              adminTotal: result.adminTotal,
-              lastSyncAt: meta?.lastSyncAt ?? snap.account.lastSyncAt,
+              status: meta?.sessionOnly ? 'active' : snap.account.status,
+              sessionStatus: meta?.sessionOnly ? 'valid' : snap.account.sessionStatus,
             },
             brandId: resolvedBrandId,
-            result,
+            result: snapshotResult,
             brandStandard: snap.brandStandard,
             masterTotal: meta?.masterTotal,
             lastSyncAt: meta?.lastSyncAt,
@@ -449,12 +468,6 @@ export function useAccountSyncFlow({
         return;
       }
 
-      const lock = tryLockUserAction(account.id, 'sync');
-      if (!lock.ok) {
-        showSyncError(userActionLockErrorCode(lock), groupId, account);
-        return;
-      }
-
       const opensLogin = routeFromSessionColumn(account.sessionStatus) === 'open_login';
       setRowProcessing(
         groupId,
@@ -463,8 +476,17 @@ export function useAccountSyncFlow({
         'sync',
       );
 
+      const slot = await acquireExecuteSlot(account.id, 'sync', () => {
+        reportBlockingError(t('groupMonitoring.sync.executeSlotsQueued'));
+      });
+      if (!slot.ok) {
+        clearRowProcessing(groupId, account.id);
+        showSyncError(executeSlotErrorCode(slot), groupId, account);
+        return;
+      }
+
       const stopLoading = () => {
-        unlockUserAction(account.id);
+        void releaseExecuteSlot(account.id);
         clearRowProcessing(groupId, account.id);
       };
 
@@ -480,7 +502,7 @@ export function useAccountSyncFlow({
         processingDbAccountIdRef.current = dbAccountId;
 
         if (outcome.kind === 'login') {
-          unlockUserAction(account.id);
+          void releaseExecuteSlot(account.id);
           patchRowProcessAction(groupId, account.id, 'sync');
           showLoginModal(
             groupId,
@@ -519,7 +541,7 @@ export function useAccountSyncFlow({
           await applyResult(groupId, account.id, outcome.invalidResult, {
             masterTotal: outcome.masterJoined,
           });
-          unlockUserAction(account.id);
+          void releaseExecuteSlot(account.id);
           patchRowProcessAction(groupId, account.id, 'sync');
           showLoginModal(
             groupId,
@@ -534,11 +556,22 @@ export function useAccountSyncFlow({
 
         if (outcome.kind === 'success') {
           markAccountLoginGrace(account.id);
-          await applyResult(groupId, account.id, outcome.result, {
-            masterTotal: outcome.masterJoined,
-            lastSyncAt: outcome.syncedAt,
-            preserveActionProcess: true,
-          });
+          await applyResult(
+            groupId,
+            account.id,
+            {
+              groupsCurrent: account.groupsCurrent,
+              groupsTotal: account.groupsTotal,
+              adminCurrent: account.adminCurrent,
+              adminTotal: account.adminTotal,
+              sessionStatus: 'valid',
+            },
+            {
+              sessionOnly: true,
+              lastSyncAt: outcome.syncedAt,
+              preserveActionProcess: true,
+            },
+          );
           await recordSyncCheckActivity({ dbAccountId: outcome.dbAccountId, account, outcome });
 
           stopLoading();
@@ -568,9 +601,11 @@ export function useAccountSyncFlow({
       clearRowProcessing,
       dismissSyncModals,
       patchRowProcessAction,
+      reportBlockingError,
       setRowProcessing,
       showLoginModal,
       showSyncError,
+      t,
       updateGroups,
       userId,
     ],
@@ -589,14 +624,10 @@ export function useAccountSyncFlow({
       if (account.sessionStatus !== 'valid') return;
       if (account.actionProcess) return;
 
-      if (processingAccountId && processingAccountId !== account.id) {
-        reportBlockingError(t('groupMonitoring.accountCard.operationGlobalBusy'));
-        return;
-      }
       if (processingAccountId === account.id) return;
 
-      const lock = tryLockUserAction(account.id, 'sync');
-      if (!lock.ok) return;
+      const slot = await acquireExecuteSlot(account.id, 'sync');
+      if (!slot.ok) return;
 
       setClearingSessionAccountId(account.id);
 
@@ -633,7 +664,7 @@ export function useAccountSyncFlow({
           getErrorMessage(error, t('groupMonitoring.accountCard.clearSessionFailed')),
         );
       } finally {
-        unlockUserAction(account.id);
+        void releaseExecuteSlot(account.id);
         setClearingSessionAccountId(null);
       }
     },
@@ -654,7 +685,13 @@ export function useAccountSyncFlow({
   const runScrapeInBackground = useCallback(
     async (
       override?: SyncTarget,
-      options?: { skipDeviceCheck?: boolean; trustedSession?: boolean },
+      options?: {
+        skipDeviceCheck?: boolean;
+        /** Jangan invalidate session DB jika scrape gagal (setelah login / Scrape Now). */
+        trustedSession?: boolean;
+        /** Kontrak: update Session+Status hanya setelah login; Run valid = false. */
+        updateSessionOnSuccess?: boolean;
+      },
     ) => {
       const ctx = override ?? target;
       if (!ctx || !userId) return;
@@ -668,17 +705,22 @@ export function useAccountSyncFlow({
         return;
       }
 
-      const trustedSession =
-        options?.trustedSession === true || options?.skipDeviceCheck === true;
+      const trustedSession = options?.trustedSession === true;
+      const updateSessionOnSuccess = options?.updateSessionOnSuccess === true;
 
       if (trustedSession) {
         markAccountLoginGrace(account.id);
         markAccountScrapeGrace(account.id);
       }
 
-      const lock = tryLockUserAction(account.id, 'scraper');
-      if (!lock.ok) {
-        showSyncError(userActionLockErrorCode(lock), groupId, account);
+      setRowProcessing(groupId, account.id, 'scraper', 'scraper');
+
+      const slot = await acquireExecuteSlot(account.id, 'scraper', () => {
+        reportBlockingError(t('groupMonitoring.sync.executeSlotsQueued'));
+      });
+      if (!slot.ok) {
+        clearRowProcessing(groupId, account.id);
+        showSyncError(executeSlotErrorCode(slot), groupId, account);
         return;
       }
 
@@ -701,13 +743,14 @@ export function useAccountSyncFlow({
       };
 
       let holdRowStateForLogin = false;
+      let deferSlotRelease = false;
 
       try {
         dbAccountId = await resolveDbAccountId({ userId, account, knownDbAccountId: ctx.dbAccountId });
 
         const loginNeeded = await resolveScrapeLoginIfNeeded({ userId, account });
         if (loginNeeded) {
-          unlockUserAction(account.id);
+          void releaseExecuteSlot(account.id);
           patchRowProcessAction(groupId, account.id, 'sync');
           holdRowStateForLogin = true;
           showLoginModal(
@@ -743,6 +786,7 @@ export function useAccountSyncFlow({
           dbAccountId,
           skipDeviceCheck: options?.skipDeviceCheck === true,
           trustedSession,
+          updateSessionOnSuccess,
           onSessionProbeComplete: skipProbe
             ? undefined
             : () => {
@@ -754,7 +798,7 @@ export function useAccountSyncFlow({
         if (outcome.kind === 'invalidated-login' && !trustedSession) {
           updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
           await applyResult(groupId, account.id, outcome.invalidResult);
-          unlockUserAction(account.id);
+          void releaseExecuteSlot(account.id);
           patchRowProcessAction(groupId, account.id, 'sync');
           holdRowStateForLogin = true;
           showLoginModal(
@@ -769,7 +813,7 @@ export function useAccountSyncFlow({
         }
 
         if (outcome.kind === 'device_busy') {
-          unlockUserAction(account.id);
+          void releaseExecuteSlot(account.id);
           clearRowProcessing(groupId, account.id);
           showSyncError(
             outcome.message === 'JOB_QUEUE_EXECUTE_FULL'
@@ -784,7 +828,7 @@ export function useAccountSyncFlow({
         if (outcome.kind === 'error') {
           if (outcome.needsLogin && outcome.dbAccountId && !trustedSession) {
             updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
-            unlockUserAction(account.id);
+            void releaseExecuteSlot(account.id);
             patchRowProcessAction(groupId, account.id, 'sync');
             holdRowStateForLogin = true;
             showLoginModal(
@@ -797,6 +841,7 @@ export function useAccountSyncFlow({
             );
             return;
           }
+          deferSlotRelease = true;
           showSyncError(outcome.message, groupId, account);
           return;
         }
@@ -809,6 +854,7 @@ export function useAccountSyncFlow({
           masterTotal: outcome.masterJoined,
           lastSyncAt: outcome.scrapedAt,
           preserveActionProcess: true,
+          preserveSession: !outcome.updateSession,
         });
 
         if (outcome.brandX > 0) {
@@ -831,9 +877,6 @@ export function useAccountSyncFlow({
         }
 
         setStep('idle');
-        if (dbAccountId) {
-          await onAccountGridRefresh?.(dbAccountId);
-        }
       } catch (error) {
         const message = getErrorMessage(error, 'SCRAPER_FAILED');
         if (isScrapeCancelledMessage(message)) {
@@ -844,9 +887,10 @@ export function useAccountSyncFlow({
           return;
         }
         showSyncError(message, groupId, account);
+        deferSlotRelease = true;
       } finally {
-        unlockUserAction(account.id);
-        if (!holdRowStateForLogin) {
+        if (!deferSlotRelease && !holdRowStateForLogin) {
+          void releaseExecuteSlot(account.id);
           clearScrapeProgress(account.id);
           clearRowProcessing(groupId, account.id);
         }
@@ -858,6 +902,7 @@ export function useAccountSyncFlow({
       clearRowProcessing,
       onAccountGridRefresh,
       patchRowProcessAction,
+      reportBlockingError,
       setRowProcessing,
       showLoginModal,
       showSyncError,
@@ -872,12 +917,6 @@ export function useAccountSyncFlow({
     if (!target) return;
     const { groupId, account } = target;
 
-    const executeBlock = await resolveAccountExecuteBlock(account);
-    if (executeBlock) {
-      showSyncError(executeBlock, groupId, account);
-      return;
-    }
-
     markAccountLoginGrace(account.id);
     markAccountScrapeGrace(account.id);
     setStep('idle');
@@ -886,12 +925,17 @@ export function useAccountSyncFlow({
     void runScrapeInBackground(target, {
       skipDeviceCheck: true,
       trustedSession: true,
+      updateSessionOnSuccess: false,
     });
-  }, [runScrapeInBackground, setRowProcessing, showSyncError, target]);
+  }, [runScrapeInBackground, setRowProcessing, target]);
 
   const dismissScrapePrompt = useCallback(() => {
+    if (target) {
+      clearRowProcessing(target.groupId, target.account.id);
+    }
     dismissSyncModals();
-  }, [dismissSyncModals]);
+    setTarget(null);
+  }, [clearRowProcessing, dismissSyncModals, target]);
 
   const requestCancelScrape = useCallback(
     (groupId: string, account: AccountBrandRow) => {
@@ -915,7 +959,7 @@ export function useAccountSyncFlow({
     const { groupId, account } = target;
     scrapeUserCancelledRef.current = true;
 
-    unlockUserAction(account.id);
+    void releaseExecuteSlot(account.id);
     clearScrapeProgress(account.id);
     clearRowProcessing(groupId, account.id);
     setStep('scrape-cancelled');
@@ -979,9 +1023,10 @@ export function useAccountSyncFlow({
         return;
       }
 
+      setRowProcessing(groupId, account.id, 'scraper', 'scraper');
       void runScrapeInBackground({ groupId, account });
     },
-    [canOperatePlatform, dismissSyncModals, runScrapeInBackground, showSyncError, userId],
+    [canOperatePlatform, dismissSyncModals, runScrapeInBackground, setRowProcessing, showSyncError, userId],
   );
 
   const handleLoginSuccess = useCallback(async () => {
@@ -1006,7 +1051,11 @@ export function useAccountSyncFlow({
     const startPostLoginScrape = (updatedAccount: AccountBrandRow) => {
       void runScrapeInBackground(
         { groupId, account: updatedAccount, dbAccountId },
-        { skipDeviceCheck: true, trustedSession: true },
+        {
+          skipDeviceCheck: true,
+          trustedSession: true,
+          updateSessionOnSuccess: true,
+        },
       );
     };
 
@@ -1023,11 +1072,22 @@ export function useAccountSyncFlow({
       });
 
       const metrics = await applyDailyMetricsAfterLogin({ userId, account, dbAccountId });
-      await applyResult(groupId, account.id, metrics.result, {
-        masterTotal: undefined,
-        lastSyncAt: metrics.syncedAt,
-        preserveActionProcess: true,
-      });
+      await applyResult(
+        groupId,
+        account.id,
+        {
+          groupsCurrent: account.groupsCurrent,
+          groupsTotal: account.groupsTotal,
+          adminCurrent: account.adminCurrent,
+          adminTotal: account.adminTotal,
+          sessionStatus: 'valid',
+        },
+        {
+          sessionOnly: true,
+          lastSyncAt: metrics.syncedAt,
+          preserveActionProcess: true,
+        },
+      );
 
       const updatedAccount = metrics.updatedAccount;
       setTarget({
@@ -1062,11 +1122,22 @@ export function useAccountSyncFlow({
       });
 
       if (recovered && persistedToDb && dbAccountId) {
-        await applyResult(groupId, account.id, recovered.result, {
-          masterTotal: recovered.masterJoined,
-          lastSyncAt: recovered.syncedAt,
-          preserveActionProcess: true,
-        });
+        await applyResult(
+          groupId,
+          account.id,
+          {
+            groupsCurrent: account.groupsCurrent,
+            groupsTotal: account.groupsTotal,
+            adminCurrent: account.adminCurrent,
+            adminTotal: account.adminTotal,
+            sessionStatus: 'valid',
+          },
+          {
+            sessionOnly: true,
+            lastSyncAt: recovered.syncedAt,
+            preserveActionProcess: true,
+          },
+        );
         clearRowProcessing(groupId, account.id);
         setStep('idle');
 

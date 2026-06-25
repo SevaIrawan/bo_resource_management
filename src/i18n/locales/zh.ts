@@ -218,8 +218,7 @@ export const zh: Messages = {
       queuedJoinAccountsOk: '已排队 {{accounts}} 个账号 — 共 {{groups}} 个群',
       resultProgress: '{{current}}/{{total}} 个群',
       resultSuccessGroups: '成功 {{count}} 个群',
-      executeFull:
-        '任务队列正在执行。在所有排队任务完成前，无法使用 Sync 与抓取。可浏览其他标签页，但无法启动新的执行操作。',
+      executeFull: '此账号的任务队列正在运行。请等待完成后再 Sync 或 Run。',
       inviteLink: '邀请链接',
       inviteLinkPlaceholder: 'https://chat.whatsapp.com/… 或 t.me/+…',
       account: '账号',
@@ -380,7 +379,7 @@ export const zh: Messages = {
       scraperRunning: '读取群组中…',
       scraperBootWa: '正在打开 WhatsApp 抓取…',
       scraperBootTg: '正在打开 Telegram 抓取…',
-      operationGlobalBusy: '其他账号正在操作 — 本机同一时间只能进行一次 Sync/Run。',
+      operationGlobalBusy: '此账号已有任务正在运行。',
       operationAlreadyRunning: '该账号正在同步或抓取 — 请等待完成。',
       scraperIdle: '已对齐',
       syncRunning: '同步中…',
@@ -556,6 +555,8 @@ export const zh: Messages = {
         '本机正在恢复设备会话（约 2 分钟）。请稍后再点同步；手机端关联未断开。',
       sessionCheckBusy:
         '本机会话仍在连接中。请稍等几秒后再次点击同步或运行；手机端关联未断开。',
+      executeSlotsQueued:
+        '所有执行槽位已满（最多 4 个）。您的操作已排队，将自动开始。',
       sessionValidMessageTg: 'Telegram 正常，计数已更新。',
       sessionValidMessageWa: 'WhatsApp 正常，计数已更新。',
       sessionValidDetail:

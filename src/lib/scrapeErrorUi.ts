@@ -61,6 +61,10 @@ export function isScrapeAbortMessage(message: string | undefined): boolean {
     lower.includes('target closed') ||
     lower.includes('session closed') ||
     lower.includes('protocol error') ||
-    lower.includes('browser has disconnected')
+    lower.includes('browser has disconnected') ||
+    lower.includes("reading 'getchat'") ||
+    lower.includes('wwebjs') ||
+    lower.includes('wa_store_not_ready') ||
+    lower.includes('wa_store_evaluate_failed')
   );
 }

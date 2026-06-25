@@ -3,9 +3,10 @@ import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
-import { accountJobStepTotal, isJobQueueBlockingExecutes } from './jobQueueBatchHelpers';
+import { accountJobStepTotal, isAccountJobQueueBusy, isJobQueueBlockingExecutes, listBusyAccountIds } from './jobQueueBatchHelpers';
 import { listSettlingSessionIds, markSessionSettleAfterJob } from './jobQueueSettle';
-import { isGlobalScrapeInFlight } from '../scraper/scrapeCancel';
+import { getExecuteSlotStats } from './executeSlotPool';
+import { getActiveScrapeSessionCount, isScrapeActiveForSession } from '../scraper/scrapeCancel';
 import type {
   AutomationJobEnqueueInput,
   AutomationJobListFilter,
@@ -104,15 +105,20 @@ export function getRunnerState(): AutomationJobRunnerState {
 
 function buildQueueStats() {
   const runningJobs = listRunningJobs();
+  const slotStats = getExecuteSlotStats();
   return {
     runningJobIds: runningJobs.map((job) => job.id),
     runningJobId: runningJobs[0]?.id ?? null,
-    maxConcurrent: 1,
+    maxConcurrent: getMaxConcurrentAutomationJobs(),
     runningCount: runningJobs.length,
     queuedCount: getQueuedJobCount(),
     blockingExecutes: isJobQueueBlockingExecutes(jobs),
+    busyAccountIds: listBusyAccountIds(jobs),
     settlingSessionIds: listSettlingSessionIds(),
-    globalScrapeActive: isGlobalScrapeInFlight(),
+    globalScrapeActive: getActiveScrapeSessionCount() > 0,
+    executeSlotsActive: slotStats.activeCount,
+    executeSlotsMax: slotStats.maxConcurrent,
+    executeSlotsQueued: slotStats.queuedCount,
   };
 }
 
@@ -311,16 +317,30 @@ export function removeAutomationJobs(jobIds: string[]): number {
   return removed;
 }
 
-/** FIFO — satu job global (satu akun); antrian akun berikutnya menunggu. */
-export function pickQueuedJobsForDispatch(_limit: number): AutomationJobRecord[] {
+/** FIFO — hingga maxConcurrent job berbeda akun; skip akun yang sudah running / scrape aktif. */
+export function pickQueuedJobsForDispatch(limit: number): AutomationJobRecord[] {
   ensureLoaded();
-  if (getRunningJobCount() > 0) return [];
+  const maxConcurrent = getMaxConcurrentAutomationJobs();
+  const running = listRunningJobs();
+  if (running.length >= maxConcurrent) return [];
 
-  const next = jobs
+  const runningAccountIds = new Set(running.map((job) => job.accountId));
+  const picked: AutomationJobRecord[] = [];
+  const queued = jobs
     .filter((job) => job.status === 'queued' && !job.paused)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  return next ? [next] : [];
+  for (const job of queued) {
+    if (picked.length >= limit) break;
+    if (runningAccountIds.has(job.accountId)) continue;
+    if (isScrapeActiveForSession(job.sessionId)) continue;
+    if (picked.some((row) => row.accountId === job.accountId)) continue;
+    picked.push(job);
+    runningAccountIds.add(job.accountId);
+    if (running.length + picked.length >= maxConcurrent) break;
+  }
+
+  return picked;
 }
 
 export function markJobRunning(jobId: string): boolean {
@@ -346,7 +366,7 @@ export function markJobRunning(jobId: string): boolean {
 
 export function isJobQueueBlockingOtherExecutes(): boolean {
   ensureLoaded();
-  return isJobQueueBlockingExecutes(jobs);
+  return false;
 }
 
 /** Jobs stuck in running (browser hang) — fail so queue can continue. */

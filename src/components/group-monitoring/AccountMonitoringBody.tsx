@@ -23,7 +23,6 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     filteredGroups,
     onGroupsChange,
     loading,
-    refreshAccountGrid,
     setProbeSuspendAccountIds,
   } = useGroupMonitoring();
 
@@ -32,18 +31,16 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     userId: user?.id ?? null,
     canOperatePlatform,
     translate: t,
-    onAccountGridRefresh: (dbAccountId) => refreshAccountGrid(dbAccountId),
   });
 
   const removeSlot = useRemoveAccountFromSlot(onGroupsChange, user?.id, canManageStructure);
 
   const probeSuspendIds = useMemo(() => {
     const ids = new Set<string>();
-    if (sync.processingAccountId) {
-      ids.add(sync.processingAccountId);
-    }
-    if (sync.processingDbAccountId && sync.processingAccountId) {
-      ids.add(sync.processingDbAccountId);
+    for (const accountId of Object.keys(sync.processingByAccount)) {
+      ids.add(accountId);
+      const dbId = sync.processingDbByAccount[accountId];
+      if (dbId) ids.add(dbId);
     }
     if (sync.step === 'scrape-prompt' && sync.target?.account.id) {
       ids.add(sync.target.account.id);
@@ -60,8 +57,8 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     return [...ids];
   }, [
     sync.postLoginGraceAccountId,
-    sync.processingAccountId,
-    sync.processingDbAccountId,
+    sync.processingByAccount,
+    sync.processingDbByAccount,
     sync.step,
     sync.target?.account.id,
     sync.target?.dbAccountId,

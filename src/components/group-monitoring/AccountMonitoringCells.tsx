@@ -14,7 +14,10 @@ import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { AccountBrandEmptySlot, AccountBrandRow } from '@/types/accountMonitoringUi';
 import { ScraperStatusMarquee } from '@/components/group-monitoring/ScraperStatusMarquee';
 import { resolveScrapeBarDisplay } from '@/lib/scrapeProgressDisplay';
-import { resolveAccountActionColumn } from '@/lib/accountActionColumn';
+import {
+  resolveAccountActionColumn,
+  resolveActiveProcessIntent,
+} from '@/lib/accountActionColumn';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 export function PlatformBadge({ platform }: { platform: AccountBrandRow['platform'] }) {
@@ -192,14 +195,6 @@ function ActionColumnCell({
     return (
       <span className="brand-action-process" aria-live="polite">
         {t('groupMonitoring.accountCard.procSync')}
-      </span>
-    );
-  }
-
-  if (kind === 'proc-scraper') {
-    return (
-      <span className="brand-action-process" aria-live="polite">
-        {t('groupMonitoring.accountCard.procScraper')}
       </span>
     );
   }
@@ -522,8 +517,11 @@ export function AccountTableRow({
   const [linksOpen, setLinksOpen] = useState(false);
   const [linksViewMode, setLinksViewMode] = useState<GroupLinksViewMode>('adminMaster');
   const isPending = row.syncState === 'pending';
-  const isProcessing = row.actionProcess !== null;
-  const activeProcessIntent = syncLoading ? 'sync' : scraperLoading ? 'scraper' : null;
+  const activeProcessIntent = resolveActiveProcessIntent(row, {
+    sync: syncLoading,
+    scraper: scraperLoading,
+  });
+  const isProcessing = row.actionProcess !== null || activeProcessIntent !== null;
 
   const operateLocked = !canOperatePlatform;
   const structureLocked = !canManageStructure;

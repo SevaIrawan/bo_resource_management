@@ -19,7 +19,7 @@ import {
 } from '@/lib/filterAccountGroups';
 import { patchAccountGridAfterDailyWrite } from '@/lib/patchAccountGridAfterDailyWrite';
 import { dispatchMonitoringReloadAfterDailyWrite } from '@/lib/monitoringRealtimeEvents';
-import { mergeGroupsAccountMetrics } from '@/lib/mergeMonitoringGroups';
+import { mergeGroupsAccountMetrics, mergeReloadPreservingActionProcess } from '@/lib/mergeMonitoringGroups';
 import { computeAccountKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
@@ -126,7 +126,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
       const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
       if (seq !== reloadAllSeqRef.current) return;
-      setGroups(loadedGroups);
+      setGroups((prev) => mergeReloadPreservingActionProcess(prev, loadedGroups));
     } catch (e) {
       if (seq !== reloadAllSeqRef.current) return;
       setError(getErrorMessage(e, t('groupMonitoring.loadAccountsFailed')));
@@ -173,7 +173,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     try {
       const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
       const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
-      setGroups(loadedGroups);
+      setGroups((prev) => mergeReloadPreservingActionProcess(prev, loadedGroups));
     } catch {
       /* tetap tampilkan data lama */
     }

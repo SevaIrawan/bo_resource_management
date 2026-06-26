@@ -2,7 +2,7 @@ import { writeScrapeDailyRows, type ScrapedGroupPayload } from '@/lib/accountScr
 import { dedupeScrapedGroupsByGroupId } from '@/lib/dedupeScrapedGroups';
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
-import { isScrapeAbortMessage } from '@/lib/scrapeErrorUi';
+import { isScrapeUserCancelledMessage } from '@/lib/scrapeErrorUi';
 import { withNetworkRetry } from '@/lib/networkRetry';
 import { finishScrapeRun, startScrapeRun } from '@/lib/scrapeRuns';
 import {
@@ -152,7 +152,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     return { deviceGroupCount, deviceAdminCount, masterCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Scrape failed';
-    const cancelled = isScrapeAbortMessage(message);
+    const cancelled = isScrapeUserCancelledMessage(message);
     if (runId) {
       await finishScrapeRun({
         runId,

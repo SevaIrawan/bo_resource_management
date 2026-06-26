@@ -1,5 +1,9 @@
 import { rebuildGroupMetrics } from '@/lib/accountBrandUtils';
-import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
+import type {
+  AccountBrandGroup,
+  AccountBrandRow,
+  AccountProcessAction,
+} from '@/types/accountMonitoringUi';
 
 function metricFieldsFromRow(row: AccountBrandRow): Partial<AccountBrandRow> {
   return {
@@ -45,4 +49,30 @@ export function mergeGroupsAccountMetrics(
         sourceGroup?.standardGroupCountByPlatform ?? group.standardGroupCountByPlatform,
     });
   });
+}
+
+/**
+ * Reload penuh dari DB — salin `actionProcess` dari state UI saat ini.
+ * Spinner per akun (`processingByAccount` di useAccountSyncFlow) terpisah dan tidak ditimpa di sini.
+ */
+export function mergeReloadPreservingActionProcess(
+  current: AccountBrandGroup[],
+  loaded: AccountBrandGroup[],
+): AccountBrandGroup[] {
+  const preserve = new Map<string, AccountProcessAction>();
+  for (const group of current) {
+    for (const account of group.accounts) {
+      if (account.actionProcess) preserve.set(account.id, account.actionProcess);
+    }
+  }
+  if (preserve.size === 0) return loaded;
+
+  return loaded.map((group) => ({
+    ...group,
+    accounts: group.accounts.map((account) => {
+      const action = preserve.get(account.id);
+      if (!action) return account;
+      return { ...account, actionProcess: action };
+    }),
+  }));
 }

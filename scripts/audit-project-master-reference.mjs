@@ -122,7 +122,7 @@ check('login modal keeps proc-sync until close', () => {
 check('runScrape defers finally clear when login modal opens', () => {
   const t = read('src/hooks/useAccountSyncFlow.ts');
   const block = t.slice(t.indexOf('const runScrapeInBackground'), t.indexOf('const confirmScrapePrompt'));
-  return /holdRowStateForLogin/.test(block) && /if \(!holdRowStateForLogin\)/.test(block)
+  return /holdRowStateForLogin/.test(block) && /!holdRowStateForLogin/.test(block)
     ? ok('runScrapeInBackground: holdRowStateForLogin')
     : fail('runScrape finally still clears on login');
 });

@@ -15,7 +15,7 @@ from telethon.tl.types import (
 
 from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 
-DEVICE_GROUP_TARGET_MAX = 3000
+DEVICE_GROUP_TARGET_MAX = 6000
 
 _scrape_progress: dict[str, dict] = {}
 _scrape_cancel_requests: set[str] = set()

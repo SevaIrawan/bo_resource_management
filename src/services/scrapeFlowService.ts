@@ -19,7 +19,13 @@ import {
   isAccountInLoginGrace,
 } from '@/lib/sessionRealtimePolicy';
 import { invalidateUserSessionOnDeviceFailure } from '@/lib/userActionSession';
-import { scrapeFailureNeedsLoginModal, isScrapeAbortMessage } from '@/lib/scrapeErrorUi';
+import {
+  isScrapeConnectionModalCode,
+  isScrapeUserCancelledMessage,
+  normalizeScrapeErrorMessage,
+  resolveScrapeErrorModalCode,
+  scrapeFailureNeedsLoginModal,
+} from '@/lib/scrapeErrorUi';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
@@ -194,9 +200,10 @@ export async function executeScrapeRun(input: {
       updateSession: input.updateSessionOnSuccess === true,
     };
   } catch (error) {
-    const message = getErrorMessage(error, 'SCRAPER_FAILED');
+    const raw = getErrorMessage(error, 'SCRAPER_FAILED');
+    const message = normalizeScrapeErrorMessage(raw);
 
-    if (isScrapeAbortMessage(message)) {
+    if (isScrapeUserCancelledMessage(message)) {
       return { kind: 'error', message: 'SCRAPER_CANCELLED', needsLogin: false };
     }
 
@@ -217,7 +224,7 @@ export async function executeScrapeRun(input: {
       return {
         kind: 'error',
         message,
-        needsLogin: true,
+        needsLogin: !isScrapeConnectionModalCode(resolveScrapeErrorModalCode(message)),
         dbAccountId: dbForLogin,
       };
     }

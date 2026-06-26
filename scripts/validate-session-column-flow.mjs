@@ -69,17 +69,14 @@ const uiChecks = [
 
 const fileChecks = [
   {
-    label: 'Scrape sukses panggil onAccountGridRefresh',
+    label: 'Scrape sukses applyResult grid (kontrak §5, tanpa onAccountGridRefresh)',
     file: 'src/hooks/useAccountSyncFlow.ts',
     pass: (src) => {
-      const idx = src.indexOf("if (outcome.kind === 'success')");
-      const syncBlock = idx >= 0 ? src.slice(idx, idx + 900) : '';
+      const idx = src.indexOf("if (outcome.kind !== 'success')");
+      const block = idx >= 0 ? src.slice(idx, idx + 700) : '';
       return (
-        syncBlock.length > 0 &&
-        !syncBlock.includes('onTicketsReload') &&
-        syncBlock.includes('setStep(outcome.modalStep)') &&
-        src.includes('confirmScrapePrompt = useCallback(async') &&
-        src.includes('await onAccountGridRefresh?.(dbAccountId)')
+        block.includes('applyResult(groupId, account.id, outcome.result') &&
+        !/await onAccountGridRefresh\?\./.test(block)
       );
     },
   },

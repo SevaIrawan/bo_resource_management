@@ -28,6 +28,7 @@ import {
 } from '@/components/group-monitoring/AccountMonitoringTableParts';
 import type { AddAccountInput, AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
+import type { RowProcessingSpinner } from '@/hooks/useAccountSyncFlow';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 interface AccountBrandCardProps {
@@ -41,8 +42,7 @@ interface AccountBrandCardProps {
   onRemoveFromSlot?: (account: import('@/types/accountMonitoringUi').AccountBrandRow) => void;
   onRunScraper?: (accountId: string) => void;
   onCancelScrape?: (accountId: string) => void;
-  checkingAccountId?: string | null;
-  scraperAccountId?: string | null;
+  processingByAccount?: Record<string, RowProcessingSpinner>;
   clearingSessionAccountId?: string | null;
   getScrapeProgress?: (accountId: string) => UiScrapeProgress | null;
   defaultExpanded?: boolean;
@@ -60,8 +60,7 @@ export function AccountBrandCard({
   onRemoveFromSlot,
   onRunScraper,
   onCancelScrape,
-  checkingAccountId = null,
-  scraperAccountId = null,
+  processingByAccount = {},
   clearingSessionAccountId = null,
   getScrapeProgress,
   defaultExpanded = true,
@@ -250,8 +249,8 @@ export function AccountBrandCard({
                       row={row}
                       canOperatePlatform={canOperatePlatform}
                       canManageStructure={canManageStructure}
-                      syncLoading={checkingAccountId === row.id}
-                      scraperLoading={scraperAccountId === row.id}
+                      syncLoading={processingByAccount[row.id] === 'sync'}
+                      scraperLoading={processingByAccount[row.id] === 'scraper'}
                       scrapeProgress={getScrapeProgress?.(row.id) ?? null}
                       onSync={() => onSyncAccount?.(row.id)}
                       onRunScraper={() => onRunScraper?.(row.id)}

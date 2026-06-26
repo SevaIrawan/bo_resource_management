@@ -539,6 +539,21 @@ export const zh: Messages = {
         '登录成功，但未能及时读取设备群组数 — 请运行抓取以刷新。是否立即抓取并写入数据库？',
       scrapeProgressHint: '后台抓取中，表格数字会更新。',
       scraperFailed: '抓取失败，请重试。',
+      scraperConnectionLostWa:
+        '与 WhatsApp 服务器的连接已中断。请检查本机网络及手机 WhatsApp 是否正常，然后重新运行抓取。',
+      scraperConnectionLostTg:
+        '与 Telegram 的连接已中断。请检查本机网络及手机 Telegram 是否正常，然后重新运行抓取。',
+      scraperConnectionLostGeneric:
+        '与 {{platform}} 的连接已中断。请检查网络后重试。',
+      scraperNetworkError: '抓取时发生网络错误。请检查网络连接后重试。',
+      scraperIdleStuckWa:
+        '抓取已停止：数分钟内无进展。WhatsApp 可能已断开或仍在同步。请检查手机连接后重试。',
+      scraperIdleStuckTg:
+        '抓取已停止：数分钟内无进展。Telegram 可能已断开或仍在同步。请检查连接后重试。',
+      scraperWaSyncPending:
+        'WhatsApp Web 仍在从服务器同步。请等待手机聊天加载完成后再运行抓取。',
+      scraperLegacyTimeout:
+        '抓取超时（旧版应用）。请更新应用，检查 WhatsApp/Telegram 连接后重试。',
       scraperNoGroups: '未找到群组。',
       scraperDesktopRequired: '抓取需使用桌面客户端。',
       authRequired: '请先登录仪表板。',

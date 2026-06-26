@@ -63,11 +63,11 @@ const checks = [
     ok: tgAuto.includes('run_join_by_invite_link') && tgAuto.includes('invite_link'),
   },
   {
-    name: 'Scrape → daily DELETE+INSERT + invite_link kolom',
+    name: 'Scrape → daily atomik rm_commit_account_scrape + invite_link kolom',
     ok:
       accountScraper.includes('invite_link: group.invite_link') &&
-      accountScraper.includes('rebuildBrandGroupsMaster') &&
-      accountScraper.includes(".delete()"),
+      accountScraper.includes("rpc('rm_commit_account_scrape'") &&
+      accountScraper.includes('invalidateMasterDailyCacheForScrape'),
   },
   {
     name: 'runAccountScraper: Electron scrape → writeScrapeDailyRows',
@@ -83,10 +83,10 @@ const checks = [
       addBar.includes('inviteLink: group.inviteLink'),
   },
   {
-    name: 'Master rebuild RPC dipanggil setelah scrape write',
-    ok: accountScraper.includes("rpc('rm_rebuild_brand_groups_master'") === false
-      ? accountScraper.includes('rebuildBrandGroupsMaster')
-      : true,
+    name: 'Master rebuild atomik dalam rm_commit_account_scrape (bukan client delete terpisah)',
+    ok:
+      accountScraper.includes("rpc('rm_commit_account_scrape'") &&
+      !accountScraper.includes('rebuildBrandGroupsMaster'),
   },
 ];
 

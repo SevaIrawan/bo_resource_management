@@ -12,19 +12,24 @@ export function isRowMisaligned(result: AccountSyncResult): boolean {
 }
 
 /**
- * DB tidak punya grup akun + device 0 grup + brand X di master juga 0 → popup resume (OK saja).
- * Modal [Now | Later] hanya bila ada data yang bisa di-scrape (device > 0, daily hari ini, atau brand X > 0).
- * Jika master X > 0 tetapi device 0 → tetap Scrape now / Later.
+ * Popup resume-empty (OK saja) — hanya bila ada **bukti** semua sumber = 0.
+ *
+ * Sync valid (GM) = probe session saja, **tidak** baca jumlah grup di HP.
+ * Tanpa daily hari ini → tidak boleh resume-empty (grup di device belum diverifikasi).
+ *
+ * Now/Later jika: daily hari ini ada, atau Y/X grid > 0, atau master brand X > 0,
+ * atau belum ada daily (user boleh scrape untuk baca device).
  */
 export function shouldShowResumeOnlyEmpty(input: {
   result: AccountSyncResult;
   deviceGroupCount: number;
   hasDailyToday: boolean;
 }): boolean {
+  if (!input.hasDailyToday) return false;
   if (input.deviceGroupCount > 0) return false;
-  if (input.hasDailyToday) return false;
+  if (input.result.groupsCurrent > 0) return false;
   if (input.result.groupsTotal > 0) return false;
-  return input.result.groupsCurrent === 0;
+  return true;
 }
 
 export type PostSyncModalStep = 'scrape-prompt' | 'resume-empty';

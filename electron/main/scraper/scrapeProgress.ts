@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron';
+import { touchScrapeWatchdog } from './scrapeWatchdog';
 
 export type ScrapeProgressPhase =
   | 'start'
@@ -18,6 +19,7 @@ export interface ScrapeProgressPayload {
 }
 
 export function emitScrapeProgress(payload: ScrapeProgressPayload): void {
+  touchScrapeWatchdog(payload.sessionId);
   const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
   if (!win) return;
   win.webContents.send('scraper:progress', payload);

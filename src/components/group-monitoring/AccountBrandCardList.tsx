@@ -39,8 +39,7 @@ export function AccountBrandCardList({
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   const {
-    processingAccountId,
-    processingAction,
+    processingByAccount,
     clearingSessionAccountId,
     handleSyncAccount,
     handleClearSession,
@@ -190,12 +189,7 @@ export function AccountBrandCardList({
               const account = group.accounts.find((row) => row.id === accountId);
               if (account) requestCancelScrape(group.id, account);
             }}
-            checkingAccountId={
-              processingAction === 'sync' ? processingAccountId : null
-            }
-            scraperAccountId={
-              processingAction === 'scraper' ? processingAccountId : null
-            }
+            processingByAccount={processingByAccount}
             getScrapeProgress={getScrapeProgress}
             onDismiss={() => openRemoveBrandModal(group)}
           />

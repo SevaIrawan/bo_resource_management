@@ -1,9 +1,9 @@
 /**
  * Kebijakan tunggal Sync/Scrape — mirror `electron/main/scraper/deviceGroupScale.ts`.
- * Timeout diskalakan dari angka grup **nyata** di grid (Y/X); cap 3000. Tanpa floor 500.
+ * Timeout scrape diskalakan dari jumlah grup nyata di device; cap store 6000.
  */
 export const SYNC_SCRAPER_POLICY = {
-  deviceGroupTargetMax: 3000,
+  deviceGroupTargetMax: 6000,
 
   login: {
     persistTimeoutMs: 180_000,

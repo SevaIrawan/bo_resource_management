@@ -551,6 +551,22 @@ export const en = {
       syncTimedOut:
         'Sync took too long. Accounts with many groups need more time — try again or restart the app.',
       scraperFailed: 'Scraper failed. Try again.',
+      scraperConnectionLostWa:
+        'WhatsApp connection to the server was lost or interrupted. Check internet on this PC and that WhatsApp works on your phone, then run the scraper again.',
+      scraperConnectionLostTg:
+        'Telegram connection was lost or interrupted. Check internet on this PC and that Telegram works on your phone, then run the scraper again.',
+      scraperConnectionLostGeneric:
+        'Connection to {{platform}} was lost or interrupted. Check internet and try again.',
+      scraperNetworkError:
+        'Network error while scraping. Check your internet connection and try again.',
+      scraperIdleStuckWa:
+        'Scrape stopped: no progress for several minutes. WhatsApp may be disconnected or still syncing. Check connection on your phone and try again.',
+      scraperIdleStuckTg:
+        'Scrape stopped: no progress for several minutes. Telegram may be disconnected or still syncing. Check connection and try again.',
+      scraperWaSyncPending:
+        'WhatsApp Web is still syncing from the server. Wait until chats load on the phone, then run the scraper again.',
+      scraperLegacyTimeout:
+        'Scrape timed out (older app build). Update the app, check WhatsApp/Telegram connection, then try again.',
       scraperNoGroups: 'No groups found.',
       scraperDesktopRequired: 'Scraper needs the desktop app.',
       authRequired: 'Log in to the dashboard first.',

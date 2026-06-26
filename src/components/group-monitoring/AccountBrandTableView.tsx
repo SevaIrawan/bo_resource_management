@@ -44,8 +44,7 @@ export function AccountBrandTableView({
   const [editError, setEditError] = useState<string | null>(null);
   const rows = flattenBrandAccounts(groups);
   const {
-    processingAccountId,
-    processingAction,
+    processingByAccount,
     clearingSessionAccountId,
     handleSyncAccount,
     handleClearSession,
@@ -161,12 +160,8 @@ export function AccountBrandTableView({
                   onSync={() => handleSyncRow(row.id)}
                   onRunScraper={() => handleScraperRow(row.id)}
                   onCancelScrape={() => handleCancelScrapeRow(row.id)}
-                  syncLoading={
-                    processingAction === 'sync' && processingAccountId === row.id
-                  }
-                  scraperLoading={
-                    processingAction === 'scraper' && processingAccountId === row.id
-                  }
+                  syncLoading={processingByAccount[row.id] === 'sync'}
+                  scraperLoading={processingByAccount[row.id] === 'scraper'}
                   scrapeProgress={getScrapeProgress(row.id)}
                   onRemoveFromSlot={() => handleRemoveRow(row.id)}
                   onEditAccount={() => handleEditRow(row.id)}

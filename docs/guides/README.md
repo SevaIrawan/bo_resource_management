@@ -13,6 +13,7 @@ You can also open the `.html` file in a browser — it looks like a Confluence p
 
 ## IT only
 
+- Job Queue troubleshooting (dev/ops): [job-queue-troubleshooting-reference.md](./job-queue-troubleshooting-reference.md) · [Confluence paste HTML](./job-queue-troubleshooting-reference-Confluence.html)
 - Edit source: `_source/HANDBOOK-en.md` / `_source/HANDBOOK-zh.md` (internal; users do not need these)
 - Rebuild: `npm run build:handbook-docs`
 - Output: `documents/EN/` and `documents/ZH/`

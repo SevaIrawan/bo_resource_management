@@ -42,6 +42,12 @@ const implChecks = [
       syncFlow.includes('resolvePostLoginModalStep'),
   },
   {
+    name: 'resume-empty hanya jika daily hari ini + semua count 0',
+    ok:
+      uiFlow.includes('if (!input.hasDailyToday) return false') &&
+      syncFlowService.includes('sync valid = probe session saja'),
+  },
+  {
     name: 'RUN intent scraper auto-scrape tanpa prompt',
     ok: syncFlow.includes("savedIntent === 'scraper'") && syncFlow.includes('runScrapeInBackground'),
   },

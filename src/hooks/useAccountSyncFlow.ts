@@ -60,7 +60,7 @@ import {
 } from '@/lib/executeSlotClient';
 import { resolveAccountExecuteBlock } from '@/lib/automationJobQueueClient';
 import { CLEAR_SESSION_REASON, clearAccountSession } from '@/lib/clearAccountSession';
-import { isScrapeAbortMessage } from '@/lib/scrapeErrorUi';
+import { isScrapeUserCancelledMessage } from '@/lib/scrapeErrorUi';
 
 export type SyncFlowStep =
   | 'idle'
@@ -83,11 +83,12 @@ interface SyncTarget {
 interface UseAccountSyncFlowOptions {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   userId?: string | null;
-  onAccountGridRefresh?: (dbAccountId: string) => void | Promise<void>;
   canOperatePlatform?: boolean;
   /** i18n dari parent — hindari hook tambahan di dalam custom hook. */
   translate: (key: string) => string;
 }
+
+export type RowProcessingSpinner = 'sync' | 'scraper';
 
 function patchAccountPhone(
   groups: AccountBrandGroup[],
@@ -107,7 +108,7 @@ function patchAccountPhone(
 }
 
 function isScrapeCancelledMessage(message: string): boolean {
-  return isScrapeAbortMessage(message);
+  return isScrapeUserCancelledMessage(message);
 }
 
 function normalizeSyncErrorMessage(message: string): string {
@@ -121,12 +122,13 @@ function normalizeSyncErrorMessage(message: string): string {
 export function useAccountSyncFlow({
   onGroupsChange,
   userId,
-  onAccountGridRefresh,
   canOperatePlatform = true,
   translate: t,
 }: UseAccountSyncFlowOptions) {
-  const [processingAccountId, setProcessingAccountId] = useState<string | null>(null);
-  const [processingAction, setProcessingAction] = useState<'sync' | 'scraper' | null>(null);
+  const [processingByAccount, setProcessingByAccount] = useState<
+    Record<string, RowProcessingSpinner>
+  >({});
+  /** Spinner per akun (Cancel Run / loading). Grid mirror: row.actionProcess via setRowProcessing. */
   const [postLoginGraceAccountId, setPostLoginGraceAccountId] = useState<string | null>(null);
   const [postLoginCountsReady, setPostLoginCountsReady] = useState(true);
   const [step, setStep] = useState<SyncFlowStep>('idle');
@@ -140,9 +142,9 @@ export function useAccountSyncFlow({
   const [phoneSaving, setPhoneSaving] = useState(false);
   const [loginModalEpoch, setLoginModalEpoch] = useState(0);
   const scrapeSessionByAccountRef = useRef<Map<string, string>>(new Map());
-  const processingDbAccountIdRef = useRef<string | null>(null);
-  const scrapeUserCancelledRef = useRef(false);
-  const [processingDbAccountId, setProcessingDbAccountId] = useState<string | null>(null);
+  const processingDbByAccountRef = useRef<Map<string, string>>(new Map());
+  const scrapeCancelledAccountIdsRef = useRef<Set<string>>(new Set());
+  const [processingDbByAccount, setProcessingDbByAccount] = useState<Record<string, string>>({});
   const [scrapeProgressBySession, setScrapeProgressBySession] = useState<
     Record<string, UiScrapeProgress>
   >({});
@@ -150,8 +152,6 @@ export function useAccountSyncFlow({
 
   useEffect(() => {
     const unsub = window.electronAPI?.scraper?.onProgress?.((payload) => {
-      if (scrapeUserCancelledRef.current) return;
-
       const current = payload.current ?? 0;
       const total = payload.total ?? 0;
       const percent =
@@ -171,6 +171,7 @@ export function useAccountSyncFlow({
         const next = { ...prev, [payload.sessionId]: entry };
         for (const [accountId, sessionId] of scrapeSessionByAccountRef.current.entries()) {
           if (sessionId === payload.sessionId) {
+            if (scrapeCancelledAccountIdsRef.current.has(accountId)) return prev;
             next[accountId] = entry;
           }
         }
@@ -215,18 +216,44 @@ export function useAccountSyncFlow({
     setLoginIntent(null);
   }, []);
 
+  const trackProcessingDbAccount = useCallback((accountId: string, dbAccountId: string) => {
+    processingDbByAccountRef.current.set(accountId, dbAccountId);
+    setProcessingDbByAccount((prev) => ({ ...prev, [accountId]: dbAccountId }));
+  }, []);
+
+  const untrackProcessingDbAccount = useCallback((accountId: string) => {
+    processingDbByAccountRef.current.delete(accountId);
+    setProcessingDbByAccount((prev) => {
+      const { [accountId]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }, []);
+
+  const setAccountProcessingSpinner = useCallback(
+    (accountId: string, spinner: RowProcessingSpinner | null) => {
+      setProcessingByAccount((prev) => {
+        if (!spinner) {
+          const { [accountId]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [accountId]: spinner };
+      });
+    },
+    [],
+  );
+
   const setRowProcessing = useCallback(
     (
       groupId: string,
       accountId: string,
       rowAction: AccountProcessAction,
-      spinner: 'sync' | 'scraper' | null = null,
+      spinner: RowProcessingSpinner | null = null,
     ) => {
-      setProcessingAccountId(accountId);
-      if (spinner) {
-        setProcessingAction(spinner);
-      } else if (rowAction === 'sync' || rowAction === 'scraper') {
-        setProcessingAction(rowAction);
+      const resolvedSpinner =
+        spinner ??
+        (rowAction === 'sync' || rowAction === 'scraper' ? rowAction : null);
+      if (resolvedSpinner) {
+        setAccountProcessingSpinner(accountId, resolvedSpinner);
       }
       updateGroups((groups) =>
         patchBrandGroup(groups, groupId, (group) =>
@@ -234,7 +261,7 @@ export function useAccountSyncFlow({
         ),
       );
     },
-    [updateGroups],
+    [setAccountProcessingSpinner, updateGroups],
   );
 
   const patchRowProcessAction = useCallback(
@@ -250,39 +277,40 @@ export function useAccountSyncFlow({
 
   const clearRowProcessing = useCallback(
     (groupId: string, accountId: string) => {
-      setProcessingAccountId(null);
-      setProcessingDbAccountId(null);
-      processingDbAccountIdRef.current = null;
-      setProcessingAction(null);
+      setAccountProcessingSpinner(accountId, null);
+      untrackProcessingDbAccount(accountId);
       updateGroups((groups) =>
         patchBrandGroup(groups, groupId, (group) => setAccountProcessAction(group, accountId, null)),
       );
     },
-    [updateGroups],
+    [setAccountProcessingSpinner, untrackProcessingDbAccount, updateGroups],
   );
 
   const closeFlow = useCallback(() => {
     if (step === 'platform-login' && target) {
       void cancelPlatformLoginForAccount({
         account: target.account,
-        dbAccountId: processingDbAccountIdRef.current ?? undefined,
+        dbAccountId: processingDbByAccountRef.current.get(target.account.id),
       });
       clearRowProcessing(target.groupId, target.account.id);
     }
     if (target?.account.id) {
       void releaseExecuteSlot(target.account.id);
       clearScrapeProgress(target.account.id);
-      if (processingAccountId === target.account.id) {
+      if (processingByAccount[target.account.id]) {
         clearRowProcessing(target.groupId, target.account.id);
       }
     }
     dismissSyncModals();
     setTarget(null);
-    setProcessingAccountId(null);
-    setProcessingDbAccountId(null);
-    processingDbAccountIdRef.current = null;
-    setProcessingAction(null);
-  }, [clearRowProcessing, clearScrapeProgress, dismissSyncModals, processingAccountId, step, target]);
+  }, [
+    clearRowProcessing,
+    clearScrapeProgress,
+    dismissSyncModals,
+    processingByAccount,
+    step,
+    target,
+  ]);
 
   const applyResult = useCallback(
     async (
@@ -423,7 +451,7 @@ export function useAccountSyncFlow({
       if (!target) return;
       void cancelPlatformLoginForAccount({
         account: target.account,
-        dbAccountId: processingDbAccountIdRef.current ?? undefined,
+        dbAccountId: processingDbByAccountRef.current.get(target.account.id),
       });
       clearRowProcessing(target.groupId, target.account.id);
       setLoginIntent(null);
@@ -498,8 +526,7 @@ export function useAccountSyncFlow({
             ? undefined
             : () => patchRowProcessAction(groupId, account.id, 'sync'),
         });
-        setProcessingDbAccountId(dbAccountId);
-        processingDbAccountIdRef.current = dbAccountId;
+        trackProcessingDbAccount(account.id, dbAccountId);
 
         if (outcome.kind === 'login') {
           void releaseExecuteSlot(account.id);
@@ -624,7 +651,7 @@ export function useAccountSyncFlow({
       if (account.sessionStatus !== 'valid') return;
       if (account.actionProcess) return;
 
-      if (processingAccountId === account.id) return;
+      if (processingByAccount[account.id]) return;
 
       const slot = await acquireExecuteSlot(account.id, 'sync');
       if (!slot.ok) return;
@@ -634,15 +661,11 @@ export function useAccountSyncFlow({
       if (step === 'platform-login' && target?.account.id === account.id) {
         await cancelPlatformLoginForAccount({
           account: target.account,
-          dbAccountId: processingDbAccountIdRef.current ?? undefined,
+          dbAccountId: processingDbByAccountRef.current.get(target.account.id),
         });
         dismissSyncModals();
         clearRowProcessing(target.groupId, target.account.id);
         setTarget(null);
-        setProcessingAccountId(null);
-        setProcessingDbAccountId(null);
-        processingDbAccountIdRef.current = null;
-        setProcessingAction(null);
       }
 
       try {
@@ -673,7 +696,7 @@ export function useAccountSyncFlow({
       canOperatePlatform,
       clearRowProcessing,
       dismissSyncModals,
-      processingAccountId,
+      processingByAccount,
       reportBlockingError,
       step,
       t,
@@ -696,8 +719,8 @@ export function useAccountSyncFlow({
       const ctx = override ?? target;
       if (!ctx || !userId) return;
 
-      scrapeUserCancelledRef.current = false;
       const { groupId, account } = ctx;
+      scrapeCancelledAccountIdsRef.current.delete(account.id);
 
       const executeBlock = await resolveAccountExecuteBlock(account);
       if (executeBlock) {
@@ -777,8 +800,7 @@ export function useAccountSyncFlow({
           await bootScrapeUi();
         }
 
-        setProcessingDbAccountId(dbAccountId);
-        processingDbAccountIdRef.current = dbAccountId;
+        trackProcessingDbAccount(account.id, dbAccountId);
 
         const outcome = await runScrapeFlow({
           userId,
@@ -880,7 +902,7 @@ export function useAccountSyncFlow({
       } catch (error) {
         const message = getErrorMessage(error, 'SCRAPER_FAILED');
         if (isScrapeCancelledMessage(message)) {
-          if (!scrapeUserCancelledRef.current) {
+          if (!scrapeCancelledAccountIdsRef.current.has(account.id)) {
             setTarget({ groupId, account, dbAccountId: dbAccountId || undefined });
             setStep('scrape-cancelled');
           }
@@ -900,7 +922,6 @@ export function useAccountSyncFlow({
       applyResult,
       clearScrapeProgress,
       clearRowProcessing,
-      onAccountGridRefresh,
       patchRowProcessAction,
       reportBlockingError,
       setRowProcessing,
@@ -942,7 +963,7 @@ export function useAccountSyncFlow({
       setTarget({
         groupId,
         account,
-        dbAccountId: processingDbAccountIdRef.current ?? undefined,
+        dbAccountId: processingDbByAccountRef.current.get(account.id),
       });
       setStep('scrape-cancel-confirm');
     },
@@ -957,7 +978,7 @@ export function useAccountSyncFlow({
     if (!target || !userId) return;
 
     const { groupId, account } = target;
-    scrapeUserCancelledRef.current = true;
+    scrapeCancelledAccountIdsRef.current.add(account.id);
 
     void releaseExecuteSlot(account.id);
     clearScrapeProgress(account.id);
@@ -966,7 +987,7 @@ export function useAccountSyncFlow({
 
     try {
       let dbAccountId =
-        target.dbAccountId ?? processingDbAccountIdRef.current ?? '';
+        target.dbAccountId ?? processingDbByAccountRef.current.get(account.id) ?? '';
       if (!dbAccountId) {
         dbAccountId = await resolveDbAccountId({
           userId,
@@ -1209,9 +1230,8 @@ export function useAccountSyncFlow({
   const activePlatform: Platform | null = target?.account.platform ?? null;
 
   return {
-    processingAccountId,
-    processingDbAccountId,
-    processingAction,
+    processingByAccount,
+    processingDbByAccount,
     postLoginGraceAccountId,
     postLoginCountsReady,
     step,

@@ -297,6 +297,7 @@ export async function executeSyncCheck(input: {
         : 'WhatsApp session valid.',
     modalStep: postSyncModalStep({
       result,
+      /** Grid Y hanya dipakai jika daily hari ini ada — sync valid tidak baca device. */
       deviceGroupCount: hasDaily ? account.groupsCurrent : 0,
       hasDailyToday: hasDaily,
     }),

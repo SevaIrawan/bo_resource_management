@@ -18,6 +18,7 @@ const guard = read('electron/main/automation/jobQueueGuard.ts');
 const slotPool = read('electron/main/automation/executeSlotPool.ts');
 const cells = read('src/components/group-monitoring/AccountMonitoringCells.tsx');
 const migration035 = read('supabase/migrations/035_rm_fix_master_pk_and_scrape_commit.sql');
+const migration036 = read('supabase/migrations/036_rm_master_pk_brand_platform_group_id.sql');
 
 const checks = [
   {
@@ -25,7 +26,15 @@ const checks = [
     ok:
       accountScraper.includes("rpc('rm_commit_account_scrape'") &&
       migration035.includes('DELETE FROM public.resource_management_group_scrape_daily') &&
-      migration035.includes('DELETE FROM public.resource_management_groups_master'),
+      migration036.includes('DELETE FROM public.resource_management_groups_master'),
+  },
+  {
+    name: '§4 Master PK = (brand, platform, group_id) + dedupe picked',
+    ok:
+      migration036.includes('ADD PRIMARY KEY (brand, platform, group_id)') &&
+      migration036.includes('DISTINCT ON (group_id)') &&
+      migration036.includes('rm_build_master_row_id(v_brand, p_platform, group_id)') &&
+      migration036.includes('pg_advisory_xact_lock'),
   },
   {
     name: '§3 Later / sync valid = sessionOnly (grid metrik tidak berubah)',

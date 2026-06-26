@@ -6,11 +6,20 @@ import { MissingPhoneModal } from '@/components/group-monitoring/MissingPhoneMod
 import { SyncAlertModal } from '@/components/group-monitoring/SyncAlertModal';
 import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
 import { PLATFORM_SESSION_RLS_HINT } from '@/lib/platformSessions';
+import {
+  formatScrapeErrorForModal,
+  isScrapeConnectionModalCode,
+  isScrapeErrorCodeOnly,
+  resolveScrapeAlertMessage,
+  resolveScrapeErrorModalCode,
+} from '@/lib/scrapeErrorUi';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
   resolveSyncFlowMessage,
 } from '@/lib/platformSyncCopy';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
+
+import type { Platform } from '@/types/database';
 
 type SyncFlow = ReturnType<typeof useAccountSyncFlow>;
 
@@ -20,9 +29,20 @@ interface AccountMonitoringSyncModalsProps {
 
 function resolveAlertMessage(
   code: string | null,
-  t: (key: string) => string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  platform?: Platform,
 ): string {
   if (!code) return '';
+
+  const factual = formatScrapeErrorForModal(code);
+  if (factual && !isScrapeErrorCodeOnly(factual)) {
+    return factual;
+  }
+
+  const modalCode = resolveScrapeErrorModalCode(code) ?? (isScrapeConnectionModalCode(code) ? code : null);
+  if (modalCode) {
+    return resolveScrapeAlertMessage(modalCode, t, platform);
+  }
 
   if (code === 'SUPABASE_NOT_CONFIGURED') {
     return t('groupMonitoring.sync.supabaseNotConfigured');
@@ -105,7 +125,7 @@ export function AccountMonitoringSyncModals({ sync }: AccountMonitoringSyncModal
     postLoginCountsReady,
   } = sync;
 
-  const alertMessage = resolveAlertMessage(checkError, t);
+  const alertMessage = resolveAlertMessage(checkError, t, target?.account.platform);
 
   return (
     <>

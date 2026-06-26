@@ -21,10 +21,15 @@ const checks = [
   { name: 'installUpdate IPC', ok: read('electron/preload/index.ts').includes('installUpdate') },
   { name: 'i18n updateNow / dataUpdatesPending', ok: i18n.includes('updateNow') && i18n.includes('dataUpdatesPending') },
   {
-    name: 'Post-scrape refresh grid akun',
+    name: 'Post-scrape refresh grid via daily realtime',
     ok: (() => {
-      const syncFlow = read('src/hooks/useAccountSyncFlow.ts');
-      return syncFlow.includes('await onAccountGridRefresh?.(dbAccountId');
+      const provider = read('src/providers/GroupMonitoringProvider.tsx');
+      const realtime = read('src/hooks/useRealtimeMonitoring.ts');
+      return (
+        provider.includes('refreshAccountAfterDailyWrite') &&
+        provider.includes('handleAccountDailyChanged') &&
+        realtime.includes('onAccountDailyChangedRef.current?.(accountId)')
+      );
     })(),
   },
   {

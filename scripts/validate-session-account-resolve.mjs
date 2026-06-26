@@ -31,8 +31,14 @@ const checks = [
     ok: resolveSrc.includes(".eq('user_id', userId)"),
   },
   {
-    name: 'checkUserActionDeviceSession warms device before probe',
-    ok: gateSrc.includes('warmSessionIfStored') && gateSrc.includes('readLatestSessionUiStatus'),
+    name: 'checkUserActionDeviceSession reads DB status then device gate',
+    ok:
+      gateSrc.includes('readLatestSessionUiStatus') &&
+      gateSrc.includes('gateDeviceSession'),
+  },
+  {
+    name: 'Scrape flow warms stored session before device probe',
+    ok: read('src/services/scrapeFlowService.ts').includes('warmSessionIfStored'),
   },
   {
     name: 'device gate uses shouldInvalidate only for dead session',

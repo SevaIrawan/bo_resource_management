@@ -1,5 +1,8 @@
-/** Target operasional: akun dengan ribuan grup (hingga ~3000). */
-export const DEVICE_GROUP_TARGET_MAX = 3000;
+/** Batas operasional scrape per akun — selaras cap store WA Web (satu pass evaluate). */
+export const WA_STORE_GROUP_LIST_CAP = 6000;
+
+/** Alias legacy — sama dengan WA_STORE_GROUP_LIST_CAP. */
+export const DEVICE_GROUP_TARGET_MAX = WA_STORE_GROUP_LIST_CAP;
 
 /** Cek session valid/invalid — cold WA Chrome + TG restore; tidak baca daftar grup; tidak skala Y/X. */
 export const SESSION_CHECK_TIMEOUT_MS = 20_000;
@@ -9,9 +12,6 @@ export const POST_LOGIN_DETECT_TIMEOUT_MS = 90_000;
 
 /** Setelah QR ready — store biasanya sudah siap; tunggu pendek saja. */
 export const QUICK_COUNT_STORE_WAIT_MS = 20_000;
-
-/** Batas aman daftar grup dari store WA Web (satu pass di browser). */
-export const WA_STORE_GROUP_LIST_CAP = 6000;
 
 /** Scrape metadata — evaluate berat; jangan 12 paralel di satu Puppeteer page. */
 export const WA_SCRAPE_METADATA_CONCURRENCY = Math.max(
@@ -45,23 +45,66 @@ const COUNT_BASE_MS = 120_000;
 const COUNT_PER_GROUP_MS = 30;
 const COUNT_MAX_MS = 1_200_000;
 
-const SCRAPE_BASE_MS = 120_000;
-const SCRAPE_PER_GROUP_MS = 3_500;
-const SCRAPE_MAX_MS = 3_600_000;
+const SCRAPE_BASE_MS = Math.max(
+  60_000,
+  Math.floor(Number(process.env.RM_SCRAPE_BASE_MS) || 120_000),
+);
+const SCRAPE_PER_GROUP_MS = Math.max(
+  500,
+  Math.floor(Number(process.env.RM_SCRAPE_PER_GROUP_MS) || 3_500),
+);
 
-/** Mirror `src/config/syncScraperPolicy.ts` — angka nyata Y/X, cap 3000, tanpa floor 500. */
+/** Selaras INVITE_CODE_TIMEOUT_MS di whatsappGroupInviteLink.ts */
+const WA_INVITE_FETCH_TIMEOUT_MS = 15_000;
+
+/** Gagal jika tidak ada progress scrape selama interval ini (ms). Override: RM_SCRAPE_IDLE_MS */
+export const SCRAPE_IDLE_TIMEOUT_MS = Math.max(
+  120_000,
+  Math.floor(Number(process.env.RM_SCRAPE_IDLE_MS) || 600_000),
+);
+
+export function clampGroupCount(count: number): number {
+  return Math.max(0, Math.min(Math.floor(count) || 0, WA_STORE_GROUP_LIST_CAP));
+}
+
+/** @deprecated gunakan clampGroupCount */
 function clampGroupEstimate(estimate: number): number {
-  return Math.max(0, Math.min(estimate || 0, DEVICE_GROUP_TARGET_MAX));
+  return clampGroupCount(estimate);
 }
 
 function scaledMs(
   baseMs: number,
   perGroupMs: number,
   maxMs: number,
-  estimate: number,
+  groupCount: number,
 ): number {
-  const est = clampGroupEstimate(estimate);
-  return Math.min(maxMs, baseMs + est * perGroupMs);
+  const n = clampGroupCount(groupCount);
+  return Math.min(maxMs, baseMs + n * perGroupMs);
+}
+
+/**
+ * Estimasi fase metadata — log/observability; bukan pemutus scrape aktif.
+ * groupCount = jumlah grup nyata di device (setelah list/count).
+ */
+export function scrapeGroupsBudgetMs(groupCount: number): number {
+  const n = clampGroupCount(groupCount);
+  return SCRAPE_BASE_MS + n * SCRAPE_PER_GROUP_MS;
+}
+
+/**
+ * Estimasi fase invite serial (admin only) — dari konstanta delay + timeout fetch di kode WA.
+ * Selaras rm-scrape-daily-master: getInviteCode serial, waInviteExportDelayMs antar admin.
+ */
+export function scrapeInvitePhaseBudgetMs(adminCount: number): number {
+  const n = Math.max(0, Math.floor(adminCount) || 0);
+  const perAdminMs =
+    WA_INVITE_FETCH_TIMEOUT_MS + WA_SCRAPE_GROUP_DELAY_MS + WA_SCRAPE_GROUP_JITTER_MS;
+  return n * perAdminMs;
+}
+
+/** Estimasi total dua fase — hanya log, watchdog idle yang memutus jika macet. */
+export function scrapeTotalPlanMs(groupCount: number, adminCount: number): number {
+  return scrapeGroupsBudgetMs(groupCount) + scrapeInvitePhaseBudgetMs(adminCount);
 }
 
 export function countGroupsTimeoutMs(estimate = 0, quick = false): number {
@@ -69,8 +112,14 @@ export function countGroupsTimeoutMs(estimate = 0, quick = false): number {
   return scaledMs(COUNT_BASE_MS, COUNT_PER_GROUP_MS, COUNT_MAX_MS, estimate);
 }
 
-export function scrapeGroupsTimeoutMs(estimate = 0): number {
-  return scaledMs(SCRAPE_BASE_MS, SCRAPE_PER_GROUP_MS, SCRAPE_MAX_MS, estimate);
+/** Alias kompat — estimate = jumlah grup nyata. */
+export function scrapeGroupsTimeoutMs(groupCount = 0): number {
+  return scrapeGroupsBudgetMs(groupCount);
+}
+
+/** Tunggu inbox WA stabil — skala dari hitungan grup di store. */
+export function waInboxStableTimeoutMs(groupCount: number): number {
+  return scaledMs(120_000, 80, 900_000, groupCount);
 }
 
 export function waQrBootstrapDeadlineMs(estimate = 0): number {
@@ -100,6 +149,7 @@ export class ScrapeTimeoutError extends Error {
   }
 }
 
+/** @deprecated Pakai withScrapeWatchdog — tetap untuk count operasi pendek. */
 export function withScrapeTimeout<T>(
   promise: Promise<T>,
   ms: number,

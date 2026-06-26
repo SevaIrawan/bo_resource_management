@@ -1,6 +1,8 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
 import { withNetworkRetry } from '../lib/networkRetry';
-import { scrapeGroupsTimeoutMs } from './deviceGroupScale';
+import { SCRAPE_IDLE_TIMEOUT_MS } from './deviceGroupScale';
+import { withScrapeWatchdog } from './scrapeWatchdog';
+import { abortActiveScrape } from './scrapeCancel';
 import { emitScrapeProgress, type ScrapeProgressPhase } from './scrapeProgress';
 import type { ScrapedGroupRow } from './index';
 
@@ -124,7 +126,6 @@ async function postTelegramScrape(
         sessionString: sessionString ?? undefined,
         expectedPhone: expectedPhone?.trim() || undefined,
       }),
-      signal: AbortSignal.timeout(scrapeGroupsTimeoutMs()),
     });
 
     const json = (await res.json()) as {
@@ -145,6 +146,32 @@ async function postTelegramScrape(
 }
 
 export async function runTelegramScrape(
+  sessionId: string,
+  storedSessionString?: string | null,
+  expectedPhone?: string,
+): Promise<{
+  ok: boolean;
+  groups: ScrapedGroupRow[];
+  count: number;
+  hint?: string;
+  telegramUser?: string;
+  elapsedMs?: number;
+}> {
+  return withScrapeWatchdog(
+    sessionId,
+    () => runTelegramScrapeInner(sessionId, storedSessionString, expectedPhone),
+    {
+      label: 'Telegram scrape',
+      idleMs: SCRAPE_IDLE_TIMEOUT_MS,
+      onStale: async (sid) => {
+        await abortActiveScrape(sid, 'telegram');
+        await cancelTelegramScrape(sid);
+      },
+    },
+  );
+}
+
+async function runTelegramScrapeInner(
   sessionId: string,
   storedSessionString?: string | null,
   expectedPhone?: string,

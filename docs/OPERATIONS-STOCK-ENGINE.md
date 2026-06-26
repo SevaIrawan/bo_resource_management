@@ -135,7 +135,7 @@ Stock **selalu dihitung ulang** dari `groups_master` (bukan cache Account grid).
 
 | Trigger | Alur |
 |---------|------|
-| Scrape selesai | daily write → RPC `rm_rebuild_brand_groups_master` → `refreshIssues` → `scheduleReportingReload` |
+| Scrape selesai | RPC `rm_commit_account_scrape` (daily + master atomik) → `scheduleReportingReload` |
 | Supabase realtime `groups_master` | `useRealtimeMonitoring` → `scheduleIssueRefreshFromData` → `scheduleReportingReload` |
 | Supabase realtime `group_scrape_daily` | reconcile akun → `scheduleReportingReload` |
 | Registry brand/akun berubah | `handleRegistryRealtime` → `scheduleReportingReload` |

@@ -35,7 +35,10 @@ Jalankan **berurutan**, satu file = satu kali **Run**, tunggu sukses sebelum fil
 | 2 | `supabase/migrations/017_rm_full_reset.sql` |
 | 3 | `supabase/migrations/020_fix_duplicate_active_sessions.sql` |
 | 4 | `supabase/migrations/023_session_and_sync_logs_bundle.sql` |
-| 5 | `supabase/migrations/030_groups_master_member_counts.sql` — count di `groups_master` + RPC rebuild |
+| 5 | `supabase/migrations/030_groups_master_member_counts.sql` |
+| 6 | `supabase/migrations/032_rm_replace_account_scrape_daily.sql` |
+| 7 | `supabase/migrations/035_rm_fix_master_pk_and_scrape_commit.sql` |
+| 8 | **`supabase/migrations/036_rm_master_pk_brand_platform_group_id.sql`** — PK `(brand, platform, group_id)` |
 
 **Jangan jalankan:** 018, 019 (kecuali skenario B).
 
@@ -51,11 +54,17 @@ Jalankan **berurutan**:
 | 2 | `019_realtime_group_scrape_daily.sql` | Opsional; aman di-run jika ragu |
 | 3 | `020_fix_duplicate_active_sessions.sql` | Wajib |
 | 4 | `023_session_and_sync_logs_bundle.sql` | **Wajib** — perbaiki error 404/400 di console |
-| 5 | `030_groups_master_member_counts.sql` | **Wajib** — `owner_count`, `admin_count`, `member_count`, `member_non_admin` di master + RPC rebuild |
+| 5 | `030_groups_master_member_counts.sql` | **Wajib** — count di master + RPC rebuild |
+| 6 | `031_messaging_accounts_location_device.sql` | Opsional — kolom location device |
+| 7 | `032_rm_replace_account_scrape_daily.sql` | **Wajib** — skema daily + RPC commit |
+| 8 | `033_rm_drop_ticket_tables.sql` | Jika masih ada tabel ticket lama |
+| 9 | `034_rm_drop_ticket_workflow_tables.sql` | Lanjutan drop ticket |
+| 10 | `035_rm_fix_master_pk_and_scrape_commit.sql` | **Wajib** — `rm_commit_account_scrape` atomik |
+| 11 | **`036_rm_master_pk_brand_platform_group_id.sql`** | **Wajib** — PK master `(brand, platform, group_id)`; fix duplicate key scrape |
 
 **Jangan jalankan:** 017 lagi (akan **hapus semua data** RM).
 
-Setelah 018: di app, **scrape ulang** tiap akun (rebuild master + ticket).
+Setelah **036**: di app, **scrape ulang** tiap akun (verifikasi commit master sukses).
 
 ---
 
@@ -115,6 +124,7 @@ Buka app lewat **Electron** (`npm run dev`), bukan hanya browser — scraper WA/
 |-------|----------|-----|
 | `404` … `sync_activity_logs` | Tabel belum ada | Run **023** |
 | `400` … `session_status` | Kolom belum ada | Run **023** |
+| `SCRAPER_DB_COMMIT: duplicate key … groups_master_pkey` | **036** belum di-run | Run **`036_rm_master_pk_brand_platform_group_id.sql`** sekali |
 | `RM_SCHEMA` / load akun gagal | 017/003 belum atau salah project | Ikuti **BAGIAN A** atau **B** dari awal |
 
 ---

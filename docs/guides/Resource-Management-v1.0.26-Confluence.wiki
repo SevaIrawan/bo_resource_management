@@ -1,12 +1,12 @@
-h1. Resource Management (GM App) — Dokumentasi Rilis v1.0.23
+h1. Resource Management (GM App) — Dokumentasi Rilis v1.0.26
 
 {info:title=Informasi Rilis}
 * *Produk:* Resource Management (UI: Backend Operation)
-* *Versi:* 1.0.23
+* *Versi:* 1.0.26
 * *Tanggal dokumen:* 22 Juni 2026
 * *Status:* Produksi internal — fitur lengkap
 * *Repository:* [SevaIrawan/bo_resource_management|https://github.com/SevaIrawan/bo_resource_management]
-* *Release:* [Resource Management v1.0.23|https://github.com/SevaIrawan/bo_resource_management/releases/tag/v1.0.23]
+* *Release:* [Resource Management v1.0.26|https://github.com/SevaIrawan/bo_resource_management/releases/tag/v1.0.26]
 * *Platform:* Desktop Electron — Windows, macOS, Linux (installer + auto-update)
 * *Database:* Supabase (PostgreSQL + Realtime)
 {info}
@@ -19,11 +19,11 @@ Aplikasi desktop untuk memantau dan mengoperasikan *banyak akun WhatsApp dan Tel
 
 *Pengguna:* tim internal perusahaan (bukan produk publik).
 
-*Highlight v1.0.23:*
-* Scrape WA mengambil *invite link* dari device → tulis *daily* → rebuild *master*
-* Stabilitas Puppeteer (protocolTimeout, concurrency metadata, retry)
-* Job Queue: VIEW detail per task + export Excel
-* Validator data nyata (`validate:real-operations-data`)
+*Highlight v1.0.26:*
+* Supabase *036*: PK `groups_master` = `(brand, platform, group_id)` — fix duplicate key scrape
+* Satu RPC atomik `rm_commit_account_scrape` (daily + master)
+* Multi-akun scrape paralel: progress + Cancel Run per baris
+* Scrape idle watchdog (bukan wall-clock 3600s)
 
 ----
 
@@ -207,15 +207,13 @@ h2. 10. Pipeline Data Scrape (Kontrak Produksi)
 {code}
 Device (WA Electron / TG sidecar)
   → runAccountScraper
-  → DELETE daily (account_id)
-  → INSERT group_scrape_daily
-      (group_id, group_name, invite_link, counts, is_admin)
-  → RPC rm_rebuild_brand_groups_master
-      (hanya invite_link valid masuk master)
-  → reconcileTickets + refresh grid/ticket/reporting
+  → writeScrapeDailyRows
+  → RPC rm_commit_account_scrape (atomik)
+      DELETE daily (account_id) + INSERT daily + rebuild master brand+platform
+  → applyResult grid + realtime reporting
 {code}
 
-*WA scrape v1.0.23:*
+*WA scrape v1.0.26:*
 * Fase 1: metadata grup paralel (concurrency 4)
 * Fase 2: invite link serial per grup admin (getInviteCode)
 * Puppeteer protocolTimeout 10 menit + retry ProtocolError
@@ -294,5 +292,5 @@ Daily + Master terupdate → Ticket auto-reconcile
 ----
 
 {tip:title=Catatan MLKB-5476}
-Dokumen ini memenuhi deliverable *Release & Documentation* GM App v1.0.23 — ringkasan teknis + operasional untuk Confluence. Untuk detail migrasi DB lihat SUPABASE_RUNBOOK.md; untuk CI lihat docs/RELEASE-CI.md.
+Dokumen ini memenuhi deliverable *Release & Documentation* GM App v1.0.26 — ringkasan teknis + operasional untuk Confluence. Untuk detail migrasi DB lihat SUPABASE_RUNBOOK.md; untuk CI lihat docs/RELEASE-CI.md.
 {tip}

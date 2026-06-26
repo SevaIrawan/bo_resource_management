@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-21  
-**Versi aplikasi:** `1.0.25` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.26` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
@@ -339,4 +339,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.18**. Jika version atau alur berubah, perbarui bagian 4, 6, 9, dan nomor versi di header.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.26**. Scrape tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase.*

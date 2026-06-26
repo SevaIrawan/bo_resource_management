@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.25` (lihat `package.json`)
+**Versi saat ini:** `1.0.26` (lihat `package.json`)
+
+**Rilis 1.0.26:** Supabase migration **036** — PK `groups_master` = `(brand, platform, group_id)` (fix duplicate key scrape); satu alur tulis DB via `rm_commit_account_scrape`; multi-akun scrape UI per baris; idle scrape watchdog.
 
 **Rilis 1.0.25:** Kontrak GM Sync/Run/Scrape — slot execute 4 akun paralel, scrape commit atomik (`rm_commit_account_scrape`), sync valid tanpa double device read, perbaikan guard IPC & tombol Run.
 
@@ -99,8 +101,8 @@ Ringkas: tim internal install `.exe` sekali → login → SYNC WA/TG. Config ter
 **Urutan SQL wajib (jangan tebak-tebak):** lihat **[SUPABASE_RUNBOOK.md](./SUPABASE_RUNBOOK.md)** di root project.
 
 Ringkas:
-- **DB baru:** `003` → `017` → `020` → `023` → `024` → `025` → `026` → `030`
-- **DB sudah jalan:** `018` (sekali) → `019` (opsional) → `020` → `023` → `024`–`026` → **`030`**
+- **DB baru:** `003` → `017` → `020` → `023` → `030` → `032` → `035` → **`036`**
+- **DB sudah jalan:** `018` (sekali) → `019` (opsional) → `020` → `023` → `030`–`032` → `035` → **`036`** (wajib — PK master + RPC scrape)
 - Error console `404 sync_activity_logs` / `400 session_status` = belum jalankan **`023`**
 
 **Prinsip:** Semua data bisnis di Supabase; session WA/TG tersimpan + Realtime; metrik sync di `account_snapshots`; audit di `platform_session_logs` & `scrape_runs`.

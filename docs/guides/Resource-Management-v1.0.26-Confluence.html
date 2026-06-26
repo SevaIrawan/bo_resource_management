@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <title>Resource Management v1.0.23 — Confluence Paste</title>
+  <title>Resource Management v1.0.26 — Confluence Paste</title>
   <style>
     body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.5; max-width: 900px; margin: 24px auto; color: #172b4d; }
     h1 { font-size: 24px; border-bottom: 2px solid #0052cc; padding-bottom: 8px; }
@@ -25,17 +25,17 @@
 </head>
 <body>
 
-<h1>Resource Management (GM App) — Dokumentasi Rilis v1.0.23</h1>
+<h1>Resource Management (GM App) — Dokumentasi Rilis v1.0.26</h1>
 
 <div class="panel info">
   <div class="panel-title">Informasi Rilis</div>
   <ul>
     <li><strong>Produk:</strong> Resource Management (UI: Backend Operation)</li>
-    <li><strong>Versi:</strong> 1.0.23</li>
+    <li><strong>Versi:</strong> 1.0.26</li>
     <li><strong>Tanggal dokumen:</strong> 22 Juni 2026</li>
     <li><strong>Status:</strong> Produksi internal — fitur lengkap</li>
     <li><strong>Repository:</strong> <a href="https://github.com/SevaIrawan/bo_resource_management">SevaIrawan/bo_resource_management</a></li>
-    <li><strong>Release:</strong> <a href="https://github.com/SevaIrawan/bo_resource_management/releases/tag/v1.0.23">Resource Management v1.0.23</a></li>
+    <li><strong>Release:</strong> <a href="https://github.com/SevaIrawan/bo_resource_management/releases/tag/v1.0.26">Resource Management v1.0.26</a></li>
     <li><strong>Platform:</strong> Desktop Electron — Windows, macOS, Linux (installer + auto-update)</li>
     <li><strong>Database:</strong> Supabase (PostgreSQL + Realtime)</li>
   </ul>
@@ -46,12 +46,12 @@
 <h2>1. Ringkasan</h2>
 <p>Aplikasi desktop untuk memantau dan mengoperasikan <strong>banyak akun WhatsApp dan Telegram</strong> per brand marketing. Semua data bisnis (akun, grup, master, ticket, session) disimpan di <strong>Supabase</strong>. Login platform (WA/TG) berjalan di <strong>Electron main process</strong> dengan session lokal per PC.</p>
 <p><strong>Pengguna:</strong> tim internal perusahaan (bukan produk publik).</p>
-<p><strong>Highlight v1.0.23:</strong></p>
+<p><strong>Highlight v1.0.26:</strong></p>
 <ul>
-  <li>Scrape WA mengambil <strong>invite link</strong> dari device → tulis <strong>daily</strong> → rebuild <strong>master</strong></li>
-  <li>Stabilitas Puppeteer (protocolTimeout, concurrency metadata, retry)</li>
-  <li>Job Queue: VIEW detail per task + export Excel</li>
-  <li>Validator data nyata (<code>validate:real-operations-data</code>)</li>
+  <li>Supabase <strong>036</strong>: PK <code>groups_master</code> = <code>(brand, platform, group_id)</code> — fix duplicate key saat scrape</li>
+  <li>Satu RPC atomik <code>rm_commit_account_scrape</code> (daily + master), bukan rebuild terpisah</li>
+  <li>Multi-akun scrape paralel: progress + Cancel Run per baris akun</li>
+  <li>Scrape idle watchdog (tanpa wall-clock 3600s)</li>
 </ul>
 
 <hr />
@@ -243,13 +243,11 @@
 <h2>10. Pipeline Data Scrape (Kontrak Produksi)</h2>
 <pre>Device (WA Electron / TG sidecar)
   → runAccountScraper
-  → DELETE daily (account_id)
-  → INSERT group_scrape_daily
-      (group_id, group_name, invite_link, counts, is_admin)
-  → RPC rm_rebuild_brand_groups_master
-      (hanya invite_link valid masuk master)
-  → reconcileTickets + refresh grid/ticket/reporting</pre>
-<p><strong>WA scrape v1.0.23:</strong></p>
+  → writeScrapeDailyRows
+  → RPC rm_commit_account_scrape (atomik)
+      DELETE daily (account_id) + INSERT daily + rebuild master brand+platform
+  → applyResult grid + realtime reporting</pre>
+<p><strong>WA scrape v1.0.26:</strong></p>
 <ul>
   <li>Fase 1: metadata grup paralel (concurrency 4)</li>
   <li>Fase 2: invite link serial per grup admin (getInviteCode)</li>
@@ -328,7 +326,7 @@ Daily + Master terupdate → Ticket auto-reconcile
 
 <div class="panel tip">
   <div class="panel-title">Catatan MLKB-5476</div>
-  <p>Dokumen ini memenuhi deliverable <strong>Release &amp; Documentation</strong> GM App v1.0.23 — ringkasan teknis + operasional. Detail migrasi DB: SUPABASE_RUNBOOK.md; CI: docs/RELEASE-CI.md.</p>
+  <p>Dokumen ini memenuhi deliverable <strong>Release &amp; Documentation</strong> GM App v1.0.26 — ringkasan teknis + operasional. Detail migrasi DB: SUPABASE_RUNBOOK.md; CI: docs/RELEASE-CI.md.</p>
 </div>
 
 </body>

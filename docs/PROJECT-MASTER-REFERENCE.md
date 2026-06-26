@@ -1,7 +1,7 @@
 # Resource Management — Referensi Master Proyek
 
 **Versi dokumen:** 2026-06-17  
-**Versi aplikasi:** 1.0.18 (`package.json`)  
+**Versi aplikasi:** 1.0.26 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
 ## Prinsip dokumen ini
@@ -444,7 +444,7 @@ Runner: `runAccountScraper.ts` → IPC `scraper:run`
 [Run]
   → resolveScrapeLoginIfNeeded → modal login (intent: scraper)
   → login sukses → auto-scrape TANPA Now/Later
-  → writeScrapeDailyRows → applyResult → refreshIssues
+  → writeScrapeDailyRows (RPC rm_commit_account_scrape) → applyResult
 ```
 
 ### 8.2 VALID + Run
@@ -454,9 +454,7 @@ Runner: `runAccountScraper.ts` → IPC `scraper:run`
   → session_check (Checking Session) kecuali post-login grace
   → onSessionProbeComplete → actionProcess: scraper
   → bootScrapeUi (progress connect)
-  → runAccountScraper (Electron baca semua grup device)
-  → applyResult + update lastSyncAt
-  → refreshIssues
+  → runAccountScraper → writeScrapeDailyRows (rm_commit atomik) → applyResult
 ```
 
 Probe gagal meski grid masih VALID → invalidate + modal login.
@@ -572,7 +570,7 @@ reconcileTickets.ts  →  upsert/delete baris tickets DB
 
 | Langkah | File |
 |---------|------|
-| Scrape tulis daily + rebuild master | `accountScraper.ts` → `invalidateMasterDailyCacheForScrape` |
+| Scrape tulis daily + master (RPC atomik) | `accountScraper.ts` → `rm_commit_account_scrape` → `invalidateMasterDailyCacheForScrape` |
 | Reconcile DB | `reconcileTickets.ts` → `loadMasterDailyForAccount({ forceFresh: true })` |
 | Kartu Issue UI | `buildTicketSummariesFromEngine.ts` → `forceFresh: true` |
 | Patch grid bookmark | `hydrateAccountMetricsFromDaily.ts`, `patchAccountMasterInGroups.ts` |

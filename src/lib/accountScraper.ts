@@ -158,10 +158,12 @@ export async function resolveMessagingAccountId(input: {
 }
 
 export interface ScrapeDailyWriteResult {
-  /** Total baris daily (= snapshot device) */
+  /** Total baris daily (= snapshot device, sudah dedupe group_id) */
   count: number;
   /** Baris di master brand setelah rebuild */
   masterCount: number;
+  /** Grup admin di device (setelah dedupe — sama data yang ditulis RPC) */
+  deviceAdminCount: number;
   scrapeDate: string;
   scrapedAt: string;
 }
@@ -263,6 +265,7 @@ export async function writeScrapeDailyRows(input: {
   return {
     count: commit.daily_count ?? rows.length,
     masterCount: commit.master_inserted ?? 0,
+    deviceAdminCount: uniqueGroups.filter((g) => g.is_admin === 'yes').length,
     scrapeDate,
     scrapedAt,
   };

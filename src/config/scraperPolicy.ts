@@ -1,7 +1,8 @@
 import { TABLES } from '@/config/tables';
 
 /**
- * Scrape DB: 017_rm_full_reset.sql / upgrade 018_drop_legacy_rm.sql
- * DELETE daily (account) → INSERT daily → RPC rm_rebuild_brand_groups_master
+ * Scrape DB: RPC rm_commit_account_scrape (035+036) — atomik:
+ * DELETE daily akun → INSERT daily → rebuild master brand+platform.
+ * Rebuild terpisah (rm_rebuild_brand_groups_master) hanya saat hapus akun dari slot.
  */
 export const SCRAPER_WRITE_TABLE = TABLES.groupScrapeDaily;

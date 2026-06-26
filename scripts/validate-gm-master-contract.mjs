@@ -29,7 +29,7 @@ const checks = [
       migration036.includes('DELETE FROM public.resource_management_groups_master'),
   },
   {
-    name: '§4 Master PK = (brand, platform, group_id) + dedupe picked',
+    name: '§4 Master PK = (brand, platform, group_id) + dedupe picked + advisory lock',
     ok:
       migration036.includes('ADD PRIMARY KEY (brand, platform, group_id)') &&
       migration036.includes('DISTINCT ON (group_id)') &&

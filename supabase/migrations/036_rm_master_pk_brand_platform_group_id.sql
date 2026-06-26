@@ -1,7 +1,11 @@
 -- PK master = (brand, platform, group_id) — bukan id global dari group_id saja.
 -- id kolom = label komposit (brand|platform|group_id) untuk SELECT/UI.
 -- Dedupe baris existing sebelum ubah constraint.
+-- Berlaku whatsapp + telegram (satu skema).
 
+BEGIN;
+
+-- 1) Fungsi 3-arg (overload dengan 035 2-arg — jangan COMMENT/DROP sebelum RPC diganti)
 CREATE OR REPLACE FUNCTION public.rm_build_master_row_id(
   p_brand TEXT,
   p_platform TEXT,
@@ -14,43 +18,7 @@ AS $$
   SELECT trim(p_brand) || E'\x1e' || trim(p_platform) || E'\x1e' || trim(p_group_id);
 $$;
 
-COMMENT ON FUNCTION public.rm_build_master_row_id IS
-  'Label baris master (bukan PK). PK tabel = (brand, platform, group_id).';
-
--- Normalisasi + dedupe: satu baris per (brand, platform, trim(group_id)), keep last_sync terbaru
-UPDATE public.resource_management_groups_master
-SET group_id = trim(group_id)
-WHERE group_id IS NOT NULL AND group_id <> trim(group_id);
-
-DELETE FROM public.resource_management_groups_master m
-WHERE m.ctid NOT IN (
-  SELECT DISTINCT ON (brand, platform, trim(group_id))
-    ctid
-  FROM public.resource_management_groups_master
-  ORDER BY
-    brand,
-    platform,
-    trim(group_id),
-    last_sync DESC NULLS LAST
-);
-
-UPDATE public.resource_management_groups_master m
-SET id = public.rm_build_master_row_id(m.brand, m.platform, m.group_id);
-
-ALTER TABLE public.resource_management_groups_master
-  DROP CONSTRAINT IF EXISTS resource_management_groups_master_pkey;
-
-ALTER TABLE public.resource_management_groups_master
-  DROP CONSTRAINT IF EXISTS rm_groups_master_brand_plat_gid;
-
-ALTER TABLE public.resource_management_groups_master
-  ADD PRIMARY KEY (brand, platform, group_id);
-
-COMMENT ON COLUMN public.resource_management_groups_master.id IS
-  'Label komposit brand+platform+group_id (bukan PK). PK = (brand, platform, group_id).';
-
-DROP FUNCTION IF EXISTS public.rm_build_master_row_id(TEXT, TEXT);
-
+-- 2) RPC pakai 3-arg dulu, baru hapus signature 035 (hindari error 42725 ambiguous)
 CREATE OR REPLACE FUNCTION public.rm_commit_account_scrape(
   p_account_id UUID,
   p_brand TEXT,
@@ -293,5 +261,48 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.rm_build_master_row_id(TEXT, TEXT);
+
+COMMENT ON FUNCTION public.rm_build_master_row_id(TEXT, TEXT, TEXT) IS
+  'Label baris master (bukan PK). PK tabel = (brand, platform, group_id).';
+
+-- 3) Bersihkan data master sebelum ubah PK
+UPDATE public.resource_management_groups_master
+SET group_id = trim(group_id)
+WHERE group_id IS NOT NULL AND group_id <> trim(group_id);
+
+DELETE FROM public.resource_management_groups_master m
+WHERE m.ctid NOT IN (
+  SELECT DISTINCT ON (brand, platform, trim(group_id))
+    ctid
+  FROM public.resource_management_groups_master
+  ORDER BY
+    brand,
+    platform,
+    trim(group_id),
+    last_sync DESC NULLS LAST
+);
+
+UPDATE public.resource_management_groups_master m
+SET id = public.rm_build_master_row_id(m.brand, m.platform, m.group_id);
+
+-- 4) PK = (brand, platform, group_id)
+ALTER TABLE public.resource_management_groups_master
+  DROP CONSTRAINT IF EXISTS resource_management_groups_master_pkey;
+
+ALTER TABLE public.resource_management_groups_master
+  DROP CONSTRAINT IF EXISTS rm_groups_master_brand_plat_gid;
+
+ALTER TABLE public.resource_management_groups_master
+  ADD PRIMARY KEY (brand, platform, group_id);
+
+COMMENT ON COLUMN public.resource_management_groups_master.id IS
+  'Label komposit brand+platform+group_id (bukan PK). PK = (brand, platform, group_id).';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rm_groups_master_id_label
+  ON public.resource_management_groups_master (id);
+
 GRANT EXECUTE ON FUNCTION public.rm_commit_account_scrape(UUID, TEXT, TEXT, JSONB) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.rm_rebuild_brand_groups_master(TEXT, TEXT) TO anon, authenticated;
+
+COMMIT;

@@ -3,16 +3,20 @@ description: Scrape → daily → master → UI (data nyata device)
 alwaysApply: true
 ---
 
-# Pipeline scrape (WAJIB)
+# Pipeline scrape (WAJIB) — satu RPC atomik
 
 ```
 Device (WA Electron / TG sidecar)
   → runAccountScraper → writeScrapeDailyRows
-      → DELETE daily (account_id)
-      → INSERT group_scrape_daily (invite_link, counts, is_admin, …)
-      → rebuildBrandGroupsMaster (RPC rm_rebuild_brand_groups_master)
-  → reconcileTickets + realtime UI
+      → RPC rm_commit_account_scrape (atomik)
+          DELETE daily (account_id)
+          INSERT group_scrape_daily
+          DELETE master (brand+platform) + INSERT master (picked daily)
+  → buildMetricsFromScrapeDaily → applyResult grid
+  → realtime reporting reload
 ```
+
+`rm_rebuild_brand_groups_master` hanya saat **hapus akun** (`removeMessagingAccountFromSlot`), bukan setelah scrape.
 
 # WA scrape — dua fase
 
@@ -30,6 +34,10 @@ Delay: `WA_SCRAPE_GROUP_DELAY_MS` + jitter (`waInviteExportDelayMs`).
 
 Master hanya baris dengan `rm_invite_link_is_valid`. Modal group link = **baca** `group_scrape_daily` — jangan "perbaiki" modal tanpa perbaiki scrape/DB.
 
+# Master PK (036)
+
+PK `groups_master` = `(brand, platform, group_id)`. Kolom `id` = label komposit (bukan PK).
+
 # Operations (job queue) — device nyata
 
 - **Join**: link dari `groups_master` (`loadMissingMasterGroupsJoinSnapshot`) → `acceptInvite`
@@ -40,8 +48,7 @@ Validator: `npm run validate:real-operations-data`
 
 # Realtime setelah scrape
 
-1. Tulis daily + rebuild master
-2. `reconcileTicketsForAccountFromDb(accountId)`
-3. `refreshIssues` / reload ticket + grid
+1. Tulis daily + master (satu RPC)
+2. Supabase realtime → grid + `scheduleReportingReload`
 
 Reporting tab = read-only Supabase, `dedupeDailyRowsByGroupIdKeepLatest`, reload `rm-reporting-reload`.

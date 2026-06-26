@@ -1,5 +1,4 @@
 import { writeScrapeDailyRows, type ScrapedGroupPayload } from '@/lib/accountScraper';
-import { dedupeScrapedGroupsByGroupId } from '@/lib/dedupeScrapedGroups';
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import { isScrapeUserCancelledMessage } from '@/lib/scrapeErrorUi';
@@ -45,10 +44,6 @@ export interface ScrapeRunCounts {
   masterCount: number;
 }
 
-function countAdminGroupsOnDevice(groups: ScrapedGroupPayload[]): number {
-  return groups.filter((g) => g.is_admin === 'yes').length;
-}
-
 /** Satu pintu scrape renderer: Sync Now + kolom Run → Electron `scraper:run`. */
 export async function runAccountScraper(input: RunAccountScraperInput): Promise<ScrapeRunCounts> {
   const api = window.electronAPI?.scraper;
@@ -91,17 +86,16 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
       expectedPhone: input.account.phoneNumber?.trim() || undefined,
     });
 
-    const scrapedGroups = dedupeScrapedGroupsByGroupId(result.groups as ScrapedGroupPayload[]);
     const scrapeWrite = await writeScrapeDailyRows({
       accountId,
       platform: input.account.platform,
       brand: input.account.brandName,
       accName: input.account.accountName,
       phoneNumber: input.account.phoneNumber,
-      groups: scrapedGroups,
+      groups: result.groups as ScrapedGroupPayload[],
     });
     const deviceGroupCount = scrapeWrite.count;
-    const deviceAdminCount = countAdminGroupsOnDevice(scrapedGroups);
+    const deviceAdminCount = scrapeWrite.deviceAdminCount;
     const masterCount = scrapeWrite.masterCount;
 
     if (input.account.platform === 'telegram') {

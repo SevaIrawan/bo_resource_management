@@ -1,7 +1,11 @@
 import { getSupabase } from '@/lib/supabase';
 import type { Platform } from '@/types/database';
 
-/** Rebuild master brand+platform dari semua daily akun (logic Excel LET). */
+/**
+ * Rebuild master brand+platform dari semua daily tersisa.
+ * Bukan jalur scrape — scrape pakai rm_commit_account_scrape (atomik).
+ * Dipakai: removeMessagingAccountFromSlot setelah DELETE akun.
+ */
 export async function rebuildBrandGroupsMaster(input: {
   brand: string;
   platform: Platform;

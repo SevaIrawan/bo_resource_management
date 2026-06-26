@@ -28,6 +28,8 @@ from telegram_scraper import (
     validate_telegram_session,
 )
 from telegram_automation import run_create_group, run_join_by_invite_link, run_set_admin
+from telegram_delete_group import run_delete_group
+from telegram_leave_group import run_leave_group
 
 def _load_env() -> None:
     env_file = os.environ.get("RM_ENV_FILE", "").strip()
@@ -126,6 +128,22 @@ class SetAdminBody(BaseModel):
 class JoinInviteBody(BaseModel):
     inviteLink: str = Field(min_length=8)
     joinSequenceIndex: int = 1
+    sessionString: str | None = None
+    expectedPhone: str | None = None
+    delay: AutomationDelayBody | None = None
+
+class LeaveGroupBody(BaseModel):
+    groupId: str | None = None
+    groupLink: str | None = None
+    sessionString: str | None = None
+    expectedPhone: str | None = None
+    delay: AutomationDelayBody | None = None
+
+class DeleteGroupBody(BaseModel):
+    groupId: str | None = None
+    groupLink: str | None = None
+    requireOwner: bool = True
+    clearChatHistory: bool = False
     sessionString: str | None = None
     expectedPhone: str | None = None
     delay: AutomationDelayBody | None = None
@@ -241,6 +259,30 @@ async def telegram_automation_join_invite(session_id: str, body: JoinInviteBody)
         session_id,
         invite_link=body.inviteLink,
         join_sequence_index=body.joinSequenceIndex,
+        session_string=body.sessionString,
+        expected_phone=body.expectedPhone,
+        delay=_delay_dict(body.delay),
+    )
+
+@app.post("/telegram/automation/leave-group/{session_id}")
+async def telegram_automation_leave_group(session_id: str, body: LeaveGroupBody) -> dict:
+    return await run_leave_group(
+        session_id,
+        group_id=body.groupId,
+        group_link=body.groupLink,
+        session_string=body.sessionString,
+        expected_phone=body.expectedPhone,
+        delay=_delay_dict(body.delay),
+    )
+
+@app.post("/telegram/automation/delete-group/{session_id}")
+async def telegram_automation_delete_group(session_id: str, body: DeleteGroupBody) -> dict:
+    return await run_delete_group(
+        session_id,
+        group_id=body.groupId,
+        group_link=body.groupLink,
+        require_owner=body.requireOwner,
+        clear_chat_history=body.clearChatHistory,
         session_string=body.sessionString,
         expected_phone=body.expectedPhone,
         delay=_delay_dict(body.delay),

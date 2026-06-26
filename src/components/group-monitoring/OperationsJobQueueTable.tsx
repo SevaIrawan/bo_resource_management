@@ -27,21 +27,25 @@ import type { AutomationJobRecord } from '@/types/automationJob';
 interface OperationsJobQueueTableProps {
   taskType: JobQueueTaskType;
   jobs: AutomationJobRecord[];
+  allJobs?: AutomationJobRecord[];
   showBrand?: boolean;
   onRun?: (jobId: string) => void;
   onPause?: (jobId: string) => void;
   onCancel?: (jobId: string) => void;
   onDeleteSelected?: (jobIds: string[]) => void;
+  onQueueDeleteFromExit?: (exitJobId: string) => Promise<boolean> | boolean;
 }
 
 export function OperationsJobQueueTable({
   taskType,
   jobs,
+  allJobs = [],
   showBrand = false,
   onRun,
   onPause,
   onCancel,
   onDeleteSelected,
+  onQueueDeleteFromExit,
 }: OperationsJobQueueTableProps) {
   const { t } = useLanguage();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -87,6 +91,13 @@ export function OperationsJobQueueTable({
     if (selectedIds.size === 0 || !onDeleteSelected) return;
     onDeleteSelected([...selectedIds]);
     setSelectedIds(new Set());
+  }
+
+  async function handleQueueDeleteFromExit(exitJobId: string): Promise<boolean> {
+    if (!onQueueDeleteFromExit) return false;
+    const ok = await onQueueDeleteFromExit(exitJobId);
+    if (ok) setViewJobId(null);
+    return ok;
   }
 
   return (
@@ -162,7 +173,12 @@ export function OperationsJobQueueTable({
           )}
         </tbody>
       </table>
-      <OperationsJobQueueDetailModal job={viewJob} onClose={() => setViewJobId(null)} />
+      <OperationsJobQueueDetailModal
+        job={viewJob}
+        allJobs={allJobs}
+        onClose={() => setViewJobId(null)}
+        onQueueDeleteFromExit={handleQueueDeleteFromExit}
+      />
     </div>
   );
 }
@@ -375,7 +391,22 @@ function buildQueueColumns(taskType: JobQueueTaskType, showBrand: boolean): Queu
     actionsCol,
   ];
 
+  const leaveDeleteCols: QueueColumnDef[] = [
+    statusCol,
+    ...(showBrand ? [brandCol] : []),
+    accountCol,
+    {
+      key: 'leaveDelete',
+      labelKey: 'operations.jobQueue.colExitDeleteTotal',
+      render: (job) => jobQueueBatchTotalText(job),
+    },
+    progressCol,
+    createdCol,
+    actionsCol,
+  ];
+
   if (taskType === 'create_group') return createCols;
   if (taskType === 'set_admin') return setAdminCols;
+  if (taskType === 'exit_delete_group') return leaveDeleteCols;
   return joinCols;
 }

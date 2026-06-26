@@ -176,7 +176,7 @@ declare global {
         run: (payload: {
           sessionId: string;
           platform: Platform;
-          action: 'create_group' | 'set_admin' | 'join_by_invite_link';
+          action: 'create_group' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
           storedSessionString?: string | null;
           expectedPhone?: string;
           delay?: {
@@ -199,7 +199,7 @@ declare global {
           inviteLink?: string;
         }) => Promise<{
           status: 'ok' | 'error';
-          action: 'create_group' | 'set_admin' | 'join_by_invite_link';
+          action: 'create_group' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
           message?: string;
           errorCode?: string;
           result?: Record<string, unknown>;
@@ -217,7 +217,7 @@ declare global {
             accountId: string;
             accountName: string;
             sessionId: string;
-            action: 'create_group' | 'set_admin' | 'join_by_invite_link';
+            action: 'create_group' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
             status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
             createdAt: string;
             startedAt?: string;
@@ -248,7 +248,7 @@ declare global {
           accountId: string;
           accountName: string;
           sessionId: string;
-          action: 'create_group' | 'set_admin' | 'join_by_invite_link';
+          action: 'create_group' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
           payload: Record<string, unknown>;
           storedSessionString?: string | null;
           expectedPhone?: string;

@@ -9,12 +9,13 @@ import { runWhatsAppCreateGroupBatch } from './waAutomation';
 import { withJobTimeout } from './promiseTimeout';
 import {
   releaseExecuteSlot,
-  tryAcquireExecuteSlot,
+  waitForExecuteSlot,
 } from './executeSlotPool';
 import {
   broadcastJobQueueChanged,
   consumeJobStopRequest,
   failStaleRunningJobs,
+  countFreeExecuteSlots,
   getRunningJobCount,
   getRunnerState,
   markJobFinished,
@@ -33,6 +34,9 @@ const STALE_RUNNING_MS = 30 * 60 * 1000;
 const JOB_TIMEOUT_BASE_MS: Record<string, number> = {
   join_by_invite_link: 20 * 60 * 1000,
   set_admin: 25 * 60 * 1000,
+  leave_group: 25 * 60 * 1000,
+  delete_group: 25 * 60 * 1000,
+  exit_delete_group: 35 * 60 * 1000,
   create_group: 90 * 60 * 1000,
 };
 
@@ -66,10 +70,24 @@ function batchSuccessCount(result: AutomationRunResult, job: AutomationJobRecord
   const created = result.message?.match(/^(\d+)\/(\d+)\s+created/i);
   if (created) return Number(created[1]);
 
+  const left = result.message?.match(/^Left\s+(\d+)/i);
+  if (left) return Number(left[1]);
+
+  const exited = result.message?.match(/^Exited\s+(\d+)/i);
+  if (exited) return Number(exited[1]);
+
   if (result.status === 'ok' && job.action !== 'create_group') {
     return accountJobStepTotal(job);
   }
   return 0;
+}
+
+function resultGroupOutcomes(
+  result: AutomationRunResult,
+): AutomationJobRecord['payload']['groupOutcomes'] | undefined {
+  const raw = result.result?.groupOutcomes;
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  return raw as AutomationJobRecord['payload']['groupOutcomes'];
 }
 
 function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
@@ -97,6 +115,7 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
     inviteLink: job.payload.inviteLink,
     joinSequenceIndex: job.payload.joinSequenceIndex,
     groups: job.payload.groups,
+    leaveDelete: job.payload.leaveDelete,
   };
 }
 
@@ -127,9 +146,10 @@ async function runAccountAutomationJob(job: AutomationJobRecord): Promise<Automa
 }
 
 async function runSingleJob(job: AutomationJobRecord): Promise<void> {
-  const slot = tryAcquireExecuteSlot(job.accountId, 'job');
-  if (!slot.ok) {
-    scheduleRunnerRetry(slot.reason === 'same_account' ? 1000 : 1500);
+  try {
+    await waitForExecuteSlot(job.accountId, 'job');
+  } catch {
+    scheduleRunnerRetry(1000);
     return;
   }
 
@@ -163,12 +183,26 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       label: job.payload.groupName ?? job.accountName,
     });
 
+    const groupOutcomes = resultGroupOutcomes(result);
+    const outcomeExtras = groupOutcomes ? { groupOutcomes } : {};
+    const isExitLeave =
+      job.action === 'leave_group' && job.payload.exitDeletePhase === 'exit';
+
     if (result.status === 'ok') {
-      if (success < total && (job.action === 'join_by_invite_link' || job.action === 'set_admin')) {
+      if (
+        success < total &&
+        !isExitLeave &&
+        (job.action === 'join_by_invite_link' ||
+          job.action === 'set_admin' ||
+          job.action === 'leave_group' ||
+          job.action === 'delete_group' ||
+          job.action === 'exit_delete_group')
+      ) {
         markJobFinished(job.id, 'failed', {
           message,
           batchSuccess: success,
           error: message,
+          ...outcomeExtras,
         });
         return;
       }
@@ -177,6 +211,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
           message,
           batchSuccess: success,
           error: message,
+          ...outcomeExtras,
         });
         return;
       }
@@ -186,8 +221,17 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
             ? `Success ${success} group(s)`
             : job.action === 'set_admin'
               ? `Success ${success} group(s)`
-              : message,
+              : job.action === 'leave_group'
+                ? isExitLeave
+                  ? `Left ${success}/${total} group(s)`
+                  : `Success ${success} group(s)`
+                : job.action === 'delete_group'
+                  ? `Deleted ${success}/${total} group(s)`
+                  : job.action === 'exit_delete_group'
+                    ? `Exited ${success} group(s)`
+                    : message,
         batchSuccess: success,
+        ...outcomeExtras,
       });
       return;
     }
@@ -196,6 +240,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       message,
       batchSuccess: success,
       error: result.errorCode ?? message ?? 'AUTOMATION_ERROR',
+      ...outcomeExtras,
     });
   } catch (error) {
     markJobFinished(job.id, 'failed', {
@@ -224,7 +269,8 @@ async function runnerTick(): Promise<void> {
 
     const maxConcurrent = getMaxConcurrentAutomationJobs();
     const running = getRunningJobCount();
-    const available = maxConcurrent - running;
+    const freeSlots = countFreeExecuteSlots();
+    const available = Math.min(maxConcurrent - running, freeSlots);
     if (available <= 0) return;
 
     const candidates = pickQueuedJobsForDispatch(available);

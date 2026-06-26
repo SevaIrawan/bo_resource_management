@@ -3,9 +3,9 @@ import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
+import { getExecuteSlotStats } from './executeSlotPool';
 import { accountJobStepTotal, isAccountJobQueueBusy, isJobQueueBlockingExecutes, listBusyAccountIds } from './jobQueueBatchHelpers';
 import { listSettlingSessionIds, markSessionSettleAfterJob } from './jobQueueSettle';
-import { getExecuteSlotStats } from './executeSlotPool';
 import { getActiveScrapeSessionCount, isScrapeActiveForSession } from '../scraper/scrapeCancel';
 import type {
   AutomationJobEnqueueInput,
@@ -317,12 +317,24 @@ export function removeAutomationJobs(jobIds: string[]): number {
   return removed;
 }
 
-/** FIFO — hingga maxConcurrent job berbeda akun; skip akun yang sudah running / scrape aktif. */
+/** Slot kosong di pool bersama Sync/Scrape/Job (max 4 akun default). */
+export function countFreeExecuteSlots(): number {
+  const stats = getExecuteSlotStats();
+  return Math.max(0, stats.maxConcurrent - stats.activeCount - stats.queuedCount);
+}
+
+/** FIFO — hingga maxConcurrent job berbeda akun; selaras execute slot pool + scrape. */
 export function pickQueuedJobsForDispatch(limit: number): AutomationJobRecord[] {
   ensureLoaded();
   const maxConcurrent = getMaxConcurrentAutomationJobs();
   const running = listRunningJobs();
-  if (running.length >= maxConcurrent) return [];
+  const freeSlots = countFreeExecuteSlots();
+  const dispatchBudget = Math.min(
+    limit,
+    maxConcurrent - running.length,
+    freeSlots,
+  );
+  if (dispatchBudget <= 0) return [];
 
   const runningAccountIds = new Set(running.map((job) => job.accountId));
   const picked: AutomationJobRecord[] = [];
@@ -331,7 +343,7 @@ export function pickQueuedJobsForDispatch(limit: number): AutomationJobRecord[] 
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   for (const job of queued) {
-    if (picked.length >= limit) break;
+    if (picked.length >= dispatchBudget) break;
     if (runningAccountIds.has(job.accountId)) continue;
     if (isScrapeActiveForSession(job.sessionId)) continue;
     if (picked.some((row) => row.accountId === job.accountId)) continue;
@@ -404,7 +416,12 @@ export function updateJobProgress(
 export function markJobFinished(
   jobId: string,
   status: Extract<AutomationJobStatus, 'completed' | 'failed'>,
-  detail?: { message?: string; error?: string; batchSuccess?: number },
+  detail?: {
+    message?: string;
+    error?: string;
+    batchSuccess?: number;
+    groupOutcomes?: AutomationJobRecord['payload']['groupOutcomes'];
+  },
 ): void {
   touch(() => {
     const job = jobs.find((row) => row.id === jobId);
@@ -434,6 +451,9 @@ export function markJobFinished(
     }
 
     job.message = detail?.message;
+    if (detail?.groupOutcomes?.length) {
+      job.payload.groupOutcomes = detail.groupOutcomes;
+    }
   });
 }
 

@@ -24,6 +24,12 @@ export function resolveJoinGroups(
   ];
 }
 
+export function resolveLeaveDeleteGroups(
+  payload: Pick<AutomationRunPayload, 'groups' | 'groupId' | 'groupName' | 'groupLink'>,
+): Array<{ groupId: string; groupName?: string; groupLink?: string }> {
+  return resolveSetAdminGroups(payload);
+}
+
 export function resolveSetAdminGroups(
   payload: Pick<AutomationRunPayload, 'groups' | 'groupId' | 'groupName' | 'groupLink'>,
 ): Array<{ groupId: string; groupName?: string; groupLink?: string }> {
@@ -57,6 +63,11 @@ export function accountJobStepTotal(job: AutomationJobRecord): number {
     return job.payload.inviteLink?.trim() ? 1 : 0;
   }
   if (job.action === 'set_admin') {
+    const fromGroups = job.payload.groups?.length ?? 0;
+    if (fromGroups > 0) return fromGroups;
+    return job.payload.groupId?.trim() ? 1 : 0;
+  }
+  if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
     const fromGroups = job.payload.groups?.length ?? 0;
     if (fromGroups > 0) return fromGroups;
     return job.payload.groupId?.trim() ? 1 : 0;

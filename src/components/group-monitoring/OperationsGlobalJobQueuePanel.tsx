@@ -15,6 +15,8 @@ import {
   jobQueueTaskTypeToAction,
   type JobQueueTaskType,
 } from '@/lib/operationsJobQueueUi';
+import { jobMatchesExitDeleteTaskType } from '@/lib/exitDeleteFlow';
+import { enqueueDeleteFromExitJob } from '@/lib/enqueueDeleteFromExitJob';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { AutomationJobListFilter, AutomationJobQueueSnapshot } from '@/types/automationJob';
@@ -44,6 +46,9 @@ export function OperationsGlobalJobQueuePanel({
   }, [brandFilter, platform]);
 
   const filteredJobs = useMemo(() => {
+    if (taskType === 'exit_delete_group') {
+      return (snapshot?.jobs ?? []).filter((job) => jobMatchesExitDeleteTaskType(job));
+    }
     const action = jobQueueTaskTypeToAction(taskType);
     return (snapshot?.jobs ?? []).filter((job) => job.action === action);
   }, [snapshot?.jobs, taskType]);
@@ -83,6 +88,17 @@ export function OperationsGlobalJobQueuePanel({
     await reload();
   }
 
+  async function handleQueueDeleteFromExit(exitJobId: string): Promise<boolean> {
+    const exitJob = snapshot?.jobs.find((job) => job.id === exitJobId);
+    if (!exitJob) return false;
+    const result = await enqueueDeleteFromExitJob(exitJob);
+    if (!result.ok) return false;
+    await reload();
+    await runAutomationJob(result.jobId);
+    await reload();
+    return true;
+  }
+
   if (!desktopReady) {
     return (
       <div className="operations-job-queue-only">
@@ -110,11 +126,13 @@ export function OperationsGlobalJobQueuePanel({
         <OperationsJobQueueTable
           taskType={taskType}
           jobs={filteredJobs}
+          allJobs={snapshot?.jobs ?? []}
           showBrand={brandFilter === 'all'}
           onRun={(jobId) => void handleRun(jobId)}
           onPause={(jobId) => void handlePause(jobId)}
           onCancel={(jobId) => void handleCancel(jobId)}
           onDeleteSelected={(jobIds) => void handleDeleteSelected(jobIds)}
+          onQueueDeleteFromExit={handleQueueDeleteFromExit}
         />
       </section>
     </div>

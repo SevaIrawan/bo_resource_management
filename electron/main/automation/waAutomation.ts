@@ -4,6 +4,9 @@ import { fetchWhatsAppGroupInviteLink } from '../scraper/whatsappGroupInviteLink
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
 import { withPromiseTimeout } from './promiseTimeout';
 import { resolveJoinGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
+import { runWaDeleteGroupChat } from './waDeleteGroupChat';
+import { runWaExitDeleteGroup } from './waExitDeleteGroup';
+import { runWaLeaveGroup } from './waLeaveGroup';
 import type {
   AutomationProgressCallback,
   AutomationRunPayload,
@@ -477,6 +480,16 @@ export async function runWhatsAppAutomation(
   payload: AutomationRunPayload,
   onProgress?: AutomationProgressCallback,
 ): Promise<AutomationRunResult> {
+  if (payload.action === 'exit_delete_group') {
+    return runWaExitDeleteGroup(payload, onProgress);
+  }
+  if (payload.action === 'leave_group') {
+    return runWaLeaveGroup(payload, onProgress);
+  }
+  if (payload.action === 'delete_group') {
+    return runWaDeleteGroupChat(payload, onProgress);
+  }
+
   const joinGroups = payload.action === 'join_by_invite_link' ? resolveJoinGroups(payload) : [];
   const adminGroups = payload.action === 'set_admin' ? resolveSetAdminGroups(payload) : [];
 

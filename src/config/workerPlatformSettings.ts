@@ -404,7 +404,13 @@ function jitterPercentFromHumanProfile(profile: HumanDelayProfile): number {
   return 35;
 }
 
-export type AutomationDelayAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
+export type AutomationDelayAction =
+  | 'create_group'
+  | 'set_admin'
+  | 'join_by_invite_link'
+  | 'leave_group'
+  | 'delete_group'
+  | 'exit_delete_group';
 
 /** Map Settings worker delay → automation IPC payload (frozen at enqueue). */
 export function toAutomationDelayConfig(
@@ -416,8 +422,13 @@ export function toAutomationDelayConfig(
       ? settings.setAdmin.betweenTargetsSec
       : settings.standard.betweenTargetsSec;
 
+  const betweenGroupsSec =
+    action === 'leave_group' || action === 'delete_group' || action === 'exit_delete_group'
+      ? settings.leaveDelete.betweenGroupsSec
+      : settings.standard.betweenGroupsSec;
+
   return {
-    between_groups_sec: settings.standard.betweenGroupsSec,
+    between_groups_sec: betweenGroupsSec,
     between_targets_sec: betweenTargetsSec,
     after_create_sec: settings.standard.afterCreateSec,
     flood_wait_extra_sec: settings.standard.floodWaitExtraSec,
@@ -435,6 +446,20 @@ export function toAutomationDelayConfig(
     resolve_entity_max_attempts: settings.setAdmin.resolveEntityMaxAttempts,
     max_admin_slots: settings.setAdmin.maxAdminSlots,
   };
+}
+
+export function toLeaveDeleteJobPayload(
+  settings: PlatformWorkerSettings,
+): { clearChatHistoryOnDelete: boolean; requireOwnerForDelete: boolean } {
+  return {
+    clearChatHistoryOnDelete: settings.leaveDelete.clearChatHistoryOnDelete,
+    requireOwnerForDelete: settings.leaveDelete.requireOwnerForDelete,
+  };
+}
+
+/** Exit & delete membutuhkan leave + delete enabled di Settings. */
+export function isExitDeleteEnabled(settings: PlatformWorkerSettings): boolean {
+  return settings.leaveDelete.leaveEnabled && settings.leaveDelete.deleteEnabled;
 }
 
 /** Export shape compatible with learning telegram config.json (subset). */

@@ -1,4 +1,10 @@
-export type AutomationAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
+export type AutomationAction =
+  | 'create_group'
+  | 'set_admin'
+  | 'join_by_invite_link'
+  | 'leave_group'
+  | 'delete_group'
+  | 'exit_delete_group';
 
 export type AutomationProgressCallback = (current: number, total: number, label: string) => void;
 
@@ -65,6 +71,11 @@ export interface AutomationRunPayload {
     inviteLink?: string;
     groupLink?: string;
   }>;
+  /** exit_delete_group — frozen from Admin leaveDelete settings */
+  leaveDelete?: {
+    clearChatHistoryOnDelete?: boolean;
+    requireOwnerForDelete?: boolean;
+  };
 }
 
 export interface AutomationRunResult {

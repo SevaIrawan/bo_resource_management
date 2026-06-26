@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
+import { cn } from '@/lib/utils';
 import {
   readTelegramWorkerSettings,
   readWhatsAppWorkerSettings,
@@ -13,12 +14,15 @@ import {
 } from '@/lib/operationsJobQueueEnqueueResult';
 import type { JobQueueTaskType } from '@/lib/operationsJobQueueUi';
 import type { MissingMasterGroupForJoin } from '@/lib/loadMissingMasterGroupsForJoin';
+import type { AccountDailyGroupForLeaveDelete, AccountExitGroupsSnapshot } from '@/lib/loadAccountDailyGroupsForLeaveDelete';
 import {
   filterSetAdminGroupsForTargets,
   type SuperAdminGroupForSetAdmin,
 } from '@/lib/loadSuperAdminGroupsForSetAdmin';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
+
+const EXIT_GROUP_SETUP_PAGE_SIZE = 10;
 
 export interface JobQueueCreateGroupDraft {
   groupName: string;
@@ -46,10 +50,14 @@ interface OperationsJobQueueSetupModalProps {
   loadingJoinGroups: boolean;
   superAdminGroups: SuperAdminGroupForSetAdmin[];
   loadingSuperAdminGroups: boolean;
+  accountExitGroups: AccountExitGroupsSnapshot;
+  processedExitGroupIds?: ReadonlySet<string>;
+  loadingAccountDailyGroups: boolean;
   saving: boolean;
   onSaveJoin: (groupIds: string[]) => Promise<string | null>;
   onSaveCreate: (draft: JobQueueCreateGroupDraft) => Promise<string | null>;
   onSaveSetAdmin: (draft: JobQueueSetAdminDraft) => Promise<string | null>;
+  onSaveExitDelete: (groupIds: string[]) => Promise<string | null>;
 }
 
 function parseMultiValueInput(raw: string): string[] {
@@ -73,10 +81,14 @@ export function OperationsJobQueueSetupModal({
   loadingJoinGroups,
   superAdminGroups,
   loadingSuperAdminGroups,
+  accountExitGroups,
+  processedExitGroupIds,
+  loadingAccountDailyGroups,
   saving,
   onSaveJoin,
   onSaveCreate,
   onSaveSetAdmin,
+  onSaveExitDelete,
 }: OperationsJobQueueSetupModalProps) {
   const { t } = useLanguage();
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -86,6 +98,12 @@ export function OperationsJobQueueSetupModal({
   const [createTotalToCreate, setCreateTotalToCreate] = useState('10');
   const [createStartFrom, setCreateStartFrom] = useState('1');
   const [selectedSetAdminGroupIds, setSelectedSetAdminGroupIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [exitGroupTab, setExitGroupTab] = useState<'daily' | 'junk'>('daily');
+  const [exitGroupPage, setExitGroupPage] = useState(1);
+  const [exitGroupProcessedAlertOpen, setExitGroupProcessedAlertOpen] = useState(false);
+  const [selectedLeaveDeleteGroupIds, setSelectedLeaveDeleteGroupIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [selectedSetAdminTargetAccountId, setSelectedSetAdminTargetAccountId] = useState('');
@@ -128,6 +146,36 @@ export function OperationsJobQueueSetupModal({
     eligibleSetAdminGroups.length > 0 &&
     eligibleSetAdminGroups.every((group) => selectedSetAdminGroupIds.has(group.groupId));
 
+  const visibleExitGroups = useMemo((): AccountDailyGroupForLeaveDelete[] => {
+    return exitGroupTab === 'daily' ? accountExitGroups.daily : accountExitGroups.junk;
+  }, [accountExitGroups.daily, accountExitGroups.junk, exitGroupTab]);
+
+  const exitGroupPageCount = Math.max(
+    1,
+    Math.ceil(visibleExitGroups.length / EXIT_GROUP_SETUP_PAGE_SIZE),
+  );
+  const exitGroupPageSafe = Math.min(exitGroupPage, exitGroupPageCount);
+  const exitGroupPageOffset = (exitGroupPageSafe - 1) * EXIT_GROUP_SETUP_PAGE_SIZE;
+  const pagedExitGroups = visibleExitGroups.slice(
+    exitGroupPageOffset,
+    exitGroupPageOffset + EXIT_GROUP_SETUP_PAGE_SIZE,
+  );
+  const showExitGroupPagination = visibleExitGroups.length > EXIT_GROUP_SETUP_PAGE_SIZE;
+  const exitGroupPageFrom = visibleExitGroups.length === 0 ? 0 : exitGroupPageOffset + 1;
+  const exitGroupPageTo = Math.min(
+    exitGroupPageOffset + EXIT_GROUP_SETUP_PAGE_SIZE,
+    visibleExitGroups.length,
+  );
+
+  const selectablePagedExitGroups = useMemo(
+    () => pagedExitGroups.filter((group) => !processedExitGroupIds?.has(group.groupId)),
+    [pagedExitGroups, processedExitGroupIds],
+  );
+
+  const allLeaveDeleteGroupsOnPageSelected =
+    selectablePagedExitGroups.length > 0 &&
+    selectablePagedExitGroups.every((group) => selectedLeaveDeleteGroupIds.has(group.groupId));
+
   const loadingSetAdminGroupList = loadingSuperAdminGroups || filteringSetAdminGroups;
 
   useEffect(() => {
@@ -139,9 +187,23 @@ export function OperationsJobQueueSetupModal({
     setCreateTotalToCreate('10');
     setCreateStartFrom('1');
     setSelectedSetAdminGroupIds(new Set());
+    setSelectedLeaveDeleteGroupIds(new Set());
+    setExitGroupTab('daily');
+    setExitGroupPage(1);
+    setExitGroupProcessedAlertOpen(false);
     setSelectedSetAdminTargetAccountId('');
     setEligibleSetAdminGroups([]);
   }, [open, taskType, activeBrand]);
+
+  useEffect(() => {
+    setExitGroupPage(1);
+  }, [exitGroupTab]);
+
+  useEffect(() => {
+    if (exitGroupPage > exitGroupPageCount) {
+      setExitGroupPage(exitGroupPageCount);
+    }
+  }, [exitGroupPage, exitGroupPageCount]);
 
   useEffect(() => {
     if (!open || taskType !== 'set_admin') return;
@@ -231,6 +293,46 @@ export function OperationsJobQueueSetupModal({
     setSelectedSetAdminGroupIds(new Set(eligibleSetAdminGroups.map((group) => group.groupId)));
   }
 
+  function isExitGroupAlreadyProcessed(groupId: string): boolean {
+    return processedExitGroupIds?.has(groupId) ?? false;
+  }
+
+  function toggleLeaveDeleteGroup(groupId: string) {
+    if (isExitGroupAlreadyProcessed(groupId)) {
+      setExitGroupProcessedAlertOpen(true);
+      return;
+    }
+    setSelectedLeaveDeleteGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
+  function toggleAllLeaveDeleteGroups() {
+    if (allLeaveDeleteGroupsOnPageSelected) {
+    setSelectedLeaveDeleteGroupIds((prev) => {
+      const next = new Set(prev);
+      for (const group of pagedExitGroups) next.delete(group.groupId);
+      return next;
+    });
+    return;
+  }
+  if (selectablePagedExitGroups.length === 0) {
+    setExitGroupProcessedAlertOpen(true);
+    return;
+  }
+  setSelectedLeaveDeleteGroupIds((prev) => {
+      const next = new Set(prev);
+      for (const group of pagedExitGroups) {
+        if (isExitGroupAlreadyProcessed(group.groupId)) continue;
+        next.add(group.groupId);
+      }
+      return next;
+    });
+  }
+
   async function handleSave() {
     setSaveError(null);
     let message: string | null = null;
@@ -252,7 +354,7 @@ export function OperationsJobQueueSetupModal({
         startFrom: Math.max(1, Math.floor(Number(createStartFrom)) || 1),
         participants: parseMultiValueInput(createParticipants),
       });
-    } else {
+    } else if (taskType === 'set_admin') {
       if (selectedSetAdminGroupIds.size === 0) {
         setSaveError(t('operations.jobQueue.setAdminSelectGroup'));
         return;
@@ -265,6 +367,15 @@ export function OperationsJobQueueSetupModal({
         groupIds: [...selectedSetAdminGroupIds],
         targetAccountIds: [selectedSetAdminTargetAccountId],
       });
+    } else if (taskType === 'exit_delete_group') {
+      if (selectedLeaveDeleteGroupIds.size === 0) {
+        setSaveError(t('operations.jobQueue.exitDeleteSelectGroup'));
+        return;
+      }
+      message = await onSaveExitDelete([...selectedLeaveDeleteGroupIds]);
+    } else {
+      setSaveError(t('operations.jobQueue.enqueueFailed'));
+      return;
     }
 
     if (!message) {
@@ -283,14 +394,18 @@ export function OperationsJobQueueSetupModal({
       ? t('operations.jobQueue.setupModalTitleJoin')
       : taskType === 'create_group'
         ? t('operations.jobQueue.setupModalTitleCreate')
-        : t('operations.jobQueue.setupModalTitleSetAdmin');
+        : taskType === 'set_admin'
+          ? t('operations.jobQueue.setupModalTitleSetAdmin')
+          : t('operations.jobQueue.setupModalTitleExitDelete');
 
   const tabLabelKey =
     taskType === 'join'
       ? 'operations.jobQueue.tabJoin'
       : taskType === 'create_group'
         ? 'operations.jobQueue.tabCreateGroup'
-        : 'operations.jobQueue.tabSetAdmin';
+        : taskType === 'set_admin'
+          ? 'operations.jobQueue.tabSetAdmin'
+          : 'operations.jobQueue.tabExitDelete';
 
   const canSaveJoin = selectedJoinGroupIds.size > 0 && selectedAccounts.length > 0;
   const canSaveCreate = createGroupName.trim().length > 0 && selectedAccounts.length > 0;
@@ -298,21 +413,27 @@ export function OperationsJobQueueSetupModal({
     Boolean(superAdminAccount) &&
     selectedSetAdminGroupIds.size > 0 &&
     selectedSetAdminTargetAccountId;
+  const canSaveExitDelete =
+    selectedLeaveDeleteGroupIds.size > 0 && selectedAccounts.length > 0;
 
   const saveDisabled =
     saving ||
     (taskType === 'join' && !canSaveJoin) ||
     (taskType === 'create_group' && !canSaveCreate) ||
-    (taskType === 'set_admin' && !canSaveSetAdmin);
+    (taskType === 'set_admin' && !canSaveSetAdmin) ||
+    (taskType === 'exit_delete_group' && !canSaveExitDelete);
 
   const setupModeClass =
     taskType === 'join'
       ? 'brand-modal-panel--job-queue-setup-join'
       : taskType === 'create_group'
         ? 'brand-modal-panel--job-queue-setup-create'
-        : 'brand-modal-panel--job-queue-setup-set-admin';
+        : taskType === 'set_admin'
+          ? 'brand-modal-panel--job-queue-setup-set-admin'
+          : 'brand-modal-panel--job-queue-setup-exit-delete';
 
   return (
+    <>
     <BrandModalRoot onBackdropClick={saving ? undefined : onClose}>
       <div
         className={`brand-modal-panel brand-modal-panel--job-queue-setup ${setupModeClass}`}
@@ -330,22 +451,58 @@ export function OperationsJobQueueSetupModal({
               {activeBrand} · {t(tabLabelKey)}
             </p>
           </div>
-          <button
-            type="button"
-            className="brand-modal-close"
-            onClick={onClose}
-            disabled={saving}
-            aria-label={t('groupMonitoring.accountCard.closeModal')}
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
+          <div className="brand-modal-header-actions">
+            {taskType === 'exit_delete_group' ? (
+              <div
+                className="operations-job-queue-exit-group-tabs operations-job-queue-exit-group-tabs--header"
+                role="tablist"
+                aria-label={t('operations.jobQueue.exitGroupTabList')}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={exitGroupTab === 'daily'}
+                  className={cn(
+                    'operations-job-queue-exit-group-tab',
+                    exitGroupTab === 'daily' && 'operations-job-queue-exit-group-tab--active',
+                  )}
+                  onClick={() => setExitGroupTab('daily')}
+                  disabled={saving}
+                >
+                  {t('operations.jobQueue.exitTabDaily')}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={exitGroupTab === 'junk'}
+                  className={cn(
+                    'operations-job-queue-exit-group-tab',
+                    exitGroupTab === 'junk' && 'operations-job-queue-exit-group-tab--active',
+                  )}
+                  onClick={() => setExitGroupTab('junk')}
+                  disabled={saving}
+                >
+                  {t('operations.jobQueue.exitTabJunk')}
+                </button>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="brand-modal-close"
+              onClick={onClose}
+              disabled={saving}
+              aria-label={t('groupMonitoring.accountCard.closeModal')}
+            >
+              <X className="h-4 w-4" strokeWidth={2} />
+            </button>
+          </div>
         </header>
 
         <div className="brand-modal-form operations-job-queue-setup-modal-body">
           {taskType === 'join' ? (
             <div className="operations-job-queue-setup-form operations-job-queue-setup-form--join">
               <p className="operations-job-queue-form-note">{t('operations.jobQueue.modalHint')}</p>
-              <div className="operations-job-queue-table-wrap">
+              <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
                 <table className="operations-job-queue-table operations-job-queue-table--missing">
                   <thead>
                     <tr>
@@ -483,7 +640,7 @@ export function OperationsJobQueueSetupModal({
                   />
                 )}
               </div>
-              <div className="operations-job-queue-table-wrap">
+              <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
                 <table className="operations-job-queue-table operations-job-queue-table--missing">
                   <thead>
                     <tr>
@@ -548,10 +705,149 @@ export function OperationsJobQueueSetupModal({
             </div>
           ) : null}
 
+          {taskType === 'exit_delete_group' ? (
+            <div className="operations-job-queue-setup-form operations-job-queue-setup-form--exit-delete">
+              <p className="operations-job-queue-exit-group-tab-caption">
+                {exitGroupTab === 'daily'
+                  ? t('operations.jobQueue.exitTabDailyCaption')
+                  : t('operations.jobQueue.exitTabJunkCaption')}
+              </p>
+              <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--paged">
+                <table className="operations-job-queue-table operations-job-queue-table--missing operations-job-queue-table--exit-groups">
+                  <colgroup>
+                    <col className="operations-job-queue-col-select" />
+                    <col className="operations-job-queue-col-group" />
+                    <col className="operations-job-queue-col-group-id" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className="operations-job-queue-select-col">
+                        <label className="operations-job-queue-select-all">
+                          <input
+                            type="checkbox"
+                            checked={allLeaveDeleteGroupsOnPageSelected}
+                            onChange={toggleAllLeaveDeleteGroups}
+                            disabled={
+                              loadingAccountDailyGroups ||
+                              pagedExitGroups.length === 0 ||
+                              saving
+                            }
+                          />
+                          <span>{t('operations.jobQueue.selectAll')}</span>
+                        </label>
+                      </th>
+                      <th className="operations-job-queue-col-group">{t('operations.jobQueue.colGroup')}</th>
+                      <th className="operations-job-queue-col-group-id">
+                        {t('operations.jobQueue.viewColGroupId')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingAccountDailyGroups ? (
+                      <tr>
+                        <td colSpan={3} className="operations-job-queue-empty">
+                          <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
+                          {t('operations.jobQueue.loadingDailyGroups')}
+                        </td>
+                      </tr>
+                    ) : visibleExitGroups.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="operations-job-queue-empty">
+                          {exitGroupTab === 'daily'
+                            ? t('operations.jobQueue.noExitDailyGroups')
+                            : t('operations.jobQueue.noExitJunkGroups')}
+                        </td>
+                      </tr>
+                    ) : (
+                      pagedExitGroups.map((group) => (
+                        <tr
+                          key={group.groupId}
+                          className={cn(
+                            isExitGroupAlreadyProcessed(group.groupId) &&
+                              'operations-job-queue-exit-row--processed',
+                          )}
+                        >
+                          <td className="operations-job-queue-select-col">
+                            <input
+                              type="checkbox"
+                              className="operations-job-queue-row-checkbox"
+                              checked={selectedLeaveDeleteGroupIds.has(group.groupId)}
+                              onChange={() => toggleLeaveDeleteGroup(group.groupId)}
+                              disabled={saving}
+                            />
+                          </td>
+                          <td className="operations-job-queue-col-group" title={group.groupName}>
+                            {group.groupName}
+                          </td>
+                          <td
+                            className="operations-job-queue-col-group-id operations-job-queue-mono"
+                            title={group.groupId}
+                          >
+                            {group.groupId}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
           {saveError ? <p className="brand-modal-error">{saveError}</p> : null}
         </div>
 
-        <footer className="brand-modal-actions">
+        <footer
+          className={cn(
+            'operations-job-queue-setup-footer',
+            !(taskType === 'exit_delete_group' && showExitGroupPagination) &&
+              'operations-job-queue-setup-footer--actions-only',
+          )}
+        >
+          {taskType === 'exit_delete_group' && showExitGroupPagination ? (
+            <div className="operations-job-queue-setup-footer__pagination">
+              <nav
+                className="group-links-pagination operations-job-queue-setup-pagination"
+                aria-label={t('groupMonitoring.groupLinks.pageLabel', {
+                  page: exitGroupPageSafe,
+                  pages: exitGroupPageCount,
+                })}
+              >
+                <span className="group-links-pagination-range">
+                  {t('groupMonitoring.groupLinks.pageRange', {
+                    from: exitGroupPageFrom,
+                    to: exitGroupPageTo,
+                    total: visibleExitGroups.length,
+                  })}
+                </span>
+                <div className="group-links-pagination-actions">
+                  <button
+                    type="button"
+                    className="group-links-page-btn"
+                    disabled={exitGroupPageSafe <= 1 || saving}
+                    onClick={() => setExitGroupPage((page) => Math.max(1, page - 1))}
+                    aria-label={t('groupMonitoring.groupLinks.prevPage')}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                    {t('groupMonitoring.groupLinks.prevPage')}
+                  </button>
+                  <button
+                    type="button"
+                    className="group-links-page-btn"
+                    disabled={exitGroupPageSafe >= exitGroupPageCount || saving}
+                    onClick={() =>
+                      setExitGroupPage((page) => Math.min(exitGroupPageCount, page + 1))
+                    }
+                    aria-label={t('groupMonitoring.groupLinks.nextPage')}
+                  >
+                    {t('groupMonitoring.groupLinks.nextPage')}
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+              </nav>
+            </div>
+          ) : null}
+          <div className="brand-modal-actions operations-job-queue-setup-footer__actions">
           <button
             type="button"
             className="brand-modal-btn brand-modal-btn--ghost"
@@ -572,8 +868,48 @@ export function OperationsJobQueueSetupModal({
               t('operations.jobQueue.setupSave')
             )}
           </button>
+          </div>
         </footer>
       </div>
     </BrandModalRoot>
+
+    {exitGroupProcessedAlertOpen ? (
+      <BrandModalRoot onBackdropClick={() => setExitGroupProcessedAlertOpen(false)}>
+        <div
+          className="brand-modal-panel brand-modal-panel--sync"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="exit-group-processed-title"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <header className="brand-modal-header">
+            <h2 id="exit-group-processed-title" className="brand-modal-title">
+              {t('operations.jobQueue.exitGroupAlreadyProcessedTitle')}
+            </h2>
+            <button
+              type="button"
+              className="brand-modal-close"
+              onClick={() => setExitGroupProcessedAlertOpen(false)}
+              aria-label={t('groupMonitoring.accountCard.closeModal')}
+            >
+              <X className="h-4 w-4" strokeWidth={2} />
+            </button>
+          </header>
+          <div className="brand-modal-form">
+            <p className="sync-modal-message">{t('operations.jobQueue.exitGroupAlreadyProcessed')}</p>
+            <div className="brand-modal-actions">
+              <button
+                type="button"
+                className="brand-modal-btn brand-modal-btn--primary"
+                onClick={() => setExitGroupProcessedAlertOpen(false)}
+              >
+                {t('operations.jobQueue.exitGroupAlreadyProcessedOk')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </BrandModalRoot>
+    ) : null}
+    </>
   );
 }

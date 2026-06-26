@@ -1,6 +1,12 @@
 import type { Platform } from '@/types/database';
 
-export type AutomationJobAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
+export type AutomationJobAction =
+  | 'create_group'
+  | 'set_admin'
+  | 'join_by_invite_link'
+  | 'leave_group'
+  | 'delete_group'
+  | 'exit_delete_group';
 
 /** Satu entri grup dalam job per-akun (join / set admin). */
 export interface AutomationJobGroupItem {
@@ -43,6 +49,23 @@ export interface AutomationJobPayload {
     addMembersAdminsOnly?: boolean;
     infoAdminsOnly?: boolean;
   };
+  leaveDelete?: {
+    clearChatHistoryOnDelete?: boolean;
+    requireOwnerForDelete?: boolean;
+  };
+  /** Exit & delete module — fase exit (leave) dari SETUP; delete dari VIEW result. */
+  exitDeletePhase?: 'exit' | 'delete';
+  /** delete_group — job exit (leave_group) sumber grup yang sudah left. */
+  sourceExitJobId?: string;
+  /** Hasil per grup setelah exit/delete (untuk VIEW & enqueue delete). */
+  groupOutcomes?: Array<{
+    groupId: string;
+    groupName?: string;
+    inviteLink?: string;
+    groupLink?: string;
+    exitStatus?: 'left' | 'failed' | 'pending';
+    deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
+  }>;
 }
 
 export interface AutomationJobProgress {

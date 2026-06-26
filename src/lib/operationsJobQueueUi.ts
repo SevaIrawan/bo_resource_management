@@ -3,8 +3,26 @@ import type {
   AutomationJobRecord,
   AutomationJobStatus,
 } from '@/types/automationJob';
+import {
+  isExitDeleteDeleteJob,
+  isExitDeleteExitJob,
+} from '@/lib/exitDeleteFlow';
 
-export type JobQueueTaskType = 'join' | 'create_group' | 'set_admin';
+export type JobQueueTaskType =
+  | 'join'
+  | 'create_group'
+  | 'set_admin'
+  | 'exit_delete_group';
+
+function isGroupBatchJobAction(action: AutomationJobAction): boolean {
+  return (
+    action === 'join_by_invite_link' ||
+    action === 'set_admin' ||
+    action === 'leave_group' ||
+    action === 'delete_group' ||
+    action === 'exit_delete_group'
+  );
+}
 
 export function jobQueueTaskTypeToAction(taskType: JobQueueTaskType): AutomationJobAction {
   switch (taskType) {
@@ -14,6 +32,8 @@ export function jobQueueTaskTypeToAction(taskType: JobQueueTaskType): Automation
       return 'create_group';
     case 'set_admin':
       return 'set_admin';
+    case 'exit_delete_group':
+      return 'exit_delete_group';
     default:
       return 'join_by_invite_link';
   }
@@ -32,6 +52,8 @@ export function jobQueueQueueTitleKey(taskType: JobQueueTaskType): string {
       return 'operations.jobQueue.queueTableTitleCreate';
     case 'set_admin':
       return 'operations.jobQueue.queueTableTitleSetAdmin';
+    case 'exit_delete_group':
+      return 'operations.jobQueue.queueTableTitleExitDelete';
     default:
       return 'operations.jobQueue.queueTableTitleJoin';
   }
@@ -45,6 +67,8 @@ export function jobQueueEmptyKey(taskType: JobQueueTaskType): string {
       return 'operations.jobQueue.emptyCreate';
     case 'set_admin':
       return 'operations.jobQueue.emptySetAdmin';
+    case 'exit_delete_group':
+      return 'operations.jobQueue.emptyExitDelete';
     default:
       return 'operations.jobQueue.emptyJoin';
   }
@@ -66,9 +90,7 @@ export function isCreateGroupBatchJob(job: AutomationJobRecord): boolean {
 export function isAccountBatchJob(job: AutomationJobRecord): boolean {
   if (isCreateGroupBatchJob(job)) return true;
   const groupCount = job.payload.groups?.length ?? 0;
-  return (
-    (job.action === 'join_by_invite_link' || job.action === 'set_admin') && groupCount > 1
-  );
+  return (isGroupBatchJobAction(job.action) && groupCount > 1);
 }
 
 export function accountJobStepTotal(job: AutomationJobRecord): number {
@@ -88,10 +110,7 @@ export function isJobQueueBatchInProgress(job: AutomationJobRecord): boolean {
 export function isJobQueueStepInProgress(job: AutomationJobRecord): boolean {
   if (job.status !== 'queued' && job.status !== 'running') return false;
   if (isAccountBatchJob(job)) return true;
-  if (
-    (job.action === 'join_by_invite_link' || job.action === 'set_admin') &&
-    Boolean(job.progress)
-  ) {
+  if (isGroupBatchJobAction(job.action) && Boolean(job.progress)) {
     return true;
   }
   return false;
@@ -102,7 +121,7 @@ export function jobQueueStepProgress(
 ): { current: number; total: number; label?: string } | null {
   if (!job.progress) return null;
   if (isCreateGroupBatchJob(job)) return job.progress;
-  if (job.action === 'join_by_invite_link' || job.action === 'set_admin') {
+  if (isGroupBatchJobAction(job.action)) {
     return job.progress;
   }
   return null;
@@ -232,7 +251,10 @@ export function jobQueueResultText(
   }
   if (job.message && job.message !== 'OK') return job.message;
   if (batch && job.status === 'completed') {
-    if (t && (job.action === 'join_by_invite_link' || job.action === 'set_admin')) {
+    if (t && isGroupBatchJobAction(job.action)) {
+      if (job.action === 'exit_delete_group') {
+        return t('operations.jobQueue.resultSuccessExited', { count: batch.current });
+      }
       return t('operations.jobQueue.resultSuccessGroups', { count: batch.current });
     }
     return `${batch.current}/${batch.total} created`;
@@ -334,6 +356,9 @@ export function jobQueueViewTableColumnIds(
   if (job.action === 'set_admin') {
     return ['groupName', 'groupId', 'inviteLink', 'targetAdmin', 'status'];
   }
+  if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
+    return ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
+  }
   return ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
 }
 
@@ -400,6 +425,46 @@ export function jobQueueViewTableRows(
   const groups = job.payload.groups ?? [];
   const targetAdmin = resolveTargetAdminLabel(job);
 
+  if (isExitDeleteExitJob(job)) {
+    const outcomes = job.payload.groupOutcomes?.length
+      ? job.payload.groupOutcomes
+      : groups.map((group) => ({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          inviteLink: group.inviteLink,
+          groupLink: group.groupLink,
+          exitStatus: 'pending' as const,
+        }));
+    return outcomes.map((row, index) => ({
+      key: row.groupId || String(index),
+      groupName: row.groupName?.trim() || row.groupId || '—',
+      groupId: row.groupId || '—',
+      inviteLink: resolveInviteLink(row),
+      targetJoin: job.accountName,
+      targetAdmin: '—',
+      count: '—',
+      status:
+        row.exitStatus === 'left'
+          ? t('operations.jobQueue.exitStatusLeft')
+          : row.exitStatus === 'failed'
+            ? t('operations.jobQueue.exitStatusFailed')
+            : jobQueueViewRowStatusLabel(job, index, t),
+    }));
+  }
+
+  if (isExitDeleteDeleteJob(job)) {
+    return groups.map((group, index) => ({
+      key: group.groupId || String(index),
+      groupName: group.groupName?.trim() || group.groupId || '—',
+      groupId: group.groupId || '—',
+      inviteLink: resolveInviteLink(group),
+      targetJoin: job.accountName,
+      targetAdmin: '—',
+      count: '—',
+      status: jobQueueViewRowStatusLabel(job, index, t),
+    }));
+  }
+
   if (job.action === 'set_admin') {
     return groups.map((group, index) => ({
       key: group.groupId || String(index),
@@ -408,6 +473,19 @@ export function jobQueueViewTableRows(
       inviteLink: resolveInviteLink(group),
       targetJoin: '—',
       targetAdmin,
+      count: '—',
+      status: jobQueueViewRowStatusLabel(job, index, t),
+    }));
+  }
+
+  if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
+    return groups.map((group, index) => ({
+      key: group.groupId || String(index),
+      groupName: group.groupName?.trim() || group.groupId || '—',
+      groupId: group.groupId || '—',
+      inviteLink: resolveInviteLink(group),
+      targetJoin: job.accountName,
+      targetAdmin: '—',
       count: '—',
       status: jobQueueViewRowStatusLabel(job, index, t),
     }));
@@ -468,6 +546,12 @@ export function jobQueueActionKey(action: AutomationJobAction): string {
       return 'operations.jobQueue.actionCreateGroup';
     case 'set_admin':
       return 'operations.jobQueue.actionSetAdmin';
+    case 'exit_delete_group':
+      return 'operations.jobQueue.actionExitDelete';
+    case 'leave_group':
+      return 'operations.jobQueue.actionExitPhase';
+    case 'delete_group':
+      return 'operations.jobQueue.actionDeletePhase';
     default:
       return 'operations.jobQueue.actionJoin';
   }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Settings } from 'lucide-react';
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import {
   OperationsJobQueueSetupModal,
@@ -12,7 +13,12 @@ import {
   subscribeJobQueueChanged,
 } from '@/lib/automationJobQueueClient';
 import { automationJobBusyGroupIdSet } from '@/lib/automationJobBusyGroups';
+import { exitDeleteProcessedGroupIdSet } from '@/lib/exitDeleteFlow';
 import { loadMissingMasterGroupsJoinSnapshot } from '@/lib/loadMissingMasterGroupsForJoin';
+import {
+  loadAccountExitGroupsSnapshot,
+  type AccountExitGroupsSnapshot,
+} from '@/lib/loadAccountDailyGroupsForLeaveDelete';
 import {
   loadSuperAdminGroupsForSetAdmin,
   type SuperAdminGroupForSetAdmin,
@@ -20,6 +26,7 @@ import {
 import {
   readTelegramWorkerSettings,
   readWhatsAppWorkerSettings,
+  toLeaveDeleteJobPayload,
   toTelegramAdminRightsPayload,
 } from '@/config/workerPlatformSettings';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -90,6 +97,12 @@ export function OperationsJobQueueAddBar({
   const [loadingJoinGroups, setLoadingJoinGroups] = useState(false);
   const [superAdminGroups, setSuperAdminGroups] = useState<SuperAdminGroupForSetAdmin[]>([]);
   const [loadingSuperAdminGroups, setLoadingSuperAdminGroups] = useState(false);
+  const [accountExitGroups, setAccountExitGroups] = useState<AccountExitGroupsSnapshot>({
+    daily: [],
+    junk: [],
+  });
+  const [processedExitGroupIds, setProcessedExitGroupIds] = useState<Set<string>>(() => new Set());
+  const [loadingAccountDailyGroups, setLoadingAccountDailyGroups] = useState(false);
 
   const activeBrand = resolveBrandName(brandFilter, selectedBrand, brandOptions);
 
@@ -116,6 +129,7 @@ export function OperationsJobQueueAddBar({
     setJoinableGroups([]);
     setJoinGroupAccountIds({});
     setSuperAdminGroups([]);
+    setAccountExitGroups({ daily: [], junk: [] });
   }, [activeBrand, platform]);
 
   useEffect(() => {
@@ -222,6 +236,44 @@ export function OperationsJobQueueAddBar({
     }
   }, [activeBrand, platform, setupOpen, superAdminAccountId, t, validAccounts]);
 
+  const reloadAccountExitGroups = useCallback(async () => {
+    if (!activeBrand || !selectedAccountId || taskType !== 'exit_delete_group') {
+      setAccountExitGroups({ daily: [], junk: [] });
+      setProcessedExitGroupIds(new Set());
+      return;
+    }
+
+    const accountValid = validAccounts.some((row) => row.id === selectedAccountId);
+    if (!accountValid) {
+      setAccountExitGroups({ daily: [], junk: [] });
+      setProcessedExitGroupIds(new Set());
+      return;
+    }
+
+    setLoadingAccountDailyGroups(true);
+    try {
+      const snapshot = await loadAccountExitGroupsSnapshot({
+        accountId: selectedAccountId,
+        brandName: activeBrand,
+        platform,
+      });
+      const queueSnapshot = await fetchJobQueueSnapshot({ brandName: activeBrand, platform });
+      setProcessedExitGroupIds(
+        exitDeleteProcessedGroupIdSet(queueSnapshot?.jobs ?? [], selectedAccountId),
+      );
+      setAccountExitGroups({
+        daily: snapshot.daily,
+        junk: snapshot.junk,
+      });
+    } catch {
+      setAccountExitGroups({ daily: [], junk: [] });
+      setProcessedExitGroupIds(new Set());
+      if (setupOpen) setFeedback(t('operations.jobQueue.loadDailyGroupsFailed'));
+    } finally {
+      setLoadingAccountDailyGroups(false);
+    }
+  }, [activeBrand, platform, selectedAccountId, setupOpen, t, taskType, validAccounts]);
+
   useEffect(() => {
     if (taskType !== 'join' || !setupOpen) return;
     void reloadMissingGroups();
@@ -233,11 +285,17 @@ export function OperationsJobQueueAddBar({
   }, [taskType, setupOpen, reloadSuperAdminGroups]);
 
   useEffect(() => {
+    if (taskType !== 'exit_delete_group' || !setupOpen) return;
+    void reloadAccountExitGroups();
+  }, [taskType, setupOpen, reloadAccountExitGroups]);
+
+  useEffect(() => {
     return subscribeJobQueueChanged(() => {
       if (taskType === 'join') void reloadMissingGroups();
       if (taskType === 'set_admin') void reloadSuperAdminGroups();
+      if (taskType === 'exit_delete_group') void reloadAccountExitGroups();
     });
-  }, [taskType, reloadMissingGroups, reloadSuperAdminGroups]);
+  }, [taskType, reloadAccountExitGroups, reloadMissingGroups, reloadSuperAdminGroups]);
 
   const selectedAccounts = useMemo(() => {
     const account = validAccounts.find((row) => row.id === selectedAccountId);
@@ -435,6 +493,71 @@ export function OperationsJobQueueAddBar({
     }
   }
 
+  async function saveExitBatch(groupIds: string[]): Promise<string | null> {
+    if (selectedAccounts.length !== 1 || groupIds.length === 0) return null;
+
+    const account = selectedAccounts[0];
+    const workerSettings =
+      platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+
+    if (!workerSettings.leaveDelete.leaveEnabled) {
+      setFeedback(t('operations.jobQueue.exitLeaveDisabledInSettings'));
+      return enqueueErrorResult(t('operations.jobQueue.exitLeaveDisabledInSettings'));
+    }
+
+    const allExitGroups = accountExitGroups.daily;
+    const allowedIds = new Set(allExitGroups.map((row) => row.groupId));
+    const selectedGroups = groupIds
+      .filter((groupId) => allowedIds.has(groupId))
+      .map((groupId) => {
+        const group = allExitGroups.find((row) => row.groupId === groupId);
+        const inviteLink = group?.inviteLink?.trim() || undefined;
+        return {
+          groupId,
+          groupName: group?.groupName ?? groupId,
+          inviteLink,
+          groupLink: platform === 'telegram' ? inviteLink : undefined,
+        };
+      });
+
+    if (selectedGroups.length === 0) return null;
+
+    const alreadyProcessed = groupIds.filter((groupId) => processedExitGroupIds.has(groupId));
+    if (alreadyProcessed.length > 0) {
+      setFeedback(t('operations.jobQueue.exitGroupAlreadyProcessed'));
+      return enqueueErrorResult(t('operations.jobQueue.exitGroupAlreadyProcessed'));
+    }
+
+    setSubmitting(true);
+    try {
+      const ctx = await buildAutomationJobRunContext(account, 'leave_group');
+      const result = await enqueueAutomationJob({
+        brandName: activeBrand,
+        platform,
+        accountId: account.id,
+        accountName: account.accountName,
+        sessionId: ctx.sessionId,
+        action: 'leave_group',
+        payload: {
+          groups: selectedGroups,
+          exitDeletePhase: 'exit',
+          leaveDelete: toLeaveDeleteJobPayload(workerSettings),
+        },
+        storedSessionString: ctx.storedSessionString,
+        expectedPhone: ctx.expectedPhone,
+        delay: ctx.delay,
+      });
+      if (!result.ok) {
+        return returnEnqueueError(result.error, t, setFeedback);
+      }
+
+      await reloadAccountExitGroups();
+      return t('operations.jobQueue.queuedExitOk', { count: selectedGroups.length });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function openSetupModal() {
     setFeedback(null);
     setSetupOpen(true);
@@ -447,13 +570,30 @@ export function OperationsJobQueueAddBar({
 
   const setAdminTargetCandidates = validAccounts.filter((row) => row.id !== superAdminAccountId);
 
+  const workerSettings =
+    platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+
   const setupReady = useMemo(() => {
     if (!activeBrand) return false;
     if (taskType === 'set_admin') {
       return Boolean(superAdminAccountId && superAdminAccount);
     }
+    if (taskType === 'exit_delete_group') {
+      return (
+        Boolean(selectedAccountId && selectedAccounts.length > 0) &&
+        workerSettings.leaveDelete.leaveEnabled
+      );
+    }
     return Boolean(selectedAccountId && selectedAccounts.length > 0);
-  }, [activeBrand, selectedAccountId, selectedAccounts.length, superAdminAccount, superAdminAccountId, taskType]);
+  }, [
+    activeBrand,
+    selectedAccountId,
+    selectedAccounts.length,
+    superAdminAccount,
+    superAdminAccountId,
+    taskType,
+    workerSettings,
+  ]);
 
   const brandSelectDisabled = submitting;
   const accountSelectDisabled = submitting;
@@ -483,6 +623,7 @@ export function OperationsJobQueueAddBar({
     ['join', 'operations.jobQueue.tabJoin'],
     ['create_group', 'operations.jobQueue.tabCreateGroup'],
     ['set_admin', 'operations.jobQueue.tabSetAdmin'],
+    ['exit_delete_group', 'operations.jobQueue.tabExitDelete'],
   ] as const;
 
   const taskTypeSelectOptions = useMemo(
@@ -540,7 +681,7 @@ export function OperationsJobQueueAddBar({
               onChange={setSuperAdminAccountId}
               options={superAdminSelectOptions}
               ariaLabel={t('operations.jobQueue.setAdminSuperAccount')}
-              triggerClassName="account-slicer-select operations-job-queue-select operations-job-queue-select--wide"
+              triggerClassName="account-slicer-select operations-job-queue-select"
               disabled={accountSelectDisabled || superAdminSelectOptions.length === 0}
             />
           </label>
@@ -570,8 +711,10 @@ export function OperationsJobQueueAddBar({
             className="operations-job-queue-setup-btn"
             disabled={setupDisabled}
             onClick={openSetupModal}
+            aria-label={t('operations.jobQueue.setup')}
+            title={t('operations.jobQueue.setup')}
           >
-            {t('operations.jobQueue.setup')}
+            <Settings className="operations-job-queue-setup-btn__icon" strokeWidth={2} aria-hidden />
           </button>
         </div>
       </div>
@@ -593,6 +736,9 @@ export function OperationsJobQueueAddBar({
         loadingJoinGroups={loadingJoinGroups}
         superAdminGroups={superAdminGroups}
         loadingSuperAdminGroups={loadingSuperAdminGroups}
+        accountExitGroups={accountExitGroups}
+        processedExitGroupIds={processedExitGroupIds}
+        loadingAccountDailyGroups={loadingAccountDailyGroups}
         saving={submitting}
         onSaveJoin={async (groupIds) => {
           const message = await saveJoinBatch(groupIds);
@@ -606,6 +752,11 @@ export function OperationsJobQueueAddBar({
         }}
         onSaveSetAdmin={async (draft) => {
           const message = await saveSetAdminBatch(draft);
+          if (message && !isEnqueueErrorResult(message)) handleSetupSaved(message);
+          return message;
+        }}
+        onSaveExitDelete={async (groupIds) => {
+          const message = await saveExitBatch(groupIds);
           if (message && !isEnqueueErrorResult(message)) handleSetupSaved(message);
           return message;
         }}

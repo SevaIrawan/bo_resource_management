@@ -1,6 +1,6 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
 import { withNetworkRetry } from '../lib/networkRetry';
-import { resolveJoinGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
+import { resolveJoinGroups, resolveLeaveDeleteGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
 import type { AutomationRunPayload, AutomationRunResult, AutomationProgressCallback } from './types';
 
 async function postTelegramAutomation(
@@ -108,6 +108,183 @@ export async function runTelegramAutomation(
       action: 'set_admin',
       message: `Promoted targets in ${success}/${groups.length} groups`,
       errorCode: success > 0 ? undefined : 'SET_ADMIN_BATCH_FAILED',
+      result: { success, total: groups.length, failed },
+    };
+  }
+
+  if (payload.action === 'exit_delete_group') {
+    const groups = resolveLeaveDeleteGroups(payload);
+    if (groups.length === 0) {
+      return {
+        status: 'error',
+        action: payload.action,
+        message: 'groupId or groupLink required',
+        errorCode: 'INVALID_PAYLOAD',
+      };
+    }
+
+    const requireOwner = payload.leaveDelete?.requireOwnerForDelete !== false;
+    const clearChatHistory = payload.leaveDelete?.clearChatHistoryOnDelete === true;
+
+    let left = 0;
+    let deleted = 0;
+    let exited = 0;
+    const failed: string[] = [];
+
+    for (let i = 0; i < groups.length; i += 1) {
+      const group = groups[i];
+      const label = group.groupName ?? group.groupId;
+      onProgress?.(exited, groups.length, `Leave: ${label}`);
+
+      const leaveResult = await postTelegramAutomation(
+        payload.sessionId,
+        `/telegram/automation/leave-group/${sid}`,
+        {
+          ...base,
+          groupId: group.groupId,
+          groupLink: group.groupLink,
+        },
+      );
+
+      if (leaveResult.status !== 'ok') {
+        failed.push(`${label}: leave ${leaveResult.message ?? 'failed'}`);
+        continue;
+      }
+
+      left += 1;
+      onProgress?.(exited, groups.length, `Delete: ${label}`);
+
+      const deleteResult = await postTelegramAutomation(
+        payload.sessionId,
+        `/telegram/automation/delete-group/${sid}`,
+        {
+          ...base,
+          groupId: group.groupId,
+          groupLink: group.groupLink,
+          requireOwner,
+          clearChatHistory,
+        },
+      );
+
+      if (deleteResult.status === 'ok') {
+        deleted += 1;
+        exited += 1;
+        onProgress?.(exited, groups.length, `Exited: ${label}`);
+      } else {
+        failed.push(`${label}: left OK, delete ${deleteResult.message ?? 'failed'}`);
+      }
+    }
+
+    return {
+      status: exited > 0 ? 'ok' : 'error',
+      action: 'exit_delete_group',
+      message: `Exited ${exited}/${groups.length} (left ${left}, deleted ${deleted})`,
+      errorCode: exited > 0 ? undefined : 'EXIT_DELETE_GROUP_FAILED',
+      result: { success: exited, total: groups.length, left, deleted, failed },
+    };
+  }
+
+  if (payload.action === 'leave_group') {
+    const groups = resolveLeaveDeleteGroups(payload);
+    if (groups.length === 0) {
+      return {
+        status: 'error',
+        action: payload.action,
+        message: 'groupId or groupLink required',
+        errorCode: 'INVALID_PAYLOAD',
+      };
+    }
+
+    let success = 0;
+    const failed: string[] = [];
+    const groupOutcomes: Array<{
+      groupId: string;
+      groupName?: string;
+      groupLink?: string;
+      exitStatus: 'left' | 'failed';
+    }> = [];
+    for (let i = 0; i < groups.length; i += 1) {
+      const group = groups[i];
+      onProgress?.(i, groups.length, group.groupName ?? group.groupId);
+      const result = await postTelegramAutomation(
+        payload.sessionId,
+        `/telegram/automation/leave-group/${sid}`,
+        {
+          ...base,
+          groupId: group.groupId,
+          groupLink: group.groupLink,
+        },
+      );
+      if (result.status === 'ok') {
+        success += 1;
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          exitStatus: 'left',
+        });
+        onProgress?.(i + 1, groups.length, group.groupName ?? 'Left');
+      } else {
+        failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          exitStatus: 'failed',
+        });
+      }
+    }
+    return {
+      status: success > 0 ? 'ok' : 'error',
+      action: 'leave_group',
+      message: `Left ${success}/${groups.length} groups`,
+      errorCode: success > 0 ? undefined : 'LEAVE_GROUP_BATCH_FAILED',
+      result: { success, total: groups.length, failed, groupOutcomes },
+    };
+  }
+
+  if (payload.action === 'delete_group') {
+    const groups = resolveLeaveDeleteGroups(payload);
+    if (groups.length === 0) {
+      return {
+        status: 'error',
+        action: payload.action,
+        message: 'groupId or groupLink required',
+        errorCode: 'INVALID_PAYLOAD',
+      };
+    }
+
+    const requireOwner = payload.leaveDelete?.requireOwnerForDelete !== false;
+    const clearChatHistory = payload.leaveDelete?.clearChatHistoryOnDelete === true;
+
+    let success = 0;
+    const failed: string[] = [];
+    for (let i = 0; i < groups.length; i += 1) {
+      const group = groups[i];
+      onProgress?.(i, groups.length, group.groupName ?? group.groupId);
+      const result = await postTelegramAutomation(
+        payload.sessionId,
+        `/telegram/automation/delete-group/${sid}`,
+        {
+          ...base,
+          groupId: group.groupId,
+          groupLink: group.groupLink,
+          requireOwner,
+          clearChatHistory,
+        },
+      );
+      if (result.status === 'ok') {
+        success += 1;
+        onProgress?.(i + 1, groups.length, group.groupName ?? 'Deleted');
+      } else {
+        failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+      }
+    }
+    return {
+      status: success > 0 ? 'ok' : 'error',
+      action: 'delete_group',
+      message: `Deleted ${success}/${groups.length} groups`,
+      errorCode: success > 0 ? undefined : 'DELETE_GROUP_BATCH_FAILED',
       result: { success, total: groups.length, failed },
     };
   }

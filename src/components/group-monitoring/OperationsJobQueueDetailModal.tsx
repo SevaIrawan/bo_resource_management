@@ -1,7 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { useLanguage } from '@/hooks/useLanguage';
+import {
+  canQueueDeleteFromExitJob,
+  isExitDeleteDeleteJob,
+  isExitDeleteExitJob,
+} from '@/lib/exitDeleteFlow';
 import { exportJobQueueViewExcel } from '@/lib/exportExcel';
 import { accountPlatformSubtitle } from '@/lib/platformSyncCopy';
 import {
@@ -18,7 +23,9 @@ import type { AutomationJobRecord } from '@/types/automationJob';
 
 interface OperationsJobQueueDetailModalProps {
   job: AutomationJobRecord | null;
+  allJobs?: AutomationJobRecord[];
   onClose: () => void;
+  onQueueDeleteFromExit?: (exitJobId: string) => Promise<boolean> | boolean;
 }
 
 function cellClassName(columnId: JobQueueViewTableColumnId): string | undefined {
@@ -73,9 +80,12 @@ function renderCell(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumn
 
 export function OperationsJobQueueDetailModal({
   job,
+  allJobs = [],
   onClose,
+  onQueueDeleteFromExit,
 }: OperationsJobQueueDetailModalProps) {
   const { t } = useLanguage();
+  const [queueingDelete, setQueueingDelete] = useState(false);
   const open = job !== null;
 
   useEffect(() => {
@@ -94,6 +104,21 @@ export function OperationsJobQueueDetailModal({
   const record = job;
   const columns = jobQueueViewTableColumnIds(record);
   const rows = jobQueueViewTableRows(record, t);
+  const showQueueDelete =
+    isExitDeleteExitJob(record) &&
+    canQueueDeleteFromExitJob(record, allJobs) &&
+    Boolean(onQueueDeleteFromExit);
+  const isDeletePhaseView = isExitDeleteDeleteJob(record);
+
+  async function handleQueueDelete() {
+    if (!onQueueDeleteFromExit || queueingDelete) return;
+    setQueueingDelete(true);
+    try {
+      await onQueueDeleteFromExit(record.id);
+    } finally {
+      setQueueingDelete(false);
+    }
+  }
 
   function handleExport() {
     if (!rows.length) return;
@@ -134,6 +159,12 @@ export function OperationsJobQueueDetailModal({
 
         <div className="brand-modal-form">
           <p className="sync-modal-message">{jobQueueViewResultSummary(record, t)}</p>
+          {isExitDeleteExitJob(record) ? (
+            <p className="operations-job-queue-form-note">{t('operations.jobQueue.exitViewDeleteHint')}</p>
+          ) : null}
+          {isDeletePhaseView ? (
+            <p className="operations-job-queue-form-note">{t('operations.jobQueue.deleteFromExitViewHint')}</p>
+          ) : null}
 
           {rows.length > 0 ? (
             <div className="group-links-table-wrap">
@@ -167,6 +198,16 @@ export function OperationsJobQueueDetailModal({
           <p className="ticket-detail-modal-meta">{jobQueueViewMetaText(record, t)}</p>
 
           <div className="brand-modal-actions">
+            {showQueueDelete ? (
+              <button
+                type="button"
+                className="brand-modal-btn brand-modal-btn--primary"
+                disabled={queueingDelete}
+                onClick={() => void handleQueueDelete()}
+              >
+                {t('operations.jobQueue.queueDeleteFromExit')}
+              </button>
+            ) : null}
             <button
               type="button"
               className="brand-modal-btn brand-modal-btn--ghost"

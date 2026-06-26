@@ -1,4 +1,10 @@
-export type AutomationJobAction = 'create_group' | 'set_admin' | 'join_by_invite_link';
+export type AutomationJobAction =
+  | 'create_group'
+  | 'set_admin'
+  | 'join_by_invite_link'
+  | 'leave_group'
+  | 'delete_group'
+  | 'exit_delete_group';
 
 export interface AutomationJobGroupItem {
   groupId: string;
@@ -38,6 +44,20 @@ export interface AutomationJobPayload {
     addMembersAdminsOnly?: boolean;
     infoAdminsOnly?: boolean;
   };
+  leaveDelete?: {
+    clearChatHistoryOnDelete?: boolean;
+    requireOwnerForDelete?: boolean;
+  };
+  exitDeletePhase?: 'exit' | 'delete';
+  sourceExitJobId?: string;
+  groupOutcomes?: Array<{
+    groupId: string;
+    groupName?: string;
+    inviteLink?: string;
+    groupLink?: string;
+    exitStatus?: 'left' | 'failed' | 'pending';
+    deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
+  }>;
 }
 
 export interface AutomationJobProgress {

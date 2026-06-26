@@ -77,6 +77,21 @@ const checks = [
       ),
   },
   {
+    name: 'Exit & delete: exit SETUP + delete from VIEW result',
+    ok: (() => {
+      const modal = read('src/components/group-monitoring/OperationsJobQueueDetailModal.tsx');
+      const detail = read('src/components/group-monitoring/OperationsJobQueueDetailModal.tsx');
+      const flow = read('src/lib/exitDeleteFlow.ts');
+      return (
+        addBar.includes('exitDeletePhase') &&
+        addBar.includes("'leave_group'") &&
+        detail.includes('queueDeleteFromExit') &&
+        modal.includes('onQueueDeleteFromExit') &&
+        flow.includes('resolveLeftGroupsFromExitJob')
+      );
+    })(),
+  },
+  {
     name: 'Join: invite-link delay settings wired',
     ok: (() => {
       const cfg = read('src/config/workerPlatformSettings.ts');
@@ -188,6 +203,94 @@ const checks = [
     ok: (() => {
       const session = read('src/lib/userActionSession.ts');
       return session.includes('gateDeviceSession') && !session.includes('warmSessionIfStored');
+    })(),
+  },
+  {
+    name: 'Exit tab: filter jobMatchesExitDeleteTaskType (no join overlap)',
+    ok: (() => {
+      const global = read('src/components/group-monitoring/OperationsGlobalJobQueuePanel.tsx');
+      const flow = read('src/lib/exitDeleteFlow.ts');
+      return (
+        global.includes('jobMatchesExitDeleteTaskType') &&
+        flow.includes("job.action === 'leave_group' && job.payload.exitDeletePhase === 'exit'") &&
+        flow.includes('sourceExitJobId')
+      );
+    })(),
+  },
+  {
+    name: 'Exit SETUP: daily snapshot + processed-group guard',
+    ok: (() => {
+      const loader = read('src/lib/loadAccountDailyGroupsForLeaveDelete.ts');
+      const flow = read('src/lib/exitDeleteFlow.ts');
+      const setup = read('src/components/group-monitoring/OperationsJobQueueSetupModal.tsx');
+      return (
+        loader.includes('daily: AccountDailyGroupForLeaveDelete[]') &&
+        loader.includes('breakdown.junk') &&
+        flow.includes('exitDeleteProcessedGroupIdSet') &&
+        setup.includes('processedExitGroupIds') &&
+        setup.includes('exitGroupProcessedAlertOpen')
+      );
+    })(),
+  },
+  {
+    name: 'Exit enqueue: leave_group exit phase only (not legacy combined)',
+    ok: (() => {
+      const add = read('src/components/group-monitoring/OperationsJobQueueAddBar.tsx');
+      const del = read('src/lib/enqueueDeleteFromExitJob.ts');
+      return (
+        add.includes("action: 'leave_group'") &&
+        add.includes("exitDeletePhase: 'exit'") &&
+        !add.includes("action: 'exit_delete_group'") &&
+        del.includes("action: 'delete_group'") &&
+        del.includes('sourceExitJobId')
+      );
+    })(),
+  },
+  {
+    name: 'Delete from VIEW: enqueue + auto-run + close modal',
+    ok: (() => {
+      const global = read('src/components/group-monitoring/OperationsGlobalJobQueuePanel.tsx');
+      const table = read('src/components/group-monitoring/OperationsJobQueueTable.tsx');
+      return (
+        global.includes('runAutomationJob(result.jobId)') &&
+        table.includes('setViewJobId(null)') &&
+        table.includes('Promise<boolean>')
+      );
+    })(),
+  },
+  {
+    name: 'Parallel execute: max 4 accounts via shared execute slot pool',
+    ok: (() => {
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const store = read('electron/main/automation/jobQueueStore.ts');
+      const pool = read('electron/main/automation/executeSlotPool.ts');
+      const conc = read('electron/main/automation/jobQueueConcurrency.ts');
+      return (
+        conc.includes('getMaxWaBrowserSlots') &&
+        pool.includes("kind: ExecuteSlotKind") &&
+        pool.includes('getMaxWaBrowserSlots') &&
+        runner.includes('waitForExecuteSlot') &&
+        runner.includes('countFreeExecuteSlots') &&
+        store.includes('countFreeExecuteSlots') &&
+        store.includes('getExecuteSlotStats')
+      );
+    })(),
+  },
+  {
+    name: 'All job actions: timeout + batch step total wired',
+    ok: (() => {
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const batch = read('electron/main/automation/jobQueueBatchHelpers.ts');
+      return (
+        runner.includes('leave_group:') &&
+        runner.includes('delete_group:') &&
+        runner.includes('exit_delete_group:') &&
+        runner.includes('join_by_invite_link:') &&
+        runner.includes('set_admin:') &&
+        runner.includes('create_group:') &&
+        batch.includes('leave_group') &&
+        batch.includes('delete_group')
+      );
     })(),
   },
   {

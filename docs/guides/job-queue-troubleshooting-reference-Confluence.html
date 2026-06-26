@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>GM App — Job Queue Troubleshooting Reference (Confluence Paste)</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.5; max-width: 900px; margin: 24px auto; color: #172b4d; }
+    h1 { font-size: 24px; border-bottom: 2px solid #0052cc; padding-bottom: 8px; }
+    h2 { font-size: 18px; margin-top: 28px; color: #0052cc; }
+    h3 { font-size: 15px; margin-top: 20px; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; }
+    th, td { border: 1px solid #c1c7d0; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f4f5f7; font-weight: 600; }
+    .panel { border-radius: 4px; padding: 12px 14px; margin: 16px 0; border-left: 4px solid; }
+    .info { background: #deebff; border-color: #0052cc; }
+    .warning { background: #fffae6; border-color: #ff991f; }
+    .tip { background: #e3fcef; border-color: #00875a; }
+    .panel-title { font-weight: 700; margin-bottom: 6px; }
+    pre { background: #f4f5f7; border: 1px solid #dfe1e6; padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.4; }
+    code { background: #f4f5f7; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    ul, ol { margin: 8px 0 16px; }
+    li { margin: 4px 0; }
+    hr { border: none; border-top: 1px solid #dfe1e6; margin: 24px 0; }
+    .paste-hint { font-size: 12px; color: #5e6c84; }
+  </style>
+</head>
+<body>
+
+<div class="panel tip paste-hint">
+  <div class="panel-title">How to paste into Confluence</div>
+  <ol>
+    <li>Open this file in a browser (double-click or drag into Chrome/Edge).</li>
+    <li>Select from the main title below through section 7 (skip this yellow box if you prefer).</li>
+    <li>Copy (<kbd>Ctrl+C</kbd> / <kbd>Cmd+C</kbd>) → paste into Confluence page editor (Visual / rich text).</li>
+    <li>Adjust page title and labels in Confluence; attach repo link if needed.</li>
+  </ol>
+</div>
+
+<h1>GM App — Job Queue &amp; Execute Worker Troubleshooting Reference</h1>
+
+<div class="panel info">
+  <div class="panel-title">Document information</div>
+  <table>
+    <tr><th>Product</th><td>Resource Management (GM App) — Electron desktop</td></tr>
+    <tr><th>Version</th><td>v1.0.25</td></tr>
+    <tr><th>Audience</th><td>Developers and ops maintaining WhatsApp / Telegram automation</td></tr>
+    <tr><th>Scope</th><td>Job Queue, execute slot pool, Sync / Scrape interaction</td></tr>
+    <tr><th>Out of scope</th><td>Reporting tab, Supabase schema migrations</td></tr>
+    <tr><th>Source (repo)</th><td><code>docs/guides/job-queue-troubleshooting-reference.md</code></td></tr>
+    <tr><th>Learning track</th><td>Job Queue &amp; Worker Pattern — Issue Handling &amp; Troubleshooting</td></tr>
+  </table>
+</div>
+
+<hr />
+
+<h2>1. Quick triage</h2>
+<p>Start here when something looks wrong in Operations → Job Queue or account row actions.</p>
+
+<table>
+  <tr><th>Symptom</th><th>Check first</th><th>Likely cause</th></tr>
+  <tr><td>Nothing runs; all actions queue</td><td><code>executeSlotsActive</code> vs max (4)</td><td>Ghost slot after crash <strong>or</strong> 4 real jobs running</td></tr>
+  <tr><td>One account stuck; others OK</td><td>Row busy indicator / job table</td><td>Scrape + job conflict, settling, or active job on that account</td></tr>
+  <tr><td>Job <code>failed</code> immediately</td><td>Job error / <code>errorCode</code></td><td>Invalid session, payload, or platform error</td></tr>
+  <tr><td>Job <code>running</code> forever</td><td>Duration vs action timeout</td><td>Chrome hang; wait 30m stale sweep or restart app</td></tr>
+  <tr><td>TG jobs fail in batch</td><td><code>FLOOD_WAIT</code> in error</td><td>Telegram rate limit exceeded</td></tr>
+  <tr><td>Sync blocked right after job</td><td>Within ~5s of job end</td><td><code>SESSION_SETTLING</code> — <strong>expected</strong></td></tr>
+</table>
+
+<div class="panel warning">
+  <div class="panel-title">First actions</div>
+  <ol>
+    <li>Open <strong>global Job Queue</strong> panel → read error message.</li>
+    <li>If <strong>global</strong> queue stuck → restart Electron app.</li>
+    <li>If <strong>one account</strong> only → relogin that account; re-enqueue job.</li>
+  </ol>
+</div>
+
+<hr />
+
+<h2>2. Architecture (do not misdiagnose)</h2>
+<ul>
+  <li><strong>Max 4 parallel accounts</strong> — shared pool for Sync, Scrape, and Job Queue (<code>executeSlotPool</code>).</li>
+  <li><strong>Per-account isolation</strong> — account A failure or block does not stop account B.</li>
+  <li><strong>Single slot source of truth</strong> — main process only; <code>jobQueueGuard</code> does <strong>not</strong> check global slot fill.</li>
+  <li><strong>Post-job settle</strong> — ~5s block on same account after any job (<code>SESSION_SETTLING</code>).</li>
+  <li><strong>Scrape + Job Queue</strong> — same account cannot run both (<code>JOB_QUEUE_EXECUTE_FULL</code>).</li>
+</ul>
+
+<h3>Key files</h3>
+<table>
+  <tr><th>Area</th><th>File</th></tr>
+  <tr><td>Slot pool</td><td><code>electron/main/automation/executeSlotPool.ts</code></td></tr>
+  <tr><td>Runner</td><td><code>electron/main/automation/jobQueueRunner.ts</code></td></tr>
+  <tr><td>Guards</td><td><code>electron/main/automation/jobQueueGuard.ts</code></td></tr>
+  <tr><td>Settle</td><td><code>electron/main/automation/jobQueueSettle.ts</code></td></tr>
+  <tr><td>Job store</td><td><code>electron/main/automation/jobQueueStore.ts</code></td></tr>
+  <tr><td>WA worker</td><td><code>electron/main/automation/waAutomation.ts</code></td></tr>
+  <tr><td>TG worker</td><td><code>python-sidecar/telegram_automation.py</code></td></tr>
+  <tr><td>Renderer</td><td><code>src/lib/executeSlotClient.ts</code>, <code>src/hooks/useAccountSyncFlow.ts</code></td></tr>
+</table>
+
+<hr />
+
+<h2>3. Failure playbook</h2>
+
+<h3>A. Slot not released (ghost slot)</h3>
+<table>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Symptom</td><td><code>EXECUTE_SLOTS_FULL</code>; no jobs running; queue never drains</td></tr>
+  <tr><td>Root cause</td><td>App crash/kill before <code>releaseExecuteSlot()</code> in <code>finally</code></td></tr>
+  <tr><td>Fix</td><td>Restart Electron app</td></tr>
+  <tr><td>Prevention</td><td>Always release slot in <code>finally</code>; scrape errors use <code>deferSlotRelease</code> until modal closes</td></tr>
+  <tr><td>Verify</td><td>After restart: <code>executeSlotsActive = 0</code>; new enqueue works</td></tr>
+  <tr><td>Known gap</td><td>No startup sweep for ghost slots</td></tr>
+</table>
+
+<h3>B. WA session expired mid-job</h3>
+<table>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Symptom</td><td>Job <code>failed</code>; ProtocolError or session not ready</td></tr>
+  <tr><td>Root cause</td><td>Logout on phone, invalid profile, Puppeteer detached</td></tr>
+  <tr><td>Fix</td><td>Relogin account → re-enqueue job</td></tr>
+  <tr><td>Prevention</td><td>One Puppeteer per <code>sessionId</code>; lock until <code>initialize()</code> completes</td></tr>
+  <tr><td>Verify</td><td>Logout mid-job → fails; other accounts keep running</td></tr>
+</table>
+
+<h3>C. TG FloodWait</h3>
+<table>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Symptom</td><td><code>FLOOD_WAIT</code> or <code>FLOOD_WAIT_RETRY</code></td></tr>
+  <tr><td>Root cause</td><td>Telethon rate limit; auto-sleep only if wait ≤ <code>max_floodwait_auto_sleep_sec</code></td></tr>
+  <tr><td>Fix</td><td>Wait duration → reduce batch / increase delays → re-enqueue</td></tr>
+  <tr><td>Config</td><td><code>flood_wait_extra_sec</code>, <code>max_floodwait_auto_sleep_sec</code> in worker settings</td></tr>
+  <tr><td>Verify</td><td>Correct error code; slot released after fail</td></tr>
+</table>
+
+<h3>D. Job stuck in <code>running</code></h3>
+<table>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Symptom</td><td>Status <code>running</code> long past expected duration</td></tr>
+  <tr><td>Root cause</td><td>Chrome/Puppeteer hang; crash after <code>markJobRunning</code></td></tr>
+  <tr><td>Fix</td><td>Wait auto-fail (30m <code>JOB_STALE_TIMEOUT</code>) or restart app</td></tr>
+  <tr><td>Timeouts</td><td>join 20m · set_admin 25m · create_group 90m (+ 5m per step)</td></tr>
+  <tr><td>Verify</td><td>Job → <code>failed</code>; queue resumes</td></tr>
+</table>
+
+<h3>E. Expected behavior (not bugs)</h3>
+<table>
+  <tr><th>Behavior</th><th>Why</th><th>What to do</th></tr>
+  <tr><td>5th action queues</td><td>Max 4 slots</td><td>Wait; notification is correct</td></tr>
+  <tr><td><code>SESSION_SETTLING</code></td><td>5s Chrome cleanup after job</td><td>Retry after ~5s</td></tr>
+  <tr><td>Scrape blocks job (same account)</td><td>Per-account isolation</td><td>Finish scrape first</td></tr>
+</table>
+
+<hr />
+
+<h2>4. Error code cheat sheet</h2>
+<table>
+  <tr><th>Code</th><th>Meaning</th><th>Action</th></tr>
+  <tr><td><code>EXECUTE_SLOTS_FULL</code></td><td>Pool full (or ghost slot)</td><td>Wait, or restart if ghost</td></tr>
+  <tr><td><code>JOB_QUEUE_EXECUTE_FULL</code></td><td>Scrape or job busy on account</td><td>Wait for current task</td></tr>
+  <tr><td><code>SESSION_SETTLING</code></td><td>Post-job cooldown (~5s)</td><td>Retry shortly</td></tr>
+  <tr><td><code>JOB_STALE_TIMEOUT</code></td><td>Running &gt; 30 minutes</td><td>Re-enqueue; investigate hang</td></tr>
+  <tr><td><code>JOB_*_TIMEOUT</code></td><td>Action exceeded time limit</td><td>Smaller batch; check WA/TG</td></tr>
+  <tr><td><code>FLOOD_WAIT</code></td><td>TG rate limit exceeds cap</td><td>Wait + reduce frequency</td></tr>
+  <tr><td><code>FLOOD_WAIT_RETRY</code></td><td>Short flood; job ended failed</td><td>Re-enqueue job</td></tr>
+  <tr><td><code>SESSION_NOT_READY</code> / <code>SESSION_UNAUTHORIZED</code></td><td>Session dead</td><td>Relogin</td></tr>
+  <tr><td><code>JOIN_FAILED</code> / <code>SET_ADMIN_FAILED</code> / <code>CREATE_GROUP_FAILED</code></td><td>WA action failed</td><td>Check payload + device state</td></tr>
+</table>
+
+<hr />
+
+<h2>5. Validation &amp; regression</h2>
+<p>Run before release or after job-queue / guard / slot changes:</p>
+<pre>npm run validate:gm-master-contract
+npm run validate:operations-job-queue
+npm run validate:multi-account-wa
+npm run validate:desktop</pre>
+
+<h3>Manual smoke (T1–T7)</h3>
+<table>
+  <tr><th>#</th><th>Test</th><th>Expected</th></tr>
+  <tr><td>T1</td><td>4 jobs, different accounts</td><td>4 <code>running</code></td></tr>
+  <tr><td>T2</td><td>5th job</td><td><code>queued</code>; runs when slot frees</td></tr>
+  <tr><td>T3</td><td>Scrape + job, same account</td><td>Job waits until scrape ends</td></tr>
+  <tr><td>T4</td><td>Job done → Sync within 5s</td><td><code>SESSION_SETTLING</code> then OK</td></tr>
+  <tr><td>T5</td><td>Logout WA mid-job</td><td><code>failed</code>; slot released</td></tr>
+  <tr><td>T6</td><td>TG with tight flood cap</td><td><code>FLOOD_WAIT</code> or retry message</td></tr>
+  <tr><td>T7</td><td>Restart app</td><td><code>executeSlotsActive = 0</code></td></tr>
+</table>
+
+<h3>Regression watchlist</h3>
+<ul>
+  <li>Dual slot lock in <code>jobQueueGuard</code> (<code>isExecuteSlotActiveForAccount</code>)</li>
+  <li>Two Puppeteer instances per <code>sessionId</code></li>
+  <li><code>markJobRunning</code> double pickup</li>
+</ul>
+
+<hr />
+
+<h2>6. Escalation path</h2>
+<ol>
+  <li><strong>Validators fail</strong> → code regression; fix before ops workaround.</li>
+  <li><strong>Validators OK; one account</strong> → session / guard / platform on that account.</li>
+  <li><strong>Validators OK; all accounts stuck</strong> → slot pool ghost; restart app.</li>
+  <li><strong>Intermittent TG failures</strong> → FloodWait + delay tuning.</li>
+  <li><strong>Wrong grid data after scrape</strong> → separate path: <code>rm_commit_account_scrape</code> RPC (not job queue).</li>
+</ol>
+
+<hr />
+
+<h2>7. Do / don't</h2>
+
+<table>
+  <tr><th>Do</th><th>Don't</th></tr>
+  <tr>
+    <td>
+      <ul>
+        <li>Release execute slot in <code>finally</code></li>
+        <li>Fix session issues per account</li>
+        <li>Use global Job Queue panel for state</li>
+        <li>Run validators after runner/guard/slot changes</li>
+      </ul>
+    </td>
+    <td>
+      <ul>
+        <li>Remove settling or guards to silence busy messages</li>
+        <li>Add second slot counter in renderer or IPC</li>
+        <li>Treat job failure as DB invalidation</li>
+        <li>Run Scrape + Job Queue on same account together</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+<hr />
+
+<div class="panel tip">
+  <div class="panel-title">Related references</div>
+  <ul>
+    <li>GM contract: <code>cursor-prompt-gm-master.md</code> (repository root)</li>
+    <li>Validators: <code>npm run validate:operations-job-queue</code>, <code>validate:gm-master-contract</code></li>
+    <li>CI installer gate: <code>scripts/validate-installer-runtime.mjs</code></li>
+    <li>Markdown source: <code>docs/guides/job-queue-troubleshooting-reference.md</code></li>
+  </ul>
+</div>
+
+</body>
+</html>

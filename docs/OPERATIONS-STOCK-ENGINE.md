@@ -14,13 +14,16 @@ Implementasi: `src/lib/classifyGroupStock.ts`, `src/lib/groupStockPolicy.ts`, `s
 
 ---
 
-## Standard group naming (sementara — default policy)
+## Standard group naming (default policy — editable Admin)
 
 | Prefix | Pola nama (contoh brand FWSG) | Makna |
 |--------|--------------------------------|--------|
-| **Prefix1** | `FWSG {user}` · `{emoji} FWSG {user}` · `FWSG {user} {emoji}` | Grup **customer** aktif |
-| **Prefix2** | `FWSG NEW` | Stock **NEW** resmi (siap assign) |
-| **Prefix3** | `… {user} LG` (suffix **` LG`**) | Customer **sudah left** — recycle resmi |
+| **Prefix1** | `{emoji} FWSG {user}` · `{emoji} FWSG {user} {tail≠NEW/LG}` · `FWSG {user}` · `FWSG {user} {tail≠NEW/LG}` | Grup **customer** (Active/Review) |
+| **Prefix2** | `{emoji} FWSG NEW` · `{emoji} FWSG {user} NEW` · `{emoji} FWSG {user} NEW {tail}` | Stock **NEW** resmi (Ready) |
+| **Prefix3** | `{emoji} FWSG {user} LG` · `FWSG {user} LG` | Customer **sudah left** (Recycle) |
+| **Other** | Tidak match blocklist / prefix di atas | Junk / legacy |
+
+`{user}` = slot setelah brand (default `*`): **huruf, angka/numeric, atau kombinasi** — contoh `WBSG 84736008`, `FWSG John`. `{tail}` = teks/angka/emoji tambahan (P1: bukan NEW/LG; P2: setelah NEW).
 
 **Blocklist → Other:** `❌aa…`, `CO group…`, `Feedback Level…` (default; Admin bisa tambah).
 

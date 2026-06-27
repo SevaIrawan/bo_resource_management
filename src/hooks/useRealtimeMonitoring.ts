@@ -19,6 +19,8 @@ interface UseRealtimeMonitoringOptions {
   onRegistryChange: () => void;
   onDataChangeNotice?: () => void;
   onMasterDataChanged?: () => void;
+  /** new_register berubah → refresh Avg ND di tab Operations. */
+  onOperationsMetricsChanged?: () => void;
 }
 
 type GroupsMasterRow = {
@@ -50,12 +52,14 @@ export function useRealtimeMonitoring({
   onRegistryChange,
   onDataChangeNotice,
   onMasterDataChanged,
+  onOperationsMetricsChanged,
 }: UseRealtimeMonitoringOptions) {
   const onGroupsChangeRef = useRef(onGroupsChange);
   const onAccountDailyChangedRef = useRef(onAccountDailyChanged);
   const onRegistryChangeRef = useRef(onRegistryChange);
   const onDataChangeNoticeRef = useRef(onDataChangeNotice);
   const onMasterDataChangedRef = useRef(onMasterDataChanged);
+  const onOperationsMetricsChangedRef = useRef(onOperationsMetricsChanged);
   const suspendedRef = useRef(suspendAccountIds);
 
   onGroupsChangeRef.current = onGroupsChange;
@@ -63,6 +67,7 @@ export function useRealtimeMonitoring({
   onRegistryChangeRef.current = onRegistryChange;
   onDataChangeNoticeRef.current = onDataChangeNotice;
   onMasterDataChangedRef.current = onMasterDataChanged;
+  onOperationsMetricsChangedRef.current = onOperationsMetricsChanged;
   suspendedRef.current = suspendAccountIds;
 
   const notifyChange = () => {
@@ -182,6 +187,14 @@ export function useRealtimeMonitoring({
         { event: '*', schema: 'public', table: TABLES.groupsMaster },
         (payload) => {
           handleMasterChange((payload.new ?? payload.old) as GroupsMasterRow | undefined);
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: TABLES.newRegister },
+        () => {
+          onOperationsMetricsChangedRef.current?.();
+          notifyChange();
         },
       )
       .on(

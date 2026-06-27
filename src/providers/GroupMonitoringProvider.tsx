@@ -18,7 +18,6 @@ import {
   filterAccountGroups,
 } from '@/lib/filterAccountGroups';
 import { patchAccountGridAfterDailyWrite } from '@/lib/patchAccountGridAfterDailyWrite';
-import { dispatchMonitoringReloadAfterDailyWrite } from '@/lib/monitoringRealtimeEvents';
 import { mergeGroupsAccountMetrics, mergeReloadPreservingActionProcess } from '@/lib/mergeMonitoringGroups';
 import { computeAccountKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -42,6 +41,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const reloadAllBusyRef = useRef(false);
   const reloadAllSeqRef = useRef(0);
   const reportingReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const operationsReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dailyChangeDebounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const accountRefreshBusyRef = useRef<Set<string>>(new Set());
   const pendingAccountRefreshRef = useRef<Set<string>>(new Set());
@@ -57,6 +57,19 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       window.dispatchEvent(new Event('rm-reporting-reload'));
     }, 500);
   }, []);
+
+  const scheduleOperationsReload = useCallback(() => {
+    if (operationsReloadDebounceRef.current) clearTimeout(operationsReloadDebounceRef.current);
+    operationsReloadDebounceRef.current = setTimeout(() => {
+      operationsReloadDebounceRef.current = null;
+      window.dispatchEvent(new Event('rm-operations-reload'));
+    }, 500);
+  }, []);
+
+  const scheduleMonitoringReload = useCallback(() => {
+    scheduleReportingReload();
+    scheduleOperationsReload();
+  }, [scheduleReportingReload, scheduleOperationsReload]);
 
   const patchAccountGridFromDb = useCallback(async (dbAccountId: string) => {
     const snapshot = await new Promise<AccountBrandGroup[]>((resolve) => {
@@ -78,7 +91,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       accountRefreshBusyRef.current.add(dbAccountId);
       try {
         await patchAccountGridFromDb(dbAccountId);
-        dispatchMonitoringReloadAfterDailyWrite();
+        scheduleMonitoringReload();
       } finally {
         accountRefreshBusyRef.current.delete(dbAccountId);
         if (pendingAccountRefreshRef.current.has(dbAccountId)) {
@@ -87,7 +100,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         }
       }
     },
-    [patchAccountGridFromDb],
+    [patchAccountGridFromDb, scheduleMonitoringReload],
   );
 
   const handleAccountDailyChanged = useCallback(
@@ -147,21 +160,24 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   useEffect(() => {
     registerRefreshHandler(async (activeTab) => {
       if (activeTab === 'reporting') {
-        window.dispatchEvent(new Event('rm-reporting-reload'));
+        scheduleReportingReload();
       } else {
         await reloadAll();
+        if (activeTab === 'operations') {
+          scheduleOperationsReload();
+        }
       }
     });
     return () => registerRefreshHandler(null);
-  }, [registerRefreshHandler, reloadAll]);
+  }, [registerRefreshHandler, reloadAll, scheduleOperationsReload, scheduleReportingReload]);
 
   useEffect(() => {
     registerFullRefreshHandler(async () => {
       await reloadAll();
-      window.dispatchEvent(new Event('rm-reporting-reload'));
+      scheduleMonitoringReload();
     });
     return () => registerFullRefreshHandler(null);
-  }, [registerFullRefreshHandler, reloadAll]);
+  }, [registerFullRefreshHandler, reloadAll, scheduleMonitoringReload]);
 
   const filteredGroups = useMemo(
     () => filterAccountGroups(groups, accountFilters),
@@ -232,7 +248,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     onAccountDailyChanged: handleAccountDailyChanged,
     onRegistryChange: handleRegistryRealtime,
     onDataChangeNotice: notifyPendingDataUpdate,
-    onMasterDataChanged: scheduleReportingReload,
+    onMasterDataChanged: scheduleMonitoringReload,
+    onOperationsMetricsChanged: scheduleOperationsReload,
   });
 
   const accountKpis = useMemo(() => computeAccountKpis(groups), [groups]);

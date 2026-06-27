@@ -3,6 +3,7 @@ import {
   dedupeDailyRowsByGroupId,
   dedupeDailyRowsByGroupIdKeepLatest,
 } from '@/lib/dedupeScrapeDaily';
+import { buildMasterGroupIdSet, isDailyGroupIdInMaster } from '@/lib/masterDailyMatch';
 import { computeReportingStockStatus } from '@/lib/reportingStockStatus';
 import { TABLES } from '@/config/tables';
 import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
@@ -139,6 +140,40 @@ export async function fetchAccountGroupLinks(
       adminCount: Math.max(0, Number(d?.admin_count) || 0),
       memberNonAdmin,
       stockStatus: computeReportingStockStatus(groupName, memberNonAdmin, brandTrimmed),
+    });
+  }
+
+  return rows.sort((a, b) => a.groupName.localeCompare(b.groupName));
+}
+
+/**
+ * Junk (Group mismatch): grup di daily akun yang group_id-nya tidak ada di master brand.
+ * Selaras ticket daily_junk_group / computeAccountTicketBreakdown.junk.
+ */
+export async function fetchAccountJunkGroupLinks(
+  brand: string,
+  platform: Platform,
+  accountId?: string,
+): Promise<AccountGroupLinkRow[]> {
+  const dbId = normalizeDbAccountId(accountId);
+  if (!dbId) return [];
+
+  const daily = await fetchDailyForAccount(dbId, true);
+  const master = await fetchMasterForBrand(brand, platform);
+  const masterIdSet = buildMasterGroupIdSet(master);
+
+  const rows: AccountGroupLinkRow[] = [];
+  for (const d of daily) {
+    const gid = String(d.group_id).trim();
+    if (!gid || isDailyGroupIdInMaster(gid, masterIdSet)) continue;
+    rows.push({
+      groupId: gid,
+      groupName: (d.group_name as string)?.trim() || 'Group',
+      inviteLink: d.invite_link?.trim() || null,
+      isAdmin: d.is_admin === 'yes' ? 'yes' : 'no',
+      inMaster: false,
+      memberCount: Math.max(0, Number(d.member_count) || 0),
+      adminCount: Math.max(0, Number(d.admin_count) || 0),
     });
   }
 

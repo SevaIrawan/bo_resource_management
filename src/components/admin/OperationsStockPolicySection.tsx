@@ -105,65 +105,116 @@ function OperationsStockSopNamingPanel({
 }: OperationsStockSopNamingPanelProps) {
   const { t } = useLanguage();
 
+  function formatPattern(template: string): string {
+    return template
+      .replace(/\{stock\}/g, draft.prefix2StockToken.trim() || 'NEW')
+      .replace(/\{suffix\}/g, draft.prefix3LeftSuffix.trim() || 'LG');
+  }
+
+  const prefix1Examples = [
+    t('admin.operationsStock.prefix1Pattern1'),
+    t('admin.operationsStock.prefix1Pattern2'),
+    t('admin.operationsStock.prefix1Pattern3'),
+    t('admin.operationsStock.prefix1Pattern4'),
+  ];
+  const prefix2Examples = [
+    formatPattern(t('admin.operationsStock.prefix2Pattern1')),
+    formatPattern(t('admin.operationsStock.prefix2Pattern2')),
+    formatPattern(t('admin.operationsStock.prefix2Pattern3')),
+  ];
+  const prefix3Examples = [
+    formatPattern(t('admin.operationsStock.prefix3Pattern1')),
+    formatPattern(t('admin.operationsStock.prefix3Pattern2')),
+  ];
+
   return (
     <div className="operations-sop-naming-panel">
       <p className="operations-stock-policy-col__desc">{t('admin.operationsStock.colNamingDesc')}</p>
 
       <div className="operations-sop-naming-rows">
-        <div className="operations-sop-naming-row">
+        <div className="operations-sop-naming-row operations-sop-naming-row--block">
           <span className="operations-sop-naming-row__label">{t('admin.operationsStock.prefix1Label')}</span>
-          <div className="operations-sop-naming-row__pattern">
-            <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixBrandToken')}</span>
-            <input
-              type="text"
-              className="operations-sop-naming-row__input"
-              value={draft.prefix1UserToken}
-              onChange={(event) =>
-                onChange({
-                  ...draft,
-                  prefix1UserToken: event.target.value,
-                })
-              }
-              aria-label={t('admin.operationsStock.prefix1Token')}
-            />
+          <div className="operations-sop-naming-row__controls">
+            <div className="operations-sop-naming-row__pattern">
+              <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixEmojiToken')}</span>
+              <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixBrandToken')}</span>
+              <input
+                type="text"
+                className="operations-sop-naming-row__input"
+                value={draft.prefix1UserToken}
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    prefix1UserToken: event.target.value,
+                  })
+                }
+                aria-label={t('admin.operationsStock.prefix1Token')}
+                title={t('admin.operationsStock.prefixUserSlotHint')}
+              />
+            </div>
+            <ul className="operations-sop-naming-row__examples">
+              {prefix1Examples.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
           </div>
         </div>
-        <div className="operations-sop-naming-row">
+        <div className="operations-sop-naming-row operations-sop-naming-row--block">
           <span className="operations-sop-naming-row__label">{t('admin.operationsStock.prefix2Label')}</span>
-          <div className="operations-sop-naming-row__pattern">
-            <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixBrandToken')}</span>
-            <input
-              type="text"
-              className="operations-sop-naming-row__input"
-              value={draft.prefix2StockToken}
-              onChange={(event) =>
-                onChange({
-                  ...draft,
-                  prefix2StockToken: event.target.value,
-                })
-              }
-              aria-label={t('admin.operationsStock.prefix2Token')}
-            />
+          <div className="operations-sop-naming-row__controls">
+            <div className="operations-sop-naming-row__pattern">
+              <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixEmojiToken')}</span>
+              <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixBrandToken')}</span>
+              <input
+                type="text"
+                className="operations-sop-naming-row__input"
+                value={draft.prefix2StockToken}
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    prefix2StockToken: event.target.value,
+                  })
+                }
+                aria-label={t('admin.operationsStock.prefix2Token')}
+              />
+            </div>
+            <ul className="operations-sop-naming-row__examples">
+              {prefix2Examples.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
           </div>
         </div>
-        <div className="operations-sop-naming-row">
+        <div className="operations-sop-naming-row operations-sop-naming-row--block">
           <span className="operations-sop-naming-row__label">{t('admin.operationsStock.prefix3Label')}</span>
-          <div className="operations-sop-naming-row__pattern">
-            <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixBrandToken')}</span>
-            <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixUserSlot')}</span>
-            <input
-              type="text"
-              className="operations-sop-naming-row__input"
-              value={draft.prefix3LeftSuffix}
-              onChange={(event) =>
-                onChange({
-                  ...draft,
-                  prefix3LeftSuffix: event.target.value,
-                })
-              }
-              aria-label={t('admin.operationsStock.prefix3Suffix')}
-            />
+          <div className="operations-sop-naming-row__controls">
+            <div className="operations-sop-naming-row__pattern">
+              <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixEmojiToken')}</span>
+              <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixBrandToken')}</span>
+              <span className="operations-sop-naming-row__token">{t('admin.operationsStock.prefixUserSlot')}</span>
+              <input
+                type="text"
+                className="operations-sop-naming-row__input"
+                value={draft.prefix3LeftSuffix}
+                onChange={(event) =>
+                  onChange({
+                    ...draft,
+                    prefix3LeftSuffix: event.target.value,
+                  })
+                }
+                aria-label={t('admin.operationsStock.prefix3Suffix')}
+              />
+            </div>
+            <ul className="operations-sop-naming-row__examples">
+              {prefix3Examples.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
           </div>
+        </div>
+        <div className="operations-sop-naming-row operations-sop-naming-row--other">
+          <span className="operations-sop-naming-row__label">{t('admin.operationsStock.prefixOtherLabel')}</span>
+          <p className="operations-sop-naming-row__other-desc">{t('admin.operationsStock.prefixOtherDesc')}</p>
         </div>
       </div>
 

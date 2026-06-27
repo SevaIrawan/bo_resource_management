@@ -1,7 +1,7 @@
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { useLanguage } from '@/hooks/useLanguage';
 
-export type GroupLinksViewMode = 'account' | 'adminMaster';
+export type GroupLinksViewMode = 'account' | 'adminMaster' | 'junk';
 
 interface GroupLinksPickerModalProps {
   open: boolean;
@@ -59,6 +59,18 @@ export function GroupLinksPickerModal({
             </span>
             <span className="group-links-picker-option-desc">
               {t('groupMonitoring.groupLinks.modeAdminMasterDesc')}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="group-links-picker-option"
+            onClick={() => onSelect('junk')}
+          >
+            <span className="group-links-picker-option-title">
+              {t('groupMonitoring.groupLinks.modeJunk')}
+            </span>
+            <span className="group-links-picker-option-desc">
+              {t('groupMonitoring.groupLinks.modeJunkDesc')}
             </span>
           </button>
         </div>

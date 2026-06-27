@@ -29,36 +29,94 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function isPrefix3(groupName, brand) {
-  const name = groupName.trim();
+const LEADING_EMOJI_PREFIX = String.raw`(?:[\p{Extended_Pictographic}\p{Emoji_Presentation}][\s\uFE0F\u200D]*)*`;
+
+function locateBrand(name, brand) {
   const token = brand.trim();
-  if (!name || !token) return false;
-  if (!/\sLG\s*$/i.test(name)) return false;
-  return name.toLowerCase().includes(token.toLowerCase());
+  if (!token) return null;
+  const normalized = name.trim();
+  const index = normalized.toLowerCase().indexOf(token.toLowerCase());
+  if (index < 0) return null;
+  return { afterBrand: normalized.slice(index + token.length).trim() };
 }
 
-function isPrefix2(groupName, brand) {
+function suffixAtEndPattern(suffix) {
+  return new RegExp(`\\s${escapeRegex(suffix)}\\s*$`, 'i');
+}
+
+function isExactStockToken(value, stockToken) {
+  return new RegExp(`^${escapeRegex(stockToken)}\\s*$`, 'i').test(value.trim());
+}
+
+function stripTrailingEmojiFromUserSlot(value) {
+  return value.replace(/[\s\p{Extended_Pictographic}\p{Emoji_Presentation}]+$/gu, '').trim();
+}
+
+function isPrefix3(groupName, brand, suffix = 'LG', stock = 'NEW') {
   const name = groupName.trim();
   const token = brand.trim();
-  if (!name || !token) return false;
-  const pattern = new RegExp(
-    `^(?:[\\p{Emoji}\\p{Emoji_Presentation}\\s])*(?:${escapeRegex(token)})\\s+NEW\\s*$`,
+  if (!name || !token || !suffix.trim()) return false;
+  const suffixRe = suffixAtEndPattern(suffix);
+  if (!suffixRe.test(name)) return false;
+  if (!name.toLowerCase().includes(token.toLowerCase())) return false;
+  const located = locateBrand(name, token);
+  if (!located) return false;
+  const userPart = located.afterBrand.replace(suffixRe, '').trim();
+  if (!userPart || isExactStockToken(userPart, stock)) return false;
+  const userSegment = String.raw`\S+(?:\s+\S+)*?`;
+  return new RegExp(
+    `^${LEADING_EMOJI_PREFIX}${escapeRegex(token)}\\s+${userSegment}\\s+${escapeRegex(suffix)}\\s*$`,
     'iu',
-  );
-  return pattern.test(name);
+  ).test(name);
 }
 
-function isPrefix1(groupName, brand) {
+function isPrefix2(groupName, brand, stock = 'NEW') {
   const name = groupName.trim();
   const token = brand.trim();
   if (!name || !token) return false;
-  if (isPrefix3(name, token) || isPrefix2(name, token)) return false;
-  const index = name.toLowerCase().indexOf(token.toLowerCase());
-  if (index < 0) return false;
-  let afterBrand = name.slice(index + token.length).trim();
-  afterBrand = afterBrand.replace(/[\p{Emoji}\p{Emoji_Presentation}]+/gu, '').trim();
-  if (!afterBrand || /^NEW$/i.test(afterBrand)) return false;
+  const stockEsc = escapeRegex(stock);
+  const b = escapeRegex(token);
+  const userSegment = String.raw`\S+(?:\s+\S+)*?`;
+  if (new RegExp(`^${LEADING_EMOJI_PREFIX}${b}\\s+${stockEsc}\\s*$`, 'iu').test(name)) return true;
+  if (new RegExp(`^${LEADING_EMOJI_PREFIX}${b}\\s+${userSegment}\\s+${stockEsc}\\s*$`, 'iu').test(name)) {
+    return true;
+  }
+  return new RegExp(
+    `^${LEADING_EMOJI_PREFIX}${b}\\s+${userSegment}\\s+${stockEsc}\\s+.+\\s*$`,
+    'iu',
+  ).test(name);
+}
+
+function parsePrefix1AfterBrand(afterBrand, p1 = '*', stock = 'NEW', suffix = 'LG') {
+  let rest = stripTrailingEmojiFromUserSlot(afterBrand.trim());
+  if (!rest || isExactStockToken(rest, stock) || suffixAtEndPattern(suffix).test(rest)) return false;
+  if (p1 !== '*' && p1 !== '\\*') {
+    const userPattern = new RegExp(`^(${escapeRegex(p1)})(?:\\s+(.*))?$`, 'is');
+    const match = rest.match(userPattern);
+    if (!match?.[1]?.trim()) return false;
+    const trailing = (match[2] ?? '').trim();
+    if (trailing && (isExactStockToken(trailing, stock) || suffixAtEndPattern(suffix).test(trailing))) {
+      return false;
+    }
+    return true;
+  }
+  const match = rest.match(/^(\S+)(?:\s+(.*))?$/s);
+  if (!match?.[1]?.trim()) return false;
+  const trailing = (match[2] ?? '').trim();
+  if (trailing && (isExactStockToken(trailing, stock) || suffixAtEndPattern(suffix).test(trailing))) {
+    return false;
+  }
   return true;
+}
+
+function isPrefix1(groupName, brand, p1 = '*', stock = 'NEW', suffix = 'LG') {
+  const name = groupName.trim();
+  const token = brand.trim();
+  if (!name || !token) return false;
+  if (isPrefix3(name, token, suffix, stock) || isPrefix2(name, token, stock)) return false;
+  const located = locateBrand(name, token);
+  if (!located?.afterBrand) return false;
+  return parsePrefix1AfterBrand(located.afterBrand, p1, stock, suffix);
 }
 
 const BLOCKLIST = [/^❌aa/i, /^CO group/i, /^Feedback Level/i];
@@ -82,6 +140,11 @@ function classifyBucket(groupName, memberNonAdmin, brand) {
 const BRAND = 'FWSG';
 const decisionCases = [
   { name: 'Prefix1 + 1 → active', in: ['FWSG John', 1], out: 'active' },
+  { name: 'Prefix1 numeric user + 1 → active', in: ['WBSG 84736008', 1], out: 'active', brand: 'WBSG' },
+  { name: 'Prefix1 numeric user + tail + 1 → active', in: ['WBSG 84736008 VIP', 1], out: 'active', brand: 'WBSG' },
+  { name: 'Prefix1 emoji + numeric + 1 → active', in: ['🟢 WBSG 84736008', 1], out: 'active', brand: 'WBSG' },
+  { name: 'Prefix2 user NEW + 0 → ready', in: ['FWSG John NEW', 0], out: 'ready' },
+  { name: 'Prefix2 user NEW tail + 0 → ready', in: ['🟢 FWSG John NEW note', 0], out: 'ready' },
   { name: 'Prefix1 + 0 → review', in: ['FWSG John', 0], out: 'review' },
   { name: 'Prefix1 + 2 → review', in: ['FWSG John', 2], out: 'review' },
   { name: 'Prefix2 + 0 → ready', in: ['FWSG NEW', 0], out: 'ready' },
@@ -132,6 +195,13 @@ const checks = [
       prefixConfig.includes('STOCK_PREFIX_CONFIG_STORAGE_KEY'),
   },
   {
+    name: 'Admin SOP naming panel shows pattern examples',
+    ok:
+      adminSection.includes('prefix1Pattern1') &&
+      adminSection.includes('operations-sop-naming-row__examples') &&
+      adminSection.includes('prefixOtherDesc'),
+  },
+  {
     name: 'Loader dedupe group_id + wire panel',
     ok:
       loader.includes('loadOperationsStockCountsByBrandPlatform') &&
@@ -161,17 +231,29 @@ const checks = [
       ),
   },
   {
-    name: 'Realtime: scheduleReportingReload → rm-operations-reload',
+    name: 'Realtime: scheduleOperationsReload → rm-operations-reload',
     ok:
-      provider.includes('scheduleReportingReload') &&
+      provider.includes('scheduleOperationsReload') &&
       provider.includes("new Event('rm-operations-reload')") &&
       panel.includes("addEventListener('rm-operations-reload'"),
   },
   {
-    name: 'Realtime: scrape/daily → scheduleReportingReload',
+    name: 'Realtime: scrape/daily → scheduleMonitoringReload (reporting + operations)',
     ok:
       provider.includes('refreshAccountAfterDailyWrite') &&
-      /refreshAccountAfterDailyWrite[\s\S]*scheduleReportingReload/.test(provider),
+      /refreshAccountAfterDailyWrite[\s\S]*scheduleMonitoringReload/.test(provider),
+  },
+  {
+    name: 'Realtime: groups_master → scheduleMonitoringReload',
+    ok:
+      provider.includes('onMasterDataChanged: scheduleMonitoringReload') &&
+      realtime.includes('table: TABLES.groupsMaster'),
+  },
+  {
+    name: 'Realtime: new_register → scheduleOperationsReload',
+    ok:
+      realtime.includes('table: TABLES.newRegister') &&
+      provider.includes('onOperationsMetricsChanged: scheduleOperationsReload'),
   },
   {
     name: 'Realtime: groups_master Supabase subscription',
@@ -256,7 +338,7 @@ const checks = [
   },
   ...decisionCases.map((c) => ({
     name: `decision: ${c.name}`,
-    ok: classifyBucket(c.in[0], c.in[1], BRAND) === c.out,
+    ok: classifyBucket(c.in[0], c.in[1], c.brand ?? BRAND) === c.out,
   })),
 ];
 

@@ -10,6 +10,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import {
   fetchAccountDailyGroupLinks,
   fetchAccountGroupLinks,
+  fetchAccountJunkGroupLinks,
   type AccountGroupLinkRow,
 } from '@/lib/accountGroupLinks';
 import type { GroupLinksViewMode } from '@/components/group-monitoring/GroupLinksPickerModal';
@@ -27,6 +28,15 @@ interface GroupLinksModalProps {
 }
 
 type AdminFilter = 'all' | 'yes' | 'no';
+
+function groupLinksModeLabel(
+  viewMode: GroupLinksViewMode,
+  t: (key: string) => string,
+): string {
+  if (viewMode === 'account') return t('groupMonitoring.groupLinks.modeAccount');
+  if (viewMode === 'junk') return t('groupMonitoring.groupLinks.modeJunk');
+  return t('groupMonitoring.groupLinks.modeAdminMaster');
+}
 
 function AdminFilterSlicer({
   value,
@@ -111,7 +121,9 @@ export function GroupLinksModal({
     const load =
       viewMode === 'account'
         ? fetchAccountDailyGroupLinks(accountId)
-        : fetchAccountGroupLinks(brandName, platform, accountId);
+        : viewMode === 'junk'
+          ? fetchAccountJunkGroupLinks(brandName, platform, accountId)
+          : fetchAccountGroupLinks(brandName, platform, accountId);
 
     const runLoad = () => {
       void load
@@ -167,11 +179,7 @@ export function GroupLinksModal({
             <h2 id="group-links-title" className="brand-modal-title group-links-modal-title">
               {brandName} {accountName}
             </h2>
-            <p className="group-links-modal-mode">
-              {viewMode === 'account'
-                ? t('groupMonitoring.groupLinks.modeAccount')
-                : t('groupMonitoring.groupLinks.modeAdminMaster')}
-            </p>
+            <p className="group-links-modal-mode">{groupLinksModeLabel(viewMode, t)}</p>
           </div>
           <div className="group-links-header-tools">
             <AdminFilterSlicer
@@ -201,7 +209,11 @@ export function GroupLinksModal({
               {error}
             </p>
           ) : links.length === 0 ? (
-            <p className="sync-modal-message">{t('groupMonitoring.sync.groupLinksEmpty')}</p>
+            <p className="sync-modal-message">
+              {viewMode === 'junk'
+                ? t('groupMonitoring.groupLinks.junkEmpty')
+                : t('groupMonitoring.sync.groupLinksEmpty')}
+            </p>
           ) : filteredLinks.length === 0 ? (
             <p className="sync-modal-message">{t('groupMonitoring.groupLinks.filterEmpty')}</p>
           ) : (

@@ -1,10 +1,10 @@
 import { Download, Plus } from 'lucide-react';
-import { useMemo } from 'react';
-import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
+import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePermissions } from '@/hooks/usePermissions';
 import { exportAllAccountsExcel } from '@/lib/exportExcel';
 import {
+  type AccountSlicerFilters,
   uniqueAccountBrands,
   uniqueAccountPlatforms,
   uniqueAccountStatuses,
@@ -12,7 +12,11 @@ import {
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import { PermissionLockedButton } from '@/components/ui/PermissionLockedButton';
 import { cn } from '@/lib/utils';
-import type { AccountConnectionStatus, AccountViewMode } from '@/types/accountMonitoringUi';
+import type {
+  AccountBrandGroup,
+  AccountConnectionStatus,
+  AccountViewMode,
+} from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
 export type { AccountViewMode };
@@ -21,6 +25,10 @@ interface AccountSlicerHeaderProps {
   viewMode: AccountViewMode;
   onViewModeChange: (mode: AccountViewMode) => void;
   onQuickAddBrand?: () => void;
+  groups: AccountBrandGroup[];
+  filteredGroups: AccountBrandGroup[];
+  accountFilters: AccountSlicerFilters;
+  setAccountFilters: Dispatch<SetStateAction<AccountSlicerFilters>>;
 }
 
 interface FilterSelectProps {
@@ -61,10 +69,13 @@ export function AccountSlicerHeader({
   viewMode,
   onViewModeChange,
   onQuickAddBrand,
+  groups,
+  filteredGroups,
+  accountFilters,
+  setAccountFilters,
 }: AccountSlicerHeaderProps) {
   const { t } = useLanguage();
   const { canManageStructure } = usePermissions();
-  const { groups, filteredGroups, accountFilters, setAccountFilters } = useGroupMonitoring();
 
   const exportableAccountCount = useMemo(
     () => filteredGroups.reduce((n, group) => n + group.accounts.length, 0),

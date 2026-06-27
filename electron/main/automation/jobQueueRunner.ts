@@ -1,4 +1,5 @@
 import { isScrapeActiveForSession } from '../scraper/scrapeCancel';
+import { isAutoScrapeActiveForSession } from '../scraper/autoScrapeCancel';
 import { isSessionSettling, markSessionSettleAfterJob } from './jobQueueSettle';
 import { accountJobStepTotal } from './jobQueueBatchHelpers';
 import { runAutomationAction, withAutomationAccountLock } from './index';
@@ -148,6 +149,7 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
     groups: job.payload.groups,
     leaveDelete: job.payload.leaveDelete,
     photoPath: job.payload.photoPath,
+    jobId: job.id,
   };
 }
 
@@ -205,7 +207,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
   try {
     const result = batch ? await runCreateGroupBatchJob(job) : await runAccountAutomationJob(job);
 
-    if (consumeJobStopRequest(job.id)) {
+    if (consumeJobStopRequest(job.id) || result.errorCode === 'JOB_STOPPED') {
       return;
     }
 
@@ -316,7 +318,10 @@ async function runnerTick(): Promise<void> {
     if (candidates.length === 0) return;
 
     for (const job of candidates) {
-      if (isScrapeActiveForSession(job.sessionId)) {
+      if (
+        isScrapeActiveForSession(job.sessionId) ||
+        isAutoScrapeActiveForSession(job.sessionId)
+      ) {
         scheduleRunnerRetry(1500);
         continue;
       }

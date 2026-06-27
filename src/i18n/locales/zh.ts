@@ -20,14 +20,15 @@ export const zh: Messages = {
     zh: '中文',
     en: 'English',
     autoSync: {
-      title: '账号自动同步',
-      desc: '与「同步」按钮相同：检查设备上的会话与群组数量，并带时间戳写入数据库。',
+      title: '账号自动抓取',
+      desc: '应用在线时每天一次：对 Account 标签下符合条件的账号依次 Run Scraper（一次一个；手动抓取占用 slot 时会排队等待）。',
       enabled: '启用',
-      intervalLabel: '间隔',
-      intervalUnit: '分钟',
-      defaultHint: '默认间隔：{{minutes}} 分钟（1 小时）。',
-      scopeHint:
-        '应用打开且在群组监控页时，对所有账号生效。未重新登录前，登出状态只更新同一条日志的时间戳。',
+      scheduledHourLabel: '每日运行时刻（时）',
+      scheduledHourUnit: ':00 本地时间',
+      defaultScheduledHint: '默认：{{hour}}:00（每个自然日最多一次）。',
+      scopeHint: 'Account 标签下所有品牌与账号；每次完成与手动抓取相同。',
+      scheduleRulesHint:
+        '仅在 scheduled 时刻应用已打开时运行；该时刻已关闭则当天跳过。运行中一次一个账号；失败则关闭设备并短暂停顿后继续；应用中途关闭则放弃剩余账号。',
     },
   },
   header: {
@@ -737,13 +738,14 @@ export const zh: Messages = {
     preferencesSection: '偏好设置',
     supabase: 'Supabase',
     activeSessions: '活跃会话',
+    sessionsLoading: '…',
     platform: '平台',
     sessionTables: '会话表',
     connected: '已连接',
     notConfigured: '未配置',
     desktop: '桌面端',
     web: '网页端',
-    autoSyncSummaryOn: '开 · {{minutes}} 分钟',
+    autoSyncSummaryOn: '开 · 每日 {{hour}}:00',
     autoSyncSummaryOff: '关',
     operationsStock: {
       title: '运维库存策略',

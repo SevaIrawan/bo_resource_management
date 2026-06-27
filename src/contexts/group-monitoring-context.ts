@@ -12,6 +12,7 @@ export interface GroupMonitoringContextValue {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   accountKpis: KpiItem[];
   loading: boolean;
+  loadError: string | null;
   reportError: (message: string) => void;
   setProbeSuspendAccountIds: Dispatch<SetStateAction<string[]>>;
   /** Patch grid + reporting setelah daily/master berubah (scrape/realtime). */

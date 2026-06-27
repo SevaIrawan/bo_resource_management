@@ -10,7 +10,7 @@ export const SYNC_SCRAPER_POLICY = {
     postLoginGraceMs: 120_000,
   },
 
-  /** Detect total grup (manual sync / post-login / auto) — satu pass store; tidak skala jumlah grup. */
+  /** Detect total grup (post-login / legacy paths) — bukan auto scrape Settings. */
   syncDetect: {
     timeoutMs: 90_000,
   },

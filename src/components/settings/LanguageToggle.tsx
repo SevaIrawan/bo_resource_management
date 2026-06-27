@@ -1,11 +1,6 @@
 import { cn } from '@/lib/utils';
-import type { Locale } from '@/i18n';
+import { LOCALES, type Locale } from '@/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
-
-const OPTIONS: { id: Locale; label: string }[] = [
-  { id: 'zh', label: 'ZH' },
-  { id: 'en', label: 'ENG' },
-];
 
 interface LanguageToggleProps {
   value: Locale;
@@ -21,7 +16,7 @@ export function LanguageToggle({ value, onChange }: LanguageToggleProps) {
       role="group"
       aria-label={t('settings.language')}
     >
-      {OPTIONS.map(({ id, label }) => (
+      {LOCALES.map(({ id }) => (
         <button
           key={id}
           type="button"
@@ -36,7 +31,7 @@ export function LanguageToggle({ value, onChange }: LanguageToggleProps) {
               : 'text-text-muted hover:text-text-secondary',
           )}
         >
-          {label}
+          {t(`settings.${id}`)}
         </button>
       ))}
     </div>

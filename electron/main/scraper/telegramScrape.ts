@@ -3,7 +3,8 @@ import { withNetworkRetry } from '../lib/networkRetry';
 import { SCRAPE_IDLE_TIMEOUT_MS } from './deviceGroupScale';
 import { withScrapeWatchdog } from './scrapeWatchdog';
 import { abortActiveScrape } from './scrapeCancel';
-import { emitScrapeProgress, type ScrapeProgressPhase } from './scrapeProgress';
+import { abortActiveAutoScrape } from './autoScrapeCancel';
+import { withTelegramScrapeSessionLock } from './telegramScrapeSessionLock';
 import type { ScrapedGroupRow } from './index';
 
 const PROGRESS_POLL_MS = 400;
@@ -157,17 +158,48 @@ export async function runTelegramScrape(
   telegramUser?: string;
   elapsedMs?: number;
 }> {
-  return withScrapeWatchdog(
-    sessionId,
-    () => runTelegramScrapeInner(sessionId, storedSessionString, expectedPhone),
-    {
-      label: 'Telegram scrape',
-      idleMs: SCRAPE_IDLE_TIMEOUT_MS,
-      onStale: async (sid) => {
-        await abortActiveScrape(sid, 'telegram');
-        await cancelTelegramScrape(sid);
+  return withTelegramScrapeSessionLock(sessionId, () =>
+    withScrapeWatchdog(
+      sessionId,
+      () => runTelegramScrapeInner(sessionId, storedSessionString, expectedPhone),
+      {
+        label: 'Telegram scrape',
+        idleMs: SCRAPE_IDLE_TIMEOUT_MS,
+        onStale: async (sid) => {
+          await abortActiveScrape(sid, 'telegram');
+          await cancelTelegramScrape(sid);
+        },
       },
-    },
+    ),
+  );
+}
+
+/** Auto scrape lane — cancel registry terpisah; sidecar sama, tidak blok user scrape guard. */
+export async function runTelegramScrapeAutoLane(
+  sessionId: string,
+  storedSessionString?: string | null,
+  expectedPhone?: string,
+): Promise<{
+  ok: boolean;
+  groups: ScrapedGroupRow[];
+  count: number;
+  hint?: string;
+  telegramUser?: string;
+  elapsedMs?: number;
+}> {
+  return withTelegramScrapeSessionLock(sessionId, () =>
+    withScrapeWatchdog(
+      sessionId,
+      () => runTelegramScrapeInner(sessionId, storedSessionString, expectedPhone),
+      {
+        label: 'Telegram auto scrape',
+        idleMs: SCRAPE_IDLE_TIMEOUT_MS,
+        onStale: async (sid) => {
+          await abortActiveAutoScrape(sid, 'telegram');
+          await cancelTelegramScrape(sid);
+        },
+      },
+    ),
   );
 }
 

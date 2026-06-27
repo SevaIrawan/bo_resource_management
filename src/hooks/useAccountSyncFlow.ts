@@ -1,15 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
-import {
-  applySyncResultToGroup,
-  patchBrandGroup,
-  rebuildGroupMetrics,
-  setAccountProcessAction,
-  type AccountSyncResult,
-} from '@/lib/accountBrandUtils';
-import { upsertAccountSnapshot } from '@/lib/accountSnapshots';
-import { TABLES } from '@/config/tables';
-import { getSupabase } from '@/lib/supabase';
+import { patchBrandGroup, rebuildGroupMetrics, setAccountProcessAction, type AccountSyncResult } from '@/lib/accountBrandUtils';
+import { applyScrapeMetricsToGroups } from '@/lib/applyScrapeMetricsToGroups';
+import { SESSION_SETTLING_CODE } from '@/lib/automationJobQueueClient';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import {
   cancelPlatformLoginForAccount,
@@ -19,6 +12,7 @@ import {
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { patchAccountSessionInGroups } from '@/lib/accountSessionPatch';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
+import { dispatchMonitoringReloadAfterDailyWrite } from '@/lib/monitoringRealtimeEvents';
 import {
   markAccountLoginGrace,
   markAccountScrapeGrace,
@@ -105,10 +99,6 @@ function patchAccountPhone(
       ),
     };
   });
-}
-
-function isScrapeCancelledMessage(message: string): boolean {
-  return isScrapeUserCancelledMessage(message);
 }
 
 function normalizeSyncErrorMessage(message: string): string {
@@ -325,80 +315,9 @@ export function useAccountSyncFlow({
         sessionOnly?: boolean;
       },
     ) => {
-      const snapshotPending: Array<{
-        account: AccountBrandRow;
-        brandId: string;
-        brandStandard: number;
-      }> = [];
-
-      updateGroups((prev) => {
-        const group = prev.find((g) => g.id === groupId);
-        const account = group?.accounts.find((r) => r.id === accountId);
-        const brandStandard =
-          group && account
-            ? (group.standardGroupCountByPlatform?.[account.platform] ?? 0)
-            : 0;
-
-        if (group?.dbBrandId && account) {
-          if (meta?.sessionOnly) {
-            snapshotPending.push({ account, brandId: group.dbBrandId, brandStandard });
-          } else if (!meta?.preserveSession) {
-            snapshotPending.push({ account, brandId: group.dbBrandId, brandStandard });
-          }
-        }
-
-        return patchBrandGroup(prev, groupId, (g) => {
-          const next = applySyncResultToGroup(g, accountId, result, {
-            masterTotal: meta?.masterTotal,
-            lastSyncAt: meta?.lastSyncAt,
-            preserveActionProcess: meta?.preserveActionProcess,
-            preserveSession: meta?.preserveSession,
-            sessionOnly: meta?.sessionOnly,
-          });
-          return rebuildGroupMetrics(next);
-        });
-      });
-
-      const snap = snapshotPending[0];
-      if (snap) {
-        let resolvedBrandId: string | undefined = snap.brandId;
-        if (!resolvedBrandId) {
-          const supabase = getSupabase();
-          if (supabase) {
-            const { data } = await supabase
-              .from(TABLES.messagingAccounts)
-              .select('brand_id')
-              .eq('id', accountId)
-              .maybeSingle();
-            resolvedBrandId = data?.brand_id as string | undefined;
-          }
-        }
-        if (resolvedBrandId) {
-          const snapshotResult = meta?.sessionOnly
-            ? {
-                groupsCurrent: snap.account.groupsCurrent,
-                groupsTotal: snap.account.groupsTotal,
-                adminCurrent: snap.account.adminCurrent,
-                adminTotal: snap.account.adminTotal,
-                sessionStatus: 'valid' as const,
-              }
-            : result;
-          await upsertAccountSnapshot({
-            account: {
-              ...snap.account,
-              status: meta?.sessionOnly ? 'active' : snap.account.status,
-              sessionStatus: meta?.sessionOnly ? 'valid' : snap.account.sessionStatus,
-            },
-            brandId: resolvedBrandId,
-            result: snapshotResult,
-            brandStandard: snap.brandStandard,
-            masterTotal: meta?.masterTotal,
-            lastSyncAt: meta?.lastSyncAt,
-          });
-        }
-      }
+      await applyScrapeMetricsToGroups(onGroupsChange, groupId, accountId, result, meta);
     },
-    [updateGroups],
+    [onGroupsChange],
   );
 
   const showLoginModal = useCallback(
@@ -543,13 +462,7 @@ export function useAccountSyncFlow({
 
         if (outcome.kind === 'device_busy') {
           stopLoading();
-          showSyncError(
-            outcome.message === 'JOB_QUEUE_EXECUTE_FULL'
-              ? 'JOB_QUEUE_EXECUTE_FULL'
-              : 'SESSION_CHECK_BUSY',
-            groupId,
-            account,
-          );
+          showSyncError(outcome.message || SESSION_SETTLING_CODE, groupId, account);
           return;
         }
 
@@ -837,13 +750,7 @@ export function useAccountSyncFlow({
         if (outcome.kind === 'device_busy') {
           void releaseExecuteSlot(account.id);
           clearRowProcessing(groupId, account.id);
-          showSyncError(
-            outcome.message === 'JOB_QUEUE_EXECUTE_FULL'
-              ? 'JOB_QUEUE_EXECUTE_FULL'
-              : 'SESSION_CHECK_BUSY',
-            groupId,
-            account,
-          );
+          showSyncError(outcome.message || SESSION_SETTLING_CODE, groupId, account);
           return;
         }
 
@@ -898,10 +805,23 @@ export function useAccountSyncFlow({
           );
         }
 
+        markAccountScrapeGrace(account.id);
+        await recordSyncActivity({
+          accountId: outcome.dbAccountId,
+          platform: account.platform,
+          syncSource: 'manual',
+          sessionStatus: 'valid',
+          deviceGroups: outcome.result.groupsCurrent,
+          brandGroups: outcome.result.groupsTotal,
+          adminGroups: outcome.result.adminCurrent,
+          message: `scrape:${outcome.result.groupsCurrent}/${outcome.result.groupsTotal}`,
+        });
+        dispatchMonitoringReloadAfterDailyWrite();
+
         setStep('idle');
       } catch (error) {
         const message = getErrorMessage(error, 'SCRAPER_FAILED');
-        if (isScrapeCancelledMessage(message)) {
+        if (isScrapeUserCancelledMessage(message)) {
           if (!scrapeCancelledAccountIdsRef.current.has(account.id)) {
             setTarget({ groupId, account, dbAccountId: dbAccountId || undefined });
             setStep('scrape-cancelled');
@@ -1261,3 +1181,5 @@ export function useAccountSyncFlow({
     getScrapeProgress,
   };
 }
+
+export type AccountSyncFlowApi = ReturnType<typeof useAccountSyncFlow>;

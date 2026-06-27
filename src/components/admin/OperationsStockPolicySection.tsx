@@ -503,18 +503,3 @@ export function OperationsStockSopNamingCard() {
     </AdminExpandCard>
   );
 }
-
-/** @deprecated Use OperationsStockBrandPolicyCard + OperationsStockSopNamingCard */
-export function OperationsStockPolicyCard() {
-  return (
-    <>
-      <OperationsStockBrandPolicyCard />
-      <OperationsStockSopNamingCard />
-    </>
-  );
-}
-
-/** @deprecated Use OperationsStockBrandPolicyCard + OperationsStockSopNamingCard */
-export function OperationsStockPolicySection() {
-  return <OperationsStockPolicyCard />;
-}

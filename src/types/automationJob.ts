@@ -156,6 +156,7 @@ export interface AutomationJobQueueSnapshot {
   busyAccountIds: string[];
   settlingSessionIds: string[];
   globalScrapeActive: boolean;
+  activeScrapeSessionIds: string[];
   executeSlotsActive: number;
   executeSlotsMax: number;
   executeSlotsQueued: number;

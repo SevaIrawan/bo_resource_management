@@ -210,6 +210,7 @@ const checks = [
       return (
         cancel.includes('isScrapeActiveForSession') &&
         runner.includes('isScrapeActiveForSession') &&
+        runner.includes('isAutoScrapeActiveForSession') &&
         runner.includes('isSessionSettling') &&
         runner.includes('markSessionSettleAfterJob') &&
         guard.includes('assertAccountExecuteAllowed') &&
@@ -430,6 +431,7 @@ const checks = [
       const client = read('src/lib/automationJobQueueClient.ts');
       const sync = read('src/hooks/useAccountSyncFlow.ts');
       const autoSync = read('src/hooks/useAutoAccountSync.ts');
+      const autoScrape = read('src/lib/runAutoAccountScrape.ts');
       return (
         client.includes('enqueueAutomationJob') &&
         client.includes('resolveAccountExecuteBlock') &&
@@ -437,7 +439,8 @@ const checks = [
         !client.includes('clearCompletedAutomationJobs') &&
         !client.includes('isHeavyDeviceExecuteBlocked()') &&
         sync.includes('resolveAccountExecuteBlock') &&
-        autoSync.includes('isHeavyDeviceExecuteBlockedForAccount')
+        autoScrape.includes('waitUntilAutoScrapeAccountReady') &&
+        autoSync.includes('runAutoAccountScrape')
       );
     })(),
   },

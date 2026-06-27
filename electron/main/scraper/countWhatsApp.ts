@@ -3,7 +3,7 @@ import {
   withLiveWhatsAppLoginClient,
   withWhatsAppClient,
 } from '../platformLogin/whatsapp';
-import { isAnyCountAborted } from './countGroupsCancel';
+import { isCountAborted } from './countGroupsCancel';
 import {
   assertWhatsAppScrapeClient,
   countWhatsAppGroupsOnDevice,
@@ -48,7 +48,7 @@ async function countFromConnectedClient(
     label: 'Reading group list from WhatsApp…',
   });
 
-  if (isAnyCountAborted()) {
+  if (isCountAborted(sessionId)) {
     return {
       valid: false,
       totalGroups: 0,

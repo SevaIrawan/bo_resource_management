@@ -1,23 +1,19 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { AUTO_SCRAPE_POLICY, type AutoScrapeCycleControl } from '@/config/autoScrapePolicy';
+import {
+  formatLocalDateKey,
+  msUntilNextAutoScrapeScheduleCheck,
+  persistAutoScrapeLastRunDate,
+  readAutoScrapeLastRunDate,
+  shouldTriggerAutoScrapeCycle,
+} from '@/config/autoScrapeSchedule';
 import { useAutoSyncSettings } from '@/contexts/AutoSyncSettingsContext';
-import { upsertAccountSnapshot } from '@/lib/accountSnapshots';
+import { teardownAutoScrapeDevice } from '@/lib/autoScrapeDeviceTeardown';
 import {
-  applySyncCheckToGroup,
-  runAccountSyncCheck,
-} from '@/lib/runAutoSyncAccount';
-import { sessionCheckTimeoutMs, syncDetectTimeoutMs } from '@/config/syncScraperPolicy';
-import {
-  isHeavyDeviceExecuteBlockedForAccount,
-  isAccountSessionSettling,
-} from '@/lib/automationJobQueueClient';
-import { withTimeout } from '@/lib/withTimeout';
-import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
-
-const DELAY_BETWEEN_ACCOUNTS_MS = 4_000;
-const INITIAL_DELAY_MS = 8_000;
-/** Probe 3s + detect 90s + buffer DB. */
-const AUTO_SYNC_ACCOUNT_TIMEOUT_MS =
-  sessionCheckTimeoutMs() + syncDetectTimeoutMs() + 15_000;
+  runAutoAccountScrape,
+  shouldSkipAutoScrapeAccount,
+} from '@/lib/runAutoAccountScrape';
+import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 
 interface UseAutoAccountSyncOptions {
   userId: string | null | undefined;
@@ -34,6 +30,21 @@ function flattenAccounts(groups: AccountBrandGroup[]) {
   );
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function sleepWithAbort(ms: number, isAborted: () => boolean): Promise<void> {
+  const step = 500;
+  let remaining = ms;
+  while (remaining > 0) {
+    if (isAborted()) return;
+    const chunk = Math.min(step, remaining);
+    await sleep(chunk);
+    remaining -= chunk;
+  }
+}
+
 export function useAutoAccountSync({
   userId,
   groups,
@@ -42,92 +53,122 @@ export function useAutoAccountSync({
   loading,
   suspendAccountIds,
 }: UseAutoAccountSyncOptions) {
-  const { enabled, intervalMs } = useAutoSyncSettings();
+  const { enabled, scheduledHour } = useAutoSyncSettings();
   const [isRunning, setIsRunning] = useState(false);
+  const [activeAutoScrapeAccountId, setActiveAutoScrapeAccountId] = useState<string | null>(
+    null,
+  );
   const runningRef = useRef(false);
   const groupsRef = useRef(groups);
   groupsRef.current = groups;
   const suspendRef = useRef(suspendAccountIds);
   suspendRef.current = suspendAccountIds;
+  const appStartedAtRef = useRef(new Date());
+  const scheduleTimerRef = useRef<number | null>(null);
+  const cycleAbortRef = useRef(false);
+  const activeAutoScrapeRef = useRef<{
+    account: AccountBrandRow;
+    dbAccountId?: string;
+  } | null>(null);
 
   const runCycle = useCallback(async () => {
     if (!userId || !window.electronAPI?.isElectron) return;
     if (runningRef.current) return;
 
+    const now = new Date();
+    const today = formatLocalDateKey(now);
+    const lastRunDate = readAutoScrapeLastRunDate();
+
+    if (
+      !shouldTriggerAutoScrapeCycle({
+        now,
+        appStartedAt: appStartedAtRef.current,
+        scheduledHour,
+        lastRunDate,
+      })
+    ) {
+      return;
+    }
+
+    cycleAbortRef.current = false;
+    const cycleControl: AutoScrapeCycleControl = {
+      isAborted: () => cycleAbortRef.current,
+    };
+
     runningRef.current = true;
     setIsRunning(true);
+    persistAutoScrapeLastRunDate(today);
 
     try {
       const entries = flattenAccounts(groupsRef.current);
       const suspended = new Set(suspendRef.current);
 
       for (const { group, account } of entries) {
-        if (suspended.has(account.id)) continue;
-        if (await isHeavyDeviceExecuteBlockedForAccount(account.id)) continue;
-        if (await isAccountSessionSettling(account)) continue;
+        if (cycleControl.isAborted()) break;
+        if (shouldSkipAutoScrapeAccount(account, suspended)) continue;
 
-        const output = await withTimeout(
-          runAccountSyncCheck({
-            userId,
-            group,
-            account,
-            syncSource: 'auto',
-          }),
-          AUTO_SYNC_ACCOUNT_TIMEOUT_MS,
-          `Auto-sync ${account.accountName}`,
-        ).catch(() => null);
+        const result = await runAutoAccountScrape({
+          userId,
+          group,
+          account,
+          onGroupsChange,
+          cycleControl,
+          suspendedIds: suspended,
+          onActiveChange: (active) => {
+            activeAutoScrapeRef.current = active;
+            setActiveAutoScrapeAccountId(active?.account.id ?? null);
+          },
+        });
 
-        if (!output) continue;
+        if (result === 'aborted') break;
 
-        onGroupsChange((prev) =>
-          prev.map((g) =>
-            g.id === group.id ? applySyncCheckToGroup(g, account.id, output) : g,
-          ),
-        );
-
-        if (group.dbBrandId) {
-          const brandStandard =
-            group.standardGroupCountByPlatform?.[account.platform] ??
-            output.result.groupsTotal;
-          await upsertAccountSnapshot({
-            account: {
-              ...account,
-              ...output.result,
-              status: output.result.sessionStatus === 'valid' ? 'active' : 'logout',
-              sessionStatus: output.result.sessionStatus,
-            },
-            brandId: group.dbBrandId,
-            result: output.result,
-            brandStandard,
-            masterTotal: output.masterJoined,
-          });
-        }
-
-        await new Promise((r) => setTimeout(r, DELAY_BETWEEN_ACCOUNTS_MS));
+        await sleepWithAbort(AUTO_SCRAPE_POLICY.gapAfterAccountMs, cycleControl.isAborted);
       }
     } finally {
+      activeAutoScrapeRef.current = null;
+      setActiveAutoScrapeAccountId(null);
       runningRef.current = false;
       setIsRunning(false);
     }
-  }, [onGroupsChange, userId]);
+  }, [onGroupsChange, scheduledHour, userId]);
 
-  useEffect(() => {
+  const scheduleNextCheck = useCallback(() => {
+    if (scheduleTimerRef.current !== null) window.clearTimeout(scheduleTimerRef.current);
+
     if (!enabled || !monitoringEnabled || loading || !userId) return;
     if (!window.electronAPI?.isElectron) return;
 
-    const startTimer = window.setTimeout(() => {
-      void runCycle();
-    }, INITIAL_DELAY_MS);
+    const delay = msUntilNextAutoScrapeScheduleCheck(new Date(), scheduledHour);
+    scheduleTimerRef.current = window.setTimeout(() => {
+      void runCycle().finally(() => {
+        scheduleNextCheck();
+      });
+    }, delay);
+  }, [enabled, loading, monitoringEnabled, runCycle, scheduledHour, userId]);
 
-    const intervalId = window.setInterval(() => {
-      void runCycle();
-    }, intervalMs);
+  useEffect(() => {
+    appStartedAtRef.current = new Date();
+    cycleAbortRef.current = false;
+    scheduleNextCheck();
 
     return () => {
-      window.clearTimeout(startTimer);
-      window.clearInterval(intervalId);
-    };
-  }, [enabled, intervalMs, loading, monitoringEnabled, runCycle, userId]);
+      cycleAbortRef.current = true;
 
-  return { isRunning };
+      if (scheduleTimerRef.current !== null) {
+        window.clearTimeout(scheduleTimerRef.current);
+        scheduleTimerRef.current = null;
+      }
+
+      const active = activeAutoScrapeRef.current;
+      if (active) {
+        void teardownAutoScrapeDevice({
+          account: active.account,
+          dbAccountId: active.dbAccountId,
+        });
+        activeAutoScrapeRef.current = null;
+      }
+    };
+  }, [scheduleNextCheck]);
+
+  return { isRunning, activeAutoScrapeAccountId };
 }

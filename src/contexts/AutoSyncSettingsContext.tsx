@@ -8,46 +8,43 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  autoSyncIntervalMs,
-  clampAutoSyncIntervalMinutes,
-  DEFAULT_AUTO_SYNC_INTERVAL_MINUTES,
-  persistAutoSyncEnabled,
-  persistAutoSyncIntervalMinutes,
-  readAutoSyncEnabled,
-  readAutoSyncIntervalMinutes,
-} from '@/config/autoSyncSettings';
+  DEFAULT_AUTO_SCRAPE_SCHEDULED_HOUR,
+  persistAutoScrapeScheduledHour,
+  readAutoScrapeScheduledHour,
+  clampAutoScrapeScheduledHour,
+} from '@/config/autoScrapeSchedule';
+import { persistAutoSyncEnabled, readAutoSyncEnabled } from '@/config/autoSyncSettings';
 
 export interface AutoSyncSettingsContextValue {
   enabled: boolean;
   setEnabled: (value: boolean) => void;
-  intervalMinutes: number;
-  setIntervalMinutes: (minutes: number) => void;
-  intervalMs: number;
+  scheduledHour: number;
+  setScheduledHour: (hour: number) => void;
 }
 
 const AutoSyncSettingsContext = createContext<AutoSyncSettingsContextValue | null>(null);
 
 export function AutoSyncSettingsProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabledState] = useState(readAutoSyncEnabled);
-  const [intervalMinutes, setIntervalMinutesState] = useState(readAutoSyncIntervalMinutes);
+  const [scheduledHour, setScheduledHourState] = useState(readAutoScrapeScheduledHour);
 
   const setEnabled = useCallback((value: boolean) => {
     setEnabledState(value);
     persistAutoSyncEnabled(value);
   }, []);
 
-  const setIntervalMinutes = useCallback((minutes: number) => {
-    const clamped = clampAutoSyncIntervalMinutes(minutes);
-    setIntervalMinutesState(clamped);
-    persistAutoSyncIntervalMinutes(clamped);
+  const setScheduledHour = useCallback((hour: number) => {
+    const clamped = clampAutoScrapeScheduledHour(hour);
+    setScheduledHourState(clamped);
+    persistAutoScrapeScheduledHour(clamped);
   }, []);
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key === null) return;
-      if (event.key.includes('rm_auto_sync')) {
+      if (event.key.includes('rm_auto_sync') || event.key.includes('rm_auto_scrape')) {
         setEnabledState(readAutoSyncEnabled());
-        setIntervalMinutesState(readAutoSyncIntervalMinutes());
+        setScheduledHourState(readAutoScrapeScheduledHour());
       }
     };
     window.addEventListener('storage', onStorage);
@@ -58,11 +55,10 @@ export function AutoSyncSettingsProvider({ children }: { children: ReactNode }) 
     () => ({
       enabled,
       setEnabled,
-      intervalMinutes,
-      setIntervalMinutes,
-      intervalMs: autoSyncIntervalMs(intervalMinutes),
+      scheduledHour,
+      setScheduledHour,
     }),
-    [enabled, intervalMinutes, setEnabled, setIntervalMinutes],
+    [enabled, scheduledHour, setEnabled, setScheduledHour],
   );
 
   return (
@@ -78,12 +74,11 @@ export function useAutoSyncSettings(): AutoSyncSettingsContextValue {
     return {
       enabled: readAutoSyncEnabled(),
       setEnabled: persistAutoSyncEnabled,
-      intervalMinutes: readAutoSyncIntervalMinutes(),
-      setIntervalMinutes: persistAutoSyncIntervalMinutes,
-      intervalMs: autoSyncIntervalMs(readAutoSyncIntervalMinutes()),
+      scheduledHour: readAutoScrapeScheduledHour(),
+      setScheduledHour: persistAutoScrapeScheduledHour,
     };
   }
   return ctx;
 }
 
-export { DEFAULT_AUTO_SYNC_INTERVAL_MINUTES };
+export { DEFAULT_AUTO_SCRAPE_SCHEDULED_HOUR };

@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { SubHeader } from './SubHeader';
 import { DashboardProviders } from '@/providers/DashboardProviders';
+import { GroupMonitoringProvider } from '@/providers/GroupMonitoringProvider';
 import { useLanguage } from '@/hooks/useLanguage';
 
 const PAGE_TITLE_KEYS: Record<string, string> = {
@@ -13,7 +14,9 @@ const PAGE_TITLE_KEYS: Record<string, string> = {
 export function DashboardLayout() {
   return (
     <DashboardProviders>
-      <DashboardShell />
+      <GroupMonitoringProvider>
+        <DashboardShell />
+      </GroupMonitoringProvider>
     </DashboardProviders>
   );
 }

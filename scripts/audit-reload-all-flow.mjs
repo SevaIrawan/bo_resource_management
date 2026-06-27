@@ -27,7 +27,7 @@ const STEPS = [
   },
   {
     row: 4,
-    where: '~~refreshSessionsFromDeviceProbe~~',
+    where: '~~refreshSessionsFromDeviceProbe~~ (removed)',
     action: 'REMOVED dari load — probe Puppeteer 25–90s × jumlah akun',
     blocksUi: false,
     note: 'INI penyebab nunggu berhari-hari; cek device hanya di SYNC/RUN',
@@ -70,9 +70,9 @@ const STEPS = [
   {
     row: 10,
     where: 'SYNC / scrape / login',
-    action: 'reconcileTicketsForAccount per akun',
+    action: 'patchAccountGridAfterDailyWrite + dispatchMonitoringReloadAfterDailyWrite',
     blocksUi: false,
-    note: 'Tetap jalan + batch insert ribuan missing_group',
+    note: 'Realtime group_scrape_daily → debounce 400ms',
   },
 ];
 

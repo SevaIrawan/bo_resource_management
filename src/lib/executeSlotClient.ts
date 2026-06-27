@@ -46,12 +46,6 @@ export async function releaseExecuteSlot(accountId: string): Promise<void> {
   unlockUserAction(accountId);
 }
 
-export function subscribeExecuteSlotsChanged(callback: () => void): () => void {
-  const api = executeSlotApi()?.onChanged;
-  if (!api) return () => undefined;
-  return api(callback);
-}
-
 export function executeSlotErrorCode(
   result: Extract<ExecuteSlotAcquireResult, { ok: false }>,
 ): string {

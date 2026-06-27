@@ -6,7 +6,8 @@ import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
 import { getExecuteSlotStats } from './executeSlotPool';
 import { accountJobStepTotal, isAccountJobQueueBusy, isJobQueueBlockingExecutes, listBusyAccountIds } from './jobQueueBatchHelpers';
 import { listSettlingSessionIds, markSessionSettleAfterJob } from './jobQueueSettle';
-import { getActiveScrapeSessionCount, isScrapeActiveForSession } from '../scraper/scrapeCancel';
+import { getActiveScrapeSessionCount, isScrapeActiveForSession, listActiveScrapeSessionIds } from '../scraper/scrapeCancel';
+import { getActiveAutoScrapeSessionCount, listActiveAutoScrapeSessionIds } from '../scraper/autoScrapeCancel';
 import type {
   AutomationJobEnqueueInput,
   AutomationJobListFilter,
@@ -30,6 +31,11 @@ export function consumeJobStopRequest(jobId: string): 'cancel' | 'pause' | null 
   const mode = jobStopRequests.get(jobId);
   if (mode) jobStopRequests.delete(jobId);
   return mode ?? null;
+}
+
+/** Cek stop tanpa consume — dipakai loop automation cooperative cancel. */
+export function peekJobStopRequest(jobId: string): 'cancel' | 'pause' | null {
+  return jobStopRequests.get(jobId) ?? null;
 }
 
 function queueFilePath(): string {
@@ -115,7 +121,12 @@ function buildQueueStats() {
     blockingExecutes: isJobQueueBlockingExecutes(jobs),
     busyAccountIds: listBusyAccountIds(jobs),
     settlingSessionIds: listSettlingSessionIds(),
-    globalScrapeActive: getActiveScrapeSessionCount() > 0,
+    globalScrapeActive:
+      getActiveScrapeSessionCount() > 0 || getActiveAutoScrapeSessionCount() > 0,
+    activeScrapeSessionIds: [
+      ...listActiveScrapeSessionIds(),
+      ...listActiveAutoScrapeSessionIds(),
+    ],
     executeSlotsActive: slotStats.activeCount,
     executeSlotsMax: slotStats.maxConcurrent,
     executeSlotsQueued: slotStats.queuedCount,

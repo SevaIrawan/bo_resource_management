@@ -135,11 +135,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     run: (payload: {
       sessionId: string;
       platform: Platform;
+      accountId?: string;
       storedSessionString?: string | null;
       expectedPhone?: string;
     }) => ipcRenderer.invoke('scraper:run', payload),
+    runAuto: (payload: {
+      sessionId: string;
+      platform: Platform;
+      accountId?: string;
+      storedSessionString?: string | null;
+      expectedPhone?: string;
+    }) => ipcRenderer.invoke('scraper:run-auto', payload),
     cancel: (payload: { sessionId: string; platform: Platform }) =>
       ipcRenderer.invoke('scraper:cancel', payload),
+    cancelAuto: (payload: { sessionId: string; platform: Platform }) =>
+      ipcRenderer.invoke('scraper:cancel-auto', payload),
+    autoLaneReady: (payload: { sessionId: string; accountId: string }) =>
+      ipcRenderer.invoke('scraper:auto-lane-ready', payload),
     cancelCount: (payload: { sessionId: string; platform: Platform }) =>
       ipcRenderer.invoke('scraper:cancel-count', payload),
     countGroups: (payload: {
@@ -180,50 +192,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('scraper:progress', listener);
       return () => ipcRenderer.removeListener('scraper:progress', listener);
     },
-  },
-  automation: {
-    run: (payload: {
-      sessionId: string;
-      platform: Platform;
-      action:
-        | 'create_group'
-        | 'set_group_photo'
-        | 'set_admin'
-        | 'join_by_invite_link'
-        | 'leave_group'
-        | 'delete_group'
-        | 'exit_delete_group';
-      storedSessionString?: string | null;
-      expectedPhone?: string;
-      delay?: Record<string, number | undefined>;
-      groupName?: string;
-      description?: string;
-      hideChatHistory?: boolean;
-      initialParticipants?: string[];
-      batchIndex?: number;
-      totalToCreate?: number;
-      perRun?: number;
-      startFrom?: number;
-      groupNamePrefix?: string;
-      createGroupSettings?: Record<string, boolean>;
-      groupId?: string;
-      groupLink?: string;
-      targets?: string[];
-      adminRights?: Record<string, boolean>;
-      inviteLink?: string;
-      joinSequenceIndex?: number;
-      groups?: Array<{
-        groupId: string;
-        groupName?: string;
-        inviteLink?: string;
-        groupLink?: string;
-      }>;
-      photoPath?: string;
-      leaveDelete?: {
-        clearChatHistoryOnDelete?: boolean;
-        requireOwnerForDelete?: boolean;
-      };
-    }) => ipcRenderer.invoke('automation:run', payload),
   },
   jobQueue: {
     getSnapshot: (filter?: { brandName?: string; platform?: Platform }) =>

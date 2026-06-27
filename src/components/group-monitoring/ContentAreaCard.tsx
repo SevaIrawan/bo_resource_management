@@ -2,13 +2,19 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { AccountSlicerHeader } from '@/components/group-monitoring/AccountSlicerHeader';
 import { useLanguage } from '@/hooks/useLanguage';
-import type { AccountViewMode } from '@/types/accountMonitoringUi';
+import type { AccountSlicerFilters } from '@/lib/filterAccountGroups';
+import type { AccountBrandGroup, AccountViewMode } from '@/types/accountMonitoringUi';
+import type { Dispatch, SetStateAction } from 'react';
 
 interface ContentAreaCardProps {
   children: ReactNode;
   accountViewMode?: AccountViewMode;
   onAccountViewModeChange?: (mode: AccountViewMode) => void;
   onQuickAddBrand?: () => void;
+  groups: AccountBrandGroup[];
+  filteredGroups: AccountBrandGroup[];
+  accountFilters: AccountSlicerFilters;
+  setAccountFilters: Dispatch<SetStateAction<AccountSlicerFilters>>;
 }
 
 export function ContentAreaCard({
@@ -16,6 +22,10 @@ export function ContentAreaCard({
   accountViewMode = 'card',
   onAccountViewModeChange,
   onQuickAddBrand,
+  groups,
+  filteredGroups,
+  accountFilters,
+  setAccountFilters,
 }: ContentAreaCardProps) {
   return (
     <section className="content-area-shell flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
@@ -25,6 +35,10 @@ export function ContentAreaCard({
             viewMode={accountViewMode}
             onViewModeChange={onAccountViewModeChange ?? (() => undefined)}
             onQuickAddBrand={onQuickAddBrand}
+            groups={groups}
+            filteredGroups={filteredGroups}
+            accountFilters={accountFilters}
+            setAccountFilters={setAccountFilters}
           />
         </AccountSlicerBar>
       </header>

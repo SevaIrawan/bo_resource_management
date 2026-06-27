@@ -145,6 +145,8 @@ export interface AutomationJobQueueSnapshot {
   settlingSessionIds: string[];
   /** Scrape aktif di PC (informasi; tidak blok global). */
   globalScrapeActive: boolean;
+  /** Device sessionId dengan scrape user atau auto lane aktif. */
+  activeScrapeSessionIds: string[];
   executeSlotsActive: number;
   executeSlotsMax: number;
   executeSlotsQueued: number;

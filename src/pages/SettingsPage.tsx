@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminExpandCard, AdminExpandCardGroup } from '@/components/admin/AdminExpandCard';
 import { AdminKpiGrid, type AdminKpiItem } from '@/components/admin/AdminKpiGrid';
 import {
@@ -14,18 +14,38 @@ import { LanguageToggle } from '@/components/settings/LanguageToggle';
 import { useAutoSyncSettings } from '@/contexts/AutoSyncSettingsContext';
 import { RM_ACTIVE_TABLES } from '@/config/tables';
 import { useAppUpdateStatus } from '@/hooks/useAppUpdateStatus';
+import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { APP_VERSION } from '@/lib/appVersion';
 import { appUpdateStatusLine, hasNewerAppVersion } from '@/lib/appUpdateUi';
+import { countActiveMessagingSessionsForUser } from '@/lib/platformSessions';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
-export function AdminPage() {
+export function SettingsPage() {
+  const { user } = useAuth();
   const { locale, setLocale, t } = useLanguage();
   const supabaseReady = isSupabaseConfigured();
-  const { enabled, intervalMinutes } = useAutoSyncSettings();
+  const { enabled, scheduledHour } = useAutoSyncSettings();
   const updateStatus = useAppUpdateStatus();
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [activeSessionCount, setActiveSessionCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!supabaseReady || !user?.id) {
+      setActiveSessionCount(null);
+      return;
+    }
+
+    let cancelled = false;
+    void countActiveMessagingSessionsForUser(user.id).then((count) => {
+      if (!cancelled) setActiveSessionCount(count);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabaseReady, user?.id]);
 
   const installedVersion = updateStatus.currentVersion || APP_VERSION;
   const newVersion = updateStatus.version;
@@ -47,7 +67,8 @@ export function AdminPage() {
     {
       id: 'sessions',
       labelKey: 'admin.activeSessions',
-      value: 0,
+      value:
+        activeSessionCount === null ? t('admin.sessionsLoading') : activeSessionCount,
       tone: 'default',
     },
     {
@@ -65,10 +86,12 @@ export function AdminPage() {
   ];
 
   const autoSyncSummary = enabled
-    ? t('admin.autoSyncSummaryOn', { minutes: intervalMinutes })
+    ? t('admin.autoSyncSummaryOn', {
+        hour: String(scheduledHour).padStart(2, '0'),
+      })
     : t('admin.autoSyncSummaryOff');
 
-  const languageSummary = locale === 'zh' ? 'ZH' : 'ENG';
+  const languageSummary = t(`settings.${locale}`);
 
   return (
     <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">

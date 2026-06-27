@@ -4,11 +4,12 @@ import { countWhatsAppGroups, countWhatsAppGroupsQuick } from './countWhatsApp';
 import {
   exportTelegramSession,
   runTelegramScrape,
-  restoreTelegramSession,
+  runTelegramScrapeAutoLane,
 } from './telegramScrape';
 import { validateTelegramSession, validateWhatsAppSession } from './validateSession';
 import { normalizeScrapeResult } from './scrapeOutput';
-import { runWhatsAppScrape } from './whatsappScrape';
+import { assertScrapeHasGroups } from './scrapeGroupValidation';
+import { runWhatsAppScrape, runWhatsAppScrapeAutoLane } from './whatsappScrape';
 import {
   abortActiveScrape,
   clearActiveScrape,
@@ -16,7 +17,19 @@ import {
   registerActiveScrape,
   ScrapeCancelledError,
 } from './scrapeCancel';
+import {
+  abortActiveAutoScrape,
+  AutoScrapeCancelledError,
+  clearActiveAutoScrape,
+  isAutoScrapeCancelled,
+  registerActiveAutoScrape,
+} from './autoScrapeCancel';
 import { cancelTelegramScrape } from './telegramScrape';
+import {
+  releaseAutoScrapeLane,
+  resolveUserLaneBlockForAutoScrape,
+  tryAcquireAutoScrapeLane,
+} from './autoScrapeLane';
 import {
   cancelCountGroups,
   clearCountAbort,
@@ -65,6 +78,46 @@ function guardAccountExecute(sessionId: string, accountId?: string): void {
   assertAccountExecuteAllowed(sessionId, accountId ?? sessionId, jobs);
 }
 
+async function executeAutoScrapeRun(payload: ScrapeRunPayload) {
+  const accountId = payload.accountId ?? payload.sessionId;
+  const userBlock = resolveUserLaneBlockForAutoScrape(payload.sessionId, accountId);
+  if (userBlock) {
+    throw new Error(`AUTO_SCRAPE_USER_LANE_BUSY:${userBlock}`);
+  }
+  if (!tryAcquireAutoScrapeLane(payload.sessionId)) {
+    throw new Error('AUTO_SCRAPE_LANE_BUSY');
+  }
+
+  registerActiveAutoScrape(payload.sessionId);
+
+  try {
+    const raw =
+      payload.platform === 'telegram'
+        ? await runTelegramScrapeAutoLane(
+            payload.sessionId,
+            payload.storedSessionString,
+            payload.expectedPhone,
+          )
+        : await runWhatsAppScrapeAutoLane(payload.sessionId, payload.expectedPhone);
+
+    const groups = normalizeScrapeResult(raw.groups);
+    assertScrapeHasGroups(payload.platform, groups, raw as { hint?: string; telegramUser?: string });
+
+    return { ...raw, groups, count: groups.length };
+  } catch (error) {
+    if (
+      error instanceof AutoScrapeCancelledError ||
+      isAutoScrapeCancelled(payload.sessionId)
+    ) {
+      throw new Error('SCRAPER_CANCELLED');
+    }
+    throw error;
+  } finally {
+    clearActiveAutoScrape(payload.sessionId);
+    releaseAutoScrapeLane(payload.sessionId);
+  }
+}
+
 export function registerScraperIpc() {
   ipcMain.handle('scraper:run', async (_event, payload: ScrapeRunPayload) => {
     guardAccountExecute(payload.sessionId, payload.accountId);
@@ -81,27 +134,7 @@ export function registerScraperIpc() {
           : await runWhatsAppScrape(payload.sessionId, payload.expectedPhone);
 
       const groups = normalizeScrapeResult(raw.groups);
-      if (!groups.length) {
-        const hint =
-          typeof (raw as { hint?: string }).hint === 'string'
-            ? (raw as { hint: string }).hint
-            : undefined;
-        const tgUser =
-          typeof (raw as { telegramUser?: string }).telegramUser === 'string'
-            ? (raw as { telegramUser: string }).telegramUser
-            : undefined;
-        if (payload.platform === 'telegram' && hint === 'ZERO_GROUPS_ON_ACCOUNT') {
-          throw new Error(
-            `SCRAPER_NO_GROUPS: Telegram @${tgUser ?? 'unknown'} — tidak ada grup di akun ini. Login ulang jika salah akun.`,
-          );
-        }
-        if (payload.platform === 'whatsapp') {
-          throw new Error(
-            'SCRAPER_NO_GROUPS: WhatsApp tidak mengembalikan grup. Pastikan sudah CONNECTED dan coba lagi.',
-          );
-        }
-        throw new Error('SCRAPER_NO_GROUPS');
-      }
+      assertScrapeHasGroups(payload.platform, groups, raw as { hint?: string; telegramUser?: string });
 
       return { ...raw, groups, count: groups.length };
     } catch (error) {
@@ -114,6 +147,34 @@ export function registerScraperIpc() {
       scheduleRunnerTick(0);
     }
   });
+
+  ipcMain.handle('scraper:run-auto', async (_event, payload: ScrapeRunPayload) =>
+    executeAutoScrapeRun(payload),
+  );
+
+  ipcMain.handle(
+    'scraper:cancel-auto',
+    async (_event, payload: { sessionId: string; platform: Platform }) => {
+      await abortActiveAutoScrape(payload.sessionId, payload.platform);
+      if (payload.platform === 'telegram') {
+        await cancelTelegramScrape(payload.sessionId).catch(() => undefined);
+      }
+      releaseAutoScrapeLane(payload.sessionId);
+      return { ok: true };
+    },
+  );
+
+  ipcMain.handle(
+    'scraper:auto-lane-ready',
+    async (
+      _event,
+      payload: { sessionId: string; accountId: string },
+    ): Promise<{ ready: boolean; reason?: string }> => {
+      const reason = resolveUserLaneBlockForAutoScrape(payload.sessionId, payload.accountId);
+      if (reason) return { ready: false, reason };
+      return { ready: true };
+    },
+  );
 
   ipcMain.handle(
     'scraper:cancel',
@@ -177,11 +238,5 @@ export function registerScraperIpc() {
   ipcMain.handle(
     'scraper:export-telegram-session',
     async (_event, sessionId: string) => exportTelegramSession(sessionId),
-  );
-
-  ipcMain.handle(
-    'scraper:restore-telegram-session',
-    async (_event, payload: { sessionId: string; sessionString: string }) =>
-      restoreTelegramSession(payload.sessionId, payload.sessionString),
   );
 }

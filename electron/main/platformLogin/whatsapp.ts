@@ -14,6 +14,7 @@ import {
   withNetworkRetry,
 } from '../lib/networkRetry';
 import { withWaBrowserSlot } from './waBrowserPool';
+import { withWaAutoScrapeBrowserSlot } from './waAutoScrapeBrowserPool';
 import { waClientPuppeteerOptions } from './waPuppeteerChrome';
 import {
   waDiskRestoreTimeoutMs,
@@ -461,10 +462,13 @@ async function initializeClientWithRetry(
   client: InstanceType<typeof Client>,
   /** Dari modal login — wajib pakai window utama, jangan lookup global (hindari regresi import). */
   loginWin?: BrowserWindow | null,
+  browserPool: 'user' | 'auto' = 'user',
 ): Promise<void> {
   const maxAttempts = NETWORK_RETRY_ATTEMPTS;
+  const withBrowserSlot =
+    browserPool === 'auto' ? withWaAutoScrapeBrowserSlot : withWaBrowserSlot;
 
-  await withWaBrowserSlot(async () => {
+  await withBrowserSlot(async () => {
     const win = loginWin ?? getNotifierWindow();
     if (win && !win.isDestroyed()) {
       win.webContents.send('platform-login:phase', {
@@ -605,6 +609,8 @@ interface WaClientOpenOptions {
   readyTimeoutMs?: number;
   /** Scrape: tutup client in-memory — paksa WA Web load & sync ulang (bukan cache session lama). */
   freshBoot?: boolean;
+  /** Auto scrape harian — slot Chrome terpisah dari pool user. */
+  browserPool?: 'user' | 'auto';
 }
 
 async function ensureWhatsAppClientInner(
@@ -638,9 +644,10 @@ async function ensureWhatsAppClientInner(
   attachSessionIntegrityHandlers(sessionId, client);
   const readyPromise = waitForClientReady(sessionId, client, 'qr', readyTimeoutMs);
   sessions.set(sessionId, { client, mode: 'qr' });
+  const browserPool = options?.browserPool ?? 'user';
 
   try {
-    await initializeClientWithRetry(sessionId, client);
+    await initializeClientWithRetry(sessionId, client, undefined, browserPool);
   } catch (error) {
     await destroyWhatsAppSession(sessionId);
     throw error;

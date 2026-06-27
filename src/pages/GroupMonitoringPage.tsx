@@ -6,14 +6,25 @@ import { ContentAreaCard } from '@/components/group-monitoring/ContentAreaCard';
 import { KpiGrid } from '@/components/group-monitoring/KpiGrid';
 import { useMonitoringTab } from '@/hooks/useMonitoringTab';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
-import { GroupMonitoringProvider } from '@/providers/GroupMonitoringProvider';
 import type { AccountViewMode } from '@/types/accountMonitoringUi';
 
 function GroupMonitoringContent() {
   const { tab } = useMonitoringTab();
-  const { accountKpis } = useGroupMonitoring();
+  const {
+    accountKpis,
+    loadError,
+    loading,
+    groups,
+    filteredGroups,
+    accountFilters,
+    setAccountFilters,
+  } = useGroupMonitoring();
   const [accountViewMode, setAccountViewMode] = useState<AccountViewMode>('card');
   const [quickAddBrandNonce, setQuickAddBrandNonce] = useState(0);
+
+  if (loadError && !loading) {
+    return <p className="account-sync-loading">{loadError}</p>;
+  }
 
   if (tab === 'reporting') {
     return (
@@ -39,6 +50,10 @@ function GroupMonitoringContent() {
         accountViewMode={accountViewMode}
         onAccountViewModeChange={setAccountViewMode}
         onQuickAddBrand={() => setQuickAddBrandNonce((n) => n + 1)}
+        groups={groups}
+        filteredGroups={filteredGroups}
+        accountFilters={accountFilters}
+        setAccountFilters={setAccountFilters}
       >
         <AccountMonitoringBody
           viewMode={accountViewMode}
@@ -50,9 +65,5 @@ function GroupMonitoringContent() {
 }
 
 export function GroupMonitoringPage() {
-  return (
-    <GroupMonitoringProvider>
-      <GroupMonitoringContent />
-    </GroupMonitoringProvider>
-  );
+  return <GroupMonitoringContent />;
 }

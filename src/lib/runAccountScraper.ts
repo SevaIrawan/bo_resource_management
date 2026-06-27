@@ -16,21 +16,27 @@ import { getSupabase } from '@/lib/supabase';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { LoginMethod } from '@/types/database';
 
+export type ScrapeLane = 'user' | 'auto';
+
 export interface RunAccountScraperInput {
   account: AccountBrandRow;
   sessionId: string;
   userId: string;
   /** UUID kanonik — sama dengan `account.id` baris grid; hindari resolve ulang. */
   dbAccountId?: string;
+  /** user = manual Run/Sync; auto = scheduled background lane. */
+  lane?: ScrapeLane;
 }
 
-async function persistTelegramSession(accountId: string, sessionId: string): Promise<void> {
+async function persistTelegramSession(
+  accountId: string,
+  sessionId: string,
+  label: string,
+): Promise<void> {
   const exporter = window.electronAPI?.scraper?.exportTelegramSession;
   if (!exporter) return;
 
-  const exported = await withNetworkRetry('Export Telegram session after scrape', () =>
-    exporter(sessionId),
-  );
+  const exported = await withNetworkRetry(label, () => exporter(sessionId));
   await saveTelegramPlatformSession({
     accountId,
     sessionString: exported.sessionString,
@@ -44,11 +50,15 @@ export interface ScrapeRunCounts {
   masterCount: number;
 }
 
-/** Satu pintu scrape renderer: Sync Now + kolom Run → Electron `scraper:run`. */
+/** Satu pintu scrape renderer — user (`scraper:run`) atau auto (`scraper:run-auto`). */
 export async function runAccountScraper(input: RunAccountScraperInput): Promise<ScrapeRunCounts> {
+  const lane = input.lane ?? 'user';
   const api = window.electronAPI?.scraper;
 
   if (!api) {
+    throw new Error('SCRAPER_DESKTOP_REQUIRED');
+  }
+  if (lane === 'auto' && !api.runAuto) {
     throw new Error('SCRAPER_DESKTOP_REQUIRED');
   }
 
@@ -77,14 +87,19 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     platform: input.account.platform,
   });
 
+  const logPrefix = lane === 'auto' ? 'Auto scrape' : 'Scrape';
+
   try {
-    const result = await api.run({
+    const scrapePayload = {
       sessionId: deviceSessionId,
       platform: input.account.platform,
       accountId,
       storedSessionString,
       expectedPhone: input.account.phoneNumber?.trim() || undefined,
-    });
+    } as const;
+
+    const result =
+      lane === 'auto' ? await api.runAuto!(scrapePayload) : await api.run(scrapePayload);
 
     const scrapeWrite = await writeScrapeDailyRows({
       accountId,
@@ -99,7 +114,11 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     const masterCount = scrapeWrite.masterCount;
 
     if (input.account.platform === 'telegram') {
-      await persistTelegramSession(accountId, deviceSessionId);
+      await persistTelegramSession(
+        accountId,
+        deviceSessionId,
+        `Export Telegram session after ${logPrefix.toLowerCase()}`,
+      );
     }
 
     await markPlatformSessionSynced(accountId);
@@ -124,7 +143,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
       accountId,
       platform: input.account.platform,
       eventType: 'login_success',
-      message: `Scrape: ${deviceGroupCount} groups, admin ${deviceAdminCount}, master ${masterCount}${metaSuffix}`,
+      message: `${logPrefix}: ${deviceGroupCount} groups, admin ${deviceAdminCount}, master ${masterCount}${metaSuffix}`,
     });
     const supabase = getSupabase();
     if (supabase) {
@@ -145,7 +164,7 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
 
     return { deviceGroupCount, deviceAdminCount, masterCount };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Scrape failed';
+    const message = error instanceof Error ? error.message : `${logPrefix} failed`;
     const cancelled = isScrapeUserCancelledMessage(message);
     if (runId) {
       await finishScrapeRun({
@@ -157,7 +176,11 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     }
     if (!cancelled && input.account.platform === 'telegram') {
       try {
-        await persistTelegramSession(accountId, deviceSessionId);
+        await persistTelegramSession(
+          accountId,
+          deviceSessionId,
+          `Export Telegram session after ${logPrefix.toLowerCase()} failure`,
+        );
       } catch {
         // session may already be gone
       }

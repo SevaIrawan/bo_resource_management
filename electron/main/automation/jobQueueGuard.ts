@@ -1,3 +1,4 @@
+import { isAutoScrapeActiveForSession } from '../scraper/autoScrapeCancel';
 import { isScrapeActiveForSession } from '../scraper/scrapeCancel';
 import { isAccountJobQueueBusy } from './jobQueueBatchHelpers';
 import { isSessionSettling } from './jobQueueSettle';
@@ -19,7 +20,7 @@ export function resolveAccountExecuteBlockReason(
   if (isAccountJobQueueBusy(jobs, accountId)) {
     return JOB_QUEUE_EXECUTE_FULL_MESSAGE;
   }
-  if (isScrapeActiveForSession(sessionId)) {
+  if (isScrapeActiveForSession(sessionId) || isAutoScrapeActiveForSession(sessionId)) {
     return JOB_QUEUE_EXECUTE_FULL_MESSAGE;
   }
   if (isSessionSettling(sessionId)) {

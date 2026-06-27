@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { TABLES } from '@/config/tables';
-import { patchGroupsFromDailyInState } from '@/lib/hydrateAccountMetricsFromDaily';
 import { patchAccountSnapshotInGroups } from '@/lib/accountSessionPatch';
 import { mergeGroupsAccountMetrics } from '@/lib/mergeMonitoringGroups';
 import { patchBrandPlatformMasterInGroups } from '@/lib/patchAccountMasterInGroups';
@@ -26,11 +25,6 @@ interface UseRealtimeMonitoringOptions {
 type GroupsMasterRow = {
   brand?: string;
   platform?: Platform;
-};
-
-type ScrapeRunRow = {
-  account_id?: string;
-  status?: string;
 };
 
 type DailyRow = {
@@ -168,17 +162,7 @@ export function useRealtimeMonitoring({
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: TABLES.scrapeRuns },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as ScrapeRunRow | undefined;
-          const accountId = row?.account_id;
-          const status = row?.status;
-          if (
-            accountId &&
-            status === 'completed' &&
-            !suspendedRef.current.includes(accountId)
-          ) {
-            onAccountDailyChangedRef.current?.(accountId);
-          }
+        () => {
           notifyChange();
         },
       )
@@ -207,16 +191,6 @@ export function useRealtimeMonitoring({
           if (!accountId || suspendedRef.current.includes(accountId)) return;
 
           onAccountDailyChangedRef.current?.(accountId);
-
-          onGroupsChangeRef.current((latest) => {
-            void patchGroupsFromDailyInState(latest, accountId).then((patched) => {
-              onGroupsChangeRef.current((current) =>
-                mergeGroupsAccountMetrics(current, patched),
-              );
-              notifyChange();
-            });
-            return latest;
-          });
           notifyChange();
         },
       )

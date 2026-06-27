@@ -81,6 +81,8 @@ export interface AutomationRunPayload {
     clearChatHistoryOnDelete?: boolean;
     requireOwnerForDelete?: boolean;
   };
+  /** Job queue runner — cooperative cancel/pause mid-automation. */
+  jobId?: string;
 }
 
 export interface AutomationRunResult {

@@ -131,6 +131,27 @@ declare global {
           loggedInAs?: string;
           elapsedMs?: number;
         }>;
+        runAuto: (payload: {
+          sessionId: string;
+          platform: Platform;
+          accountId?: string;
+          storedSessionString?: string | null;
+          expectedPhone?: string;
+        }) => Promise<{
+          ok: boolean;
+          groups: ScrapedGroupRow[];
+          count: number;
+          loggedInAs?: string;
+          elapsedMs?: number;
+        }>;
+        cancelAuto: (payload: {
+          sessionId: string;
+          platform: Platform;
+        }) => Promise<{ ok: boolean }>;
+        autoLaneReady: (payload: {
+          sessionId: string;
+          accountId: string;
+        }) => Promise<{ ready: boolean; reason?: string }>;
         cancel: (payload: {
           sessionId: string;
           platform: Platform;
@@ -172,39 +193,6 @@ declare global {
           }) => void,
         ) => () => void;
       };
-      automation?: {
-        run: (payload: {
-          sessionId: string;
-          platform: Platform;
-          action: 'create_group' | 'set_group_photo' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
-          storedSessionString?: string | null;
-          expectedPhone?: string;
-          delay?: {
-            between_targets_sec?: number;
-            after_create_sec?: number;
-            flood_wait_extra_sec?: number;
-            max_floodwait_auto_sleep_sec?: number;
-            invite_export_retries?: number;
-            invite_export_retry_sec?: number;
-            jitter_percent?: number;
-          };
-          groupName?: string;
-          description?: string;
-          hideChatHistory?: boolean;
-          initialParticipants?: string[];
-          groupId?: string;
-          groupLink?: string;
-          targets?: string[];
-          adminRights?: Record<string, boolean>;
-          inviteLink?: string;
-        }) => Promise<{
-          status: 'ok' | 'error';
-          action: 'create_group' | 'set_group_photo' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
-          message?: string;
-          errorCode?: string;
-          result?: Record<string, unknown>;
-        }>;
-      };
       jobQueue?: {
         getSnapshot: (filter?: {
           brandName?: string;
@@ -238,6 +226,7 @@ declare global {
           busyAccountIds: string[];
           settlingSessionIds: string[];
           globalScrapeActive: boolean;
+          activeScrapeSessionIds: string[];
           executeSlotsActive: number;
           executeSlotsMax: number;
           executeSlotsQueued: number;

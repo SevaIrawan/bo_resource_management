@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccountMonitoringSyncModals } from '@/components/group-monitoring/AccountMonitoringSyncModals';
+import { AccountSyncFlowContext } from '@/contexts/account-sync-flow-context';
 import { GroupMonitoringContext } from '@/contexts/group-monitoring-context';
 import { useAuth } from '@/hooks/useAuth';
+import { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAutoAccountSync } from '@/hooks/useAutoAccountSync';
 import { useRealtimeAccountSessions } from '@/hooks/useRealtimeAccountSessions';
@@ -18,6 +21,7 @@ import {
   filterAccountGroups,
 } from '@/lib/filterAccountGroups';
 import { patchAccountGridAfterDailyWrite } from '@/lib/patchAccountGridAfterDailyWrite';
+import { dispatchMonitoringReloadAfterDailyWrite } from '@/lib/monitoringRealtimeEvents';
 import { mergeGroupsAccountMetrics, mergeReloadPreservingActionProcess } from '@/lib/mergeMonitoringGroups';
 import { computeAccountKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -29,7 +33,7 @@ interface GroupMonitoringProviderProps {
 
 export function GroupMonitoringProvider({ children }: GroupMonitoringProviderProps) {
   const { user } = useAuth();
-  const { canAutoSync } = usePermissions();
+  const { canAutoSync, canOperatePlatform } = usePermissions();
   const { registerRefreshHandler, registerFullRefreshHandler } = useMonitoringTab();
   const { notifyPendingDataUpdate } = useMonitoringPending();
   const { t } = useLanguage();
@@ -91,7 +95,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       accountRefreshBusyRef.current.add(dbAccountId);
       try {
         await patchAccountGridFromDb(dbAccountId);
-        scheduleMonitoringReload();
+        dispatchMonitoringReloadAfterDailyWrite();
       } finally {
         accountRefreshBusyRef.current.delete(dbAccountId);
         if (pendingAccountRefreshRef.current.has(dbAccountId)) {
@@ -100,7 +104,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         }
       }
     },
-    [patchAccountGridFromDb, scheduleMonitoringReload],
+    [patchAccountGridFromDb],
   );
 
   const handleAccountDailyChanged = useCallback(
@@ -201,7 +205,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     scheduleReportingReload();
   }, [notifyPendingDataUpdate, reloadGroupsOnly, scheduleReportingReload]);
 
-  const autoSyncState = useAutoAccountSync({
+  const autoSync = useAutoAccountSync({
     userId: user?.id,
     groups,
     onGroupsChange: setGroups,
@@ -209,19 +213,17 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     loading,
     suspendAccountIds: probeSuspendAccountIds,
   });
-  const autoSyncRunning = autoSyncState?.isRunning ?? false;
 
-  const realtimeSuspendIds = useMemo(() => {
-    if (!autoSyncRunning) return probeSuspendAccountIds;
-    const all = groups.flatMap((g) => g.accounts.map((a) => a.id));
-    return [...new Set([...probeSuspendAccountIds, ...all])];
-  }, [autoSyncRunning, groups, probeSuspendAccountIds]);
+  const realtimeSuspendAccountIds = useMemo(() => {
+    if (!autoSync.activeAutoScrapeAccountId) return probeSuspendAccountIds;
+    return [...new Set([...probeSuspendAccountIds, autoSync.activeAutoScrapeAccountId])];
+  }, [autoSync.activeAutoScrapeAccountId, probeSuspendAccountIds]);
 
   useRealtimeAccountSessions({
     groups,
     onGroupsChange: setGroups,
     enabled: Boolean(user?.id) && !loading,
-    suspendProbeAccountIds: realtimeSuspendIds,
+    suspendProbeAccountIds: realtimeSuspendAccountIds,
   });
 
   const [monitoringUserId, setMonitoringUserId] = useState<string | null>(null);
@@ -243,7 +245,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   useRealtimeMonitoring({
     userId: monitoringUserId,
     enabled: Boolean(monitoringUserId) && !loading,
-    suspendAccountIds: probeSuspendAccountIds,
+    suspendAccountIds: realtimeSuspendAccountIds,
     onGroupsChange: setGroups,
     onAccountDailyChanged: handleAccountDailyChanged,
     onRegistryChange: handleRegistryRealtime,
@@ -254,6 +256,46 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   const accountKpis = useMemo(() => computeAccountKpis(groups), [groups]);
 
+  const sync = useAccountSyncFlow({
+    onGroupsChange: setGroups,
+    userId: user?.id ?? null,
+    canOperatePlatform,
+    translate: t,
+  });
+
+  const probeSuspendIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const accountId of Object.keys(sync.processingByAccount)) {
+      ids.add(accountId);
+      const dbId = sync.processingDbByAccount[accountId];
+      if (dbId) ids.add(dbId);
+    }
+    if (sync.step === 'scrape-prompt' && sync.target?.account.id) {
+      ids.add(sync.target.account.id);
+    }
+    if (sync.step === 'platform-login' && sync.target?.account.id) {
+      ids.add(sync.target.account.id);
+    }
+    if (sync.target?.dbAccountId) {
+      ids.add(sync.target.dbAccountId);
+    }
+    if (sync.postLoginGraceAccountId) {
+      ids.add(sync.postLoginGraceAccountId);
+    }
+    return [...ids];
+  }, [
+    sync.postLoginGraceAccountId,
+    sync.processingByAccount,
+    sync.processingDbByAccount,
+    sync.step,
+    sync.target?.account.id,
+    sync.target?.dbAccountId,
+  ]);
+
+  useEffect(() => {
+    setProbeSuspendAccountIds(probeSuspendIds);
+  }, [probeSuspendIds, setProbeSuspendAccountIds]);
+
   const value = useMemo(
     () => ({
       groups,
@@ -263,6 +305,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       onGroupsChange: setGroups,
       accountKpis,
       loading,
+      loadError: error,
       reportError,
       setProbeSuspendAccountIds,
       refreshAccountGrid: refreshAccountAfterDailyWrite,
@@ -273,16 +316,18 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       accountFilters,
       accountKpis,
       loading,
+      error,
       reportError,
       refreshAccountAfterDailyWrite,
     ],
   );
 
-  if (error && !loading && groups.length === 0) {
-    return <p className="account-sync-loading">{error}</p>;
-  }
-
   return (
-    <GroupMonitoringContext.Provider value={value}>{children}</GroupMonitoringContext.Provider>
+    <GroupMonitoringContext.Provider value={value}>
+      <AccountSyncFlowContext.Provider value={sync}>
+        <AccountMonitoringSyncModals sync={sync} />
+        {children}
+      </AccountSyncFlowContext.Provider>
+    </GroupMonitoringContext.Provider>
   );
 }

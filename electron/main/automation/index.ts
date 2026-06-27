@@ -61,10 +61,6 @@ export async function runAutomationAction(
 export function registerAutomationIpc(): void {
   registerBrandGroupPhotoIpc();
 
-  ipcMain.handle('automation:run', async (_event, payload: AutomationRunPayload) => {
-    return runAutomationAction(payload);
-  });
-
   ipcMain.handle('jobQueue:getSnapshot', (_event, filter?: AutomationJobListFilter) => {
     return getJobQueueSnapshot(filter);
   });

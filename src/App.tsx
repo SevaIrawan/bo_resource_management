@@ -4,7 +4,7 @@ import { AdminRoute } from '@/components/auth/AdminRoute';
 import { GuestRoute, ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { GroupMonitoringPage } from '@/pages/GroupMonitoringPage';
-import { AdminPage } from '@/pages/AdminPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { LoginPage } from '@/pages/LoginPage';
 export default function App() {
   return (
@@ -22,7 +22,7 @@ export default function App() {
               path="settings"
               element={
                 <AdminRoute>
-                  <AdminPage />
+                  <SettingsPage />
                 </AdminRoute>
               }
             />

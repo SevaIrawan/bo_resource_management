@@ -89,8 +89,16 @@ const checks = [
     ok: read('src/lib/automationJobQueueClient.ts').includes('isAccountJobActive'),
   },
   {
-    name: '§ Tidak ada freshBoot di WA scrape',
-    ok: !read('electron/main/scraper/whatsappScrape.ts').includes('freshBoot: true'),
+    name: '§ User WA scrape tanpa freshBoot; auto lane boleh freshBoot+pool terpisah',
+    ok: (() => {
+      const wa = read('electron/main/scraper/whatsappScrape.ts');
+      const userLane = wa.slice(0, wa.indexOf('runWhatsAppScrapeAutoLane'));
+      return (
+        !userLane.includes('freshBoot: true') &&
+        wa.includes('runWhatsAppScrapeAutoLane') &&
+        wa.includes("browserPool: 'auto'")
+      );
+    })(),
   },
   {
     name: '§ WA scrape log skip grup (bukan silent)',

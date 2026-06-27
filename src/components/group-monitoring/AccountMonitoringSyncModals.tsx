@@ -69,7 +69,7 @@ function resolveAlertMessage(
   if (code === 'SESSION_WARM_PENDING') {
     return t('groupMonitoring.sync.sessionWarmPending');
   }
-  if (code === 'SESSION_CHECK_BUSY') {
+  if (code === 'SESSION_SETTLING' || code === 'SESSION_CHECK_BUSY') {
     return t('groupMonitoring.sync.sessionCheckBusy');
   }
   if (code === 'EXECUTE_SLOTS_FULL') {

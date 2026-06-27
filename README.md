@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.26` (lihat `package.json`)
+**Versi saat ini:** `1.0.27` (lihat `package.json`)
+
+**Rilis 1.0.27:** Auto scrape lane terpisah; progress scrape persist saat navigasi; audit guard job queue vs auto-scrape; Settings page; bersihkan dead code & duplikasi scrape cancel/metrics.
 
 **Rilis 1.0.26:** Supabase migration **036** — PK `groups_master` = `(brand, platform, group_id)` (fix duplicate key scrape); satu alur tulis DB via `rm_commit_account_scrape`; multi-akun scrape UI per baris; idle scrape watchdog.
 

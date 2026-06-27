@@ -10,7 +10,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const config = read('src/config/workerPlatformSettings.ts');
 const ui = read('src/components/admin/WorkerPlatformSettingsSection.tsx');
-const admin = read('src/pages/AdminPage.tsx');
+const admin = read('src/pages/SettingsPage.tsx');
 const en = read('src/i18n/locales/en.ts');
 
 const checks = [

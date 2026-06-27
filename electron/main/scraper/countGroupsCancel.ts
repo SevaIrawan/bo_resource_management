@@ -1,7 +1,4 @@
-import {
-  forceReleaseWhatsAppForLogin,
-  listActiveWhatsAppSessionIds,
-} from '../platformLogin/whatsapp';
+import { forceReleaseWhatsAppForLogin } from '../platformLogin/whatsapp';
 
 type Platform = 'whatsapp' | 'telegram';
 
@@ -23,35 +20,24 @@ export function isCountAborted(sessionId: string): boolean {
   return countAbortBySession.get(sessionId)?.signal.aborted ?? false;
 }
 
-export function isAnyCountAborted(): boolean {
-  for (const ac of countAbortBySession.values()) {
-    if (ac.signal.aborted) return true;
-  }
-  return false;
-}
-
 /** Batalkan count grup di main — lepas Chrome WA agar tidak zombie setelah renderer timeout. */
 export async function cancelCountGroups(
   sessionId: string,
   platform: Platform,
 ): Promise<{ ok: boolean }> {
-  const ids =
-    platform === 'whatsapp'
-      ? [sessionId, ...listActiveWhatsAppSessionIds().filter((id) => id !== sessionId)]
-      : [sessionId];
+  countAbortBySession.get(sessionId)?.abort();
 
   let released = false;
-  for (const id of ids) {
-    countAbortBySession.get(id)?.abort();
-    if (platform === 'whatsapp') {
-      await forceReleaseWhatsAppForLogin(id, { urgent: true, fast: true }).catch(() => undefined);
-      released = true;
-    }
+  if (platform === 'whatsapp') {
+    await forceReleaseWhatsAppForLogin(sessionId, { urgent: true, fast: true }).catch(
+      (error) => {
+        console.warn('[count-cancel] WA release failed:', error);
+      },
+    );
+    released = true;
   }
 
-  for (const id of ids) {
-    clearCountAbort(id);
-  }
+  clearCountAbort(sessionId);
 
   return { ok: released || platform === 'telegram' };
 }

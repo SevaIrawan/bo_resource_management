@@ -60,7 +60,7 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     - duplicate_group_id — group_id sama (HP & master), nama beda.
     - duplicate_group_name — group_id beda (HP vs master), nama sama.
     TIDAK ada group_count_mismatch (agregat Y≠X).
-    Implementasi: reconcileTickets.ts + label UI ticketPanel (en/zh).
+    Implementasi: `accountMasterDailyCompare.ts` → `computeAccountTicketBreakdown` (in-memory; dipakai join/leave/admin picker). Tab Ticket DB dihapus migrasi 033 — jangan cari `reconcileTickets.ts`.
 
 12. MULTI-AKUN (100+ WA & Telegram per platform)
     Produk ini multi-akun: setiap baris `messaging_accounts` = satu sesi terpisah.
@@ -86,7 +86,7 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     - Menyalahkan operator/user sebelum trace alur lengkap (Scraper → daily → reconcile → realtime → UI state).
     - Mengubah banyak file berdasarkan teori tanpa baca file terkait dulu (`Read`, `Grep`, trace call chain).
     WAJIB SEBELUM JAWAB BUG / PERILAKU SISTEM:
-    1. Baca kode path yang relevan end-to-end (contoh Issue: `reconcileTickets.ts` → `loadTickets.ts` → `GroupMonitoringProvider` → `useRealtimeMonitoring`).
+    1. Baca kode path yang relevan end-to-end (contoh metrik/issue: `accountMasterDailyCompare.ts` → `patchAccountGridAfterDailyWrite` → `GroupMonitoringProvider` → `useRealtimeMonitoring`).
     2. Pisahkan fakta vs hipotesis; tulis eksplisit jika belum diverifikasi.
     3. Jika user sudah state fakta ("sudah Scraper", "kolom Groups sudah update") — percaya dan cari bug di layer lain, jangan ulangi teori yang user sudah bantah.
     4. Verifikasi dengan validator/skrip repo jika ada (`npm run validate:*`).
@@ -94,12 +94,13 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     Saat user marah karena diagnosa salah: akui kesalahan, revisi berdasarkan trace ulang — jangan defend asumsi lama.
 
 15. REALTIME SETELAH SYNC / SCRAPER (wajib)
-    Contoh: brand X=150, akun punya 146 di daily → missing_group ticket = 4 (bukan 50 lama).
-    Urutan wajib setelah execute:
-    1. Tulis daily (scrape) + snapshot
-    2. reconcileTicketsForAccountFromDb(accountId) — banding master vs daily, tutup ticket yang sudah join
-    3. reloadTickets() — kartu Issue realtime
-    Trigger: onTicketsReload / refreshIssues(dbAccountId) setelah Run Scraper & Sync; Supabase realtime daily → onAccountDailyChanged; master brand → reconcile user.
+    Contoh: brand X=150, akun punya 146 di daily → missing_group breakdown = 4 (bukan 50 lama).
+    Urutan wajib setelah scrape execute:
+    1. Tulis daily atomik (`rm_commit_account_scrape`) + snapshot
+    2. Patch grid akun (`applyResult` manual / `runAutoAccountScrape` auto) + `refreshAccountAfterDailyWrite` via realtime `group_scrape_daily`
+    3. `dispatchMonitoringReloadAfterDailyWrite` → Reporting + Operations reload
+    Auto scrape: lane terpisah (`scraper:run-auto`, pool Chrome auto max 1) — tidak ambil execute slot user, tidak suspend probe global.
+    Trigger: Supabase realtime daily → `onAccountDailyChanged`; master brand → patch master; manual/auto scrape → `recordSyncActivity` + dispatch reload.
 
 16. TAB REPORTING — DATA REAL + REALTIME SUPABASE (wajib)
     Tab Reporting = read-only; TIDAK ubah session, scraper, sync, ticket, reconcile.

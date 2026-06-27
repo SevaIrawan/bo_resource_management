@@ -4,6 +4,7 @@ import { fetchWhatsAppGroupInviteLink } from '../scraper/whatsappGroupInviteLink
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
 import { withPromiseTimeout } from './promiseTimeout';
 import { resolveJoinGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
+import { peekJobStopRequest } from './jobQueueStore';
 import { runWaDeleteGroupChat } from './waDeleteGroupChat';
 import { runWaExitDeleteGroup } from './waExitDeleteGroup';
 import { runWaLeaveGroup } from './waLeaveGroup';
@@ -390,6 +391,31 @@ async function runJoinByInviteLink(
   }
 }
 
+function buildBatchStopResult(input: {
+  created: number;
+  totalTarget: number;
+  failed: string[];
+  groupOutcomes: Array<{
+    groupId: string;
+    groupName?: string;
+    inviteLink?: string;
+    createStatus: 'created' | 'failed';
+  }>;
+}): AutomationRunResult {
+  const { created, totalTarget, failed, groupOutcomes } = input;
+  return {
+    status: created > 0 ? 'ok' : 'error',
+    action: 'create_group',
+    message: 'Stopped by user',
+    errorCode: 'JOB_STOPPED',
+    result: { success: created, total: totalTarget, failed, groupOutcomes },
+  };
+}
+
+function isJobStopRequested(jobId?: string): boolean {
+  return Boolean(jobId && peekJobStopRequest(jobId));
+}
+
 function pauseBetweenRunsMs(delay?: AutomationRunPayload['delay']): number {
   const minSec = delay?.pause_between_runs_min_sec ?? 45 * 60;
   const maxSec = delay?.pause_between_runs_max_sec ?? 65 * 60;
@@ -435,10 +461,18 @@ export async function runWhatsAppCreateGroupBatch(
       onProgress(0, totalTarget, prefix);
 
       while (created < totalTarget) {
+        if (isJobStopRequested(payload.jobId)) {
+          return buildBatchStopResult({ created, totalTarget, failed, groupOutcomes });
+        }
+
         const createdBeforeSlice = created;
         const sliceSize = Math.min(perRun, totalTarget - created);
 
         for (let i = 0; i < sliceSize; i += 1) {
+          if (isJobStopRequested(payload.jobId)) {
+            return buildBatchStopResult({ created, totalTarget, failed, groupOutcomes });
+          }
+
           const num = nextNum + i;
           const groupName = totalTarget > 1 ? `${prefix} ${num}`.trim() : prefix;
           const batchIndex = created + 1;
@@ -483,7 +517,7 @@ export async function runWhatsAppCreateGroupBatch(
           break;
         }
 
-        console.log(
+        console.warn(
           `[wa-automation] batch slice done ${created}/${totalTarget}; pause before next slice`,
         );
         await sleep(pauseBetweenRunsMs(payload.delay));

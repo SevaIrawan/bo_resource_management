@@ -120,10 +120,13 @@ const implChecks = [
     ok: (() => {
       const scraper = read('src/lib/accountScraper.ts');
       const wa = read('electron/main/scraper/whatsappScrape.ts');
+      const userLane = wa.slice(0, wa.indexOf('runWhatsAppScrapeAutoLane'));
       return (
         scraper.includes('invite_link: group.invite_link') &&
         scraper.includes("rpc('rm_commit_account_scrape'") &&
-        !wa.includes('freshBoot: true')
+        !userLane.includes('freshBoot: true') &&
+        wa.includes('runWhatsAppScrapeAutoLane') &&
+        wa.includes('browserPool: \'auto\'')
       );
     })(),
   },
@@ -131,11 +134,13 @@ const implChecks = [
     name: 'Kontrak: execute slot pool max 4 + IPC (cursor-prompt-gm-master)',
     ok: (() => {
       const pool = read('electron/main/automation/executeSlotPool.ts');
+      const policy = read('src/config/executeSlotPolicy.ts');
       const gate = read('src/lib/userActionGate.ts');
       const client = read('src/lib/executeSlotClient.ts');
       return (
         pool.includes('getMaxWaBrowserSlots') &&
-        gate.includes('MAX_EXECUTE_SLOTS = 4') &&
+        policy.includes('DEFAULT_MAX_EXECUTE_SLOTS = 4') &&
+        gate.includes('DEFAULT_MAX_EXECUTE_SLOTS') &&
         client.includes('acquireOrWait')
       );
     })(),
@@ -153,6 +158,41 @@ const implChecks = [
   {
     name: 'Kontrak: job queue per-akun (bukan global block)',
     ok: read('src/lib/automationJobQueueClient.ts').includes('isAccountJobActive'),
+  },
+  {
+    name: 'Auto Sync Settings = runAutoAccountScraper lane terpisah (bukan sync check / quick count)',
+    ok: (() => {
+      const autoHook = read('src/hooks/useAutoAccountSync.ts');
+      const autoScrape = read('src/lib/runAutoAccountScrape.ts');
+      const autoScraper = read('src/lib/runAutoAccountScraper.ts');
+      const schedule = read('src/config/autoScrapeSchedule.ts');
+      const policy = read('src/config/autoScrapePolicy.ts');
+      const teardown = read('src/lib/autoScrapeDeviceTeardown.ts');
+      const scraperMain = read('electron/main/scraper/index.ts');
+      return (
+        autoHook.includes('runAutoAccountScrape') &&
+        autoHook.includes('cycleAbortRef') &&
+        autoHook.includes('teardownAutoScrapeDevice') &&
+        autoHook.includes('AUTO_SCRAPE_POLICY') &&
+        !autoHook.includes('setInterval') &&
+        autoScrape.includes('runAutoAccountScraper') &&
+        autoScrape.includes('isAutoScrapeLaneReadyForAccount') &&
+        autoScrape.includes("sessionStatus !== 'valid'") &&
+        autoScrape.includes('teardownAutoScrapeDevice') &&
+        autoScrape.includes('AUTO_SCRAPE_POLICY') &&
+        autoScrape.includes('waitUntilAutoScrapeAccountReady') &&
+        !autoScrape.includes('acquireExecuteSlotWithinMs') &&
+        autoScraper.includes('runAuto') &&
+        policy.includes('gapAfterAccountMs') &&
+        !policy.includes('slotMaxWaitMs') &&
+        teardown.includes('cancelAuto') &&
+        !teardown.includes('releaseExecuteSlot') &&
+        scraperMain.includes('scraper:run-auto') &&
+        scraperMain.includes('scraper:cancel-auto') &&
+        schedule.includes('shouldTriggerAutoScrapeCycle') &&
+        !autoHook.includes('runAccountSyncCheck')
+      );
+    })(),
   },
 ];
 

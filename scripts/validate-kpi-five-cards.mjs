@@ -26,8 +26,8 @@ const checks = [
     ok: !kpis.includes('computeTicketKpis'),
   },
   {
-    name: 'ACCOUNT_KPIS default: 4 item',
-    ok: (defaults.match(/kpi\.account\./g) ?? []).length === 4,
+    name: 'KPI dari computeAccountKpis (tanpa ACCOUNT_KPIS stub)',
+    ok: !defaults.includes('ACCOUNT_KPIS') && defaults.includes('export interface KpiItem'),
   },
   {
     name: 'Tidak ada TICKET_KPIS',

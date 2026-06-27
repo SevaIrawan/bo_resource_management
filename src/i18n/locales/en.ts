@@ -18,14 +18,16 @@ export const en = {
     zh: '中文',
     en: 'English',
     autoSync: {
-      title: 'Automatic account sync',
-      desc: 'Runs the same checks as the Sync button: live session on device and group count. Activity is stored in the database with timestamps.',
+      title: 'Automatic account scrape',
+      desc: 'Once per day while the app is open: runs Run Scraper on every eligible account on the Account tab, one account at a time (waits for a free slot if you scrape manually).',
       enabled: 'Enabled',
-      intervalLabel: 'Interval',
-      intervalUnit: 'minutes',
-      defaultHint: 'Default interval: {{minutes}} minutes (1 hour).',
+      scheduledHourLabel: 'Daily run at (hour)',
+      scheduledHourUnit: ':00 local time',
+      defaultScheduledHint: 'Default: {{hour}}:00 (once per calendar day).',
       scopeHint:
-        'Applies to all accounts in Group Monitoring while the app is open. Logout status is updated on the same log row until the user logs in again.',
+        'All brands and accounts on the Account tab. Same effects as a manual scrape when each run completes.',
+      scheduleRulesHint:
+        'Runs only if the app is already open at the scheduled time. If the app was closed when that time passed, today’s run is skipped (no catch-up). While running: one account at a time; on failure the device is closed and the next account continues after a short gap. If the app closes mid-run, the rest is abandoned.',
     },
   },
   header: {
@@ -771,13 +773,14 @@ export const en = {
     preferencesSection: 'Preferences',
     supabase: 'Supabase',
     activeSessions: 'Active sessions',
+    sessionsLoading: '…',
     platform: 'Platform',
     sessionTables: 'Session tables',
     connected: 'Connected',
     notConfigured: 'Not configured',
     desktop: 'Desktop',
     web: 'Web',
-    autoSyncSummaryOn: 'On · {{minutes}} min',
+    autoSyncSummaryOn: 'On · daily {{hour}}:00',
     autoSyncSummaryOff: 'Off',
     operationsStock: {
       title: 'Operations stock policy',

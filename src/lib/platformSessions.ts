@@ -142,6 +142,29 @@ export async function fetchActiveSessionAccountIdSet(
   );
 }
 
+/** Jumlah akun messaging user yang punya baris platform_sessions is_active=true. */
+export async function countActiveMessagingSessionsForUser(userId: string): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 0;
+
+  const { data, error } = await supabase
+    .from(TABLES.messagingAccounts)
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  if (error) {
+    if (isRlsError(error.code, error.message)) {
+      console.error('[platformSessions]', PLATFORM_SESSION_RLS_HINT, error);
+    }
+    return 0;
+  }
+
+  const accountIds = ((data as { id: string }[] | null) ?? []).map((row) => row.id);
+  const activeSet = await fetchActiveSessionAccountIdSet(accountIds);
+  return activeSet.size;
+}
+
 async function resolvePlatformForAccount(accountId: string): Promise<Platform> {
   const supabase = getSupabase();
   if (!supabase) return 'whatsapp';

@@ -35,7 +35,7 @@ import {
   isEnqueueErrorResult,
 } from '@/lib/operationsJobQueueEnqueueResult';
 import { mapEnqueueJobQueueError } from '@/lib/mapEnqueueJobQueueError';
-import type { JobQueueTaskType } from '@/lib/operationsJobQueueUi';
+import type { JobQueueTaskType, JobQueueTaskTypeSelection } from '@/lib/operationsJobQueueUi';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { MissingMasterGroupForJoin } from '@/lib/loadMissingMasterGroupsForJoin';
 import type { Platform } from '@/types/database';
@@ -44,14 +44,14 @@ interface OperationsJobQueueAddBarProps {
   groups: AccountBrandGroup[];
   platform: Platform;
   brandFilter: string;
-  taskType: JobQueueTaskType;
-  onTaskTypeChange: (taskType: JobQueueTaskType) => void;
+  taskType: JobQueueTaskTypeSelection;
+  onTaskTypeChange: (taskType: JobQueueTaskTypeSelection) => void;
 }
 
 function resolveBrandName(brandFilter: string, selectedBrand: string, brandOptions: string[]): string {
   if (brandFilter !== 'all') return brandFilter;
   if (selectedBrand && brandOptions.includes(selectedBrand)) return selectedBrand;
-  return brandOptions[0] ?? '';
+  return '';
 }
 
 function returnEnqueueError(error: string, t: (key: string) => string, setFeedback: (msg: string) => void): string {
@@ -101,10 +101,14 @@ export function OperationsJobQueueAddBar({
   const activeBrand = resolveBrandName(brandFilter, selectedBrand, brandOptions);
 
   useEffect(() => {
-    if (brandFilter !== 'all') return;
-    if (selectedBrand && brandOptions.includes(selectedBrand)) return;
-    setSelectedBrand(brandOptions[0] ?? '');
-  }, [brandFilter, brandOptions, selectedBrand]);
+    setSelectedBrand('');
+    setSelectedAccountId('');
+    setSuperAdminAccountId('');
+    setJoinableGroups([]);
+    setJoinGroupAccountIds({});
+    setSuperAdminGroups([]);
+    setAccountExitGroups({ daily: [], junk: [] });
+  }, [platform]);
 
   const platformAccounts = useMemo(() => {
     const group = groups.find((g) => g.brandName === activeBrand);
@@ -124,21 +128,7 @@ export function OperationsJobQueueAddBar({
     setJoinGroupAccountIds({});
     setSuperAdminGroups([]);
     setAccountExitGroups({ daily: [], junk: [] });
-  }, [activeBrand, platform]);
-
-  useEffect(() => {
-    if (taskType === 'set_admin') return;
-    if (selectedAccountId && validAccounts.some((row) => row.id === selectedAccountId)) return;
-    const first = validAccounts[0];
-    setSelectedAccountId(first?.id ?? '');
-  }, [taskType, selectedAccountId, validAccounts]);
-
-  useEffect(() => {
-    if (taskType !== 'set_admin') return;
-    if (superAdminAccountId && validAccounts.some((row) => row.id === superAdminAccountId)) return;
-    const first = validAccounts[0];
-    setSuperAdminAccountId(first?.id ?? '');
-  }, [taskType, superAdminAccountId, validAccounts]);
+  }, [activeBrand]);
 
   const reloadMissingGroups = useCallback(async () => {
     const accountIds =
@@ -568,6 +558,7 @@ export function OperationsJobQueueAddBar({
     platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
 
   const setupReady = useMemo(() => {
+    if (!taskType) return false;
     if (!activeBrand) return false;
     if (taskType === 'set_admin') {
       return Boolean(superAdminAccountId && superAdminAccount);
@@ -633,8 +624,7 @@ export function OperationsJobQueueAddBar({
     <section className="operations-job-queue-add">
       <div className="operations-job-queue-execute-panel">
         <div className="operations-job-queue-add-filters">
-          <label className="operations-job-queue-field operations-job-queue-field--inline">
-            <span>{t('operations.jobQueue.actionTabsLabel')}</span>
+          <div className="operations-job-queue-field operations-job-queue-field--inline">
             <DarkSelect
               value={taskType}
               onChange={(value) => {
@@ -645,57 +635,56 @@ export function OperationsJobQueueAddBar({
               ariaLabel={t('operations.jobQueue.actionTabsLabel')}
               triggerClassName="account-slicer-select operations-job-queue-select"
               disabled={brandSelectDisabled}
+              placeholder={t('operations.jobQueue.selectTask')}
             />
-          </label>
+          </div>
 
         {brandFilter === 'all' ? (
-          <label className="operations-job-queue-field operations-job-queue-field--inline">
-            <span>{t('operations.jobQueue.colBrand')}</span>
+          <div className="operations-job-queue-field operations-job-queue-field--inline">
             <DarkSelect
-              value={activeBrand}
+              value={selectedBrand}
               onChange={setSelectedBrand}
               options={brandSelectOptions}
               ariaLabel={t('operations.jobQueue.colBrand')}
               triggerClassName="account-slicer-select operations-job-queue-select"
               disabled={brandSelectDisabled || brandSelectOptions.length === 0}
+              placeholder={t('operations.jobQueue.selectBrand')}
             />
-          </label>
+          </div>
         ) : (
           <div className="operations-job-queue-field operations-job-queue-field--inline operations-job-queue-field--readonly">
-            <span>{t('operations.jobQueue.colBrand')}</span>
             <strong>{brandFilter}</strong>
           </div>
         )}
 
         {taskType === 'set_admin' ? (
-          <label className="operations-job-queue-field operations-job-queue-field--inline">
-            <span>{t('operations.jobQueue.setAdminSuperAccount')}</span>
+          <div className="operations-job-queue-field operations-job-queue-field--inline">
             <DarkSelect
               value={superAdminAccountId}
               onChange={setSuperAdminAccountId}
               options={superAdminSelectOptions}
               ariaLabel={t('operations.jobQueue.setAdminSuperAccount')}
               triggerClassName="account-slicer-select operations-job-queue-select"
-              disabled={accountSelectDisabled || superAdminSelectOptions.length === 0}
+              disabled={
+                accountSelectDisabled ||
+                !activeBrand ||
+                superAdminSelectOptions.length === 0
+              }
+              placeholder={t('operations.jobQueue.selectAccount')}
             />
-          </label>
+          </div>
         ) : (
           <div className="operations-job-queue-field operations-job-queue-field--inline">
-            <span>{t('operations.jobQueue.account')}</span>
-            {platformAccounts.length === 0 ? (
-              <span className="operations-schedule-join-empty">{t('operations.jobQueue.noAccounts')}</span>
-            ) : (
-              <DarkSelect
-                value={selectedAccountId}
-                onChange={setSelectedAccountId}
-                options={accountSelectOptions}
-                disabledValues={invalidAccountIds}
-                ariaLabel={t('operations.jobQueue.account')}
-                triggerClassName="account-slicer-select operations-job-queue-select"
-                disabled={accountSelectDisabled}
-                placeholder={t('operations.jobQueue.pickAccount')}
-              />
-            )}
+            <DarkSelect
+              value={selectedAccountId}
+              onChange={setSelectedAccountId}
+              options={accountSelectOptions}
+              disabledValues={invalidAccountIds}
+              ariaLabel={t('operations.jobQueue.account')}
+              triggerClassName="account-slicer-select operations-job-queue-select"
+              disabled={accountSelectDisabled || !activeBrand}
+              placeholder={t('operations.jobQueue.selectAccount')}
+            />
           </div>
         )}
 
@@ -716,6 +705,7 @@ export function OperationsJobQueueAddBar({
       {feedback ? <p className="operations-schedule-join-feedback">{feedback}</p> : null}
       </div>
 
+      {setupOpen && taskType ? (
       <OperationsJobQueueSetupModal
         open={setupOpen}
         onClose={() => setSetupOpen(false)}
@@ -755,6 +745,7 @@ export function OperationsJobQueueAddBar({
           return message;
         }}
       />
+      ) : null}
     </section>
   );
 }

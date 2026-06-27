@@ -39,7 +39,7 @@ interface OperationsSlicerHeaderProps {
 
 const OPERATIONS_BOOKMARKS: OperationsBookmark[] = ['overview', 'job_queue'];
 
-/** Slicer Operations — bookmark Overview | Job Queue; brand hanya di Overview. */
+/** Slicer Operations — Platform (+ Brand di Overview) kiri; bookmark kanan. */
 export function OperationsSlicerHeader({
   groups,
   filters,
@@ -67,7 +67,7 @@ export function OperationsSlicerHeader({
 
   return (
     <div className="account-slicer-row operations-slicer-row">
-      <div className="account-slicer-right">
+      <div className="account-slicer-left">
         <div className="account-slicer-filters">
           <SlicerSelect
             value={filters.platform}
@@ -82,7 +82,9 @@ export function OperationsSlicerHeader({
             />
           ) : null}
         </div>
+      </div>
 
+      <div className="account-slicer-right">
         <div
           className="account-slicer-view-toggle"
           role="group"

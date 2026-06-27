@@ -8,12 +8,14 @@ interface ContentAreaCardProps {
   children: ReactNode;
   accountViewMode?: AccountViewMode;
   onAccountViewModeChange?: (mode: AccountViewMode) => void;
+  onQuickAddBrand?: () => void;
 }
 
 export function ContentAreaCard({
   children,
   accountViewMode = 'card',
   onAccountViewModeChange,
+  onQuickAddBrand,
 }: ContentAreaCardProps) {
   return (
     <section className="content-area-shell flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
@@ -22,6 +24,7 @@ export function ContentAreaCard({
           <AccountSlicerHeader
             viewMode={accountViewMode}
             onViewModeChange={onAccountViewModeChange ?? (() => undefined)}
+            onQuickAddBrand={onQuickAddBrand}
           />
         </AccountSlicerBar>
       </header>

@@ -1,6 +1,8 @@
 import { isMisalignedFromSyncResult } from '@/lib/accountDisplayMetrics';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { buildStandardCountByPlatformFromRows } from '@/lib/brandStandardCount';
+import { ensureBrand } from '@/lib/brands';
+import type { Dispatch, SetStateAction } from 'react';
 import type { AccountBrandGroup, AddAccountInput } from '@/types/accountMonitoringUi';
 import type { SessionUiStatus } from '@/types/accountMonitoringUi';
 
@@ -63,6 +65,33 @@ export function createEmptyBrandGroup(
     accounts: [],
     emptySlots: createEmptyAccountSlots(name, id),
   };
+}
+
+/** Tambah kartu brand kosong ke grid (Account tab — card bawah atau quick + header). */
+export async function appendBrandGroupFromName(
+  brandName: string,
+  userId: string | undefined,
+  setGroups: Dispatch<SetStateAction<AccountBrandGroup[]>>,
+): Promise<void> {
+  const name = brandName.trim();
+  if (!name) return;
+
+  let dbBrandId: string | undefined;
+  if (userId) {
+    const brand = await ensureBrand({ userId, brandName: name });
+    dbBrandId = brand.id;
+  }
+  const nextGroup = { ...createEmptyBrandGroup(name, dbBrandId), dbBrandId };
+
+  setGroups((prev) => {
+    const exists = prev.some(
+      (g) =>
+        g.brandName.trim().toLowerCase() === name.toLowerCase() ||
+        (dbBrandId && g.dbBrandId === dbBrandId),
+    );
+    if (exists) return prev;
+    return [...prev, nextGroup].sort((a, b) => a.brandName.localeCompare(b.brandName));
+  });
 }
 
 export function flattenBrandAccounts(groups: AccountBrandGroup[]) {

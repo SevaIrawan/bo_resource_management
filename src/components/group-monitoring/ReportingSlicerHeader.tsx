@@ -1,4 +1,3 @@
-import { Search } from 'lucide-react';
 import { useMemo } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { DarkSelect } from '@/components/ui/DarkSelect';
@@ -131,7 +130,10 @@ export function ReportingSlicerHeader({
   return (
     <div className="account-slicer-row reporting-slicer-row">
       <div className="account-slicer-left">
-        <div className="account-slicer-search-group">
+        <form
+          className="account-slicer-search-group"
+          onSubmit={(event) => event.preventDefault()}
+        >
           <input
             type="search"
             value={filters.groupNameSearch}
@@ -141,14 +143,13 @@ export function ReportingSlicerHeader({
             aria-label={t('groupMonitoring.reporting.searchGroupNamePlaceholder')}
           />
           <button
-            type="button"
-            className="account-slicer-search-btn"
-            aria-label={t('groupMonitoring.searchSubmit')}
+            type="submit"
+            className="account-slicer-search-btn account-slicer-search-btn--enter"
+            aria-label={t('groupMonitoring.searchEnter')}
           >
-            <Search className="h-3.5 w-3.5" strokeWidth={2} />
-            {t('groupMonitoring.searchSubmit')}
+            {t('groupMonitoring.searchEnter')}
           </button>
-        </div>
+        </form>
       </div>
 
       <div className="account-slicer-right reporting-slicer-right">

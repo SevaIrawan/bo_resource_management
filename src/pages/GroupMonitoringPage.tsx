@@ -13,6 +13,7 @@ function GroupMonitoringContent() {
   const { tab } = useMonitoringTab();
   const { accountKpis } = useGroupMonitoring();
   const [accountViewMode, setAccountViewMode] = useState<AccountViewMode>('card');
+  const [quickAddBrandNonce, setQuickAddBrandNonce] = useState(0);
 
   if (tab === 'reporting') {
     return (
@@ -37,8 +38,12 @@ function GroupMonitoringContent() {
       <ContentAreaCard
         accountViewMode={accountViewMode}
         onAccountViewModeChange={setAccountViewMode}
+        onQuickAddBrand={() => setQuickAddBrandNonce((n) => n + 1)}
       >
-        <AccountMonitoringBody viewMode={accountViewMode} />
+        <AccountMonitoringBody
+          viewMode={accountViewMode}
+          quickAddBrandNonce={quickAddBrandNonce}
+        />
       </ContentAreaCard>
     </div>
   );

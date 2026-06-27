@@ -1,7 +1,8 @@
-import { Download, Search } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import { useMemo } from 'react';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
+import { usePermissions } from '@/hooks/usePermissions';
 import { exportAllAccountsExcel } from '@/lib/exportExcel';
 import {
   uniqueAccountBrands,
@@ -9,6 +10,7 @@ import {
   uniqueAccountStatuses,
 } from '@/lib/filterAccountGroups';
 import { DarkSelect } from '@/components/ui/DarkSelect';
+import { PermissionLockedButton } from '@/components/ui/PermissionLockedButton';
 import { cn } from '@/lib/utils';
 import type { AccountConnectionStatus, AccountViewMode } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
@@ -18,6 +20,7 @@ export type { AccountViewMode };
 interface AccountSlicerHeaderProps {
   viewMode: AccountViewMode;
   onViewModeChange: (mode: AccountViewMode) => void;
+  onQuickAddBrand?: () => void;
 }
 
 interface FilterSelectProps {
@@ -54,8 +57,13 @@ function platformLabel(t: (key: string) => string, platform: Platform): string {
     : t('groupMonitoring.platform.telegram');
 }
 
-export function AccountSlicerHeader({ viewMode, onViewModeChange }: AccountSlicerHeaderProps) {
+export function AccountSlicerHeader({
+  viewMode,
+  onViewModeChange,
+  onQuickAddBrand,
+}: AccountSlicerHeaderProps) {
   const { t } = useLanguage();
+  const { canManageStructure } = usePermissions();
   const { groups, filteredGroups, accountFilters, setAccountFilters } = useGroupMonitoring();
 
   const exportableAccountCount = useMemo(
@@ -105,23 +113,26 @@ export function AccountSlicerHeader({ viewMode, onViewModeChange }: AccountSlice
   return (
     <div className="account-slicer-row">
       <div className="account-slicer-left">
-        <div className="account-slicer-search-group">
+        <form
+          className="account-slicer-search-group"
+          onSubmit={(event) => event.preventDefault()}
+        >
           <input
             type="search"
             value={accountFilters.search}
             onChange={(e) => patchFilters({ search: e.target.value })}
-            placeholder={t('groupMonitoring.searchPlaceholder')}
+            placeholder={t('groupMonitoring.searchAccPlaceholder')}
             className="account-slicer-search"
+            aria-label={t('groupMonitoring.searchAccPlaceholder')}
           />
           <button
-            type="button"
-            className="account-slicer-search-btn"
-            aria-label={t('groupMonitoring.searchSubmit')}
+            type="submit"
+            className="account-slicer-search-btn account-slicer-search-btn--enter"
+            aria-label={t('groupMonitoring.searchEnter')}
           >
-            <Search className="h-3.5 w-3.5" strokeWidth={2} />
-            {t('groupMonitoring.searchSubmit')}
+            {t('groupMonitoring.searchEnter')}
           </button>
-        </div>
+        </form>
       </div>
 
       <div className="account-slicer-right">
@@ -171,6 +182,23 @@ export function AccountSlicerHeader({ viewMode, onViewModeChange }: AccountSlice
         >
           <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
         </button>
+
+        {canManageStructure ? (
+          <button
+            type="button"
+            className="account-slicer-export-btn"
+            onClick={() => onQuickAddBrand?.()}
+            title={t('groupMonitoring.accountCard.addBrandTitle')}
+            aria-label={t('groupMonitoring.accountCard.addBrandTitle')}
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </button>
+        ) : (
+          <PermissionLockedButton
+            className="account-slicer-export-btn"
+            title={t('groupMonitoring.accountCard.addBrandTitle')}
+          />
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import {
   countAccountsByPlatform,
   masterGroupCountsByPlatform,
+  type AccountPlatformFilter,
 } from '@/lib/brandCardHeaderBadges';
 import { resolveMessagingAccountSaveErrorCode } from '@/lib/messagingAccounts';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 interface AccountBrandCardProps {
   group: AccountBrandGroup;
+  activePlatformFilter?: AccountPlatformFilter;
   canManageStructure?: boolean;
   canOperatePlatform?: boolean;
   onAddAccount: (input: AddAccountInput) => Promise<void>;
@@ -51,6 +53,7 @@ interface AccountBrandCardProps {
 
 export function AccountBrandCard({
   group,
+  activePlatformFilter = 'all',
   canManageStructure = true,
   canOperatePlatform = true,
   onAddAccount,
@@ -88,6 +91,24 @@ export function AccountBrandCard({
     () => masterGroupCountsByPlatform(group.standardGroupCountByPlatform),
     [group.standardGroupCountByPlatform],
   );
+  const showAllPlatforms = activePlatformFilter === 'all';
+
+  function renderAccountsBadge() {
+    if (showAllPlatforms) {
+      return t('groupMonitoring.accountCard.platformAccountsBadge', {
+        wa: accountsByPlatform.whatsapp,
+        tg: accountsByPlatform.telegram,
+      });
+    }
+    if (activePlatformFilter === 'whatsapp') {
+      return t('groupMonitoring.accountCard.platformAccountsBadgeWa', {
+        count: accountsByPlatform.whatsapp,
+      });
+    }
+    return t('groupMonitoring.accountCard.platformAccountsBadgeTg', {
+      count: accountsByPlatform.telegram,
+    });
+  }
 
   function openAddFlow(platform: Platform, slotId?: string) {
     if (!canManageStructure) return;
@@ -197,22 +218,23 @@ export function AccountBrandCard({
 
           <div className="brand-card-header-actions">
             <span className="brand-card-badge brand-card-badge--neutral brand-card-badge--split">
-              {t('groupMonitoring.accountCard.platformAccountsBadge', {
-                wa: accountsByPlatform.whatsapp,
-                tg: accountsByPlatform.telegram,
-              })}
+              {renderAccountsBadge()}
             </span>
             <span className="brand-card-header-platform-badges">
-              <BrandPlatformGroupsBadgeButton
-                platform="whatsapp"
-                count={groupsByPlatform.whatsapp}
-                onClick={() => setComparePlatform('whatsapp')}
-              />
-              <BrandPlatformGroupsBadgeButton
-                platform="telegram"
-                count={groupsByPlatform.telegram}
-                onClick={() => setComparePlatform('telegram')}
-              />
+              {(showAllPlatforms || activePlatformFilter === 'whatsapp') && (
+                <BrandPlatformGroupsBadgeButton
+                  platform="whatsapp"
+                  count={groupsByPlatform.whatsapp}
+                  onClick={() => setComparePlatform('whatsapp')}
+                />
+              )}
+              {(showAllPlatforms || activePlatformFilter === 'telegram') && (
+                <BrandPlatformGroupsBadgeButton
+                  platform="telegram"
+                  count={groupsByPlatform.telegram}
+                  onClick={() => setComparePlatform('telegram')}
+                />
+              )}
             </span>
             <span
               className={cn(

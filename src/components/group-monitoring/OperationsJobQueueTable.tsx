@@ -20,13 +20,14 @@ import {
   jobQueueResultText,
   jobQueueStatusClass,
   jobQueueStatusLabel,
-  type JobQueueTaskType,
+  isJobQueueTaskTypeSelected,
+  type JobQueueTaskTypeSelection,
 } from '@/lib/operationsJobQueueUi';
 import type { AutomationJobRecord } from '@/types/automationJob';
 import type { QueueFromViewResult } from '@/lib/operationsJobQueueEnqueueResult';
 
 interface OperationsJobQueueTableProps {
-  taskType: JobQueueTaskType;
+  taskType: JobQueueTaskTypeSelection;
   jobs: AutomationJobRecord[];
   allJobs?: AutomationJobRecord[];
   showBrand?: boolean;
@@ -152,7 +153,11 @@ export function OperationsJobQueueTable({
           {jobs.length === 0 ? (
             <tr>
               <td colSpan={columns.length + 1} className="operations-job-queue-empty">
-                {t(jobQueueEmptyKey(taskType))}
+                {t(
+                  isJobQueueTaskTypeSelected(taskType)
+                    ? jobQueueEmptyKey(taskType)
+                    : 'operations.jobQueue.emptySelectTask',
+                )}
               </td>
             </tr>
           ) : (
@@ -316,7 +321,8 @@ function JobQueueProgressCell({
   );
 }
 
-function buildQueueColumns(taskType: JobQueueTaskType, showBrand: boolean): QueueColumnDef[] {
+function buildQueueColumns(taskType: JobQueueTaskTypeSelection, showBrand: boolean): QueueColumnDef[] {
+  const resolvedTaskType = isJobQueueTaskTypeSelected(taskType) ? taskType : 'join';
   const statusCol: QueueColumnDef = {
     key: 'status',
     labelKey: 'operations.jobQueue.colStatus',
@@ -422,8 +428,8 @@ function buildQueueColumns(taskType: JobQueueTaskType, showBrand: boolean): Queu
     actionsCol,
   ];
 
-  if (taskType === 'create_group') return createCols;
-  if (taskType === 'set_admin') return setAdminCols;
-  if (taskType === 'exit_delete_group') return leaveDeleteCols;
+  if (resolvedTaskType === 'create_group') return createCols;
+  if (resolvedTaskType === 'set_admin') return setAdminCols;
+  if (resolvedTaskType === 'exit_delete_group') return leaveDeleteCols;
   return joinCols;
 }

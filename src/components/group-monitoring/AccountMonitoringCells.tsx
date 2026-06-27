@@ -123,12 +123,14 @@ function SessionColumnCell({
   onClearSession,
   clearSessionLoading = false,
   operateLocked = false,
+  hideClearButton = false,
 }: {
   row: AccountBrandRow;
   isPending: boolean;
   onClearSession?: () => void;
   clearSessionLoading?: boolean;
   operateLocked?: boolean;
+  hideClearButton?: boolean;
 }) {
   const { t } = useLanguage();
 
@@ -147,6 +149,7 @@ function SessionColumnCell({
   }
 
   const showClear =
+    !hideClearButton &&
     row.sessionStatus === 'valid' &&
     !row.actionProcess &&
     Boolean(onClearSession || operateLocked);
@@ -483,6 +486,7 @@ function AccountRemoveSlotIcon({
 
 export function AccountTableRow({
   row,
+  layout = 'brandCard',
   showAction = true,
   onSync,
   onRunScraper,
@@ -498,6 +502,7 @@ export function AccountTableRow({
   scrapeProgress = null,
 }: {
   row: AccountBrandRow;
+  layout?: 'brandCard' | 'flat';
   showAction?: boolean;
   onSync?: () => void;
   onRunScraper?: () => void;
@@ -523,13 +528,16 @@ export function AccountTableRow({
   });
   const isProcessing = row.actionProcess !== null || activeProcessIntent !== null;
 
+  const isFlatLayout = layout === 'flat';
   const operateLocked = !canOperatePlatform;
   const structureLocked = !canManageStructure;
   const showRemoveHover =
+    !isFlatLayout &&
     (Boolean(onRemoveFromSlot) || Boolean(onEditAccount) || structureLocked) &&
     !isPending &&
     !isProcessing;
   const showClearSessionHover =
+    !isFlatLayout &&
     (Boolean(onClearSession) || operateLocked) &&
     !isPending &&
     !isProcessing &&
@@ -557,28 +565,42 @@ export function AccountTableRow({
                 )}
               </p>
             </div>
-            <div className="brand-account-cell-tools">
-              {showRemoveHover ? (
-                <>
-                  <AccountEditSlotIcon
-                    onEdit={onEditAccount}
-                    structureLocked={structureLocked}
-                  />
-                  <AccountRemoveSlotIcon
-                    onRemove={onRemoveFromSlot}
-                    structureLocked={structureLocked}
-                  />
-                </>
-              ) : null}
-              <AccountSyncIcon
-                onSync={onSync}
-                loading={syncLoading}
-                operateLocked={operateLocked}
-              />
-            </div>
+            {!isFlatLayout ? (
+              <div className="brand-account-cell-tools">
+                {showRemoveHover ? (
+                  <>
+                    <AccountEditSlotIcon
+                      onEdit={onEditAccount}
+                      structureLocked={structureLocked}
+                    />
+                    <AccountRemoveSlotIcon
+                      onRemove={onRemoveFromSlot}
+                      structureLocked={structureLocked}
+                    />
+                  </>
+                ) : null}
+                <AccountSyncIcon
+                  onSync={onSync}
+                  loading={syncLoading}
+                  operateLocked={operateLocked}
+                />
+              </div>
+            ) : null}
           </div>
         </td>
-        <td className="brand-col-cell brand-col-cell--brand">
+        {isFlatLayout ? (
+          <td className="brand-col-cell brand-col-cell--brand-name">
+            <div className="brand-col-cell-inner">
+              <span className="truncate text-text-secondary">{row.brandName}</span>
+            </div>
+          </td>
+        ) : null}
+        <td
+          className={cn(
+            'brand-col-cell',
+            isFlatLayout ? 'brand-col-cell--location' : 'brand-col-cell--brand',
+          )}
+        >
           <div className="brand-col-cell-inner">
             <span className="truncate text-text-secondary">
               {row.locationDevice?.trim() ? row.locationDevice : '—'}
@@ -607,6 +629,7 @@ export function AccountTableRow({
               onClearSession={onClearSession}
               clearSessionLoading={clearSessionLoading}
               operateLocked={operateLocked}
+              hideClearButton={isFlatLayout}
             />
           </div>
         </td>
@@ -637,17 +660,19 @@ export function AccountTableRow({
             )}
           </div>
         </td>
-        <td className="brand-col-cell brand-col-cell--scraper">
-          <div className="brand-col-cell-inner">
-            <ScraperColumnCell
-              row={row}
-              scraperLoading={scraperLoading}
-              scrapeProgress={scrapeProgress}
-              onRunScraper={onRunScraper}
-              operateLocked={operateLocked}
-            />
-          </div>
-        </td>
+        {!isFlatLayout ? (
+          <td className="brand-col-cell brand-col-cell--scraper">
+            <div className="brand-col-cell-inner">
+              <ScraperColumnCell
+                row={row}
+                scraperLoading={scraperLoading}
+                scrapeProgress={scrapeProgress}
+                onRunScraper={onRunScraper}
+                operateLocked={operateLocked}
+              />
+            </div>
+          </td>
+        ) : null}
         {showAction ? (
           <td className="brand-col-cell brand-col-cell--action">
             <div className="brand-col-cell-inner">

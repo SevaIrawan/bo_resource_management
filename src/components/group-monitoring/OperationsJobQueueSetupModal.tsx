@@ -636,7 +636,7 @@ export function OperationsJobQueueSetupModal({
                     ariaLabel={t('operations.jobQueue.setAdminTargetAccounts')}
                     triggerClassName="account-slicer-select operations-job-queue-select"
                     disabled={saving}
-                    placeholder={t('operations.jobQueue.pickAccount')}
+                    placeholder={t('operations.jobQueue.selectAccount')}
                   />
                 )}
               </div>

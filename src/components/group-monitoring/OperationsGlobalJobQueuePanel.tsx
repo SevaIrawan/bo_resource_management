@@ -12,8 +12,9 @@ import {
 } from '@/lib/automationJobQueueClient';
 import {
   jobQueueQueueTitleKey,
+  isJobQueueTaskTypeSelected,
   jobMatchesTaskType,
-  type JobQueueTaskType,
+  type JobQueueTaskTypeSelection,
 } from '@/lib/operationsJobQueueUi';
 import { enqueueDeleteFromExitJob } from '@/lib/enqueueDeleteFromExitJob';
 import { enqueueSetPhotoFromCreateJob } from '@/lib/enqueueSetPhotoFromCreateJob';
@@ -38,7 +39,11 @@ export function OperationsGlobalJobQueuePanel({
   const { t } = useLanguage();
   const desktopReady = isJobQueueAvailable();
   const [snapshot, setSnapshot] = useState<AutomationJobQueueSnapshot | null>(null);
-  const [taskType, setTaskType] = useState<JobQueueTaskType>('join');
+  const [taskType, setTaskType] = useState<JobQueueTaskTypeSelection>('');
+
+  useEffect(() => {
+    setTaskType('');
+  }, [platform]);
 
   const listFilter = useMemo((): AutomationJobListFilter => {
     const filter: AutomationJobListFilter = { platform };
@@ -47,6 +52,7 @@ export function OperationsGlobalJobQueuePanel({
   }, [brandFilter, platform]);
 
   const filteredJobs = useMemo(() => {
+    if (!isJobQueueTaskTypeSelected(taskType)) return [];
     return (snapshot?.jobs ?? []).filter((job) => jobMatchesTaskType(job, taskType));
   }, [snapshot?.jobs, taskType]);
 
@@ -134,7 +140,13 @@ export function OperationsGlobalJobQueuePanel({
 
       <section className="operations-job-queue-zone operations-job-queue-zone--table">
         <div className="operations-job-queue-zone-head">
-          <h3 className="operations-job-queue-zone-title">{t(jobQueueQueueTitleKey(taskType))}</h3>
+          <h3 className="operations-job-queue-zone-title">
+            {t(
+              isJobQueueTaskTypeSelected(taskType)
+                ? jobQueueQueueTitleKey(taskType)
+                : 'operations.jobQueue.queueTableTitleDefault',
+            )}
+          </h3>
         </div>
         <OperationsJobQueueTable
           taskType={taskType}

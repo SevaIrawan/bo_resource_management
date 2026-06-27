@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { AccountBrandCard } from '@/components/group-monitoring/AccountBrandCard';
 import type { EditAccountFormValues } from '@/components/group-monitoring/EditAccountModal';
 import { AddBrandCard } from '@/components/group-monitoring/AddBrandCard';
@@ -7,18 +7,21 @@ import { RemoveBrandModal } from '@/components/group-monitoring/RemoveBrandModal
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
-import { addAccountToGroup, createEmptyBrandGroup, patchAccountDetailsInGroups } from '@/lib/accountBrandUtils';
+import { addAccountToGroup, appendBrandGroupFromName, patchAccountDetailsInGroups } from '@/lib/accountBrandUtils';
 import { commitAccountDetailsEdit } from '@/lib/commitAccountDetailsEdit';
-import { ensureBrand, removeBrandCompletely } from '@/lib/brands';
+import { removeBrandCompletely } from '@/lib/brands';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { createMessagingAccount } from '@/lib/messagingAccounts';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup, AccountBrandRow, AddAccountInput } from '@/types/accountMonitoringUi';
+import type { AccountPlatformFilter } from '@/lib/brandCardHeaderBadges';
 
 type SyncFlow = ReturnType<typeof useAccountSyncFlow>;
 
 interface AccountBrandCardListProps {
   groups: AccountBrandGroup[];
+  activePlatformFilter?: AccountPlatformFilter;
+  quickAddBrandNonce?: number;
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   sync: SyncFlow;
   onRemoveFromSlot: (groupId: string, account: AccountBrandRow) => void;
@@ -26,6 +29,8 @@ interface AccountBrandCardListProps {
 
 export function AccountBrandCardList({
   groups,
+  activePlatformFilter = 'all',
+  quickAddBrandNonce = 0,
   onGroupsChange,
   sync,
   onRemoveFromSlot,
@@ -37,6 +42,14 @@ export function AccountBrandCardList({
   const [removeTarget, setRemoveTarget] = useState<AccountBrandGroup | null>(null);
   const [removeSaving, setRemoveSaving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const lastQuickAddNonce = useRef(0);
+
+  useEffect(() => {
+    if (quickAddBrandNonce > lastQuickAddNonce.current && canManageStructure) {
+      setModalOpen(true);
+    }
+    lastQuickAddNonce.current = quickAddBrandNonce;
+  }, [quickAddBrandNonce, canManageStructure]);
 
   const {
     processingByAccount,
@@ -50,27 +63,7 @@ export function AccountBrandCardList({
 
   async function handleAddBrand(brandName: string) {
     if (!canManageStructure) return;
-    const name = brandName.trim();
-    if (!name) return;
-
-    let dbBrandId: string | undefined;
-    if (user?.id) {
-      const brand = await ensureBrand({ userId: user.id, brandName: name });
-      dbBrandId = brand.id;
-    }
-    const nextGroup = { ...createEmptyBrandGroup(name, dbBrandId), dbBrandId };
-
-    onGroupsChange((prev) => {
-      const exists = prev.some(
-        (g) =>
-          g.brandName.trim().toLowerCase() === name.toLowerCase() ||
-          (dbBrandId && g.dbBrandId === dbBrandId),
-      );
-      if (exists) return prev;
-      return [...prev, nextGroup].sort((a, b) =>
-        a.brandName.localeCompare(b.brandName),
-      );
-    });
+    await appendBrandGroupFromName(brandName, user?.id, onGroupsChange);
   }
 
   async function handleAddAccount(group: AccountBrandGroup, input: AddAccountInput) {
@@ -164,6 +157,7 @@ export function AccountBrandCardList({
           <AccountBrandCard
             key={group.id}
             group={group}
+            activePlatformFilter={activePlatformFilter}
             onAddAccount={(input) => handleAddAccount(group, input)}
             onEditAccount={(account, values) => handleEditAccount(group, account, values)}
             canManageStructure={canManageStructure}

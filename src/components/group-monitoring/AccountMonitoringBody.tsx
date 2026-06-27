@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccountBrandCardList } from '@/components/group-monitoring/AccountBrandCardList';
 import { AccountBrandTableView } from '@/components/group-monitoring/AccountBrandTableView';
 import { AccountMonitoringSyncModals } from '@/components/group-monitoring/AccountMonitoringSyncModals';
+import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
 import { RemoveAccountModal } from '@/components/group-monitoring/RemoveAccountModal';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -9,13 +10,19 @@ import { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
 import { useRemoveAccountFromSlot } from '@/hooks/useRemoveAccountFromSlot';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
+import { appendBrandGroupFromName } from '@/lib/accountBrandUtils';
 import type { AccountViewMode } from '@/types/accountMonitoringUi';
+import type { Platform } from '@/types/database';
 
 interface AccountMonitoringBodyProps {
   viewMode: AccountViewMode;
+  quickAddBrandNonce?: number;
 }
 
-export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) {
+export function AccountMonitoringBody({
+  viewMode,
+  quickAddBrandNonce = 0,
+}: AccountMonitoringBodyProps) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { canManageStructure, canOperatePlatform } = usePermissions();
@@ -24,6 +31,7 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
     onGroupsChange,
     loading,
     setProbeSuspendAccountIds,
+    accountFilters,
   } = useGroupMonitoring();
 
   const sync = useAccountSyncFlow({
@@ -34,6 +42,24 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
   });
 
   const removeSlot = useRemoveAccountFromSlot(onGroupsChange, user?.id, canManageStructure);
+  const [quickAddModalOpen, setQuickAddModalOpen] = useState(false);
+  const lastQuickAddNonce = useRef(0);
+
+  useEffect(() => {
+    if (
+      quickAddBrandNonce > lastQuickAddNonce.current &&
+      canManageStructure &&
+      viewMode === 'table'
+    ) {
+      setQuickAddModalOpen(true);
+    }
+    lastQuickAddNonce.current = quickAddBrandNonce;
+  }, [quickAddBrandNonce, canManageStructure, viewMode]);
+
+  async function handleQuickAddBrand(brandName: string) {
+    if (!canManageStructure) return;
+    await appendBrandGroupFromName(brandName, user?.id, onGroupsChange);
+  }
 
   const probeSuspendIds = useMemo(() => {
     const ids = new Set<string>();
@@ -91,15 +117,18 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
         />
       ) : null}
 
+      {!loading && viewMode === 'table' && canManageStructure ? (
+        <AddBrandModal
+          open={quickAddModalOpen}
+          onClose={() => setQuickAddModalOpen(false)}
+          onSubmit={handleQuickAddBrand}
+        />
+      ) : null}
+
       {!loading &&
         (viewMode === 'table' ? (
           hasFilteredBrands ? (
-            <AccountBrandTableView
-              groups={filteredGroups}
-              onGroupsChange={onGroupsChange}
-              sync={sync}
-              onRemoveFromSlot={removeSlot.openRemoveModal}
-            />
+            <AccountBrandTableView groups={filteredGroups} />
           ) : (
             <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
               <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
@@ -112,6 +141,12 @@ export function AccountMonitoringBody({ viewMode }: AccountMonitoringBodyProps) 
             onGroupsChange={onGroupsChange}
             sync={sync}
             onRemoveFromSlot={removeSlot.openRemoveModal}
+            activePlatformFilter={
+              accountFilters.platform === 'all'
+                ? 'all'
+                : (accountFilters.platform as Platform)
+            }
+            quickAddBrandNonce={quickAddBrandNonce}
           />
         ))}
     </>

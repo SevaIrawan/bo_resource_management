@@ -18,6 +18,15 @@ export type JobQueueTaskType =
   | 'set_admin'
   | 'exit_delete_group';
 
+/** Belum pilih task — default bar Job Queue. */
+export type JobQueueTaskTypeSelection = JobQueueTaskType | '';
+
+export function isJobQueueTaskTypeSelected(
+  taskType: JobQueueTaskTypeSelection,
+): taskType is JobQueueTaskType {
+  return taskType !== '';
+}
+
 function isGroupBatchJobAction(action: AutomationJobAction): boolean {
   return (
     action === 'join_by_invite_link' ||

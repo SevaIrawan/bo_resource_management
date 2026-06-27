@@ -39,7 +39,8 @@ export function DarkSelect({
   const wrapRef = useRef<HTMLDivElement>(null);
   const disabledSet = new Set(disabledValues);
   const selected = options.find((opt) => opt.value === value);
-  const triggerLabel = selected?.label ?? (value || placeholder || '');
+  const showPlaceholder = !selected && !value;
+  const triggerLabel = selected?.label ?? placeholder ?? value;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,7 +82,14 @@ export function DarkSelect({
           toggle();
         }}
       >
-        <span className="dark-select-trigger-label">{triggerLabel}</span>
+        <span
+          className={cn(
+            'dark-select-trigger-label',
+            showPlaceholder && 'dark-select-trigger-label--placeholder',
+          )}
+        >
+          {triggerLabel}
+        </span>
         <ChevronDown
           className={cn('dark-select-trigger-icon', isOpen && 'dark-select-trigger-icon--open')}
           aria-hidden

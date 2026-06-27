@@ -1,6 +1,8 @@
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
+export type AccountPlatformFilter = 'all' | Platform;
+
 export interface PlatformPairCounts {
   whatsapp: number;
   telegram: number;

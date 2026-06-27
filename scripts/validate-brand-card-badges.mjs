@@ -30,8 +30,11 @@ const checks = [
       card.includes('BrandMasterGroupsModal'),
   },
   {
-    name: 'Helper countAccountsByPlatform',
-    ok: card.includes('countAccountsByPlatform'),
+    name: 'Card: platform filter — single vs all badges',
+    ok:
+      card.includes('activePlatformFilter') &&
+      card.includes('platformAccountsBadgeWa') &&
+      card.includes('showAllPlatforms'),
   },
 ];
 

@@ -280,20 +280,6 @@ export function cancelAutomationJob(jobId: string): boolean {
   return changed;
 }
 
-export function clearCompletedAutomationJobs(filter?: AutomationJobListFilter): number {
-  let removed = 0;
-  touch(() => {
-    const before = jobs.length;
-    jobs = jobs.filter((job) => {
-      if (!matchesFilter(job, filter)) return true;
-      if (job.status === 'completed' || job.status === 'cancelled') return false;
-      return true;
-    });
-    removed = before - jobs.length;
-  });
-  return removed;
-}
-
 /** Hapus baris antrian; running di-force stop dulu. */
 export function removeAutomationJobs(jobIds: string[]): number {
   if (jobIds.length === 0) return 0;
@@ -447,6 +433,9 @@ export function markJobFinished(
       const rawMessage = detail?.message?.trim();
       job.message =
         rawMessage && rawMessage !== 'OK' ? rawMessage : `${success}/${batchTotal} created`;
+      if (detail?.groupOutcomes?.length) {
+        job.payload.groupOutcomes = detail.groupOutcomes;
+      }
       return;
     }
 

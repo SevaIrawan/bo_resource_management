@@ -1,5 +1,6 @@
 export type AutomationJobAction =
   | 'create_group'
+  | 'set_group_photo'
   | 'set_admin'
   | 'join_by_invite_link'
   | 'leave_group'
@@ -50,11 +51,16 @@ export interface AutomationJobPayload {
   };
   exitDeletePhase?: 'exit' | 'delete';
   sourceExitJobId?: string;
+  sourceCreateJobId?: string;
+  setPhotoPhase?: 'apply';
+  photoPath?: string;
   groupOutcomes?: Array<{
     groupId: string;
     groupName?: string;
     inviteLink?: string;
     groupLink?: string;
+    createStatus?: 'created' | 'failed';
+    photoStatus?: 'set' | 'failed';
     exitStatus?: 'left' | 'failed' | 'pending';
     deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
   }>;
@@ -84,6 +90,8 @@ export interface AutomationJobDelayConfig {
   invite_batch_delay_max_sec?: number;
   resolve_entity_max_attempts?: number;
   max_admin_slots?: number;
+  /** TG set_group_photo — retry unggah foto. */
+  set_photo_max_retry?: number;
 }
 
 export interface AutomationJobRecord {

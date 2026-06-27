@@ -29,23 +29,6 @@ function isAccountJobActive(
   );
 }
 
-/** True when this account has queued/running job — isolasi per akun (kontrak). */
-export async function isAccountAutomationJobBusy(accountId: string): Promise<boolean> {
-  const snapshot = await fetchJobQueueSnapshot();
-  if (!snapshot) return false;
-  return isAccountJobActive(snapshot.jobs, accountId);
-}
-
-/** @deprecated Gunakan isAccountAutomationJobBusy(accountId). */
-export async function isAutomationJobQueueBlockingExecutes(): Promise<boolean> {
-  return false;
-}
-
-/** @deprecated — gunakan isHeavyDeviceExecuteBlockedForAccount(accountId). */
-export async function isHeavyDeviceExecuteBlocked(): Promise<boolean> {
-  return false;
-}
-
 /** Job queue aktif pada akun yang sama — skip auto-sync cycle untuk akun itu saja. */
 export async function isHeavyDeviceExecuteBlockedForAccount(
   accountId: string,
@@ -135,24 +118,6 @@ export async function removeAutomationJobs(jobIds: string[]): Promise<number> {
   if (!api || jobIds.length === 0) return 0;
   const result = await api(jobIds);
   return result.removed ?? 0;
-}
-
-export async function clearCompletedAutomationJobs(
-  filter?: AutomationJobListFilter,
-): Promise<number> {
-  const api = jobQueueApi()?.clearCompleted;
-  if (!api) return 0;
-  const result = await api(filter);
-  return result.removed ?? 0;
-}
-
-export async function setJobQueuePaused(
-  paused: boolean,
-): Promise<AutomationJobQueueSnapshot['runnerState'] | null> {
-  const api = jobQueueApi()?.setPaused;
-  if (!api) return null;
-  const result = await api(paused);
-  return result.runnerState ?? null;
 }
 
 export function subscribeJobQueueChanged(callback: () => void): () => void {

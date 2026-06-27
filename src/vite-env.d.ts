@@ -176,7 +176,7 @@ declare global {
         run: (payload: {
           sessionId: string;
           platform: Platform;
-          action: 'create_group' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
+          action: 'create_group' | 'set_group_photo' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
           storedSessionString?: string | null;
           expectedPhone?: string;
           delay?: {
@@ -199,7 +199,7 @@ declare global {
           inviteLink?: string;
         }) => Promise<{
           status: 'ok' | 'error';
-          action: 'create_group' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
+          action: 'create_group' | 'set_group_photo' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
           message?: string;
           errorCode?: string;
           result?: Record<string, unknown>;
@@ -217,7 +217,7 @@ declare global {
             accountId: string;
             accountName: string;
             sessionId: string;
-            action: 'create_group' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
+            action: 'create_group' | 'set_group_photo' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
             status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
             createdAt: string;
             startedAt?: string;
@@ -248,7 +248,7 @@ declare global {
           accountId: string;
           accountName: string;
           sessionId: string;
-          action: 'create_group' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
+          action: 'create_group' | 'set_group_photo' | 'set_admin' | 'join_by_invite_link' | 'leave_group' | 'delete_group' | 'exit_delete_group';
           payload: Record<string, unknown>;
           storedSessionString?: string | null;
           expectedPhone?: string;
@@ -261,15 +261,25 @@ declare global {
         run: (jobId: string) => Promise<{ ok: boolean }>;
         pauseJob: (jobId: string) => Promise<{ ok: boolean }>;
         removeJobs: (jobIds: string[]) => Promise<{ ok: boolean; removed?: number }>;
-        clearCompleted: (filter?: {
-          brandName?: string;
-          platform?: Platform;
-        }) => Promise<{ ok: boolean; removed?: number }>;
-        setPaused: (paused: boolean) => Promise<{
-          ok: boolean;
-          runnerState?: 'idle' | 'running' | 'paused';
-        }>;
         onChanged: (callback: () => void) => () => void;
+      };
+      brandGroupPhoto?: {
+        resolve: (brandName: string) => Promise<{
+          ok: boolean;
+          path?: string;
+          expectedFileName?: string;
+          dir?: string;
+        }>;
+        pickAndSave: (brandName: string) => Promise<{
+          ok: boolean;
+          path?: string;
+          dataUrl?: string;
+          error?: string;
+        }>;
+        previewUrl: (filePath: string) => Promise<{
+          ok: boolean;
+          dataUrl?: string;
+        }>;
       };
       executeSlots?: {
         tryAcquire: (

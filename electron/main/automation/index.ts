@@ -1,15 +1,14 @@
 import { ipcMain } from 'electron';
+import { registerBrandGroupPhotoIpc } from '../brandGroupPhoto';
 import { runTelegramAutomation } from './tgAutomationClient';
 import type { AutomationRunPayload, AutomationRunResult, AutomationProgressCallback } from './types';
 import { runWhatsAppAutomation } from './waAutomation';
 import type {
   AutomationJobEnqueueInput,
   AutomationJobListFilter,
-  AutomationJobRunnerState,
 } from './jobQueueTypes';
 import {
   cancelAutomationJob,
-  clearCompletedAutomationJobs,
   enqueueAutomationJob,
   getJobQueueSnapshot,
   pauseAutomationJob,
@@ -17,7 +16,7 @@ import {
   runAutomationJob,
   setRunnerPaused,
 } from './jobQueueStore';
-import { notifyRunnerStateChanged, scheduleRunnerTick } from './jobQueueRunner';
+import { scheduleRunnerTick } from './jobQueueRunner';
 import {
   getExecuteSlotStats,
   releaseExecuteSlot,
@@ -60,6 +59,8 @@ export async function runAutomationAction(
 }
 
 export function registerAutomationIpc(): void {
+  registerBrandGroupPhotoIpc();
+
   ipcMain.handle('automation:run', async (_event, payload: AutomationRunPayload) => {
     return runAutomationAction(payload);
   });
@@ -101,18 +102,6 @@ export function registerAutomationIpc(): void {
     const removed = removeAutomationJobs(Array.isArray(jobIds) ? jobIds : []);
     if (removed > 0) scheduleRunnerTick(0);
     return { ok: true, removed };
-  });
-
-  ipcMain.handle('jobQueue:clearCompleted', (_event, filter?: AutomationJobListFilter) => {
-    const removed = clearCompletedAutomationJobs(filter);
-    return { ok: true, removed };
-  });
-
-  ipcMain.handle('jobQueue:setPaused', (_event, paused: boolean) => {
-    const runnerState: AutomationJobRunnerState = setRunnerPaused(paused);
-    notifyRunnerStateChanged();
-    if (!paused) scheduleRunnerTick(0);
-    return { ok: true, runnerState };
   });
 
   ipcMain.handle(

@@ -4,15 +4,6 @@ import type {
 } from '@/types/automationJob';
 import { automationJobBusyGroupIds } from '@/lib/automationJobBusyGroups';
 
-export interface ExitDeleteGroupOutcome {
-  groupId: string;
-  groupName?: string;
-  inviteLink?: string;
-  groupLink?: string;
-  exitStatus: 'left' | 'failed' | 'pending';
-  deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
-}
-
 export function isExitDeleteExitJob(job: AutomationJobRecord): boolean {
   return job.action === 'leave_group' && job.payload.exitDeletePhase === 'exit';
 }
@@ -53,7 +44,7 @@ export function resolveLeftGroupsFromExitJob(job: AutomationJobRecord): Automati
   }));
 }
 
-export function exitJobHasDeleteQueuedOrDone(
+function exitJobHasDeleteQueuedOrDone(
   exitJobId: string,
   jobs: AutomationJobRecord[],
 ): boolean {

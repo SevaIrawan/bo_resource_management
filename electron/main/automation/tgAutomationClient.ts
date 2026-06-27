@@ -112,6 +112,74 @@ export async function runTelegramAutomation(
     };
   }
 
+  if (payload.action === 'set_group_photo') {
+    const photoPath = payload.photoPath?.trim();
+    if (!photoPath) {
+      return {
+        status: 'error',
+        action: payload.action,
+        message: 'photoPath required',
+        errorCode: 'INVALID_PAYLOAD',
+      };
+    }
+    const groups = resolveSetAdminGroups(payload);
+    if (groups.length === 0) {
+      return {
+        status: 'error',
+        action: payload.action,
+        message: 'groups required',
+        errorCode: 'INVALID_PAYLOAD',
+      };
+    }
+
+    let success = 0;
+    const failed: string[] = [];
+    const groupOutcomes: Array<{
+      groupId: string;
+      groupName?: string;
+      photoStatus: 'set' | 'failed';
+    }> = [];
+
+    for (let i = 0; i < groups.length; i += 1) {
+      const group = groups[i];
+      onProgress?.(i, groups.length, group.groupName ?? group.groupId);
+      const result = await postTelegramAutomation(
+        payload.sessionId,
+        `/telegram/automation/set-group-photo/${sid}`,
+        {
+          ...base,
+          photoPath,
+          groupId: group.groupId,
+          groupLink: group.groupLink,
+        },
+      );
+      if (result.status === 'ok') {
+        success += 1;
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          photoStatus: 'set',
+        });
+        onProgress?.(i + 1, groups.length, group.groupName ?? 'Photo set');
+      } else {
+        failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          photoStatus: 'failed',
+        });
+      }
+    }
+
+    return {
+      status: success > 0 ? 'ok' : 'error',
+      action: 'set_group_photo',
+      message: `Set photo ${success}/${groups.length} groups`,
+      errorCode: success > 0 ? undefined : 'SET_GROUP_PHOTO_BATCH_FAILED',
+      result: { success, total: groups.length, failed, groupOutcomes },
+    };
+  }
+
   if (payload.action === 'exit_delete_group') {
     const groups = resolveLeaveDeleteGroups(payload);
     if (groups.length === 0) {
@@ -359,9 +427,16 @@ export async function runTelegramCreateGroupBatch(
   let created = 0;
   let nextNum = startFrom;
   const failed: string[] = [];
+  const groupOutcomes: Array<{
+    groupId: string;
+    groupName?: string;
+    inviteLink?: string;
+    createStatus: 'created' | 'failed';
+  }> = [];
   onProgress(0, totalTarget, prefix);
 
   while (created < totalTarget) {
+    const createdBeforeSlice = created;
     const sliceSize = Math.min(perRun, totalTarget - created);
 
     for (let i = 0; i < sliceSize; i += 1) {
@@ -378,14 +453,33 @@ export async function runTelegramCreateGroupBatch(
 
       if (result.status === 'ok') {
         created += 1;
+        const detail = result.result ?? {};
+        groupOutcomes.push({
+          groupId: String(detail.group_id ?? '').trim(),
+          groupName: String(detail.group_name ?? groupName).trim() || groupName,
+          inviteLink: typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
+          createStatus: 'created',
+        });
         onProgress(created, totalTarget, groupName);
       } else {
         failed.push(`${groupName}: ${result.message ?? 'failed'}`);
+        groupOutcomes.push({
+          groupId: '',
+          groupName,
+          createStatus: 'failed',
+        });
       }
     }
 
     nextNum += sliceSize;
     if (created >= totalTarget) break;
+
+    if (created === createdBeforeSlice) {
+      console.warn(
+        `[tg-automation] batch slice produced 0 creates (${created}/${totalTarget}); stopping`,
+      );
+      break;
+    }
 
     const minSec = payload.delay?.pause_between_runs_min_sec ?? 45 * 60;
     const maxSec = payload.delay?.pause_between_runs_max_sec ?? 65 * 60;
@@ -403,6 +497,6 @@ export async function runTelegramCreateGroupBatch(
         ? `${created}/${totalTarget} created (${failed.length} failed)`
         : `${created}/${totalTarget} created`,
     errorCode: created > 0 ? undefined : 'CREATE_GROUP_BATCH_FAILED',
-    result: { success: created, total: totalTarget, failed },
+    result: { success: created, total: totalTarget, failed, groupOutcomes },
   };
 }

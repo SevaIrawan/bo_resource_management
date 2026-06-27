@@ -406,6 +406,7 @@ function jitterPercentFromHumanProfile(profile: HumanDelayProfile): number {
 
 export type AutomationDelayAction =
   | 'create_group'
+  | 'set_group_photo'
   | 'set_admin'
   | 'join_by_invite_link'
   | 'leave_group'
@@ -445,6 +446,7 @@ export function toAutomationDelayConfig(
     invite_batch_delay_max_sec: settings.inviteLink.batchDelayMaxSec,
     resolve_entity_max_attempts: settings.setAdmin.resolveEntityMaxAttempts,
     max_admin_slots: settings.setAdmin.maxAdminSlots,
+    set_photo_max_retry: settings.standard.setPhotoMaxRetry,
   };
 }
 

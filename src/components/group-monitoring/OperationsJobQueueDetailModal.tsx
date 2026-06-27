@@ -7,7 +7,13 @@ import {
   isExitDeleteDeleteJob,
   isExitDeleteExitJob,
 } from '@/lib/exitDeleteFlow';
+import {
+  isCreateGroupSourceJob,
+  isSetPhotoFromCreateJob,
+} from '@/lib/createSetPhotoFlow';
 import { exportJobQueueViewExcel } from '@/lib/exportExcel';
+import { mapEnqueueJobQueueError } from '@/lib/mapEnqueueJobQueueError';
+import { OperationsJobQueueCreateGroupViewModal } from '@/components/group-monitoring/OperationsJobQueueCreateGroupViewModal';
 import { accountPlatformSubtitle } from '@/lib/platformSyncCopy';
 import {
   jobQueueViewMetaText,
@@ -20,12 +26,17 @@ import {
   type JobQueueViewTableRow,
 } from '@/lib/operationsJobQueueUi';
 import type { AutomationJobRecord } from '@/types/automationJob';
+import type { QueueFromViewResult } from '@/lib/operationsJobQueueEnqueueResult';
 
 interface OperationsJobQueueDetailModalProps {
   job: AutomationJobRecord | null;
   allJobs?: AutomationJobRecord[];
   onClose: () => void;
-  onQueueDeleteFromExit?: (exitJobId: string) => Promise<boolean> | boolean;
+  onQueueDeleteFromExit?: (exitJobId: string) => Promise<QueueFromViewResult> | QueueFromViewResult;
+  onQueueSetPhotoFromCreate?: (
+    createJobId: string,
+    photoPath: string,
+  ) => Promise<QueueFromViewResult> | QueueFromViewResult;
 }
 
 function cellClassName(columnId: JobQueueViewTableColumnId): string | undefined {
@@ -83,10 +94,16 @@ export function OperationsJobQueueDetailModal({
   allJobs = [],
   onClose,
   onQueueDeleteFromExit,
+  onQueueSetPhotoFromCreate,
 }: OperationsJobQueueDetailModalProps) {
   const { t } = useLanguage();
   const [queueingDelete, setQueueingDelete] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
   const open = job !== null;
+
+  useEffect(() => {
+    setQueueError(null);
+  }, [job?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -101,6 +118,17 @@ export function OperationsJobQueueDetailModal({
 
   if (!job) return null;
 
+  if (isCreateGroupSourceJob(job)) {
+    return (
+      <OperationsJobQueueCreateGroupViewModal
+        job={job}
+        allJobs={allJobs}
+        onClose={onClose}
+        onQueueSetPhotoFromCreate={onQueueSetPhotoFromCreate}
+      />
+    );
+  }
+
   const record = job;
   const columns = jobQueueViewTableColumnIds(record);
   const rows = jobQueueViewTableRows(record, t);
@@ -109,12 +137,17 @@ export function OperationsJobQueueDetailModal({
     canQueueDeleteFromExitJob(record, allJobs) &&
     Boolean(onQueueDeleteFromExit);
   const isDeletePhaseView = isExitDeleteDeleteJob(record);
+  const isSetPhotoPhaseView = isSetPhotoFromCreateJob(record);
 
   async function handleQueueDelete() {
     if (!onQueueDeleteFromExit || queueingDelete) return;
     setQueueingDelete(true);
+    setQueueError(null);
     try {
-      await onQueueDeleteFromExit(record.id);
+      const result = await onQueueDeleteFromExit(record.id);
+      if (!result.ok) {
+        setQueueError(mapEnqueueJobQueueError(result.error, t));
+      }
     } finally {
       setQueueingDelete(false);
     }
@@ -165,6 +198,9 @@ export function OperationsJobQueueDetailModal({
           {isDeletePhaseView ? (
             <p className="operations-job-queue-form-note">{t('operations.jobQueue.deleteFromExitViewHint')}</p>
           ) : null}
+          {isSetPhotoPhaseView ? (
+            <p className="operations-job-queue-form-note">{t('operations.jobQueue.setPhotoFromCreateViewHint')}</p>
+          ) : null}
 
           {rows.length > 0 ? (
             <div className="group-links-table-wrap">
@@ -196,6 +232,12 @@ export function OperationsJobQueueDetailModal({
           ) : null}
 
           <p className="ticket-detail-modal-meta">{jobQueueViewMetaText(record, t)}</p>
+
+          {queueError ? (
+            <p className="operations-job-queue-form-note operations-job-queue-form-note--warn">
+              {queueError}
+            </p>
+          ) : null}
 
           <div className="brand-modal-actions">
             {showQueueDelete ? (

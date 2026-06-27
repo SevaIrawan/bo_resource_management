@@ -123,6 +123,65 @@ const checks = [
     })(),
   },
   {
+    name: 'Electron: create_group batch markJobFinished persists groupOutcomes',
+    ok: (() => {
+      const store = read('electron/main/automation/jobQueueStore.ts');
+      return (
+        store.includes('isCreateBatch') &&
+        store.includes('job.payload.groupOutcomes = detail.groupOutcomes') &&
+        store.includes('if (detail?.groupOutcomes?.length)')
+      );
+    })(),
+  },
+  {
+    name: 'Electron: create_group batch persists groupOutcomes per group',
+    ok: (() => {
+      const wa = read('electron/main/automation/waAutomation.ts');
+      const tg = read('electron/main/automation/tgAutomationClient.ts');
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      return (
+        wa.includes("createStatus: 'created'") &&
+        wa.includes('groupOutcomes') &&
+        tg.includes("createStatus: 'created'") &&
+        tg.includes('groupOutcomes') &&
+        runner.includes('resolveCreateGroupOutcomesFromSingle')
+      );
+    })(),
+  },
+  {
+    name: 'Renderer: create_group VIEW rows from groupOutcomes (groupId + invite)',
+    ok: (() => {
+      const ui = read('src/lib/operationsJobQueueUi.ts');
+      return (
+        ui.includes("row.createStatus !== 'failed'") &&
+        ui.includes('resolveCreateGroupResultOutcomes') &&
+        ui.includes("'groupName', 'groupId', 'inviteLink', 'status'") &&
+        ui.includes('createStatusCreated')
+      );
+    })(),
+  },
+  {
+    name: 'Set photo: flow from create VIEW + brand photo path + automation',
+    ok: (() => {
+      const flow = read('src/lib/createSetPhotoFlow.ts');
+      const enqueue = read('src/lib/enqueueSetPhotoFromCreateJob.ts');
+      const wa = read('electron/main/automation/waSetGroupPhoto.ts');
+      const tg = read('python-sidecar/telegram_set_group_photo.py');
+      const main = read('python-sidecar/main.py');
+      const brand = read('electron/main/brandGroupPhoto.ts');
+      return (
+        flow.includes('resolveCreatedGroupsFromCreateJob') &&
+        flow.includes('canQueueSetPhotoFromCreateJob') &&
+        enqueue.includes('set_group_photo') &&
+        enqueue.includes('sourceCreateJobId') &&
+        wa.includes('setPicture') &&
+        tg.includes('EditPhotoRequest') &&
+        main.includes('set-group-photo') &&
+        brand.includes('brand-group-photos')
+      );
+    })(),
+  },
+  {
     name: 'Electron: job queue IPC + boot resume runner',
     ok: (() => {
       const auto = read('electron/main/automation/index.ts');
@@ -206,12 +265,14 @@ const checks = [
     })(),
   },
   {
-    name: 'Exit tab: filter jobMatchesExitDeleteTaskType (no join overlap)',
+    name: 'Exit tab: filter jobMatchesTaskType (no join overlap)',
     ok: (() => {
       const global = read('src/components/group-monitoring/OperationsGlobalJobQueuePanel.tsx');
+      const ui = read('src/lib/operationsJobQueueUi.ts');
       const flow = read('src/lib/exitDeleteFlow.ts');
       return (
-        global.includes('jobMatchesExitDeleteTaskType') &&
+        global.includes('jobMatchesTaskType') &&
+        ui.includes('jobMatchesExitDeleteTaskType') &&
         flow.includes("job.action === 'leave_group' && job.payload.exitDeletePhase === 'exit'") &&
         flow.includes('sourceExitJobId')
       );
@@ -253,9 +314,66 @@ const checks = [
       const table = read('src/components/group-monitoring/OperationsJobQueueTable.tsx');
       return (
         global.includes('runAutomationJob(result.jobId)') &&
+        global.includes('QueueFromViewResult') &&
         table.includes('setViewJobId(null)') &&
-        table.includes('Promise<boolean>')
+        table.includes('QueueFromViewResult')
       );
+    })(),
+  },
+  {
+    name: 'VIEW queue: enqueue error feedback wired',
+    ok: (() => {
+      const map = read('src/lib/mapEnqueueJobQueueError.ts');
+      const create = read('src/components/group-monitoring/OperationsJobQueueCreateGroupViewModal.tsx');
+      const detail = read('src/components/group-monitoring/OperationsJobQueueDetailModal.tsx');
+      const add = read('src/components/group-monitoring/OperationsJobQueueAddBar.tsx');
+      return (
+        map.includes('NO_LEFT_GROUPS') &&
+        map.includes('NO_CREATED_GROUPS') &&
+        create.includes('queueError') &&
+        create.includes('mapEnqueueJobQueueError') &&
+        detail.includes('queueError') &&
+        add.includes('mapEnqueueJobQueueError')
+      );
+    })(),
+  },
+  {
+    name: 'WA leave_group: runWaLeaveGroup imported',
+    ok: (() => {
+      const wa = read('electron/main/automation/waAutomation.ts');
+      return wa.includes("import { runWaLeaveGroup }") && wa.includes('runWaLeaveGroup(');
+    })(),
+  },
+  {
+    name: 'Batch create: stall guard when slice creates zero',
+    ok: (() => {
+      const wa = read('electron/main/automation/waAutomation.ts');
+      const tg = read('electron/main/automation/tgAutomationClient.ts');
+      return (
+        wa.includes('createdBeforeSlice') &&
+        wa.includes('created === createdBeforeSlice') &&
+        tg.includes('createdBeforeSlice') &&
+        tg.includes('created === createdBeforeSlice')
+      );
+    })(),
+  },
+  {
+    name: 'Batch create: withJobTimeout wrapper',
+    ok: (() => {
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      return (
+        runner.includes('async function runCreateGroupBatchJob') &&
+        runner.includes('withJobTimeout') &&
+        runner.includes('runWhatsAppCreateGroupBatch')
+      );
+    })(),
+  },
+  {
+    name: 'Electron delay: set_photo_max_retry typed',
+    ok: (() => {
+      const jq = read('electron/main/automation/jobQueueTypes.ts');
+      const auto = read('electron/main/automation/types.ts');
+      return jq.includes('set_photo_max_retry') && auto.includes('set_photo_max_retry');
     })(),
   },
   {
@@ -294,6 +412,19 @@ const checks = [
     })(),
   },
   {
+    name: 'Enqueue helpers: shared account row stub',
+    ok: (() => {
+      const helper = read('src/lib/accountRowFromAutomationJob.ts');
+      const setPhoto = read('src/lib/enqueueSetPhotoFromCreateJob.ts');
+      const del = read('src/lib/enqueueDeleteFromExitJob.ts');
+      return (
+        helper.includes('accountRowFromAutomationJob') &&
+        setPhoto.includes('accountRowFromAutomationJob') &&
+        del.includes('accountRowFromAutomationJob')
+      );
+    })(),
+  },
+  {
     name: 'Renderer: job queue client + execute blocking',
     ok: (() => {
       const client = read('src/lib/automationJobQueueClient.ts');
@@ -302,9 +433,11 @@ const checks = [
       return (
         client.includes('enqueueAutomationJob') &&
         client.includes('resolveAccountExecuteBlock') &&
-        client.includes('isHeavyDeviceExecuteBlocked') &&
+        client.includes('isHeavyDeviceExecuteBlockedForAccount') &&
+        !client.includes('clearCompletedAutomationJobs') &&
+        !client.includes('isHeavyDeviceExecuteBlocked()') &&
         sync.includes('resolveAccountExecuteBlock') &&
-        autoSync.includes('isHeavyDeviceExecuteBlocked')
+        autoSync.includes('isHeavyDeviceExecuteBlockedForAccount')
       );
     })(),
   },

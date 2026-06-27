@@ -1,3 +1,5 @@
+export type QueueFromViewResult = { ok: true } | { ok: false; error: string };
+
 const ENQUEUE_ERROR_PREFIX = '\0JQERR\0';
 
 export function enqueueErrorResult(message: string): string {

@@ -2,6 +2,7 @@ import type { Platform } from '@/types/database';
 
 export type AutomationJobAction =
   | 'create_group'
+  | 'set_group_photo'
   | 'set_admin'
   | 'join_by_invite_link'
   | 'leave_group'
@@ -57,12 +58,19 @@ export interface AutomationJobPayload {
   exitDeletePhase?: 'exit' | 'delete';
   /** delete_group — job exit (leave_group) sumber grup yang sudah left. */
   sourceExitJobId?: string;
-  /** Hasil per grup setelah exit/delete (untuk VIEW & enqueue delete). */
+  /** set_group_photo — job create_group sumber grup yang sudah created. */
+  sourceCreateJobId?: string;
+  setPhotoPhase?: 'apply';
+  /** Path absolut file foto brand (satu foto untuk semua grup). */
+  photoPath?: string;
+  /** Hasil per grup setelah create / set photo / exit / delete. */
   groupOutcomes?: Array<{
     groupId: string;
     groupName?: string;
     inviteLink?: string;
     groupLink?: string;
+    createStatus?: 'created' | 'failed';
+    photoStatus?: 'set' | 'failed';
     exitStatus?: 'left' | 'failed' | 'pending';
     deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
   }>;
@@ -94,6 +102,8 @@ export interface AutomationJobDelayConfig {
   /** Set admin (Settings → Set admin). */
   resolve_entity_max_attempts?: number;
   max_admin_slots?: number;
+  /** TG set_group_photo — retry unggah foto. */
+  set_photo_max_retry?: number;
 }
 
 export interface AutomationJobRecord {

@@ -1,5 +1,6 @@
 export type AutomationAction =
   | 'create_group'
+  | 'set_group_photo'
   | 'set_admin'
   | 'join_by_invite_link'
   | 'leave_group'
@@ -29,6 +30,8 @@ export interface AutomationDelayConfig {
   invite_batch_delay_max_sec?: number;
   resolve_entity_max_attempts?: number;
   max_admin_slots?: number;
+  /** TG set_group_photo — retry unggah foto. */
+  set_photo_max_retry?: number;
 }
 
 export interface WaCreateGroupSettings {
@@ -71,6 +74,8 @@ export interface AutomationRunPayload {
     inviteLink?: string;
     groupLink?: string;
   }>;
+  /** set_group_photo — path absolut foto brand */
+  photoPath?: string;
   /** exit_delete_group — frozen from Admin leaveDelete settings */
   leaveDelete?: {
     clearChatHistoryOnDelete?: boolean;

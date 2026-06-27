@@ -23,6 +23,7 @@ import {
   type JobQueueTaskType,
 } from '@/lib/operationsJobQueueUi';
 import type { AutomationJobRecord } from '@/types/automationJob';
+import type { QueueFromViewResult } from '@/lib/operationsJobQueueEnqueueResult';
 
 interface OperationsJobQueueTableProps {
   taskType: JobQueueTaskType;
@@ -33,7 +34,11 @@ interface OperationsJobQueueTableProps {
   onPause?: (jobId: string) => void;
   onCancel?: (jobId: string) => void;
   onDeleteSelected?: (jobIds: string[]) => void;
-  onQueueDeleteFromExit?: (exitJobId: string) => Promise<boolean> | boolean;
+  onQueueDeleteFromExit?: (exitJobId: string) => Promise<QueueFromViewResult> | QueueFromViewResult;
+  onQueueSetPhotoFromCreate?: (
+    createJobId: string,
+    photoPath: string,
+  ) => Promise<QueueFromViewResult> | QueueFromViewResult;
 }
 
 export function OperationsJobQueueTable({
@@ -46,6 +51,7 @@ export function OperationsJobQueueTable({
   onCancel,
   onDeleteSelected,
   onQueueDeleteFromExit,
+  onQueueSetPhotoFromCreate,
 }: OperationsJobQueueTableProps) {
   const { t } = useLanguage();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -93,11 +99,21 @@ export function OperationsJobQueueTable({
     setSelectedIds(new Set());
   }
 
-  async function handleQueueDeleteFromExit(exitJobId: string): Promise<boolean> {
-    if (!onQueueDeleteFromExit) return false;
-    const ok = await onQueueDeleteFromExit(exitJobId);
-    if (ok) setViewJobId(null);
-    return ok;
+  async function handleQueueDeleteFromExit(exitJobId: string): Promise<QueueFromViewResult> {
+    if (!onQueueDeleteFromExit) return { ok: false, error: 'ENQUEUE_FAILED' };
+    const result = await onQueueDeleteFromExit(exitJobId);
+    if (result.ok) setViewJobId(null);
+    return result;
+  }
+
+  async function handleQueueSetPhotoFromCreate(
+    createJobId: string,
+    photoPath: string,
+  ): Promise<QueueFromViewResult> {
+    if (!onQueueSetPhotoFromCreate) return { ok: false, error: 'ENQUEUE_FAILED' };
+    const result = await onQueueSetPhotoFromCreate(createJobId, photoPath);
+    if (result.ok) setViewJobId(null);
+    return result;
   }
 
   return (
@@ -178,6 +194,7 @@ export function OperationsJobQueueTable({
         allJobs={allJobs}
         onClose={() => setViewJobId(null)}
         onQueueDeleteFromExit={handleQueueDeleteFromExit}
+        onQueueSetPhotoFromCreate={handleQueueSetPhotoFromCreate}
       />
     </div>
   );

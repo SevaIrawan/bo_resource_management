@@ -34,6 +34,7 @@ import {
   enqueueErrorResult,
   isEnqueueErrorResult,
 } from '@/lib/operationsJobQueueEnqueueResult';
+import { mapEnqueueJobQueueError } from '@/lib/mapEnqueueJobQueueError';
 import type { JobQueueTaskType } from '@/lib/operationsJobQueueUi';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { MissingMasterGroupForJoin } from '@/lib/loadMissingMasterGroupsForJoin';
@@ -53,15 +54,8 @@ function resolveBrandName(brandFilter: string, selectedBrand: string, brandOptio
   return brandOptions[0] ?? '';
 }
 
-function mapEnqueueError(error: string, t: (key: string) => string): string {
-  if (error === 'JOB_ALREADY_QUEUED_FOR_GROUP') return t('operations.jobQueue.alreadyQueuedGroup');
-  if (error === 'JOB_ALREADY_RUNNING_FOR_ACCOUNT') return t('operations.jobQueue.accountBusy');
-  if (error === 'JOB_ALREADY_QUEUED_FOR_ACCOUNT') return t('operations.jobQueue.oneJobPerAccount');
-  return t('operations.jobQueue.enqueueFailed');
-}
-
 function returnEnqueueError(error: string, t: (key: string) => string, setFeedback: (msg: string) => void): string {
-  const message = mapEnqueueError(error, t);
+  const message = mapEnqueueJobQueueError(error, t);
   setFeedback(message);
   return enqueueErrorResult(message);
 }

@@ -7,6 +7,7 @@ import { resolveJoinGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers
 import { runWaDeleteGroupChat } from './waDeleteGroupChat';
 import { runWaExitDeleteGroup } from './waExitDeleteGroup';
 import { runWaLeaveGroup } from './waLeaveGroup';
+import { runWaSetGroupPhoto } from './waSetGroupPhoto';
 import type {
   AutomationProgressCallback,
   AutomationRunPayload,
@@ -424,10 +425,17 @@ export async function runWhatsAppCreateGroupBatch(
       let created = 0;
       let nextNum = startFrom;
       const failed: string[] = [];
+      const groupOutcomes: Array<{
+        groupId: string;
+        groupName?: string;
+        inviteLink?: string;
+        createStatus: 'created' | 'failed';
+      }> = [];
 
       onProgress(0, totalTarget, prefix);
 
       while (created < totalTarget) {
+        const createdBeforeSlice = created;
         const sliceSize = Math.min(perRun, totalTarget - created);
 
         for (let i = 0; i < sliceSize; i += 1) {
@@ -445,15 +453,35 @@ export async function runWhatsAppCreateGroupBatch(
 
           if (result.status === 'ok') {
             created += 1;
+            const detail = result.result ?? {};
+            groupOutcomes.push({
+              groupId: String(detail.group_id ?? '').trim(),
+              groupName: String(detail.group_name ?? groupName).trim() || groupName,
+              inviteLink:
+                typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
+              createStatus: 'created',
+            });
             onProgress(created, totalTarget, groupName);
           } else {
             failed.push(`${groupName}: ${result.message ?? 'failed'}`);
+            groupOutcomes.push({
+              groupId: '',
+              groupName,
+              createStatus: 'failed',
+            });
           }
         }
 
         nextNum += sliceSize;
 
         if (created >= totalTarget) break;
+
+        if (created === createdBeforeSlice) {
+          console.warn(
+            `[wa-automation] batch slice produced 0 creates (${created}/${totalTarget}); stopping`,
+          );
+          break;
+        }
 
         console.log(
           `[wa-automation] batch slice done ${created}/${totalTarget}; pause before next slice`,
@@ -469,7 +497,7 @@ export async function runWhatsAppCreateGroupBatch(
             ? `${created}/${totalTarget} created (${failed.length} failed)`
             : `${created}/${totalTarget} created`,
         errorCode: created > 0 ? undefined : 'CREATE_GROUP_BATCH_FAILED',
-        result: { success: created, total: totalTarget, failed },
+        result: { success: created, total: totalTarget, failed, groupOutcomes },
       };
     },
     { purpose: 'operation' },
@@ -488,6 +516,9 @@ export async function runWhatsAppAutomation(
   }
   if (payload.action === 'delete_group') {
     return runWaDeleteGroupChat(payload, onProgress);
+  }
+  if (payload.action === 'set_group_photo') {
+    return runWaSetGroupPhoto(payload, onProgress);
   }
 
   const joinGroups = payload.action === 'join_by_invite_link' ? resolveJoinGroups(payload) : [];

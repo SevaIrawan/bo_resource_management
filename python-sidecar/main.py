@@ -30,6 +30,7 @@ from telegram_scraper import (
 from telegram_automation import run_create_group, run_join_by_invite_link, run_set_admin
 from telegram_delete_group import run_delete_group
 from telegram_leave_group import run_leave_group
+from telegram_set_group_photo import run_set_group_photo
 
 def _load_env() -> None:
     env_file = os.environ.get("RM_ENV_FILE", "").strip()
@@ -106,6 +107,7 @@ class AutomationDelayBody(BaseModel):
     invite_batch_delay_max_sec: float | None = None
     resolve_entity_max_attempts: int | None = None
     max_admin_slots: int | None = None
+    set_photo_max_retry: int | None = None
 
 class CreateGroupBody(BaseModel):
     groupName: str = Field(min_length=1)
@@ -144,6 +146,14 @@ class DeleteGroupBody(BaseModel):
     groupLink: str | None = None
     requireOwner: bool = True
     clearChatHistory: bool = False
+    sessionString: str | None = None
+    expectedPhone: str | None = None
+    delay: AutomationDelayBody | None = None
+
+class SetGroupPhotoBody(BaseModel):
+    photoPath: str = Field(min_length=1)
+    groupId: str | None = None
+    groupLink: str | None = None
     sessionString: str | None = None
     expectedPhone: str | None = None
     delay: AutomationDelayBody | None = None
@@ -283,6 +293,18 @@ async def telegram_automation_delete_group(session_id: str, body: DeleteGroupBod
         group_link=body.groupLink,
         require_owner=body.requireOwner,
         clear_chat_history=body.clearChatHistory,
+        session_string=body.sessionString,
+        expected_phone=body.expectedPhone,
+        delay=_delay_dict(body.delay),
+    )
+
+@app.post("/telegram/automation/set-group-photo/{session_id}")
+async def telegram_automation_set_group_photo(session_id: str, body: SetGroupPhotoBody) -> dict:
+    return await run_set_group_photo(
+        session_id,
+        photo_path=body.photoPath,
+        group_id=body.groupId,
+        group_link=body.groupLink,
         session_string=body.sessionString,
         expected_phone=body.expectedPhone,
         delay=_delay_dict(body.delay),

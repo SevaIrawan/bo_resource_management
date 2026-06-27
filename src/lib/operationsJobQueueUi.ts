@@ -6,7 +6,11 @@ import type {
 import {
   isExitDeleteDeleteJob,
   isExitDeleteExitJob,
+  jobMatchesExitDeleteTaskType,
 } from '@/lib/exitDeleteFlow';
+import {
+  jobMatchesCreateGroupTaskType,
+} from '@/lib/createSetPhotoFlow';
 
 export type JobQueueTaskType =
   | 'join'
@@ -18,30 +22,40 @@ function isGroupBatchJobAction(action: AutomationJobAction): boolean {
   return (
     action === 'join_by_invite_link' ||
     action === 'set_admin' ||
+    action === 'set_group_photo' ||
     action === 'leave_group' ||
     action === 'delete_group' ||
     action === 'exit_delete_group'
   );
 }
 
-export function jobQueueTaskTypeToAction(taskType: JobQueueTaskType): AutomationJobAction {
+export function jobMatchesTaskType(job: AutomationJobRecord, taskType: JobQueueTaskType): boolean {
   switch (taskType) {
     case 'join':
-      return 'join_by_invite_link';
+      return job.action === 'join_by_invite_link';
     case 'create_group':
-      return 'create_group';
+      return jobMatchesCreateGroupTaskType(job);
     case 'set_admin':
-      return 'set_admin';
+      return job.action === 'set_admin';
     case 'exit_delete_group':
-      return 'exit_delete_group';
+      return jobMatchesExitDeleteTaskType(job);
     default:
-      return 'join_by_invite_link';
+      return false;
   }
 }
 
-export function jobQueueTargetsText(job: AutomationJobRecord): string {
-  if (!job.payload.targets?.length) return '—';
-  return job.payload.targets.join(', ');
+/** Hanya untuk tab join / set_admin — exit & create pakai jobMatchesTaskType. */
+export function jobQueueTaskTypeToAction(
+  taskType: Exclude<JobQueueTaskType, 'exit_delete_group' | 'create_group'>,
+): AutomationJobAction {
+  switch (taskType) {
+    case 'join':
+      return 'join_by_invite_link';
+    case 'set_admin':
+      return 'set_admin';
+    default:
+      return 'join_by_invite_link';
+  }
 }
 
 export function jobQueueQueueTitleKey(taskType: JobQueueTaskType): string {
@@ -74,7 +88,7 @@ export function jobQueueEmptyKey(taskType: JobQueueTaskType): string {
   }
 }
 
-export const OPERATIONS_JOB_STATUS_CLASS: Record<AutomationJobStatus, string> = {
+const OPERATIONS_JOB_STATUS_CLASS: Record<AutomationJobStatus, string> = {
   queued: 'operations-job-status--queued',
   running: 'operations-job-status--running',
   completed: 'operations-job-status--completed',
@@ -150,17 +164,6 @@ export function formatJobQueueWhen(iso?: string): string {
   return date.toLocaleString();
 }
 
-export function jobQueueDetail(job: AutomationJobRecord): string {
-  if (job.error) return job.error;
-  if (job.message) return job.message;
-  if (job.payload.groupName) return job.payload.groupName;
-  if (job.payload.groupId) return job.payload.groupId;
-  if (job.payload.inviteLink) return job.payload.inviteLink;
-  if (job.payload.groupLink) return job.payload.groupLink;
-  if (job.payload.targets?.length) return job.payload.targets.join(', ');
-  return '—';
-}
-
 export function jobQueueGroupName(job: AutomationJobRecord): string {
   if (isCreateGroupBatchJob(job)) {
     const prefix = job.payload.groupNamePrefix ?? job.payload.groupName ?? '—';
@@ -219,16 +222,6 @@ export function jobQueueStatusLabel(
     });
   }
   return t(jobQueueStatusKey(job.status));
-}
-
-export function jobQueueActionLabel(
-  job: AutomationJobRecord,
-  t: (key: string) => string,
-): string {
-  if (isJobQueueBatchInProgress(job)) {
-    return t('operations.jobQueue.actionProcessCreatingGroup');
-  }
-  return t(jobQueueActionKey(job.action));
 }
 
 export function jobQueueResultText(
@@ -351,10 +344,13 @@ export function jobQueueViewTableColumnIds(
   job: AutomationJobRecord,
 ): JobQueueViewTableColumnId[] {
   if (job.action === 'create_group') {
-    return ['groupName', 'count', 'status'];
+    return ['groupName', 'groupId', 'inviteLink', 'status'];
   }
   if (job.action === 'set_admin') {
     return ['groupName', 'groupId', 'inviteLink', 'targetAdmin', 'status'];
+  }
+  if (job.action === 'set_group_photo') {
+    return ['groupName', 'groupId', 'inviteLink', 'status'];
   }
   if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
     return ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
@@ -398,11 +394,69 @@ function resolveInviteLink(group: {
   return group.inviteLink?.trim() || group.groupLink?.trim() || '—';
 }
 
+export function jobQueueCreateGroupResultColumnIds(): JobQueueViewTableColumnId[] {
+  return ['groupName', 'groupId', 'inviteLink'];
+}
+
+function resolveCreateGroupResultOutcomes(
+  job: AutomationJobRecord,
+): NonNullable<AutomationJobRecord['payload']['groupOutcomes']> {
+  const outcomes = job.payload.groupOutcomes ?? [];
+  return outcomes.filter((row) => row.createStatus !== 'failed');
+}
+
+/** Tab Result create group — hanya grup created, tanpa kolom Status. */
+export function jobQueueCreateGroupResultTableRows(
+  job: AutomationJobRecord,
+): JobQueueViewTableRow[] {
+  const createdOutcomes = resolveCreateGroupResultOutcomes(job);
+  if (createdOutcomes.length > 0) {
+    return createdOutcomes.map((row, index) => ({
+      key: row.groupId || String(index),
+      groupName: row.groupName?.trim() || row.groupId || '—',
+      groupId: row.groupId || '—',
+      inviteLink: resolveInviteLink(row),
+      targetJoin: '—',
+      targetAdmin: '—',
+      count: '—',
+      status: '—',
+    }));
+  }
+
+  return [
+    {
+      key: 'create-batch',
+      groupName: jobQueueCreateGroupViewName(job),
+      groupId: '—',
+      inviteLink: '—',
+      targetJoin: '—',
+      targetAdmin: '—',
+      count: '—',
+      status: '—',
+    },
+  ];
+}
+
 export function jobQueueViewTableRows(
   job: AutomationJobRecord,
   t: (key: string) => string,
 ): JobQueueViewTableRow[] {
   if (job.action === 'create_group') {
+    const createdOutcomes = resolveCreateGroupResultOutcomes(job);
+
+    if (createdOutcomes.length > 0) {
+      return createdOutcomes.map((row, index) => ({
+        key: row.groupId || String(index),
+        groupName: row.groupName?.trim() || row.groupId || '—',
+        groupId: row.groupId || '—',
+        inviteLink: resolveInviteLink(row),
+        targetJoin: '—',
+        targetAdmin: '—',
+        count: '—',
+        status: t('operations.jobQueue.createStatusCreated'),
+      }));
+    }
+
     const total = Math.max(1, Math.floor(Number(job.payload.totalToCreate) || 1));
     const count =
       job.status === 'completed' || job.status === 'failed'
@@ -478,6 +532,33 @@ export function jobQueueViewTableRows(
     }));
   }
 
+  if (job.action === 'set_group_photo') {
+    const outcomes: NonNullable<AutomationJobRecord['payload']['groupOutcomes']> =
+      job.payload.groupOutcomes?.length
+        ? job.payload.groupOutcomes
+        : groups.map((group) => ({
+            groupId: group.groupId,
+            groupName: group.groupName,
+            inviteLink: group.inviteLink,
+            groupLink: group.groupLink,
+          }));
+    return outcomes.map((row, index) => ({
+      key: row.groupId || String(index),
+      groupName: row.groupName?.trim() || row.groupId || '—',
+      groupId: row.groupId || '—',
+      inviteLink: resolveInviteLink(row),
+      targetJoin: '—',
+      targetAdmin: '—',
+      count: '—',
+      status:
+        row.photoStatus === 'set'
+          ? t('operations.jobQueue.photoStatusSet')
+          : row.photoStatus === 'failed'
+            ? t('operations.jobQueue.photoStatusFailed')
+            : jobQueueViewRowStatusLabel(job, index, t),
+    }));
+  }
+
   if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
     return groups.map((group, index) => ({
       key: group.groupId || String(index),
@@ -544,6 +625,8 @@ export function jobQueueActionKey(action: AutomationJobAction): string {
       return 'operations.jobQueue.actionJoin';
     case 'create_group':
       return 'operations.jobQueue.actionCreateGroup';
+    case 'set_group_photo':
+      return 'operations.jobQueue.actionSetGroupPhoto';
     case 'set_admin':
       return 'operations.jobQueue.actionSetAdmin';
     case 'exit_delete_group':

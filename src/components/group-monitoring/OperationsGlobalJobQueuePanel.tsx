@@ -12,11 +12,12 @@ import {
 } from '@/lib/automationJobQueueClient';
 import {
   jobQueueQueueTitleKey,
-  jobQueueTaskTypeToAction,
+  jobMatchesTaskType,
   type JobQueueTaskType,
 } from '@/lib/operationsJobQueueUi';
-import { jobMatchesExitDeleteTaskType } from '@/lib/exitDeleteFlow';
 import { enqueueDeleteFromExitJob } from '@/lib/enqueueDeleteFromExitJob';
+import { enqueueSetPhotoFromCreateJob } from '@/lib/enqueueSetPhotoFromCreateJob';
+import type { QueueFromViewResult } from '@/lib/operationsJobQueueEnqueueResult';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 import type { AutomationJobListFilter, AutomationJobQueueSnapshot } from '@/types/automationJob';
@@ -46,11 +47,7 @@ export function OperationsGlobalJobQueuePanel({
   }, [brandFilter, platform]);
 
   const filteredJobs = useMemo(() => {
-    if (taskType === 'exit_delete_group') {
-      return (snapshot?.jobs ?? []).filter((job) => jobMatchesExitDeleteTaskType(job));
-    }
-    const action = jobQueueTaskTypeToAction(taskType);
-    return (snapshot?.jobs ?? []).filter((job) => job.action === action);
+    return (snapshot?.jobs ?? []).filter((job) => jobMatchesTaskType(job, taskType));
   }, [snapshot?.jobs, taskType]);
 
   const reload = useCallback(async () => {
@@ -88,15 +85,31 @@ export function OperationsGlobalJobQueuePanel({
     await reload();
   }
 
-  async function handleQueueDeleteFromExit(exitJobId: string): Promise<boolean> {
+  async function handleQueueDeleteFromExit(exitJobId: string): Promise<QueueFromViewResult> {
     const exitJob = snapshot?.jobs.find((job) => job.id === exitJobId);
-    if (!exitJob) return false;
+    if (!exitJob) return { ok: false, error: 'JOB_NOT_FOUND' };
     const result = await enqueueDeleteFromExitJob(exitJob);
-    if (!result.ok) return false;
+    if (!result.ok) return { ok: false, error: result.error };
     await reload();
-    await runAutomationJob(result.jobId);
+    const ran = await runAutomationJob(result.jobId);
+    if (!ran) return { ok: false, error: 'RUN_FAILED' };
     await reload();
-    return true;
+    return { ok: true };
+  }
+
+  async function handleQueueSetPhotoFromCreate(
+    createJobId: string,
+    photoPath: string,
+  ): Promise<QueueFromViewResult> {
+    const createJob = snapshot?.jobs.find((job) => job.id === createJobId);
+    if (!createJob) return { ok: false, error: 'JOB_NOT_FOUND' };
+    const result = await enqueueSetPhotoFromCreateJob(createJob, photoPath);
+    if (!result.ok) return { ok: false, error: result.error };
+    await reload();
+    const ran = await runAutomationJob(result.jobId);
+    if (!ran) return { ok: false, error: 'RUN_FAILED' };
+    await reload();
+    return { ok: true };
   }
 
   if (!desktopReady) {
@@ -133,6 +146,7 @@ export function OperationsGlobalJobQueuePanel({
           onCancel={(jobId) => void handleCancel(jobId)}
           onDeleteSelected={(jobIds) => void handleDeleteSelected(jobIds)}
           onQueueDeleteFromExit={handleQueueDeleteFromExit}
+          onQueueSetPhotoFromCreate={handleQueueSetPhotoFromCreate}
         />
       </section>
     </div>

@@ -72,6 +72,11 @@ export function accountJobStepTotal(job: AutomationJobRecord): number {
     if (fromGroups > 0) return fromGroups;
     return job.payload.groupId?.trim() ? 1 : 0;
   }
+  if (job.action === 'set_group_photo') {
+    const fromGroups = job.payload.groups?.length ?? 0;
+    if (fromGroups > 0) return fromGroups;
+    return job.payload.groupId?.trim() ? 1 : 0;
+  }
   return 1;
 }
 

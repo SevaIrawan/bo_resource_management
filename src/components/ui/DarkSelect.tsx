@@ -19,6 +19,7 @@ export interface DarkSelectProps {
   className?: string;
   triggerClassName?: string;
   menuAlign?: 'left' | 'right';
+  menuPlacement?: 'down' | 'up';
   disabled?: boolean;
 }
 
@@ -33,6 +34,7 @@ export function DarkSelect({
   className,
   triggerClassName,
   menuAlign = 'left',
+  menuPlacement = 'down',
   disabled = false,
 }: DarkSelectProps) {
   const { phase, isOpen, isVisible, close, toggle } = useDarkSelectMenu();
@@ -100,6 +102,7 @@ export function DarkSelect({
           className={cn(
             'dark-select-menu',
             menuAlign === 'right' && 'dark-select-menu--align-right',
+            menuPlacement === 'up' && 'dark-select-menu--drop-up',
             (phase === 'open' || phase === 'opening') && 'dark-select-menu--open',
             phase === 'closing' && 'dark-select-menu--closing',
           )}

@@ -1,3 +1,31 @@
+export type BrandGroupPhotoEntry = {
+  path: string;
+  fileName: string;
+  savedAt: string;
+};
+
+/** Selaras electron/main/brandGroupPhoto.ts — huruf besar/kecil brand dipertahankan. */
+export function brandGroupPhotoFileBase(brandName: string): string {
+  const trimmed = brandName.trim();
+  const safe = trimmed.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\s+/g, '_');
+  return safe || 'brand';
+}
+
+/** Format wajib: [brand].jpg — ekstensi selalu .jpg (huruf kecil). */
+export function expectedBrandGroupPhotoFileName(brandName: string): string {
+  return `${brandGroupPhotoFileBase(brandName)}.jpg`;
+}
+
+export async function listBrandGroupPhotos(
+  brandName: string,
+): Promise<BrandGroupPhotoEntry[]> {
+  const api = window.electronAPI?.brandGroupPhoto?.list;
+  if (!api) return [];
+  const result = await api(brandName);
+  if (!result.ok || !result.photos?.length) return [];
+  return result.photos;
+}
+
 export async function resolveBrandGroupPhotoPath(
   brandName: string,
 ): Promise<{ ok: true; path: string } | { ok: false; expectedFileName?: string; dir?: string }> {

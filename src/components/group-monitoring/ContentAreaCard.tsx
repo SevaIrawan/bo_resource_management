@@ -10,7 +10,7 @@ interface ContentAreaCardProps {
   children: ReactNode;
   accountViewMode?: AccountViewMode;
   onAccountViewModeChange?: (mode: AccountViewMode) => void;
-  onQuickAddBrand?: () => void;
+  onOpenAddBrand?: () => void;
   groups: AccountBrandGroup[];
   filteredGroups: AccountBrandGroup[];
   accountFilters: AccountSlicerFilters;
@@ -21,7 +21,7 @@ export function ContentAreaCard({
   children,
   accountViewMode = 'card',
   onAccountViewModeChange,
-  onQuickAddBrand,
+  onOpenAddBrand,
   groups,
   filteredGroups,
   accountFilters,
@@ -34,7 +34,7 @@ export function ContentAreaCard({
           <AccountSlicerHeader
             viewMode={accountViewMode}
             onViewModeChange={onAccountViewModeChange ?? (() => undefined)}
-            onQuickAddBrand={onQuickAddBrand}
+            onOpenAddBrand={onOpenAddBrand}
             groups={groups}
             filteredGroups={filteredGroups}
             accountFilters={accountFilters}

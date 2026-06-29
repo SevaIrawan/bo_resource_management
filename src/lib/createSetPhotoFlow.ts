@@ -83,3 +83,12 @@ export function canQueueSetPhotoFromCreateJob(
 ): boolean {
   return resolveSetPhotoQueueBlockReason(createJob, jobs, photoPath) === null;
 }
+
+/** Tab Set Photo — lock setelah set photo sudah di-queue / jalan / selesai untuk create job ini. */
+export function isCreateGroupSetPhotoTabLocked(
+  createJob: AutomationJobRecord,
+  jobs: AutomationJobRecord[],
+): boolean {
+  if (!isCreateGroupSourceJob(createJob)) return false;
+  return createJobHasSetPhotoQueuedOrDone(createJob.id, jobs);
+}

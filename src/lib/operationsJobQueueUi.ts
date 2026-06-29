@@ -9,7 +9,10 @@ import {
   jobMatchesExitDeleteTaskType,
 } from '@/lib/exitDeleteFlow';
 import {
+  isCreateGroupSourceJob,
+  isSetPhotoFromCreateJob,
   jobMatchesCreateGroupTaskType,
+  resolveCreatedGroupsFromCreateJob,
 } from '@/lib/createSetPhotoFlow';
 
 export type JobQueueTaskType =
@@ -626,6 +629,29 @@ export function jobQueueStatusKey(status: AutomationJobStatus): string {
     default:
       return 'operations.jobQueue.statusQueued';
   }
+}
+
+/** Kolom Remark — create tab: teks VIEW set photo vs Completed (set photo job selesai = lock tab modal). */
+export function jobQueueCreateGroupRemarkKey(
+  job: AutomationJobRecord,
+  allJobs: AutomationJobRecord[],
+): string | null {
+  if (isSetPhotoFromCreateJob(job)) {
+    return job.status === 'completed' ? 'operations.jobQueue.statusCompleted' : null;
+  }
+  if (!isCreateGroupSourceJob(job)) return null;
+
+  const setPhotoCompleted = allJobs.some(
+    (row) =>
+      row.action === 'set_group_photo' &&
+      row.payload.sourceCreateJobId === job.id &&
+      row.status === 'completed',
+  );
+  if (setPhotoCompleted) return 'operations.jobQueue.statusCompleted';
+
+  if (job.status !== 'completed' && job.status !== 'failed') return null;
+  if (resolveCreatedGroupsFromCreateJob(job).length === 0) return null;
+  return 'operations.jobQueue.createRemarkPressView';
 }
 
 export function jobQueueActionKey(action: AutomationJobAction): string {

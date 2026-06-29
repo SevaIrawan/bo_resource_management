@@ -20,7 +20,7 @@ function GroupMonitoringContent() {
     setAccountFilters,
   } = useGroupMonitoring();
   const [accountViewMode, setAccountViewMode] = useState<AccountViewMode>('card');
-  const [quickAddBrandNonce, setQuickAddBrandNonce] = useState(0);
+  const [addBrandModalOpen, setAddBrandModalOpen] = useState(false);
 
   if (loadError && !loading) {
     return <p className="account-sync-loading">{loadError}</p>;
@@ -49,7 +49,7 @@ function GroupMonitoringContent() {
       <ContentAreaCard
         accountViewMode={accountViewMode}
         onAccountViewModeChange={setAccountViewMode}
-        onQuickAddBrand={() => setQuickAddBrandNonce((n) => n + 1)}
+        onOpenAddBrand={() => setAddBrandModalOpen(true)}
         groups={groups}
         filteredGroups={filteredGroups}
         accountFilters={accountFilters}
@@ -57,7 +57,8 @@ function GroupMonitoringContent() {
       >
         <AccountMonitoringBody
           viewMode={accountViewMode}
-          quickAddBrandNonce={quickAddBrandNonce}
+          addBrandModalOpen={addBrandModalOpen}
+          onAddBrandModalOpenChange={setAddBrandModalOpen}
         />
       </ContentAreaCard>
     </div>

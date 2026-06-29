@@ -13,6 +13,7 @@ import {
   jobQueueCanPause,
   jobQueueCanRun,
   jobQueueRowActionMode,
+  jobQueueCreateGroupRemarkKey,
   jobQueueEmptyKey,
   jobQueueGroupName,
   jobQueueBatchTotalText,
@@ -63,7 +64,7 @@ export function OperationsJobQueueTable({
     [jobs, viewJobId],
   );
 
-  const columns = buildQueueColumns(taskType, showBrand);
+  const columns = buildQueueColumns(taskType, showBrand, allJobs);
   const deletableJobs = useMemo(() => jobs.filter((job) => jobQueueCanDelete(job)), [jobs]);
   const selectionActive = selectedIds.size > 0;
   const allDeletableSelected =
@@ -179,6 +180,7 @@ export function OperationsJobQueueTable({
                       col.key === 'created' && 'tabular-nums',
                       col.key === 'progress' && 'operations-job-queue-detail',
                       col.key === 'actions' && 'operations-job-queue-actions-cell',
+                      col.key === 'remark' && 'operations-job-queue-remark-cell',
                     )}
                   >
                     {col.render(job, t, {
@@ -321,7 +323,11 @@ function JobQueueProgressCell({
   );
 }
 
-function buildQueueColumns(taskType: JobQueueTaskTypeSelection, showBrand: boolean): QueueColumnDef[] {
+function buildQueueColumns(
+  taskType: JobQueueTaskTypeSelection,
+  showBrand: boolean,
+  allJobs: AutomationJobRecord[],
+): QueueColumnDef[] {
   const resolvedTaskType = isJobQueueTaskTypeSelected(taskType) ? taskType : 'join';
   const statusCol: QueueColumnDef = {
     key: 'status',
@@ -386,6 +392,15 @@ function buildQueueColumns(taskType: JobQueueTaskTypeSelection, showBrand: boole
     actionsCol,
   ];
 
+  const createRemarkCol: QueueColumnDef = {
+    key: 'remark',
+    labelKey: 'operations.jobQueue.colRemark',
+    render: (job, t) => {
+      const key = jobQueueCreateGroupRemarkKey(job, allJobs);
+      return key ? t(key) : '—';
+    },
+  };
+
   const createCols: QueueColumnDef[] = [
     statusCol,
     ...(showBrand ? [brandCol] : []),
@@ -398,6 +413,7 @@ function buildQueueColumns(taskType: JobQueueTaskTypeSelection, showBrand: boole
     progressCol,
     createdCol,
     actionsCol,
+    createRemarkCol,
   ];
 
   const setAdminCols: QueueColumnDef[] = [

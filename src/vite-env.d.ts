@@ -269,6 +269,10 @@ declare global {
           ok: boolean;
           dataUrl?: string;
         }>;
+        list: (brandName: string) => Promise<{
+          ok: boolean;
+          photos?: Array<{ path: string; fileName: string; savedAt: string }>;
+        }>;
       };
       executeSlots?: {
         tryAcquire: (

@@ -112,8 +112,7 @@ export function OperationsGlobalJobQueuePanel({
     const result = await enqueueSetPhotoFromCreateJob(createJob, photoPath);
     if (!result.ok) return { ok: false, error: result.error };
     await reload();
-    const ran = await runAutomationJob(result.jobId);
-    if (!ran) return { ok: false, error: 'RUN_FAILED' };
+    await runAutomationJob(result.jobId);
     await reload();
     return { ok: true };
   }

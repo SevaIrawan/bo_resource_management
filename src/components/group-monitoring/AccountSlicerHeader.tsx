@@ -24,7 +24,7 @@ export type { AccountViewMode };
 interface AccountSlicerHeaderProps {
   viewMode: AccountViewMode;
   onViewModeChange: (mode: AccountViewMode) => void;
-  onQuickAddBrand?: () => void;
+  onOpenAddBrand?: () => void;
   groups: AccountBrandGroup[];
   filteredGroups: AccountBrandGroup[];
   accountFilters: AccountSlicerFilters;
@@ -68,7 +68,7 @@ function platformLabel(t: (key: string) => string, platform: Platform): string {
 export function AccountSlicerHeader({
   viewMode,
   onViewModeChange,
-  onQuickAddBrand,
+  onOpenAddBrand,
   groups,
   filteredGroups,
   accountFilters,
@@ -198,7 +198,7 @@ export function AccountSlicerHeader({
           <button
             type="button"
             className="account-slicer-export-btn"
-            onClick={() => onQuickAddBrand?.()}
+            onClick={() => onOpenAddBrand?.()}
             title={t('groupMonitoring.accountCard.addBrandTitle')}
             aria-label={t('groupMonitoring.accountCard.addBrandTitle')}
           >

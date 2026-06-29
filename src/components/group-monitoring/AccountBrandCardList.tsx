@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { AccountBrandCard } from '@/components/group-monitoring/AccountBrandCard';
 import type { EditAccountFormValues } from '@/components/group-monitoring/EditAccountModal';
 import { AddBrandCard } from '@/components/group-monitoring/AddBrandCard';
-import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
 import { RemoveBrandModal } from '@/components/group-monitoring/RemoveBrandModal';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { useAccountSyncFlow } from '@/hooks/useAccountSyncFlow';
-import { addAccountToGroup, appendBrandGroupFromName, patchAccountDetailsInGroups } from '@/lib/accountBrandUtils';
+import { addAccountToGroup, patchAccountDetailsInGroups } from '@/lib/accountBrandUtils';
 import { commitAccountDetailsEdit } from '@/lib/commitAccountDetailsEdit';
 import { removeBrandCompletely } from '@/lib/brands';
 import { getErrorMessage } from '@/lib/errorMessage';
@@ -21,7 +20,7 @@ type SyncFlow = ReturnType<typeof useAccountSyncFlow>;
 interface AccountBrandCardListProps {
   groups: AccountBrandGroup[];
   activePlatformFilter?: AccountPlatformFilter;
-  quickAddBrandNonce?: number;
+  onOpenAddBrand?: () => void;
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   sync: SyncFlow;
   onRemoveFromSlot: (groupId: string, account: AccountBrandRow) => void;
@@ -30,7 +29,7 @@ interface AccountBrandCardListProps {
 export function AccountBrandCardList({
   groups,
   activePlatformFilter = 'all',
-  quickAddBrandNonce = 0,
+  onOpenAddBrand,
   onGroupsChange,
   sync,
   onRemoveFromSlot,
@@ -38,18 +37,9 @@ export function AccountBrandCardList({
   const { user } = useAuth();
   const { t } = useLanguage();
   const { canManageStructure, canOperatePlatform } = usePermissions();
-  const [modalOpen, setModalOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<AccountBrandGroup | null>(null);
   const [removeSaving, setRemoveSaving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  const lastQuickAddNonce = useRef(0);
-
-  useEffect(() => {
-    if (quickAddBrandNonce > lastQuickAddNonce.current && canManageStructure) {
-      setModalOpen(true);
-    }
-    lastQuickAddNonce.current = quickAddBrandNonce;
-  }, [quickAddBrandNonce, canManageStructure]);
 
   const {
     processingByAccount,
@@ -60,11 +50,6 @@ export function AccountBrandCardList({
     requestCancelScrape,
     getScrapeProgress,
   } = sync;
-
-  async function handleAddBrand(brandName: string) {
-    if (!canManageStructure) return;
-    await appendBrandGroupFromName(brandName, user?.id, onGroupsChange);
-  }
 
   async function handleAddAccount(group: AccountBrandGroup, input: AddAccountInput) {
     if (!canManageStructure) return;
@@ -190,18 +175,9 @@ export function AccountBrandCardList({
         ))}
         <AddBrandCard
           locked={!canManageStructure}
-          onClick={() => {
-            if (!canManageStructure) return;
-            setModalOpen(true);
-          }}
+          onClick={() => onOpenAddBrand?.()}
         />
       </div>
-
-      <AddBrandModal
-        open={modalOpen && canManageStructure}
-        onClose={() => setModalOpen(false)}
-        onSubmit={handleAddBrand}
-      />
 
       {removeTarget ? (
         <RemoveBrandModal

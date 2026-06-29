@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { AccountBrandCardList } from '@/components/group-monitoring/AccountBrandCardList';
 import { AccountBrandTableView } from '@/components/group-monitoring/AccountBrandTableView';
 import { AddBrandModal } from '@/components/group-monitoring/AddBrandModal';
@@ -15,12 +14,14 @@ import type { Platform } from '@/types/database';
 
 interface AccountMonitoringBodyProps {
   viewMode: AccountViewMode;
-  quickAddBrandNonce?: number;
+  addBrandModalOpen: boolean;
+  onAddBrandModalOpenChange: (open: boolean) => void;
 }
 
 export function AccountMonitoringBody({
   viewMode,
-  quickAddBrandNonce = 0,
+  addBrandModalOpen,
+  onAddBrandModalOpenChange,
 }: AccountMonitoringBodyProps) {
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -29,21 +30,13 @@ export function AccountMonitoringBody({
   const sync = useAccountSyncFlowContext();
 
   const removeSlot = useRemoveAccountFromSlot(onGroupsChange, user?.id, canManageStructure);
-  const [quickAddModalOpen, setQuickAddModalOpen] = useState(false);
-  const lastQuickAddNonce = useRef(0);
 
-  useEffect(() => {
-    if (
-      quickAddBrandNonce > lastQuickAddNonce.current &&
-      canManageStructure &&
-      viewMode === 'table'
-    ) {
-      setQuickAddModalOpen(true);
-    }
-    lastQuickAddNonce.current = quickAddBrandNonce;
-  }, [quickAddBrandNonce, canManageStructure, viewMode]);
+  function openAddBrandModal() {
+    if (!canManageStructure) return;
+    onAddBrandModalOpenChange(true);
+  }
 
-  async function handleQuickAddBrand(brandName: string) {
+  async function handleAddBrand(brandName: string) {
     if (!canManageStructure) return;
     await appendBrandGroupFromName(brandName, user?.id, onGroupsChange);
   }
@@ -69,11 +62,11 @@ export function AccountMonitoringBody({
         />
       ) : null}
 
-      {!loading && viewMode === 'table' && canManageStructure ? (
+      {!loading && canManageStructure ? (
         <AddBrandModal
-          open={quickAddModalOpen}
-          onClose={() => setQuickAddModalOpen(false)}
-          onSubmit={handleQuickAddBrand}
+          open={addBrandModalOpen}
+          onClose={() => onAddBrandModalOpenChange(false)}
+          onSubmit={handleAddBrand}
         />
       ) : null}
 
@@ -93,12 +86,12 @@ export function AccountMonitoringBody({
             onGroupsChange={onGroupsChange}
             sync={sync}
             onRemoveFromSlot={removeSlot.openRemoveModal}
+            onOpenAddBrand={openAddBrandModal}
             activePlatformFilter={
               accountFilters.platform === 'all'
                 ? 'all'
                 : (accountFilters.platform as Platform)
             }
-            quickAddBrandNonce={quickAddBrandNonce}
           />
         ))}
     </>

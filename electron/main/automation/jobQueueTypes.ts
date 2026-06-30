@@ -35,6 +35,7 @@ export interface AutomationJobPayload {
   totalToCreate?: number;
   perRun?: number;
   startFrom?: number;
+  useGroupNumbering?: boolean;
   groupNamePrefix?: string;
   batchIndex?: number;
   batchTotal?: number;

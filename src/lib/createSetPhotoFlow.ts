@@ -56,24 +56,103 @@ export function resolveSetPhotoQueueBlockReason(
     return 'NO_CREATED_GROUPS';
   }
   if (!photoPath?.trim()) return 'NO_PHOTO';
-  if (createJobHasSetPhotoQueuedOrDone(createJob.id, jobs)) {
+  if (createJobHasSetPhotoFollowUp(createJob.id, jobs)) {
     return 'ALREADY_QUEUED';
   }
   return null;
 }
 
-function createJobHasSetPhotoQueuedOrDone(
+function isSetPhotoFollowUpLockStatus(job: AutomationJobRecord): boolean {
+  return (
+    job.status === 'queued' ||
+    job.status === 'running' ||
+    job.status === 'completed' ||
+    (job.status === 'failed' && (job.progress?.current ?? 0) > 0)
+  );
+}
+
+/** Set photo job terkait create job — prioritas: running > queued > completed > partial fail > lainnya. */
+export function findSetPhotoJobForCreateJob(
+  createJobId: string,
+  jobs: AutomationJobRecord[],
+): AutomationJobRecord | undefined {
+  const matches = jobs.filter(
+    (job) =>
+      job.action === 'set_group_photo' &&
+      job.payload.sourceCreateJobId === createJobId,
+  );
+  if (matches.length === 0) return undefined;
+
+  const priority = (job: AutomationJobRecord): number => {
+    if (job.status === 'running') return 0;
+    if (job.status === 'queued') return 1;
+    if (job.status === 'completed') return 2;
+    if (job.status === 'failed' && (job.progress?.current ?? 0) > 0) return 3;
+    return 4;
+  };
+
+  return [...matches].sort((a, b) => {
+    const delta = priority(a) - priority(b);
+    if (delta !== 0) return delta;
+    return b.createdAt.localeCompare(a.createdAt);
+  })[0];
+}
+
+export function createJobHasSetPhotoFollowUp(
   createJobId: string,
   jobs: AutomationJobRecord[],
 ): boolean {
   return jobs.some(
     (job) =>
+      job.action === 'set_group_photo' &&
       job.payload.sourceCreateJobId === createJobId &&
-      (job.status === 'queued' ||
-        job.status === 'running' ||
-        job.status === 'completed' ||
-        (job.status === 'failed' && (job.progress?.current ?? 0) > 0)),
+      isSetPhotoFollowUpLockStatus(job),
   );
+}
+
+function resolveSetPhotoJobFollowUpRemarkKey(
+  setPhotoJob: AutomationJobRecord,
+): string | null {
+  switch (setPhotoJob.status) {
+    case 'completed':
+      return 'operations.jobQueue.statusCompleted';
+    case 'running':
+      return 'operations.jobQueue.createRemarkSetPhotoRunning';
+    case 'queued':
+      return 'operations.jobQueue.createRemarkSetPhotoQueued';
+    case 'failed':
+      if ((setPhotoJob.progress?.current ?? 0) > 0) {
+        return 'operations.jobQueue.createRemarkSetPhotoPartial';
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+/** Remark kolom create tab — selaras dengan lock tab Set Photo di VIEW modal. */
+export function resolveCreateJobSetPhotoFollowUpRemarkKey(
+  createJob: AutomationJobRecord,
+  allJobs: AutomationJobRecord[],
+): string | null {
+  if (!isCreateGroupSourceJob(createJob)) return null;
+  if (createJob.status !== 'completed' && createJob.status !== 'failed') {
+    return null;
+  }
+  if (resolveCreatedGroupsFromCreateJob(createJob).length === 0) return null;
+
+  const setPhotoJob = findSetPhotoJobForCreateJob(createJob.id, allJobs);
+  if (!setPhotoJob) return 'operations.jobQueue.createRemarkPressView';
+
+  return resolveSetPhotoJobFollowUpRemarkKey(setPhotoJob);
+}
+
+/** Remark baris set_group_photo (follow-up dari create job). */
+export function resolveSetPhotoJobRemarkKey(
+  job: AutomationJobRecord,
+): string | null {
+  if (!isSetPhotoFromCreateJob(job)) return null;
+  return resolveSetPhotoJobFollowUpRemarkKey(job);
 }
 
 export function canQueueSetPhotoFromCreateJob(
@@ -90,5 +169,5 @@ export function isCreateGroupSetPhotoTabLocked(
   jobs: AutomationJobRecord[],
 ): boolean {
   if (!isCreateGroupSourceJob(createJob)) return false;
-  return createJobHasSetPhotoQueuedOrDone(createJob.id, jobs);
+  return createJobHasSetPhotoFollowUp(createJob.id, jobs);
 }

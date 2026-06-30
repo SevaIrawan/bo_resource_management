@@ -15,6 +15,10 @@ import type {
   AutomationRunResult,
   WaCreateGroupSettings,
 } from './types';
+import {
+  createGroupBatchUsesNumbering,
+  resolveCreateBatchGroupName,
+} from './createGroupBatchNaming';
 
 const WA_ACCEPT_INVITE_TIMEOUT_MS = 120_000;
 const WA_CHAT_LOOKUP_TIMEOUT_MS = 90_000;
@@ -433,6 +437,7 @@ export async function runWhatsAppCreateGroupBatch(
   const totalTarget = Math.max(1, Math.floor(Number(payload.totalToCreate) || 1));
   const perRun = Math.max(1, Math.floor(Number(payload.perRun) || totalTarget));
   const startFrom = Math.max(1, Math.floor(Number(payload.startFrom) || 1));
+  const useNumbering = createGroupBatchUsesNumbering(payload, totalTarget);
   const prefix = (payload.groupNamePrefix ?? payload.groupName ?? '').trim();
 
   if (!prefix) {
@@ -474,7 +479,7 @@ export async function runWhatsAppCreateGroupBatch(
           }
 
           const num = nextNum + i;
-          const groupName = totalTarget > 1 ? `${prefix} ${num}`.trim() : prefix;
+          const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
           const batchIndex = created + 1;
 
           onProgress(created, totalTarget, groupName);

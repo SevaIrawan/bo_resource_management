@@ -138,6 +138,7 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
     totalToCreate: batchTotal(job),
     perRun: Math.max(1, Math.floor(Number(job.payload.perRun) || batchTotal(job))),
     startFrom: Math.max(1, Math.floor(Number(job.payload.startFrom) || 1)),
+    useGroupNumbering: job.payload.useGroupNumbering,
     groupNamePrefix: job.payload.groupNamePrefix,
     createGroupSettings: job.payload.createGroupSettings,
     groupId: job.payload.groupId,

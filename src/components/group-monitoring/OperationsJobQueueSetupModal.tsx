@@ -7,6 +7,10 @@ import {
   readTelegramWorkerSettings,
   readWhatsAppWorkerSettings,
 } from '@/config/workerPlatformSettings';
+import {
+  readCreateGroupWorkerSettings,
+} from '@/lib/createGroupWorkerSettings';
+import { collectCreateGroupSetupValidationCodes } from '@/lib/createGroupSetupValidation';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
   isEnqueueErrorResult,
@@ -21,14 +25,21 @@ import {
 } from '@/lib/loadSuperAdminGroupsForSetAdmin';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
+import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
 
 const EXIT_GROUP_SETUP_PAGE_SIZE = 10;
 
 export interface JobQueueCreateGroupDraft {
   groupName: string;
   totalToCreate: number;
+  useGroupNumbering: boolean;
   startFrom: number;
-  participants: string[];
+  createGroupSettings?: {
+    messagesAdminsOnly: boolean;
+    addMembersAdminsOnly: boolean;
+    infoAdminsOnly: boolean;
+  };
+  hideChatHistoryForMembers?: boolean;
 }
 
 export interface JobQueueSetAdminDraft {
@@ -60,11 +71,50 @@ interface OperationsJobQueueSetupModalProps {
   onSaveExitDelete: (groupIds: string[]) => Promise<string | null>;
 }
 
-function parseMultiValueInput(raw: string): string[] {
-  return raw
-    .split(/[\n,;]+/)
-    .map((value) => value.trim())
-    .filter(Boolean);
+function RequiredMark() {
+  return (
+    <span className="operations-job-queue-required-mark" aria-hidden="true">
+      *
+    </span>
+  );
+}
+
+function loadCreateGroupOptionsFromSettings(platform: Platform) {
+  return readCreateGroupWorkerSettings(platform);
+}
+
+function CreateSetupSwitchRow({
+  label,
+  checked,
+  disabled = false,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: (next: boolean) => void;
+}) {
+  return (
+    <div className="operations-job-queue-create-row">
+      <span className="operations-job-queue-create-row__label">
+        {label}
+        <RequiredMark />
+      </span>
+      <div className="operations-job-queue-create-row__control operations-job-queue-create-row__control--switch">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          aria-label={label}
+          className={cn('operations-job-queue-switch', checked && 'operations-job-queue-switch--on')}
+          disabled={disabled}
+          onClick={() => onToggle(!checked)}
+        >
+          <span className="operations-job-queue-switch__thumb" aria-hidden />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function OperationsJobQueueSetupModal({
@@ -94,9 +144,13 @@ export function OperationsJobQueueSetupModal({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedJoinGroupIds, setSelectedJoinGroupIds] = useState<Set<string>>(() => new Set());
   const [createGroupName, setCreateGroupName] = useState('');
-  const [createParticipants, setCreateParticipants] = useState('');
   const [createTotalToCreate, setCreateTotalToCreate] = useState('10');
+  const [createUseGroupNumbering, setCreateUseGroupNumbering] = useState(false);
   const [createStartFrom, setCreateStartFrom] = useState('1');
+  const [createMessagesAdminsOnly, setCreateMessagesAdminsOnly] = useState(false);
+  const [createAddMembersAdminsOnly, setCreateAddMembersAdminsOnly] = useState(true);
+  const [createInfoAdminsOnly, setCreateInfoAdminsOnly] = useState(true);
+  const [createHideChatHistory, setCreateHideChatHistory] = useState(false);
   const [selectedSetAdminGroupIds, setSelectedSetAdminGroupIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -178,14 +232,62 @@ export function OperationsJobQueueSetupModal({
 
   const loadingSetAdminGroupList = loadingSuperAdminGroups || filteringSetAdminGroups;
 
+  function setCreateGroupPermissionLocal(patch: {
+    messagesAdminsOnly?: boolean;
+    addMembersAdminsOnly?: boolean;
+    infoAdminsOnly?: boolean;
+    hideChatHistoryForMembers?: boolean;
+  }) {
+    if (patch.messagesAdminsOnly !== undefined) {
+      setCreateMessagesAdminsOnly(patch.messagesAdminsOnly);
+    }
+    if (patch.addMembersAdminsOnly !== undefined) {
+      setCreateAddMembersAdminsOnly(patch.addMembersAdminsOnly);
+    }
+    if (patch.infoAdminsOnly !== undefined) {
+      setCreateInfoAdminsOnly(patch.infoAdminsOnly);
+    }
+    if (patch.hideChatHistoryForMembers !== undefined) {
+      setCreateHideChatHistory(patch.hideChatHistoryForMembers);
+    }
+  }
+
+  function loadCreateGroupPermissionDefaultsFromSettings() {
+    const createGroup = loadCreateGroupOptionsFromSettings(platform);
+    setCreateMessagesAdminsOnly(createGroup.messagesAdminsOnly);
+    setCreateAddMembersAdminsOnly(createGroup.addMembersAdminsOnly);
+    setCreateInfoAdminsOnly(createGroup.infoAdminsOnly);
+    setCreateHideChatHistory(createGroup.hideChatHistoryForMembers);
+  }
+
+  function collectCreateGroupValidationMessages(): string[] {
+    return collectCreateGroupSetupValidationCodes({
+      groupName: createGroupName,
+      totalToCreateRaw: createTotalToCreate,
+      useGroupNumbering: createUseGroupNumbering,
+      startFromRaw: createStartFrom,
+      hasSelectedAccount: selectedAccounts.length > 0,
+    }).map((code) => t(`operations.jobQueue.${code}`));
+  }
+
+  function currentCreateGroupPermissionDraft() {
+    return {
+      messagesAdminsOnly: createMessagesAdminsOnly,
+      addMembersAdminsOnly: createAddMembersAdminsOnly,
+      infoAdminsOnly: createInfoAdminsOnly,
+      hideChatHistoryForMembers: createHideChatHistory,
+    };
+  }
+
   useEffect(() => {
     if (!open) return;
     setSaveError(null);
     setSelectedJoinGroupIds(new Set());
     setCreateGroupName('');
-    setCreateParticipants('');
     setCreateTotalToCreate('10');
+    setCreateUseGroupNumbering(false);
     setCreateStartFrom('1');
+    loadCreateGroupPermissionDefaultsFromSettings();
     setSelectedSetAdminGroupIds(new Set());
     setSelectedLeaveDeleteGroupIds(new Set());
     setExitGroupTab('daily');
@@ -193,7 +295,7 @@ export function OperationsJobQueueSetupModal({
     setExitGroupProcessedAlertOpen(false);
     setSelectedSetAdminTargetAccountId('');
     setEligibleSetAdminGroups([]);
-  }, [open, taskType, activeBrand]);
+  }, [open, taskType, activeBrand, platform]);
 
   useEffect(() => {
     setExitGroupPage(1);
@@ -344,15 +446,29 @@ export function OperationsJobQueueSetupModal({
       }
       message = await onSaveJoin([...selectedJoinGroupIds]);
     } else if (taskType === 'create_group') {
-      if (!createGroupName.trim()) {
-        setSaveError(t('operations.jobQueue.createGroupNameRequired'));
+      const validationMessages = collectCreateGroupValidationMessages();
+      if (validationMessages.length > 0) {
+        setSaveError(validationMessages.join('\n'));
         return;
       }
+
+      const permissionDraft = currentCreateGroupPermissionDraft();
+
       message = await onSaveCreate({
         groupName: createGroupName.trim(),
         totalToCreate: createTotalParsed,
+        useGroupNumbering: createUseGroupNumbering,
         startFrom: Math.max(1, Math.floor(Number(createStartFrom)) || 1),
-        participants: parseMultiValueInput(createParticipants),
+        createGroupSettings:
+          platform === 'whatsapp'
+            ? {
+                messagesAdminsOnly: permissionDraft.messagesAdminsOnly,
+                addMembersAdminsOnly: permissionDraft.addMembersAdminsOnly,
+                infoAdminsOnly: permissionDraft.infoAdminsOnly,
+              }
+            : undefined,
+        hideChatHistoryForMembers:
+          platform === 'telegram' ? permissionDraft.hideChatHistoryForMembers : undefined,
       });
     } else if (taskType === 'set_admin') {
       if (selectedSetAdminGroupIds.size === 0) {
@@ -407,6 +523,23 @@ export function OperationsJobQueueSetupModal({
           ? 'operations.jobQueue.tabSetAdmin'
           : 'operations.jobQueue.tabExitDelete';
 
+  const createGroupPlatformLabel =
+    platform === 'whatsapp'
+      ? t('groupMonitoring.brandMasterDetail.platformWa')
+      : t('groupMonitoring.brandMasterDetail.platformTg');
+
+  const modalSubtitle =
+    taskType === 'create_group'
+      ? [
+          createGroupPlatformLabel,
+          activeBrand,
+          reportingAccountDisplayName(
+            selectedAccounts[0]?.accountName ?? '',
+            activeBrand,
+          ) || '—',
+        ].join(' | ')
+      : `${activeBrand} · ${t(tabLabelKey)}`;
+
   const canSaveJoin = selectedJoinGroupIds.size > 0 && selectedAccounts.length > 0;
   const canSaveCreate = createGroupName.trim().length > 0 && selectedAccounts.length > 0;
   const canSaveSetAdmin =
@@ -448,7 +581,7 @@ export function OperationsJobQueueSetupModal({
               {modalTitle}
             </h2>
             <p className="brand-modal-subtitle">
-              {activeBrand} · {t(tabLabelKey)}
+              {modalSubtitle}
             </p>
           </div>
           <div className="brand-modal-header-actions">
@@ -558,47 +691,124 @@ export function OperationsJobQueueSetupModal({
 
           {taskType === 'create_group' ? (
             <div className="operations-job-queue-setup-form operations-job-queue-setup-form--create">
-              <label className="operations-job-queue-field operations-job-queue-setup-form__full">
-                <span>{t('operations.jobQueue.createGroupName')}</span>
-                <input
-                  type="text"
-                  value={createGroupName}
-                  onChange={(event) => setCreateGroupName(event.target.value)}
-                  placeholder={t('operations.jobQueue.createGroupNamePlaceholder')}
-                  disabled={saving}
-                />
-              </label>
-              <label className="operations-job-queue-field">
-                <span>{t('operations.jobQueue.createTotalToCreate')}</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={createTotalToCreate}
-                  onChange={(event) => setCreateTotalToCreate(event.target.value)}
-                  disabled={saving}
-                />
-              </label>
-              <label className="operations-job-queue-field">
-                <span>{t('operations.jobQueue.createStartFrom')}</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={createStartFrom}
-                  onChange={(event) => setCreateStartFrom(event.target.value)}
-                  disabled={saving}
-                />
-              </label>
-              <label className="operations-job-queue-field operations-job-queue-setup-form__full">
-                <span>{t('operations.jobQueue.createGroupParticipants')}</span>
-                <textarea
-                  rows={2}
-                  value={createParticipants}
-                  onChange={(event) => setCreateParticipants(event.target.value)}
-                  placeholder={t('operations.jobQueue.createGroupParticipantsPlaceholder')}
-                  disabled={saving}
-                />
-              </label>
+              <div className="operations-job-queue-create-cards operations-job-queue-setup-form__full">
+                <div className="operations-job-queue-create-column">
+                  <h4 className="operations-job-queue-create-card__title">
+                    {t('operations.jobQueue.createSetupCardBatch')}
+                  </h4>
+                  <section className="operations-job-queue-create-card operations-job-queue-create-card--batch">
+                    <div className="operations-job-queue-create-row">
+                      <span className="operations-job-queue-create-row__label">
+                        {t('operations.jobQueue.createGroupName')}
+                        <RequiredMark />
+                      </span>
+                      <div className="operations-job-queue-create-row__control">
+                        <input
+                          type="text"
+                          value={createGroupName}
+                          onChange={(event) => setCreateGroupName(event.target.value)}
+                          placeholder={t('operations.jobQueue.createGroupNamePlaceholder')}
+                          disabled={saving}
+                        />
+                      </div>
+                    </div>
+                    <div className="operations-job-queue-create-row">
+                      <span className="operations-job-queue-create-row__label">
+                        {t('operations.jobQueue.createTotalToCreate')}
+                        <RequiredMark />
+                      </span>
+                      <div className="operations-job-queue-create-row__control">
+                        <input
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={createTotalToCreate}
+                          onChange={(event) => setCreateTotalToCreate(event.target.value)}
+                          disabled={saving}
+                        />
+                      </div>
+                    </div>
+                    <div className="operations-job-queue-create-row">
+                      <div className="operations-job-queue-create-row__label operations-job-queue-create-row__label--with-switch">
+                        <span>
+                          {t('operations.jobQueue.createStartFrom')}
+                          <RequiredMark />
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={createUseGroupNumbering}
+                          aria-label={t('operations.jobQueue.createUseGroupNumbering')}
+                          className={cn(
+                            'operations-job-queue-switch',
+                            createUseGroupNumbering && 'operations-job-queue-switch--on',
+                          )}
+                          disabled={saving}
+                          onClick={() => setCreateUseGroupNumbering((value) => !value)}
+                        >
+                          <span className="operations-job-queue-switch__thumb" aria-hidden />
+                        </button>
+                      </div>
+                      <div className="operations-job-queue-create-row__control">
+                        <input
+                          type="number"
+                          min={1}
+                          value={createStartFrom}
+                          onChange={(event) => setCreateStartFrom(event.target.value)}
+                          disabled={saving || !createUseGroupNumbering}
+                          aria-label={t('operations.jobQueue.createStartFrom')}
+                        />
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="operations-job-queue-create-column">
+                  <h4 className="operations-job-queue-create-card__title">
+                    {t('operations.jobQueue.createSetupCardPermissions')}
+                  </h4>
+                  <p className="operations-job-queue-create-card-hint">
+                    {t('operations.jobQueue.createSetupCardPermissionsHint')}
+                  </p>
+                  <section className="operations-job-queue-create-card">
+                  {platform === 'whatsapp' ? (
+                    <>
+                      <CreateSetupSwitchRow
+                        label={t('admin.workerWhatsApp.messagesAdminsOnly')}
+                        checked={createMessagesAdminsOnly}
+                        disabled={saving}
+                        onToggle={(next) =>
+                          setCreateGroupPermissionLocal({ messagesAdminsOnly: next })
+                        }
+                      />
+                      <CreateSetupSwitchRow
+                        label={t('admin.workerWhatsApp.addMembersAdminsOnly')}
+                        checked={createAddMembersAdminsOnly}
+                        disabled={saving}
+                        onToggle={(next) =>
+                          setCreateGroupPermissionLocal({ addMembersAdminsOnly: next })
+                        }
+                      />
+                      <CreateSetupSwitchRow
+                        label={t('admin.workerWhatsApp.infoAdminsOnly')}
+                        checked={createInfoAdminsOnly}
+                        disabled={saving}
+                        onToggle={(next) => setCreateGroupPermissionLocal({ infoAdminsOnly: next })}
+                      />
+                    </>
+                  ) : (
+                    <CreateSetupSwitchRow
+                      label={t('admin.workerTelegram.hideChatHistoryForMembers')}
+                      checked={createHideChatHistory}
+                      disabled={saving}
+                      onToggle={(next) =>
+                        setCreateGroupPermissionLocal({ hideChatHistoryForMembers: next })
+                      }
+                    />
+                  )}
+                  </section>
+                </div>
+              </div>
               <p className="operations-job-queue-form-note operations-job-queue-setup-form__full">
                 {t('operations.jobQueue.createPerRunHint', {
                   perRun: workerSettings.standard.perRun,
@@ -794,7 +1004,22 @@ export function OperationsJobQueueSetupModal({
             </div>
           ) : null}
 
-          {saveError ? <p className="brand-modal-error">{saveError}</p> : null}
+          {saveError ? (
+            <div className="brand-modal-error" role="alert">
+              {saveError.includes('\n') ? (
+                <>
+                  <p>{t('operations.jobQueue.createSetupMissingFields')}</p>
+                  <ul className="operations-job-queue-setup-missing-list">
+                    {saveError.split('\n').map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                saveError
+              )}
+            </div>
+          ) : null}
         </div>
 
         <footer

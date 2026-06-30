@@ -38,6 +38,8 @@ export interface AutomationJobPayload {
   /** Learning per_run — max groups per slice inside one job */
   perRun?: number;
   startFrom?: number;
+  /** Batch create: append " {n}" to group name when true. */
+  useGroupNumbering?: boolean;
   groupNamePrefix?: string;
   batchIndex?: number;
   batchTotal?: number;

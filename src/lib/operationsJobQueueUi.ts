@@ -8,11 +8,12 @@ import {
   isExitDeleteExitJob,
   jobMatchesExitDeleteTaskType,
 } from '@/lib/exitDeleteFlow';
+import { createGroupBatchUsesNumbering } from '@/lib/createGroupBatchNaming';
 import {
-  isCreateGroupSourceJob,
   isSetPhotoFromCreateJob,
   jobMatchesCreateGroupTaskType,
-  resolveCreatedGroupsFromCreateJob,
+  resolveCreateJobSetPhotoFollowUpRemarkKey,
+  resolveSetPhotoJobRemarkKey,
 } from '@/lib/createSetPhotoFlow';
 
 export type JobQueueTaskType =
@@ -180,9 +181,16 @@ export function jobQueueGroupName(job: AutomationJobRecord): string {
   if (isCreateGroupBatchJob(job)) {
     const prefix = job.payload.groupNamePrefix ?? job.payload.groupName ?? '—';
     const total = job.payload.totalToCreate ?? 1;
-    const start = job.payload.startFrom ?? 1;
-    const end = start + total - 1;
-    return total > 1 ? `${prefix} (${start}–${end})` : prefix;
+    const useNumbering = createGroupBatchUsesNumbering(job.payload, total);
+    if (total > 1 && useNumbering) {
+      const start = job.payload.startFrom ?? 1;
+      const end = start + total - 1;
+      return `${prefix} (${start}–${end})`;
+    }
+    if (total > 1) {
+      return `${prefix} (×${total})`;
+    }
+    return prefix;
   }
   const groups = job.payload.groups;
   if (groups?.length) {
@@ -631,27 +639,15 @@ export function jobQueueStatusKey(status: AutomationJobStatus): string {
   }
 }
 
-/** Kolom Remark — create tab: teks VIEW set photo vs Completed (set photo job selesai = lock tab modal). */
+/** Kolom Remark — create tab; satu sumber dengan lock tab Set Photo (`createSetPhotoFlow`). */
 export function jobQueueCreateGroupRemarkKey(
   job: AutomationJobRecord,
   allJobs: AutomationJobRecord[],
 ): string | null {
   if (isSetPhotoFromCreateJob(job)) {
-    return job.status === 'completed' ? 'operations.jobQueue.statusCompleted' : null;
+    return resolveSetPhotoJobRemarkKey(job);
   }
-  if (!isCreateGroupSourceJob(job)) return null;
-
-  const setPhotoCompleted = allJobs.some(
-    (row) =>
-      row.action === 'set_group_photo' &&
-      row.payload.sourceCreateJobId === job.id &&
-      row.status === 'completed',
-  );
-  if (setPhotoCompleted) return 'operations.jobQueue.statusCompleted';
-
-  if (job.status !== 'completed' && job.status !== 'failed') return null;
-  if (resolveCreatedGroupsFromCreateJob(job).length === 0) return null;
-  return 'operations.jobQueue.createRemarkPressView';
+  return resolveCreateJobSetPhotoFollowUpRemarkKey(job, allJobs);
 }
 
 export function jobQueueActionKey(action: AutomationJobAction): string {

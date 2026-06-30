@@ -2,6 +2,10 @@ import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSide
 import { withNetworkRetry } from '../lib/networkRetry';
 import { resolveJoinGroups, resolveLeaveDeleteGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
 import type { AutomationRunPayload, AutomationRunResult, AutomationProgressCallback } from './types';
+import {
+  createGroupBatchUsesNumbering,
+  resolveCreateBatchGroupName,
+} from './createGroupBatchNaming';
 
 async function postTelegramAutomation(
   sessionId: string,
@@ -413,6 +417,7 @@ export async function runTelegramCreateGroupBatch(
   const totalTarget = Math.max(1, Math.floor(Number(payload.totalToCreate) || 1));
   const perRun = Math.max(1, Math.floor(Number(payload.perRun) || totalTarget));
   const startFrom = Math.max(1, Math.floor(Number(payload.startFrom) || 1));
+  const useNumbering = createGroupBatchUsesNumbering(payload, totalTarget);
   const prefix = (payload.groupNamePrefix ?? payload.groupName ?? '').trim();
 
   if (!prefix) {
@@ -441,7 +446,7 @@ export async function runTelegramCreateGroupBatch(
 
     for (let i = 0; i < sliceSize; i += 1) {
       const num = nextNum + i;
-      const groupName = totalTarget > 1 ? `${prefix} ${num}`.trim() : prefix;
+      const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
       onProgress(created, totalTarget, groupName);
 
       const result = await runTelegramAutomation({

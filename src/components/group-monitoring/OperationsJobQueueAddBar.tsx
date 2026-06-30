@@ -29,6 +29,7 @@ import {
   toLeaveDeleteJobPayload,
   toTelegramAdminRightsPayload,
 } from '@/config/workerPlatformSettings';
+import { buildCreateGroupEnqueueFromJobDraft } from '@/lib/createGroupWorkerSettings';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
   enqueueErrorResult,
@@ -363,16 +364,18 @@ export function OperationsJobQueueAddBar({
   async function saveCreateBatch(draft: JobQueueCreateGroupDraft): Promise<string | null> {
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
-    const createGroupSettings =
-      platform === 'whatsapp'
-        ? {
-            messagesAdminsOnly: workerSettings.createGroup.messagesAdminsOnly,
-            addMembersAdminsOnly: workerSettings.createGroup.addMembersAdminsOnly,
-            infoAdminsOnly: workerSettings.createGroup.infoAdminsOnly,
-          }
-        : undefined;
 
     if (selectedAccounts.length === 0 || !activeBrand) return null;
+
+    let enqueueSettings: ReturnType<typeof buildCreateGroupEnqueueFromJobDraft>;
+    try {
+      enqueueSettings = buildCreateGroupEnqueueFromJobDraft(platform, {
+        createGroupSettings: draft.createGroupSettings,
+        hideChatHistoryForMembers: draft.hideChatHistoryForMembers,
+      });
+    } catch {
+      return returnEnqueueError('ENQUEUE_FAILED', t, setFeedback);
+    }
 
     setSubmitting(true);
     let queued = 0;
@@ -390,14 +393,11 @@ export function OperationsJobQueueAddBar({
             groupName: draft.groupName,
             groupNamePrefix: draft.groupName,
             totalToCreate: draft.totalToCreate,
+            useGroupNumbering: draft.useGroupNumbering,
             startFrom: draft.startFrom,
             perRun: workerSettings.standard.perRun,
-            initialParticipants: draft.participants.length ? draft.participants : undefined,
-            hideChatHistory:
-              platform === 'telegram'
-                ? workerSettings.createGroup.hideChatHistoryForMembers
-                : undefined,
-            createGroupSettings,
+            hideChatHistory: enqueueSettings.hideChatHistoryForMembers,
+            createGroupSettings: enqueueSettings.createGroupSettings,
           },
           storedSessionString: ctx.storedSessionString,
           expectedPhone: ctx.expectedPhone,

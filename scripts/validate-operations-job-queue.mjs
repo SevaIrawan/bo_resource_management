@@ -62,11 +62,40 @@ const checks = [
     })(),
   },
   {
-    name: 'Create group: wired via SETUP modal + worker settings',
+    name: 'Create group: SETUP modal + enqueue batch',
     ok:
       read('src/components/group-monitoring/OperationsJobQueueSetupModal.tsx').includes(
         'createTotalToCreate',
       ) && addBar.includes('saveCreateBatch'),
+  },
+  {
+    name: 'Create group permissions: modal draft only at enqueue (no Settings merge)',
+    ok: (() => {
+      const setup = read('src/components/group-monitoring/OperationsJobQueueSetupModal.tsx');
+      const bar = read('src/components/group-monitoring/OperationsJobQueueAddBar.tsx');
+      const lib = read('src/lib/createGroupWorkerSettings.ts');
+      return (
+        bar.includes('buildCreateGroupEnqueueFromJobDraft') &&
+        lib.includes('buildCreateGroupEnqueueFromJobDraft') &&
+        !bar.includes('workerSettings.createGroup.messagesAdminsOnly') &&
+        !bar.includes('workerSettings.createGroup.hideChatHistoryForMembers') &&
+        !setup.includes('persistWhatsAppWorkerSettings') &&
+        !setup.includes('persistTelegramWorkerSettings') &&
+        setup.includes('loadCreateGroupPermissionDefaultsFromSettings') &&
+        setup.includes('setCreateGroupPermissionLocal')
+      );
+    })(),
+  },
+  {
+    name: 'Create group runner: permission from job payload only',
+    ok: (() => {
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const wa = read('electron/main/automation/waAutomation.ts');
+      return (
+        runner.includes('createGroupSettings: job.payload.createGroupSettings') &&
+        wa.includes('payload.createGroupSettings')
+      );
+    })(),
   },
   {
     name: 'Set admin: super-admin + SETUP modal',
@@ -178,6 +207,28 @@ const checks = [
         tg.includes('EditPhotoRequest') &&
         main.includes('set-group-photo') &&
         brand.includes('brand-group-photos')
+      );
+    })(),
+  },
+  {
+    name: 'Set photo: remark + tab lock from single flow module (no duplicate logic)',
+    ok: (() => {
+      const flow = read('src/lib/createSetPhotoFlow.ts');
+      const ui = read('src/lib/operationsJobQueueUi.ts');
+      const viewModal = read(
+        'src/components/group-monitoring/OperationsJobQueueCreateGroupViewModal.tsx',
+      );
+      return (
+        flow.includes('findSetPhotoJobForCreateJob') &&
+        flow.includes('createJobHasSetPhotoFollowUp') &&
+        flow.includes('resolveCreateJobSetPhotoFollowUpRemarkKey') &&
+        flow.includes('resolveSetPhotoJobRemarkKey') &&
+        flow.includes('isSetPhotoFollowUpLockStatus') &&
+        ui.includes('resolveCreateJobSetPhotoFollowUpRemarkKey') &&
+        ui.includes('resolveSetPhotoJobRemarkKey') &&
+        !ui.includes('setPhotoCompleted') &&
+        viewModal.includes('isCreateGroupSetPhotoTabLocked') &&
+        viewModal.includes('createJobHasSetPhotoFollowUp') === false
       );
     })(),
   },

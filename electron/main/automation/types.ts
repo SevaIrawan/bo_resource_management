@@ -58,6 +58,7 @@ export interface AutomationRunPayload {
   /** Learning group.per_run — max grup per slice dalam satu job. */
   perRun?: number;
   startFrom?: number;
+  useGroupNumbering?: boolean;
   groupNamePrefix?: string;
   createGroupSettings?: WaCreateGroupSettings;
   /** set_admin */

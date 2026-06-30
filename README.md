@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.27` (lihat `package.json`)
+**Versi saat ini:** `1.0.28` (lihat `package.json`)
+
+**Rilis 1.0.28:** Job Queue — modal SETUP create group (batch + permission per job); Settings hanya default permission (modal tidak menulis balik); set photo dari VIEW create job dengan remark/tab lock selaras (`createSetPhotoFlow`); validator job queue diperluas.
 
 **Rilis 1.0.27:** Auto scrape lane terpisah; progress scrape persist saat navigasi; audit guard job queue vs auto-scrape; Settings page; bersihkan dead code & duplikasi scrape cancel/metrics.
 

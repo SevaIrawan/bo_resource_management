@@ -73,14 +73,16 @@ WA promote has no granular rights in whatsapp-web.js — only delay.
 
 ## Wire to worker
 
-Settings are read in the renderer at **enqueue** time via `readWhatsAppWorkerSettings()` / `readTelegramWorkerSettings()` and frozen on each job as `delay` + payload fields.
+Settings are read in the renderer at **enqueue** time via `readWhatsAppWorkerSettings()` / `readTelegramWorkerSettings()`.
 
 | Section | Wired to |
 |---------|----------|
-| Standard delays + human profile jitter | create_group batch, set_admin between targets (via `setAdmin.betweenTargetsSec`), TG flood-wait |
-| Create group toggles | WA `applyWaCreateGroupSettings`; TG `hideChatHistory` + `adminRights` on set_admin |
+| Standard delays + human profile jitter | create_group batch, set_admin between targets, TG flood-wait |
+| Create group toggles | **Defaults only** — modal SETUP seeds from Settings but enqueues **per-job draft** in `payload.createGroupSettings` (`buildCreateGroupEnqueueFromJobDraft`) |
 | Invite by link | join throttle (`invite_delay_*`, batch rest), `maxPerRun` at enqueue |
 | Set admin | `betweenTargetsSec`, `maxAdminSlots`, `resolveEntityMaxAttempts` (TG) |
-| Leave & delete | Not yet — no job type in queue |
+| Leave & delete | exit/delete job guards + delays at enqueue |
+
+Runner (Electron/TG) reads **frozen job payload** — not live Settings after enqueue.
 
 Export shapes: `toTelegramLearningConfigShape()` / `toWhatsAppWorkerConfigShape()` for reference scripts.

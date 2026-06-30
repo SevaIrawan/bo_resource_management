@@ -1,7 +1,7 @@
 # GM App — Job Queue & Execute Worker Troubleshooting Reference
 
 **Product:** Resource Management (Electron)  
-**Version:** v1.0.26  
+**Version:** v1.0.28  
 **Audience:** Developers and ops maintaining WhatsApp / Telegram automation  
 **Scope:** Job Queue, execute slot pool, Sync / Scrape interaction — not Reporting or Supabase schema
 
@@ -178,6 +178,17 @@ npm run validate:desktop
 - Add a second slot counter in renderer or IPC guard.
 - Treat job failure as DB or session invalidation.
 - Run Scrape and Job Queue on the same account at the same time.
+
+---
+
+## 8. Create group & set photo (Job Queue)
+
+| Topic | Expected behavior | If wrong |
+|-------|-------------------|----------|
+| Create permission | Modal SETUP = per job; Admin Worker settings = defaults only | Check `payload.createGroupSettings` on job row, not live Settings |
+| Queue blocked "already queued" | `createJobHasSetPhotoFollowUp` or duplicate join | Read Remark column; partial set photo fail locks VIEW tab |
+| Set photo groups | Only from create job `groupOutcomes` (VIEW Result) | Re-run create on app version with outcome persistence |
+| Remark vs tab lock | Same rules in `createSetPhotoFlow.ts` | If mismatch, code regression — run `validate:operations-job-queue` |
 
 ---
 

@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
-**Versi dokumen:** 2026-06-21  
-**Versi aplikasi:** `1.0.27` (lihat `package.json`)  
+**Versi dokumen:** 2026-06-30  
+**Versi aplikasi:** `1.0.28` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
@@ -43,7 +43,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Electron Renderer (React)                                   │
-│  Group Monitoring · Tickets · Login · Admin                  │
+│  Group Monitoring · Login · Admin · Settings (worker)          │
 │  getSupabase() ← service role via IPC (app terinstall)       │
 └──────────────────────────┬──────────────────────────────────┘
                            │ IPC
@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.18)
+## 4. Konfigurasi & installer (kondisi 1.0.28)
 
 ### 4.1 Variabel lingkungan
 
@@ -160,24 +160,46 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 - Export: group links, semua akun, tickets (Excel)
 - Auto-sync terjadwal (`useAutoAccountSync`)
 
-### 6.2 Ticket monitoring
+### 6.2 Issue & metrik (tab Account — KPI)
 
-- Issue dari rekonsiliasi daily vs master brand (`reconcileTickets.ts`)
-- **Kontrak bisnis:** login/logout session **bukan** ticket; hanya mismatch grup/admin, grup sampah, duplicate ID/nama
-- **Group mismatch** (`daily_junk_group`): gap **daily > master** — semua baris **daily** yang `group_id`-nya tidak ada di master
-- **Missing groups** (`missing_group`): gap **master > daily** — baris **master** yang belum ada di daily akun (kebalikan Group mismatch)
-- **Duplicate Group ID:** `group_id` sama (HP & master), nama beda
-- **Duplicate Name:** `group_id` beda (HP vs master), nama sama
-- **Detail:** double-click kartu → tabel lengkap (Group ID, invite link, note); export Excel per issue atau semua issue terfilter
-- **Auto-close:** issue hilang setelah scrape/sync → `resolveTickets` menutup baris open; kartu hilang dari UI
-- Workflow: handle issue, modal proses ticket (migrasi 024–026)
-- Realtime: `group_scrape_daily` + `scrape_runs` completed → reconcile akun → reload ticket
-- **Data fresh (1.0.17+):** setelah scrape/sync, `invalidateMasterDailyCacheForScrape` + `forceFresh: true` di reconcile & kartu UI — tidak pakai cache master/daily lama
-- **UI realtime post-scrape (1.0.18):** `refreshAccountAfterDailyWrite` — reconcile → patch grid atomik (`patchAccountGridAfterDailyWrite`) → `setTicketSummariesFromEngine` (bypass `ticketSyncLocked`) → `scheduleReportingReload`; modal Full Group/Admin ikut reload via `rm-reporting-reload`
-- **UI ticket:** angka kartu tab Ticket dari `buildTicketSummariesForUser` — sama engine dengan kolom Groups/Admin bookmark (`accountMasterDailyCompare`)
-- **Modal Admin vs master:** daftar hanya grup master brand (denominator **X**); grup junk di device tidak masuk modal (lihat tab Ticket → Junk)
+- **Tab Ticket dihapus** sejak **1.0.24** — tidak ada tab terpisah; issue ditampilkan sebagai **KPI cards** di tab Account (Groups/Admin mismatch per akun).
+- Engine in-memory: `accountMasterDailyCompare.ts` → `computeAccountTicketBreakdown` (5 tipe issue per akun).
+- **Kontrak bisnis:** login/logout session **bukan** issue; hanya mismatch grup/admin vs master brand.
+- **daily_junk_group** (Group mismatch): gap daily > master — `group_id` di daily tidak ada di master.
+- **missing_group**: gap master > daily — belum join grup master.
+- **not_admin**, **duplicate_group_id**, **duplicate_group_name** — lihat `.cursorrules` §11.
+- Realtime post-scrape: `patchAccountGridAfterDailyWrite` → patch grid + `scheduleReportingReload`.
+- Modal **Admin vs master** / **Groups on account**: read-only dari Supabase (`fetchAccountGroupLinks`, `fetchAccountDailyGroupLinks`).
 
-### 6.3 Tab Reporting (read-only)
+### 6.3 Tab Operations (Overview + Job Queue)
+
+Bookmark **Overview** — stock opname per brand+platform (`OperationsMonitoringPanel`, `OPERATIONS-STOCK-ENGINE.md`).
+
+Bookmark **Job Queue** — antrian otomasi device nyata (WA Puppeteer / TG sidecar):
+
+| Action | Alur singkat |
+|--------|----------------|
+| `join_by_invite_link` | SETUP → queue dari master missing groups |
+| `create_group` | SETUP modal (batch + **permission per job**) → runner baca `payload.createGroupSettings` |
+| `set_group_photo` | Dari **VIEW** create job selesai → upload/select foto brand → queue follow-up |
+| `set_admin` | SETUP super-admin targets |
+| `exit_delete_group` | Exit SETUP → delete dari VIEW result |
+
+**Create group permission (1.0.28):**
+
+- **Admin → Worker settings** = **default saja** (localStorage, Save).
+- **Modal SETUP** = custom **per job**; perubahan modal **tidak** menulis balik ke Settings.
+- Saat Queue: permission masuk **job payload** via `buildCreateGroupEnqueueFromJobDraft()` — runner Electron/TG hanya baca payload.
+
+**Set photo (1.0.28):**
+
+- Grup dari `groupOutcomes` create job (VIEW Result).
+- Foto brand `{brand}.jpg` via IPC `brandGroupPhoto`.
+- Remark kolom queue + lock tab Set Photo: satu modul `createSetPhotoFlow.ts` (`createJobHasSetPhotoFollowUp`).
+
+Validasi: `npm run validate:operations-job-queue`, `npm run validate:real-operations-data`.
+
+### 6.4 Tab Reporting (read-only)
 
 - Slicer: Platform, Brand, Acc Name (**All** = matrix), bookmark **Full Group** / **Full Admin**
 - Matrix (Acc=All): baris `groups_master` × join/admin per akun dari `group_scrape_daily` terbaru (`dedupeDailyRowsByGroupIdKeepLatest`)
@@ -185,9 +207,10 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 - Realtime: event `rm-reporting-reload` setelah scrape, reconcile, atau perubahan master/daily (debounce 500 ms)
 - Filter kolom akun (Yes/No): jika kosong, header tabel + dropdown tetap tampil + tombol **Back to all groups**
 
-### 6.4 Admin (`/admin`)
+### 6.5 Admin & Settings
 
 - Status sistem, buka folder config (untuk IT), cek update manual
+- **Worker platform settings** (WA/TG): delay, create-group defaults, invite throttle — lihat `docs/WORKER-PLATFORM-SETTINGS.md`
 
 ---
 
@@ -217,10 +240,10 @@ Validasi sebelum rilis: `npm run validate:desktop`
 | `resource_management_group_scrape_daily` | Snapshot grup per hari per akun |
 | `resource_management_groups_master` | Master join list per brand+platform |
 | `resource_management_account_snapshots` | Metrik kartu dashboard |
-| `resource_management_tickets` | Issue terbuka |
-| `resource_management_ticket_issue_handles` | Workflow handle issue |
 
 `public.users` — existing, tidak dibuat migrasi RM.
+
+**Catatan:** Tabel `resource_management_ticket_*` **dihapus** migrasi **033** (rilis 1.0.24). Issue hanya engine in-memory + KPI UI.
 
 ### 8.2 Urutan migrasi SQL
 
@@ -234,8 +257,7 @@ Detail: `supabase/migrations/README.md`
 
 | Perubahan di DB | Dampak di app |
 |-----------------|---------------|
-| Ticket, scrape run, snapshot | UI patch / reload ticket |
-| `groups_master`, `group_scrape_daily` | Metrik, ticket reconcile, **Reporting reload** (debounce ~500 ms) |
+| Scrape run, snapshot, daily, master | Patch grid metrik + **Reporting reload** (debounce ~500 ms) |
 | Brand / messaging account | Reload monitoring penuh |
 | Session `is_active` false | Badge session invalid |
 
@@ -339,4 +361,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.27**. Scrape tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.28**. Scrape tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase; Job Queue create group permission per payload job.*

@@ -1,7 +1,7 @@
 # Resource Management — Referensi Master Proyek
 
-**Versi dokumen:** 2026-06-17  
-**Versi aplikasi:** 1.0.26 (`package.json`)  
+**Versi dokumen:** 2026-06-30  
+**Versi aplikasi:** 1.0.28 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
 ## Prinsip dokumen ini
@@ -102,7 +102,7 @@ Routing: `src/App.tsx` (HashRouter)
 | Path | Halaman | Akses | Sumber |
 |------|---------|-------|--------|
 | `/login` | Login app (`loginWithCredentials` → tabel `users`) | Guest | `src/lib/auth.ts`, `src/App.tsx` |
-| `/` | Group Monitoring — tab Account + Operations + Ticket + **Reporting** | Login required | `GroupMonitoringPage.tsx` |
+| `/` | Group Monitoring — tab **Account** + **Operations** + **Reporting** | Login required | `GroupMonitoringPage.tsx` |
 | `/admin` | Admin settings | `AdminRoute` — username `admin` | `AdminRoute.tsx` |
 | `/settings` | Redirect → `/admin` jika admin, else `/` | Login required | `SettingsRedirect.tsx` |
 
@@ -110,9 +110,8 @@ Routing: `src/App.tsx` (HashRouter)
 
 **Group Monitoring** — `GroupMonitoringPage.tsx` + `useMonitoringTab()`:
 
-- **Account** — brand card, grid akun, sync/scrape
-- **Operations** — stock opname per brand+platform (`OperationsMonitoringPanel.tsx`); klasifikasi bucket dari `groups_master` — lihat [`OPERATIONS-STOCK-ENGINE.md`](./OPERATIONS-STOCK-ENGINE.md)
-- **Ticket** — issue per akun (missing group, not admin, duplicate, dll.)
+- **Account** — brand card, grid akun, sync/scrape, KPI issue (engine `accountMasterDailyCompare`)
+- **Operations** — bookmark **Overview** (stock opname) + **Job Queue** (join, create group, set admin, exit/delete, set photo) — `OperationsMonitoringPanel.tsx`
 - **Reporting** — matrix join/admin read-only per brand+platform (`ReportingMonitoringPanel.tsx`)
 
 View mode Account: **Card** (satu kartu per brand) atau **Table** (semua baris flat). State di slicer header.
@@ -719,7 +718,12 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | `ScrapeCancelConfirmModal.tsx` | Konfirmasi cancel scrape |
 | `ReportingMonitoringPanel.tsx` | Tab Reporting — slicer + reload |
 | `ReportingJoinMatrixTable.tsx` | Matrix join/admin + filter kolom |
-| `OperationsMonitoringPanel.tsx` | Tab Operations — stock chip + Avg ND |
+| `OperationsMonitoringPanel.tsx` | Tab Operations — Overview stock + Job Queue |
+| `OperationsJobQueueAddBar.tsx` | Enqueue task + SETUP modal trigger |
+| `OperationsJobQueueSetupModal.tsx` | SETUP create/join/set_admin/exit |
+| `OperationsJobQueueCreateGroupViewModal.tsx` | VIEW create result + Set Photo tab |
+| `createSetPhotoFlow.ts` | Set photo queue block + tab lock + remark keys |
+| `createGroupWorkerSettings.ts` | Create group defaults + enqueue dari modal draft |
 | `classifyGroupStock.ts` | Decision table stock bucket |
 | `loadOperationsStockCounts.ts` | Load + agregat stock dari master |
 | `loadJoinGroupReport.ts` | Fetch matrix/daily reporting |

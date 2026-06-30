@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.18 |
+| **Versi app** | 1.0.28 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Admin → Language) |
@@ -13,6 +13,8 @@ Dokumen ini adalah **referensi internal (Bahasa Indonesia)**.
 **Untuk tim operasional:** bagikan **PDF atau Word** dari [docs/guides/documents/](guides/documents/) — **bukan** file Markdown. Lihat [docs/guides/README.md](guides/README.md).
 
 Untuk arsitektur & rilis IT, lihat [PROJECT.md](../PROJECT.md).
+
+> **Pembaruan v1.0.24+:** Tab **Ticket** dihapus — issue ditampilkan sebagai **KPI** di tab Account. Tab **Operations** punya bookmark **Overview** (stock) dan **Job Queue** (otomatisasi join/create/set admin/exit/set photo). §5 di bawah = referensi historis workflow issue.
 
 ---
 
@@ -87,7 +89,7 @@ Anda langsung masuk ke **Group Monitoring** (halaman utama).
 | Ikon / menu | Fungsi |
 |-------------|--------|
 | **Logo** | Brand aplikasi (NEXMAX / Backend Operation) |
-| **Group Monitoring** | Halaman utama — akun & ticket |
+| **Group Monitoring** | Halaman utama — Account, Operations, Reporting |
 | **Admin** | Pengaturan sistem & preferensi |
 | **Logout (Power)** | Keluar dari dashboard (tidak logout WA/TG otomatis) |
 
@@ -105,8 +107,8 @@ Anda langsung masuk ke **Group Monitoring** (halaman utama).
 
 | Tab | Fungsi |
 |-----|--------|
-| **Account** | Daftar brand & akun WA/TG |
-| **Ticket** | Daftar issue yang harus ditangani (angka = jumlah issue terbuka) |
+| **Account** | Brand card, grid akun WA/TG, KPI issue, sync/scrape |
+| **Operations** | **Overview** — stock opname; **Job Queue** — antrian join / create group / set admin / exit & delete / set photo |
 | **Reporting** | Laporan read-only join/admin grup per brand (matrix atau per akun) |
 
 ### 3.4 KPI (kartu angka di atas)
@@ -122,9 +124,11 @@ Angka berubah sesuai tab aktif.
 | Online | Akun dengan session **VALID** |
 | Aligned | Akun sudah sync & selaras dengan standar |
 | Issue | Akun **not aligned** |
-| Open issues | Jumlah issue ticket terbuka (ringkasan) |
+| Open issues | Ringkasan mismatch grup/admin (engine sama dengan kolom Groups/Admin) |
 
-**Tab Ticket:**
+**Tab Operations (Job Queue):** antrian task per akun — SETUP modal untuk create group (batch + permission per job), VIEW hasil create → tab Set Photo (satu foto per brand).
+
+**Tab Ticket (historis — dihapus v1.0.24):**
 
 | KPI | Arti |
 |-----|------|
@@ -534,22 +538,20 @@ IT — cek API Telegram & migrasi database `023`.
 Login
   └─ Group Monitoring
         ├─ [Tab Account]
-        │     ├─ KPI
+        │     ├─ KPI (issue summary)
         │     ├─ Filter / Search / Export / Card|Table
-        │     └─ Per Brand Card
-        │           ├─ +Add account (WA/TG)
-        │           ├─ Row: Sync ↻ | Remove X (akun) | Clear X (session) | Group link
-        │           └─ Scraper: Run
-        └─ [Tab Ticket]
-              ├─ KPI
-              ├─ Filter / Bookmark / Export
-              └─ Card issue → Process | Double-click Detail
+        │     └─ Per Brand Card → Sync | Scraper Run | Group link
+        ├─ [Tab Operations]
+        │     ├─ Overview — stock buckets
+        │     └─ Job Queue — join, create, set admin, exit/delete, set photo
+        └─ [Tab Reporting]
+              └─ Matrix / Full Group / Full Admin
   └─ Admin
-        ├─ System status
+        ├─ System status + Worker settings (defaults)
         ├─ Config folder / Check updates (IT)
         └─ Auto-sync + Language
 ```
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.18**. Jika fitur baru ditambahkan, perbarui dokumen ini setelah rilis.*
+*Handbook ini selaras dengan aplikasi versi **1.0.28**. Tab Ticket dihapus sejak 1.0.24; §5 = referensi historis.*

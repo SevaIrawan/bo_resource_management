@@ -3,12 +3,14 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.18 |
+| **App version** | 1.0.28 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (Admin → Language) |
 
 This document is the **official guide to every feature** in the current application. For architecture and IT release notes, see [PROJECT.md](../../PROJECT.md).
+
+> **v1.0.24+:** The **Ticket** tab was removed — issues appear as **KPI cards** on the Account tab. **Operations** tab has **Overview** (stock) and **Job Queue** (automation). Section 5 below is historical reference.
 
 ---
 
@@ -658,4 +660,4 @@ Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type,
 
 ---
 
-*This guide matches application version **1.0.18**. Update this document when new features ship.*
+*This guide matches application version **1.0.28**. Ticket tab removed since 1.0.24; update PDF/Word after each release via `npm run build:handbook-docs`.*

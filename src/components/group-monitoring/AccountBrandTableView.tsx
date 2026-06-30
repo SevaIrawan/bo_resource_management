@@ -13,7 +13,7 @@ interface AccountBrandTableViewProps {
   groups: AccountBrandGroup[];
 }
 
-/** Table view — satu tabel flat semua brand; read-only kolom Account/Session, tanpa Scraper. */
+/** Table view — satu tabel flat semua brand; read-only kolom Account/Session, tanpa Last update. */
 export function AccountBrandTableView({ groups }: AccountBrandTableViewProps) {
   const { t } = useLanguage();
   const { canOperatePlatform } = usePermissions();

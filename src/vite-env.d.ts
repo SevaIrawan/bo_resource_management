@@ -78,6 +78,7 @@ declare global {
         start: (payload: {
           sessionId: string;
           platform: Platform;
+          accountId?: string;
           mode?: LoginMode;
           phone?: string;
           skipDiskRestore?: boolean;
@@ -104,6 +105,7 @@ declare global {
         tryRestore?: (payload: {
           sessionId: string;
           platform: Platform;
+          accountId?: string;
           storedSessionString?: string | null;
         }) => Promise<{ ready: boolean; message?: string }>;
         hasWaDiskAuth?: (sessionId: string) => Promise<{ hasAuth: boolean }>;

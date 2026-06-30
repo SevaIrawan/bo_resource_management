@@ -1,3 +1,4 @@
+import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type {
   AutomationJobAction,
   AutomationJobRecord,
@@ -171,10 +172,7 @@ export function jobQueueBatchProgress(job: AutomationJobRecord): { current: numb
 }
 
 export function formatJobQueueWhen(iso?: string): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString();
+  return formatLastSyncAt(iso);
 }
 
 export function jobQueueGroupName(job: AutomationJobRecord): string {

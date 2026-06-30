@@ -81,8 +81,11 @@ const checks = [
       syncFlow.includes('releaseExecuteSlot(target.account.id)'),
   },
   {
-    name: '§ Run tombol tampil session valid',
-    ok: cells.includes("row.sessionStatus === 'valid'") && cells.includes('canRunScraper'),
+    name: '§ Kolom Last update read-only (tanpa tombol Run)',
+    ok:
+      cells.includes('LastUpdateColumnCell') &&
+      !cells.includes('canRunScraper') &&
+      cells.includes('useSyncToLogin'),
   },
   {
     name: '§ Job queue isolasi per akun (bukan global block)',

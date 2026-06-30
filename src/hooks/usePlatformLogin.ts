@@ -398,6 +398,7 @@ export function usePlatformLogin(
         await api.start({
           sessionId: deviceSessionId,
           platform: 'whatsapp',
+          accountId: dbAccountId,
           mode: 'qr',
           skipDiskRestore: purgeDisk,
           groupEstimate: groupEstimateRef.current,
@@ -416,7 +417,7 @@ export function usePlatformLogin(
         throw error;
       }
     },
-    [devicePrepared, markChromeSessionActive, prepareWhatsAppForQr],
+    [devicePrepared, dbAccountId, markChromeSessionActive, prepareWhatsAppForQr],
   );
 
   // Start login (tanpa cancel saat StrictMode remount)
@@ -478,6 +479,7 @@ export function usePlatformLogin(
           .start({
             sessionId: deviceSessionId,
             platform,
+            accountId: dbAccountId,
             mode: 'qr',
             skipDiskRestore,
           })
@@ -659,6 +661,7 @@ export function usePlatformLogin(
           .start({
             sessionId: deviceSessionId,
             platform,
+            accountId: dbAccountId,
             mode: 'qr',
             skipDiskRestore: false,
           })
@@ -694,7 +697,7 @@ export function usePlatformLogin(
         setPairingCode(null);
         loginStartedRef.current = true;
         markChromeSessionActive();
-        await api.start({ sessionId: deviceSessionId, platform, mode: 'phone', phone });
+        await api.start({ sessionId: deviceSessionId, platform, accountId: dbAccountId, mode: 'phone', phone });
       } catch (err) {
         setStatus('error');
         setError(err instanceof Error ? err.message : 'Phone login failed');

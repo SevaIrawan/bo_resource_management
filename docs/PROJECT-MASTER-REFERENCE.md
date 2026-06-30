@@ -1,7 +1,7 @@
 # Resource Management — Referensi Master Proyek
 
 **Versi dokumen:** 2026-06-30  
-**Versi aplikasi:** 1.0.28 (`package.json`)  
+**Versi aplikasi:** 1.0.29 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
 ## Prinsip dokumen ini
@@ -52,7 +52,7 @@ Dokumen ini melengkapi (bukan mengganti):
 7. [Metrik Y/X (Groups & Admin)](#7-metrik-yx-groups--admin)
 8. [Alur Sync (tombol ↻)](#8-alur-sync-tombol-)
 9. [Alur Scraper / Run](#9-alur-scraper--run)
-10. [Cancel Run](#10-cancel-run)
+10. [Cancel Scrape](#10-cancel-scrape)
 11. [Modal login platform](#11-modal-login-platform)
 12. [Tab Ticket & reconcile](#12-tab-ticket--reconcile)
 13. [Tab Reporting](#13-tab-reporting)
@@ -328,7 +328,7 @@ Resolver: `resolveAccountActionColumn(row)` — **prioritas dari atas ke bawah**
 
 | Prioritas | Kind | Tampilan | Kondisi |
 |-----------|------|----------|---------|
-| 1 | `cancel-run` | Tombol **Cancel Run** | `actionProcess === 'scraper'` |
+| 1 | `cancel-scrape` | Tombol **Cancel scrape** | `actionProcess === 'scraper'` |
 | 2 | `proc-sync` / `proc-scraper` | **PROC SYNC** / **PROC SCRAPER** | `actionProcess === 'sync'` atau `session_check` |
 | 3 | `none` | Kosong | `groupsCurrent === 0` atau `groupsTotal === 0` (0/0, 0/>0) — belum scrape (Y=0) |
 | 4 | `group-link` | Tombol **Group link** | `groupsCurrent > 0 && groupsTotal > 0` (>0/>0); session INVALID/VALID sama; bukan patokan admin |
@@ -433,7 +433,7 @@ Now → `runScrapeInBackground({ skipDeviceCheck: true })`
 
 ## 9. Alur Scraper / Run
 
-Orchestrator: `runScrapeInBackground` / `handleRunScraper`  
+Orchestrator: `runScrapeInBackground` (Sync → Scrape Now, login intent scraper, auto-scrape)  
 Service: `scrapeFlowService.ts` → `executeScrapeRun`  
 Runner: `runAccountScraper.ts` → IPC `scraper:run`
 
@@ -471,22 +471,22 @@ Write DB: **hanya setelah scrape selesai** — `writeScrapeDailyRows` (cancel se
 
 ---
 
-## 10. Cancel Run
+## 10. Cancel Scrape
 
-**Trigger UI:** tombol Cancel Run saat `actionProcess === 'scraper'` (Reading groups — bukan saat `session_check`)
+**Trigger UI:** tombol Cancel scrape saat `actionProcess === 'scraper'` (Reading groups — bukan saat `session_check`)
 
-### 9.1 Alur UX
+### 10.1 Alur UX
 
 ```
-[Klik Cancel Run]
+[Klik Cancel scrape]
   → modal konfirmasi (Keep running | Cancel scrape)
   → konfirmasi → IPC scraper:cancel
   → scrape loop throw SCRAPER_CANCELLED
   → modal info: "Scrape cancelled. No data was saved."
-  → grid tidak berubah; scraper column kembali standby
+  → grid tidak berubah; kolom Last update kembali standby
 ```
 
-### 9.2 Implementasi teknis
+### 10.2 Implementasi teknis
 
 | Lapisan | File |
 |---------|------|
@@ -554,15 +554,14 @@ Session login/logout **bukan** ticket.
 ### 11.2 Engine (satu sumber kebenaran dengan grid)
 
 ```
-accountMasterDailyCompare.ts  →  computeAccountTicketBreakdown
-buildTicketSummariesFromEngine.ts  →  kartu KPI ticket tab
-reconcileTickets.ts  →  upsert/delete baris tickets DB
+accountMasterDailyCompare.ts  →  computeAccountTicketBreakdown (in-memory)
+buildTicketSummariesFromEngine.ts  →  kartu KPI Issue
 ```
 
-### 11.3 Kapan reconcile jalan
+### 11.3 Kapan grid & reporting refresh
 
-- Setelah sync/scrape sukses → `onTicketsReload(dbAccountId)` → `refreshIssues` (reconcile + reload kartu + **Reporting reload**)
-- Realtime Supabase pada `group_scrape_daily`, `scrape_runs`, `tickets`
+- Setelah sync/scrape sukses → `applyResult` + realtime `group_scrape_daily` → `refreshAccountAfterDailyWrite` → `scheduleMonitoringReload`
+- Realtime Supabase pada `group_scrape_daily`, `groups_master`, registry akun
 - Hook: `useRealtimeMonitoring.ts`
 
 ### 11.4 Data fresh (anti cache lama)
@@ -570,9 +569,9 @@ reconcileTickets.ts  →  upsert/delete baris tickets DB
 | Langkah | File |
 |---------|------|
 | Scrape tulis daily + master (RPC atomik) | `accountScraper.ts` → `rm_commit_account_scrape` → `invalidateMasterDailyCacheForScrape` |
-| Reconcile DB | `reconcileTickets.ts` → `loadMasterDailyForAccount({ forceFresh: true })` |
-| Kartu Issue UI | `buildTicketSummariesFromEngine.ts` → `forceFresh: true` |
-| Patch grid bookmark | `hydrateAccountMetricsFromDaily.ts`, `patchAccountMasterInGroups.ts` |
+| Breakdown Issue | `accountMasterDailyCompare.ts` → `loadMasterDailyForAccount({ forceFresh: true })` |
+| Kartu Issue UI | `buildTicketSummariesFromEngine.ts` |
+| Patch grid | `patchAccountGridAfterDailyWrite.ts`, `hydrateAccountMetricsFromDaily.ts` |
 
 ---
 
@@ -753,8 +752,8 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | `accountBrandUtils.ts` | Slot CRUD, apply sync result |
 | `accountActionColumn.ts` | Logic kolom Action |
 | `sessionColumnFlowSpec.ts` | Spec matrix session column |
-| `accountMasterDailyCompare.ts` | Engine Y/X + ticket breakdown |
-| `reconcileTickets.ts` | Upsert tickets DB |
+| `accountMasterDailyCompare.ts` | Engine Y/X + ticket breakdown (in-memory) |
+| `buildTicketSummariesFromEngine.ts` | Kartu Issue dari engine |
 | `clearAccountSession.ts` | Clear Session — purge lokal + invalidate DB |
 | `messagingAccounts.ts` | Remove slot + rebuild master |
 
@@ -835,7 +834,7 @@ flowchart TD
 ```mermaid
 flowchart TD
   A[Baris akun] --> Q1{actionProcess scraper?}
-  Q1 -->|Ya| CR[Cancel Run]
+  Q1 -->|Ya| CR[Cancel scrape]
   Q1 -->|Tidak| Q2{groupsCurrent=0 AND adminCurrent=0?}
   Q2 -->|Ya| N[None kosong]
   Q2 -->|Tidak| GL[Group link]

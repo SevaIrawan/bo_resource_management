@@ -1,4 +1,6 @@
 import type { Platform } from '@/types/database';
+import { PHONE_COLUMN_MIGRATION_HINT } from '@/lib/dbPhoneSchema';
+import { PLATFORM_SESSION_RLS_HINT } from '@/lib/platformSessions';
 import {
   isWaLinkLoadingProbeMessage,
   isWaUnlinkedProbeMessage,
@@ -248,4 +250,81 @@ export function resolveScrapeAlertMessage(
     default:
       return code;
   }
+}
+
+/** Peta kode error sync/scrape/job-queue ke teks modal (i18n). */
+export function resolveSyncFlowAlertMessage(
+  code: string | null,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  platform?: Platform,
+): string {
+  if (!code) return '';
+
+  const factual = formatScrapeErrorForModal(code);
+  if (factual && !isScrapeErrorCodeOnly(factual)) {
+    return factual;
+  }
+
+  const modalCode =
+    resolveScrapeErrorModalCode(code) ?? (isScrapeConnectionModalCode(code) ? code : null);
+  if (modalCode) {
+    return resolveScrapeAlertMessage(modalCode, t, platform);
+  }
+
+  if (code === 'SUPABASE_NOT_CONFIGURED') {
+    return t('groupMonitoring.sync.supabaseNotConfigured');
+  }
+  if (code === 'SCRAPER_DESKTOP_REQUIRED') {
+    return t('groupMonitoring.sync.scraperDesktopRequired');
+  }
+  if (code === 'SCRAPER_NO_GROUPS' || code.startsWith('SCRAPER_NO_GROUPS:')) {
+    if (code.includes(':')) return code.replace('SCRAPER_NO_GROUPS: ', '');
+    return t('groupMonitoring.sync.scraperNoGroups');
+  }
+  if (code.startsWith('WA_CLIENT_NOT_READY') || code.startsWith('WA_NOT_CONNECTED')) {
+    return code.replace(/^WA_[A-Z_]+:\s*/, '');
+  }
+  if (code === 'AUTH_REQUIRED') {
+    return t('groupMonitoring.sync.authRequired');
+  }
+  if (code === 'SYNC_FAILED') {
+    return t('groupMonitoring.sync.syncFailed');
+  }
+  if (code === 'SYNC_TIMED_OUT') {
+    return t('groupMonitoring.sync.syncTimedOut');
+  }
+  if (code === 'SESSION_WARM_PENDING') {
+    return t('groupMonitoring.sync.sessionWarmPending');
+  }
+  if (code === 'SESSION_SETTLING' || code === 'SESSION_CHECK_BUSY') {
+    return t('groupMonitoring.sync.sessionCheckBusy');
+  }
+  if (code === 'EXECUTE_SLOTS_FULL') {
+    return t('groupMonitoring.sync.executeSlotsQueued');
+  }
+  if (code === 'OPERATION_GLOBAL_BUSY') {
+    return t('groupMonitoring.accountCard.operationGlobalBusy');
+  }
+  if (code === 'OPERATION_ALREADY_RUNNING') {
+    return t('groupMonitoring.accountCard.operationAlreadyRunning');
+  }
+  if (code === 'JOB_QUEUE_EXECUTE_FULL') {
+    return t('operations.jobQueue.executeFull');
+  }
+  if (code === 'SCRAPER_WRITE_FAILED' || code === 'SCRAPER_FAILED') {
+    return t('groupMonitoring.sync.scraperFailed');
+  }
+  if (code.startsWith('SCRAPER_DB_WRITE:')) {
+    return code.replace('SCRAPER_DB_WRITE: ', '');
+  }
+  if (code.startsWith('PHONE_COLUMN_MISSING:')) {
+    return code.replace('PHONE_COLUMN_MISSING: ', '');
+  }
+  if (code.includes(PHONE_COLUMN_MIGRATION_HINT)) {
+    return code;
+  }
+  if (code.includes(PLATFORM_SESSION_RLS_HINT)) {
+    return code.replace('PLATFORM_SESSION_RLS: ', '');
+  }
+  return code;
 }

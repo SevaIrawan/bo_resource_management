@@ -1,4 +1,4 @@
-/** Tampilan ringkas untuk kolom Scraper (last update). */
+/** Tampilan ringkas untuk kolom Last update. */
 export function formatLastSyncAt(iso: string | null | undefined, locale?: string): string {
   if (!iso) return '—';
   const date = new Date(iso);

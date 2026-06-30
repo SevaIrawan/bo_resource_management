@@ -80,10 +80,9 @@ export function accountJobStepTotal(job: AutomationJobRecord): number {
   return 1;
 }
 
-export function isJobQueueBlockingExecutes(jobs: AutomationJobRecord[]): boolean {
-  return jobs.some(
-    (job) => job.status === 'running' || (job.status === 'queued' && !job.paused),
-  );
+export function isJobQueueBlockingExecutes(_jobs: AutomationJobRecord[]): boolean {
+  /** Global execute block dihapus — gunakan busyAccountIds / per-akun guard. */
+  return false;
 }
 
 /** Kontrak isolasi per akun — job queue akun A tidak blok Sync/Scrape akun B. */

@@ -115,6 +115,7 @@ async function executeAutoScrapeRun(payload: ScrapeRunPayload) {
   } finally {
     clearActiveAutoScrape(payload.sessionId);
     releaseAutoScrapeLane(payload.sessionId);
+    scheduleRunnerTick(0);
   }
 }
 

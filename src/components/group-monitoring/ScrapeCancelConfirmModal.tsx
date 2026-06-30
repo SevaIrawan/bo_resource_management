@@ -59,18 +59,18 @@ export function ScrapeCancelConfirmModal({
         </header>
 
         <div className="brand-modal-form">
-          <p className="sync-modal-message">{t('groupMonitoring.sync.cancelRunConfirmMessage')}</p>
+          <p className="sync-modal-message">{t('groupMonitoring.sync.cancelScrapeConfirmMessage')}</p>
 
           <div className="brand-modal-actions">
             <button type="button" className="brand-modal-btn brand-modal-btn--ghost" onClick={onClose}>
-              {t('groupMonitoring.sync.cancelRunKeep')}
+              {t('groupMonitoring.sync.cancelScrapeKeep')}
             </button>
             <button
               type="button"
               className="brand-modal-btn brand-modal-btn--danger"
               onClick={onConfirm}
             >
-              {t('groupMonitoring.sync.cancelRunConfirm')}
+              {t('groupMonitoring.sync.cancelScrapeConfirm')}
             </button>
           </div>
         </div>

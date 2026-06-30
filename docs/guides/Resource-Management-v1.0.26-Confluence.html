@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
@@ -50,7 +50,7 @@
 <ul>
   <li>Supabase <strong>036</strong>: PK <code>groups_master</code> = <code>(brand, platform, group_id)</code> — fix duplicate key saat scrape</li>
   <li>Satu RPC atomik <code>rm_commit_account_scrape</code> (daily + master), bukan rebuild terpisah</li>
-  <li>Multi-akun scrape paralel: progress + Cancel Run per baris akun</li>
+  <li>Multi-akun scrape paralel: progress + Cancel scrape per baris akun</li>
   <li>Scrape idle watchdog (tanpa wall-clock 3600s)</li>
 </ul>
 
@@ -121,13 +121,13 @@
   <tr><td>In brand</td><td>Joined di master brand (joinedInMaster / groupsTotal)</td></tr>
   <tr><td>Admin</td><td>Y/X admin di device vs standar</td></tr>
   <tr><td>Scraper</td><td>Timestamp / RUN / progress bar</td></tr>
-  <tr><td>Action</td><td>Sync, Run Scraper, edit akun, group links</td></tr>
+  <tr><td>Action</td><td>Sync, Scrape (via Sync), edit akun, group links</td></tr>
 </table>
 
-<h3>5.2 Sync &amp; Run Scraper</h3>
+<h3>5.2 Sync &amp; Scrape (via Sync)</h3>
 <ul>
   <li><strong>Sync (↻):</strong> probe session device → update hitungan grup/admin → prompt Scraper Now / Later</li>
-  <li><strong>Run Scraper:</strong> scrape penuh device → tulis daily → rebuild master → reconcile ticket → refresh UI realtime</li>
+  <li><strong>Scrape (via Sync):</strong> scrape penuh device → tulis daily → rebuild master → refresh grid & reporting → refresh UI realtime</li>
   <li><strong>Later:</strong> tutup modal tanpa scrape</li>
   <li><strong>Cancel scrape:</strong> stop total + lepas Chrome</li>
 </ul>
@@ -298,7 +298,7 @@
   <li>Install sekali dari installer terbaru</li>
   <li>Login dashboard (users)</li>
   <li>Tambah akun → login WA/TG di HP marketing</li>
-  <li>Sync / Run Scraper / pantau ticket &amp; reporting</li>
+  <li>Sync / Scrape (via Sync) / pantau selisih & reporting &amp; reporting</li>
   <li>Restart app saat ada notifikasi update</li>
 </ol>
 
@@ -318,7 +318,7 @@
 <h2>15. Diagram Alur Operator (Harian)</h2>
 <pre>[Login app] → [Tambah akun + login WA/TG]
       ↓
-[Sync] → (opsional) [Run Scraper]
+[Sync] → (opsional) [Scrape (via Sync)]
       ↓
 Daily + Master terupdate → Ticket auto-reconcile
       ↓

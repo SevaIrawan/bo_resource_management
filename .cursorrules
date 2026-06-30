@@ -98,7 +98,7 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     Urutan wajib setelah scrape execute:
     1. Tulis daily atomik (`rm_commit_account_scrape`) + snapshot
     2. Patch grid akun (`applyResult` manual / `runAutoAccountScrape` auto) + `refreshAccountAfterDailyWrite` via realtime `group_scrape_daily`
-    3. `dispatchMonitoringReloadAfterDailyWrite` → Reporting + Operations reload
+    3. `scheduleMonitoringReload` di `GroupMonitoringProvider.refreshAccountAfterDailyWrite` → Reporting + Operations reload (debounce 500ms)
     Auto scrape: lane terpisah (`scraper:run-auto`, pool Chrome auto max 1) — tidak ambil execute slot user, tidak suspend probe global.
     Trigger: Supabase realtime daily → `onAccountDailyChanged`; master brand → patch master; manual/auto scrape → `recordSyncActivity` + dispatch reload.
 

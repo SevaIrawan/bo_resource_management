@@ -62,11 +62,16 @@ const checks = [
     })(),
   },
   {
-    name: 'Create group: SETUP modal + enqueue batch',
+    name: 'SETUP Queue: enqueue + try-run all task types',
     ok:
+      addBar.includes('enqueueAndTryRunAutomationJob') &&
+      addBar.includes('saveJoinBatch') &&
+      addBar.includes('saveCreateBatch') &&
+      addBar.includes('saveSetAdminBatch') &&
+      addBar.includes('saveExitBatch') &&
       read('src/components/group-monitoring/OperationsJobQueueSetupModal.tsx').includes(
         'createTotalToCreate',
-      ) && addBar.includes('saveCreateBatch'),
+      ),
   },
   {
     name: 'Create group permissions: modal draft only at enqueue (no Settings merge)',
@@ -365,8 +370,9 @@ const checks = [
       const global = read('src/components/group-monitoring/OperationsGlobalJobQueuePanel.tsx');
       const table = read('src/components/group-monitoring/OperationsJobQueueTable.tsx');
       return (
-        global.includes('runAutomationJob(result.jobId)') &&
+        global.includes('tryRunEnqueuedAutomationJob(result.jobId)') &&
         global.includes('QueueFromViewResult') &&
+        !global.includes("'RUN_FAILED'") &&
         table.includes('setViewJobId(null)') &&
         table.includes('QueueFromViewResult')
       );
@@ -485,6 +491,7 @@ const checks = [
       const autoScrape = read('src/lib/runAutoAccountScrape.ts');
       return (
         client.includes('enqueueAutomationJob') &&
+        client.includes('enqueueAndTryRunAutomationJob') &&
         client.includes('resolveAccountExecuteBlock') &&
         client.includes('isHeavyDeviceExecuteBlockedForAccount') &&
         !client.includes('clearCompletedAutomationJobs') &&

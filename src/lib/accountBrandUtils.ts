@@ -5,6 +5,7 @@ import { ensureBrand } from '@/lib/brands';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AccountBrandGroup, AddAccountInput } from '@/types/accountMonitoringUi';
 import type { SessionUiStatus } from '@/types/accountMonitoringUi';
+import type { Platform } from '@/types/database';
 
 export const DEFAULT_EMPTY_SLOT_COUNT = 3;
 
@@ -273,4 +274,29 @@ export function setAccountProcessAction(
     account.id === accountId ? { ...account, actionProcess: action } : account,
   );
   return { ...group, accounts };
+}
+
+/** Setelah scrape: sinkronkan X standar brand per platform ke semua akun platform yang sama. */
+export function patchBrandStandardCountForPlatform(
+  groups: AccountBrandGroup[],
+  groupId: string,
+  platform: Platform,
+  accountId: string,
+  brandX: number,
+): AccountBrandGroup[] {
+  if (brandX <= 0) return groups;
+  return patchBrandGroup(groups, groupId, (g) =>
+    rebuildGroupMetrics({
+      ...g,
+      standardGroupCountByPlatform: {
+        ...g.standardGroupCountByPlatform,
+        [platform]: brandX,
+      },
+      accounts: g.accounts.map((row) =>
+        row.platform === platform && row.id !== accountId
+          ? { ...row, groupsTotal: brandX, adminTotal: brandX }
+          : row,
+      ),
+    }),
+  );
 }

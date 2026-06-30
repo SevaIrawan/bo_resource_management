@@ -1,4 +1,5 @@
 import { dedupeMasterRowsByGroupId } from '@/lib/accountMasterDailyCompare';
+import { normalizeDbAccountId } from '@/lib/accountDbId';
 import {
   dedupeDailyRowsByGroupId,
   dedupeDailyRowsByGroupIdKeepLatest,
@@ -20,19 +21,6 @@ export interface AccountGroupLinkRow {
   adminCount: number;
   memberNonAdmin?: number;
   stockStatus?: GroupStockBucket;
-}
-
-const UUID_RE = /^[0-9a-f-]{36}$/i;
-
-function normalizeDbAccountId(accountId: string | undefined): string | null {
-  if (!accountId) return null;
-  const trimmed = accountId.trim();
-  if (UUID_RE.test(trimmed)) return trimmed;
-  if (trimmed.startsWith('acc-')) {
-    const id = trimmed.slice(4);
-    return UUID_RE.test(id) ? id : null;
-  }
-  return null;
 }
 
 type DailyGroupRow = {
@@ -86,7 +74,7 @@ async function fetchMasterForBrand(
 export async function fetchAccountDailyGroupLinks(
   accountId?: string,
 ): Promise<AccountGroupLinkRow[]> {
-  const dbId = normalizeDbAccountId(accountId);
+  const dbId = accountId ? normalizeDbAccountId(accountId) : null;
   if (!dbId) return [];
 
   const daily = await fetchDailyForAccount(dbId, true);
@@ -116,7 +104,7 @@ export async function fetchAccountGroupLinks(
   platform: Platform,
   accountId?: string,
 ): Promise<AccountGroupLinkRow[]> {
-  const dbId = normalizeDbAccountId(accountId);
+  const dbId = accountId ? normalizeDbAccountId(accountId) : null;
   const daily = dbId ? await fetchDailyForAccount(dbId, true) : [];
   const dailyByGid = new Map(daily.map((d) => [String(d.group_id).trim(), d]));
 
@@ -155,7 +143,7 @@ export async function fetchAccountJunkGroupLinks(
   platform: Platform,
   accountId?: string,
 ): Promise<AccountGroupLinkRow[]> {
-  const dbId = normalizeDbAccountId(accountId);
+  const dbId = accountId ? normalizeDbAccountId(accountId) : null;
   if (!dbId) return [];
 
   const daily = await fetchDailyForAccount(dbId, true);

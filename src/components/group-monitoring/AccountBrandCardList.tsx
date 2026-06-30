@@ -46,7 +46,6 @@ export function AccountBrandCardList({
     clearingSessionAccountId,
     handleSyncAccount,
     handleClearSession,
-    handleRunScraper,
     requestCancelScrape,
     getScrapeProgress,
   } = sync;
@@ -158,11 +157,6 @@ export function AccountBrandCardList({
             }}
             onRemoveFromSlot={(account) => onRemoveFromSlot(group.id, account)}
             clearingSessionAccountId={clearingSessionAccountId}
-            onRunScraper={(accountId) => {
-              if (!canOperatePlatform) return;
-              const account = group.accounts.find((row) => row.id === accountId);
-              if (account) void handleRunScraper(group.id, account);
-            }}
             onCancelScrape={(accountId) => {
               if (!canOperatePlatform) return;
               const account = group.accounts.find((row) => row.id === accountId);

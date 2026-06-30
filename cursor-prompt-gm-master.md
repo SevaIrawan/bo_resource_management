@@ -7,7 +7,7 @@
 
 - Stack: Electron + TypeScript, Supabase (PostgreSQL)
 - App manages WhatsApp and Telegram accounts per brand
-- Each account row has two action buttons: **Sync** and **Run** (inside Scraper column)
+- Each account row: **Sync (↻)** in Action area; **scrape penuh** via modal **Scrape now** after Sync (kolom **Last update** read-only — tidak ada tombol Run terpisah)
 - Existing Job Queue handles: **Create Group**, **Set Admin**, **Invite Member by Group Link**
 - WA session is read from local storage. TG session is read from Supabase.
 
@@ -21,8 +21,8 @@ Read these first before implementing anything:
 2. Scrape fails at any step → show error modal → close → **no updates of any kind**, no partial writes.
 3. "Later" path → **only update Session and Status** → nothing else.
 4. Delete + rewrite of daily and master must be a **single atomic transaction**.
-5. Grid columns (On Device, In Brand, Admin, Scraper) update **only after all scrape steps complete successfully**.
-6. Do not add any new gate, middleware, or interceptor before Sync or Run logic unless explicitly instructed.
+5. Grid columns (On Device, In Brand, Admin, Last update) update **only after all scrape steps complete successfully**.
+6. Do not add any new gate, middleware, or interceptor before Sync or scrape logic unless explicitly instructed.
 
 ---
 
@@ -74,35 +74,30 @@ Login Modal rules (all cases):
 
 ---
 
-## Run Button Logic
+## Scrape Trigger (no separate Run button)
 
-Run has **no Later option**. Always executes scrape immediately after session is confirmed.
+Full scrape is started only by:
+- **Scrape now** in the modal after Sync / login (Scrape Now / Later)
+- **Auto-scrape** (Settings) on schedule
+- Login success with scraper intent (auto-scrape without Later prompt)
 
-### Case 1 — Session Invalid
+There is **no** standalone Run button in the grid. Column **Last update** shows timestamp, progress, or *Use Sync to log in first*.
 
-```
-Run
-→ Check Session → Invalid
-→ Show Login Modal
-    → [Login Failed] → close. No action.
-    → [Login Success]
-        → Update Session + Status
-        → Run Scrape Logic immediately (no modal)
-```
-
-### Case 2 — Session Valid
+### After Sync when session becomes valid
 
 ```
-Run
-→ Check Session → Valid
-→ Run Scrape Logic immediately (no modal)
+Sync → session check / login
+→ [Later] → close (no scrape)
+→ [Scrape now] → run Scrape Logic immediately
 ```
+
+Invalid session attempting scrape path: login first, then optional Scrape now (same as Sync flow).
 
 ---
 
 ## Scrape Logic
 
-Called by Scrape Now and Run. Execute steps in order. If any step fails — stop, show error modal, close, no updates.
+Called by **Scrape now** and auto-scrape. Execute steps in order. If any step fails — stop, show error modal, close, no updates.
 
 ```
 Step 1 — Read total group count from device (live, real count)
@@ -127,7 +122,7 @@ Step 4 — Write new scrape result to daily
 Step 5 — Update Master: delete first, then rewrite
 
 Step 6 — Update Grid in UI:
-          On Device · In Brand · Admin · Scraper
+          On Device · In Brand · Admin · Last update
 
 Step 7 — Close
 ```

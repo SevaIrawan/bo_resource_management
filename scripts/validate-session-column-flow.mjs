@@ -81,9 +81,9 @@ const fileChecks = [
     },
   },
   {
-    label: 'refreshAccountAfterDailyWrite dispatch monitoring reload',
+    label: 'refreshAccountAfterDailyWrite schedule monitoring reload',
     file: 'src/providers/GroupMonitoringProvider.tsx',
-    pass: (src) => src.includes('dispatchMonitoringReloadAfterDailyWrite()'),
+    pass: (src) => src.includes('scheduleMonitoringReload()'),
   },
   {
     label: 'Scrape skip warm bila trustedSession',

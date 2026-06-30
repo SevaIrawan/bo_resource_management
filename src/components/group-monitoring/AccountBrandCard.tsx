@@ -42,7 +42,6 @@ interface AccountBrandCardProps {
   onSyncAccount?: (accountId: string) => void;
   onClearSession?: (accountId: string) => void;
   onRemoveFromSlot?: (account: import('@/types/accountMonitoringUi').AccountBrandRow) => void;
-  onRunScraper?: (accountId: string) => void;
   onCancelScrape?: (accountId: string) => void;
   processingByAccount?: Record<string, RowProcessingSpinner>;
   clearingSessionAccountId?: string | null;
@@ -61,7 +60,6 @@ export function AccountBrandCard({
   onSyncAccount,
   onClearSession,
   onRemoveFromSlot,
-  onRunScraper,
   onCancelScrape,
   processingByAccount = {},
   clearingSessionAccountId = null,
@@ -275,7 +273,6 @@ export function AccountBrandCard({
                       scraperLoading={processingByAccount[row.id] === 'scraper'}
                       scrapeProgress={getScrapeProgress?.(row.id) ?? null}
                       onSync={() => onSyncAccount?.(row.id)}
-                      onRunScraper={() => onRunScraper?.(row.id)}
                       onCancelScrape={() => onCancelScrape?.(row.id)}
                       onRemoveFromSlot={
                         onRemoveFromSlot ? () => onRemoveFromSlot(row) : undefined

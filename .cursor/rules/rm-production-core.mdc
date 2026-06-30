@@ -26,7 +26,7 @@ alwaysApply: true
 4. `duplicate_group_id` — id sama, nama beda
 5. `duplicate_group_name` — id beda, nama sama
 
-Tidak ada `group_count_mismatch`. Implementasi: `reconcileTickets.ts`.
+Tidak ada `group_count_mismatch`. Implementasi: `accountMasterDailyCompare.ts` → `computeAccountTicketBreakdown` (in-memory).
 
 # Bahasa
 

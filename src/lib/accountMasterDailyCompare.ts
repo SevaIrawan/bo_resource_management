@@ -70,7 +70,7 @@ export function dedupeMasterRowsByGroupId<T extends { group_id: string | null | 
   return dedupeDailyRowsByGroupId(rows);
 }
 
-/** Hitung semua issue + metrik join — logic identik reconcileTicketsForAccount. */
+/** Hitung semua issue + metrik join — engine in-memory tunggal grid & kartu Issue. */
 export function computeAccountTicketBreakdown(
   masterRows: CompareMasterRow[],
   dailyRows: CompareDailyRow[],

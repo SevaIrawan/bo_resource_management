@@ -54,13 +54,3 @@ export async function loadMissingMasterGroupsJoinSnapshot(input: {
   joinable.sort((a, b) => a.groupName.localeCompare(b.groupName));
   return { joinable, missingWithoutInviteLink };
 }
-
-/** @deprecated use loadMissingMasterGroupsJoinSnapshot */
-export async function loadMissingMasterGroupsForJoin(input: {
-  accountId: string;
-  brandName: string;
-  platform: Platform;
-}): Promise<MissingMasterGroupForJoin[]> {
-  const snapshot = await loadMissingMasterGroupsJoinSnapshot(input);
-  return snapshot.joinable;
-}

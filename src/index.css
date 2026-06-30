@@ -562,13 +562,6 @@
     gap: 1rem;
   }
 
-  .operations-job-queue-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem 1rem;
-  }
-
   .operations-job-queue-title {
     margin: 0;
     font-size: 0.9375rem;
@@ -2342,39 +2335,39 @@
   }
 
   .brand-col--account {
-    width: 20%;
+    width: 25%;
   }
 
-  .brand-col--brand {
-    width: 10%;
+  .brand-col--location {
+    width: 9%;
   }
 
   .brand-col--status {
-    width: 10%;
+    width: 9%;
   }
 
   .brand-col--session {
-    width: 10%;
+    width: 9%;
   }
 
   .brand-col--on-device {
-    width: 10%;
+    width: 9%;
   }
 
   .brand-col--in-brand {
-    width: 10%;
+    width: 9%;
   }
 
   .brand-col--admin {
-    width: 10%;
+    width: 9%;
   }
 
-  .brand-col--scraper {
-    width: 10%;
+  .brand-col--last-update {
+    width: 12%;
   }
 
   .brand-col--action {
-    width: 10%;
+    width: 9%;
   }
 
   .brand-col-head {
@@ -2404,14 +2397,17 @@
     text-align: left;
   }
 
-  .brand-col-cell--brand,
+  .brand-col-cell--last-update {
+    overflow: visible;
+  }
+
   .brand-col-cell--location,
   .brand-col-cell--status,
   .brand-col-cell--session,
   .brand-col-cell--on-device,
   .brand-col-cell--in-brand,
   .brand-col-cell--admin,
-  .brand-col-cell--scraper,
+  .brand-col-cell--last-update,
   .brand-col-cell--action {
     white-space: nowrap;
   }
@@ -2507,10 +2503,6 @@
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
     font-weight: 600;
-  }
-
-  .permission-locked-btn--run {
-    color: var(--color-text-muted);
   }
 
   .brand-add-card--locked {
@@ -3075,14 +3067,14 @@
     white-space: nowrap;
   }
 
-  .brand-scraper-progress {
+  .brand-last-update-progress {
     display: flex;
     width: 100%;
     align-items: center;
     gap: 0.375rem;
   }
 
-  .brand-scraper-progress-bar {
+  .brand-last-update-progress-bar {
     height: 0.375rem;
     min-width: 0;
     flex: 1 1 auto;
@@ -3091,14 +3083,14 @@
     background: rgba(255, 255, 255, 0.08);
   }
 
-  .brand-scraper-progress-fill {
+  .brand-last-update-progress-fill {
     height: 100%;
     border-radius: 999px;
     background: linear-gradient(90deg, rgb(245, 158, 11), rgb(251, 191, 36));
     transition: width 200ms ease;
   }
 
-  .brand-scraper-marquee {
+  .brand-last-update-marquee {
     --marquee-duration: 12s;
     --marquee-gap: 1.5rem;
     display: block;
@@ -3117,20 +3109,20 @@
     );
   }
 
-  .brand-scraper-marquee__track {
+  .brand-last-update-marquee__track {
     display: inline-flex;
     width: max-content;
-    animation: brand-scraper-marquee-scroll var(--marquee-duration) linear infinite;
+    animation: brand-last-update-marquee-scroll var(--marquee-duration) linear infinite;
     will-change: transform;
   }
 
-  .brand-scraper-marquee__item {
+  .brand-last-update-marquee__item {
     flex: 0 0 auto;
     padding-inline-end: var(--marquee-gap);
     white-space: nowrap;
   }
 
-  @keyframes brand-scraper-marquee-scroll {
+  @keyframes brand-last-update-marquee-scroll {
     from {
       transform: translateX(0);
     }
@@ -3140,12 +3132,12 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .brand-scraper-marquee {
+    .brand-last-update-marquee {
       mask-image: none;
       text-align: center;
     }
 
-    .brand-scraper-marquee__track {
+    .brand-last-update-marquee__track {
       display: block;
       width: 100%;
       animation: none;
@@ -3154,12 +3146,12 @@
       white-space: nowrap;
     }
 
-    .brand-scraper-marquee__item:last-child {
+    .brand-last-update-marquee__item:last-child {
       display: none;
     }
   }
 
-  .brand-scraper-progress-pct {
+  .brand-last-update-progress-pct {
     flex: 0 0 auto;
     min-width: 2rem;
     font-size: 0.6875rem;
@@ -3168,7 +3160,7 @@
     color: rgb(251, 191, 36);
   }
 
-  .brand-scraper-cell-stack {
+  .brand-last-update-cell-stack {
     display: flex;
     width: 100%;
     flex-direction: column;
@@ -3246,48 +3238,7 @@
     animation: brand-sync-spin 0.85s linear infinite;
   }
 
-  .brand-scraper-run-link {
-    border: 0;
-    padding: 0;
-    background: transparent;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1.2;
-    color: #f97316;
-    cursor: pointer;
-    text-align: center;
-    text-decoration: none;
-    transition: color 160ms ease;
-  }
-
-  .brand-scraper-run-link:hover:not(:disabled) {
-    color: #fb923c;
-    text-decoration: underline;
-  }
-
-  .brand-scraper-run-link:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  .brand-scraper-last-update {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.0625rem;
-    line-height: 1.2;
-    margin-inline: auto;
-  }
-
-  .brand-scraper-last-update-label {
-    font-size: 0.625rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-
-  .brand-scraper-last-update-time {
+  .brand-last-update-time {
     display: block;
     width: 100%;
     font-size: 0.6875rem;
@@ -3314,8 +3265,20 @@
     padding: 0.375rem 0.5rem;
   }
 
-  .brand-col-cell--action .brand-col-cell-inner,
-  .brand-col-cell--scraper .brand-col-cell-inner {
+  .brand-col-cell--last-update .brand-col-cell-inner {
+    justify-content: center;
+    overflow: visible;
+  }
+
+  .brand-last-update-hint {
+    display: inline-block;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    text-align: center;
+  }
+
+  .brand-col-cell--action .brand-col-cell-inner {
     justify-content: center;
   }
 
@@ -3349,17 +3312,6 @@
     color: var(--color-text-primary);
   }
 
-  .brand-card-action-btn--scraper {
-    border-color: rgba(245, 158, 11, 0.35);
-    color: rgb(251, 191, 36);
-  }
-
-  .brand-card-action-btn--scraper:hover {
-    border-color: rgba(245, 158, 11, 0.55);
-    background: rgba(245, 158, 11, 0.12);
-    color: rgb(253, 224, 71);
-  }
-
   .brand-action-process {
     display: inline-flex;
     font-size: 0.625rem;
@@ -3367,19 +3319,6 @@
     letter-spacing: 0.06em;
     color: rgb(96, 165, 250);
     animation: brand-process-blink 1s ease-in-out infinite;
-  }
-
-  .brand-scraper-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    color: var(--color-tg, #38bdf8);
-  }
-
-  .brand-scraper-status--active {
-    animation: brand-process-blink 1.2s ease-in-out infinite;
   }
 
   @keyframes brand-process-blink {
@@ -3532,12 +3471,12 @@
     background: rgba(255, 255, 255, 0.05);
   }
 
-  .brand-card-action-btn--cancel-run {
+  .brand-card-action-btn--cancel-scrape {
     color: var(--color-danger, #f87171);
     border-color: color-mix(in srgb, var(--color-danger, #f87171) 35%, transparent);
   }
 
-  .brand-card-action-btn--cancel-run:hover {
+  .brand-card-action-btn--cancel-scrape:hover {
     color: var(--color-danger, #f87171);
     background: color-mix(in srgb, var(--color-danger, #f87171) 12%, transparent);
   }

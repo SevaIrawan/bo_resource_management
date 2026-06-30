@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
-import { patchBrandGroup, rebuildGroupMetrics, setAccountProcessAction, type AccountSyncResult } from '@/lib/accountBrandUtils';
+import { patchBrandGroup, patchBrandStandardCountForPlatform, setAccountProcessAction, type AccountSyncResult } from '@/lib/accountBrandUtils';
 import { applyScrapeMetricsToGroups } from '@/lib/applyScrapeMetricsToGroups';
 import { SESSION_SETTLING_CODE } from '@/lib/automationJobQueueClient';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
@@ -12,7 +12,6 @@ import {
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { patchAccountSessionInGroups } from '@/lib/accountSessionPatch';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
-import { dispatchMonitoringReloadAfterDailyWrite } from '@/lib/monitoringRealtimeEvents';
 import {
   markAccountLoginGrace,
   markAccountScrapeGrace,
@@ -788,19 +787,12 @@ export function useAccountSyncFlow({
 
         if (outcome.brandX > 0) {
           updateGroups((prev) =>
-            patchBrandGroup(prev, groupId, (g) =>
-              rebuildGroupMetrics({
-                ...g,
-                standardGroupCountByPlatform: {
-                  ...g.standardGroupCountByPlatform,
-                  [account.platform]: outcome.brandX,
-                },
-                accounts: g.accounts.map((row) =>
-                  row.platform === account.platform && row.id !== account.id
-                    ? { ...row, groupsTotal: outcome.brandX, adminTotal: outcome.brandX }
-                    : row,
-                ),
-              }),
+            patchBrandStandardCountForPlatform(
+              prev,
+              groupId,
+              account.platform,
+              account.id,
+              outcome.brandX,
             ),
           );
         }
@@ -816,7 +808,6 @@ export function useAccountSyncFlow({
           adminGroups: outcome.result.adminCurrent,
           message: `scrape:${outcome.result.groupsCurrent}/${outcome.result.groupsTotal}`,
         });
-        dispatchMonitoringReloadAfterDailyWrite();
 
         setStep('idle');
       } catch (error) {
@@ -935,40 +926,6 @@ export function useAccountSyncFlow({
     setStep('idle');
     setTarget(null);
   }, []);
-
-  const handleRunScraper = useCallback(
-    async (groupId: string, account: AccountBrandRow) => {
-      if (!canOperatePlatform) return;
-
-      dismissSyncModals();
-      setTarget({ groupId, account });
-
-      if (!userId) {
-        showSyncError('AUTH_REQUIRED', groupId, account);
-        return;
-      }
-
-      if (!window.electronAPI?.isElectron) {
-        showSyncError('SCRAPER_DESKTOP_REQUIRED', groupId, account);
-        return;
-      }
-
-      const executeBlock = await resolveAccountExecuteBlock(account);
-      if (executeBlock) {
-        showSyncError(executeBlock, groupId, account);
-        return;
-      }
-
-      if (accountMissingRequiredPhone(account.platform, account.phoneNumber)) {
-        setStep('missing-phone');
-        return;
-      }
-
-      setRowProcessing(groupId, account.id, 'scraper', 'scraper');
-      void runScrapeInBackground({ groupId, account });
-    },
-    [canOperatePlatform, dismissSyncModals, runScrapeInBackground, setRowProcessing, showSyncError, userId],
-  );
 
   const handleLoginSuccess = useCallback(async () => {
     if (!target || !userId) return;
@@ -1166,7 +1123,6 @@ export function useAccountSyncFlow({
     handleSyncAccount,
     handleClearSession,
     clearingSessionAccountId,
-    handleRunScraper,
     requestCancelScrape,
     confirmCancelScrape,
     dismissCancelScrapeConfirm,

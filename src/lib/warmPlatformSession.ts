@@ -23,6 +23,7 @@ export async function tryWarmPlatformSession(input: {
   const result = await tryRestore({
     sessionId: deviceSessionId,
     platform: input.platform,
+    accountId: input.accountId,
     storedSessionString,
   });
 

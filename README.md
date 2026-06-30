@@ -2,9 +2,11 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.28` (lihat `package.json`)
+**Versi saat ini:** `1.0.29` (lihat `package.json`)
 
-**Rilis 1.0.28:** Job Queue — modal SETUP create group (batch + permission per job); Settings hanya default permission (modal tidak menulis balik); set photo dari VIEW create job dengan remark/tab lock selaras (`createSetPhotoFlow`); validator job queue diperluas.
+**Rilis 1.0.29:** Grid **Last update** read-only (tanpa tombol Run); scrape penuh via **Sync → Scrape now**; Job Queue VIEW enqueue+try-run; konsolidasi realtime reload; guard IPC `accountId`; bersihkan dead code; panduan operasional + HTML Confluence diselaraskan UI aktual.
+
+**Rilis 1.0.28:** Job Queue create group SETUP modal, permission per job, set photo dari VIEW create job.
 
 **Rilis 1.0.27:** Auto scrape lane terpisah; progress scrape persist saat navigasi; audit guard job queue vs auto-scrape; Settings page; bersihkan dead code & duplikasi scrape cancel/metrics.
 
@@ -27,6 +29,8 @@ Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary
 **Rilis 1.0.17:** session probe 20s + resolve akun per baris grid; ticket/reporting data fresh setelah scrape; tab Reporting matrix dengan filter back.
 
 **Dokumen resmi (kondisi proyek terkini):** **[PROJECT.md](./PROJECT.md)** — arsitektur, installer, auto-update, Supabase realtime, kontrak internal.
+
+**Panduan Group Monitoring (tim R&M):** **[docs/PANDUAN-PENGGUNA-SIMPLE.md](./docs/PANDUAN-PENGGUNA-SIMPLE.md)**
 
 **Installer multi-platform:** Windows `.exe`, macOS `.dmg`/`.zip`, Linux `.AppImage` — lihat [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) dan [docs/RELEASE-CI.md](./docs/RELEASE-CI.md).
 

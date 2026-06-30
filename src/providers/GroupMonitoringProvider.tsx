@@ -21,7 +21,10 @@ import {
   filterAccountGroups,
 } from '@/lib/filterAccountGroups';
 import { patchAccountGridAfterDailyWrite } from '@/lib/patchAccountGridAfterDailyWrite';
-import { dispatchMonitoringReloadAfterDailyWrite } from '@/lib/monitoringRealtimeEvents';
+import {
+  dispatchOperationsReload,
+  dispatchReportingReload,
+} from '@/lib/monitoringRealtimeEvents';
 import { mergeGroupsAccountMetrics, mergeReloadPreservingActionProcess } from '@/lib/mergeMonitoringGroups';
 import { computeAccountKpis } from '@/lib/monitoringKpis';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -58,7 +61,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     if (reportingReloadDebounceRef.current) clearTimeout(reportingReloadDebounceRef.current);
     reportingReloadDebounceRef.current = setTimeout(() => {
       reportingReloadDebounceRef.current = null;
-      window.dispatchEvent(new Event('rm-reporting-reload'));
+      dispatchReportingReload();
     }, 500);
   }, []);
 
@@ -66,7 +69,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     if (operationsReloadDebounceRef.current) clearTimeout(operationsReloadDebounceRef.current);
     operationsReloadDebounceRef.current = setTimeout(() => {
       operationsReloadDebounceRef.current = null;
-      window.dispatchEvent(new Event('rm-operations-reload'));
+      dispatchOperationsReload();
     }, 500);
   }, []);
 
@@ -95,7 +98,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       accountRefreshBusyRef.current.add(dbAccountId);
       try {
         await patchAccountGridFromDb(dbAccountId);
-        dispatchMonitoringReloadAfterDailyWrite();
+        scheduleMonitoringReload();
       } finally {
         accountRefreshBusyRef.current.delete(dbAccountId);
         if (pendingAccountRefreshRef.current.has(dbAccountId)) {
@@ -104,7 +107,7 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
         }
       }
     },
-    [patchAccountGridFromDb],
+    [patchAccountGridFromDb, scheduleMonitoringReload],
   );
 
   const handleAccountDailyChanged = useCallback(

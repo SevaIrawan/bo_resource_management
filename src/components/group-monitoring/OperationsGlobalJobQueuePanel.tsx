@@ -8,6 +8,7 @@ import {
   pauseAutomationJob,
   removeAutomationJobs,
   runAutomationJob,
+  tryRunEnqueuedAutomationJob,
   subscribeJobQueueChanged,
 } from '@/lib/automationJobQueueClient';
 import {
@@ -96,9 +97,7 @@ export function OperationsGlobalJobQueuePanel({
     if (!exitJob) return { ok: false, error: 'JOB_NOT_FOUND' };
     const result = await enqueueDeleteFromExitJob(exitJob);
     if (!result.ok) return { ok: false, error: result.error };
-    await reload();
-    const ran = await runAutomationJob(result.jobId);
-    if (!ran) return { ok: false, error: 'RUN_FAILED' };
+    await tryRunEnqueuedAutomationJob(result.jobId);
     await reload();
     return { ok: true };
   }
@@ -111,8 +110,7 @@ export function OperationsGlobalJobQueuePanel({
     if (!createJob) return { ok: false, error: 'JOB_NOT_FOUND' };
     const result = await enqueueSetPhotoFromCreateJob(createJob, photoPath);
     if (!result.ok) return { ok: false, error: result.error };
-    await reload();
-    await runAutomationJob(result.jobId);
+    await tryRunEnqueuedAutomationJob(result.jobId);
     await reload();
     return { ok: true };
   }

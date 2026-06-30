@@ -11,7 +11,7 @@
     <p class="doc-cover-logo">Backend Operation</p>
     <h1>Resource Management</h1>
     <p class="doc-cover-subtitle">Official User Guide</p>
-    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.17</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Admin → Language)</td></tr></table>
+    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.28</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Admin → Language)</td></tr></table>
   </header>
   
 <section class="doc-toc">
@@ -32,6 +32,9 @@
 </section>
   <main class="doc-body">
     <p>This document is the <strong>official guide to every feature</strong> in the current application. For architecture and IT release notes, see <a href="../../PROJECT.md">PROJECT.md</a>.</p>
+<blockquote>
+<p><strong>v1.0.24+:</strong> The <strong>Ticket</strong> tab was removed — issues appear as <strong>KPI cards</strong> on the Account tab. <strong>Operations</strong> tab has <strong>Overview</strong> (stock) and <strong>Job Queue</strong> (automation). Section 5 below is historical reference.</p>
+</blockquote>
 <hr>
 <h2 id="table-of-contents">Table of contents</h2>
 <ol>
@@ -555,7 +558,7 @@
 </tr>
 <tr>
 <td>5</td>
-<td>App may prompt <strong>Run scraper</strong> to save full group list to DB</td>
+<td>App may prompt <strong>Scrape now</strong> to save full group list to DB</td>
 </tr>
 </tbody></table>
 <h4 id="session-valid">Session = **Valid**</h4>
@@ -589,7 +592,7 @@
 <li>If QR does not appear within ~10 seconds: close modal, wait a few seconds, <strong>Sync</strong> again.</li>
 <li>Long sync (&gt;3 min) on Telegram with many groups: retry or restart app.</li>
 </ul>
-<h3 id="4-6-scraper-column-run-button">4.6 Scraper column — **Run** button</h3>
+<h3 id="4-6-last-update-column-full-scrape-via-sync">4.6 Last update column (full scrape via Sync)</h3>
 <table>
 <thead>
 <tr>
@@ -604,18 +607,13 @@
 <td>Sync first</td>
 </tr>
 <tr>
-<td>Already aligned</td>
-<td><strong>Last update</strong> time only</td>
-<td>Run usually not needed</td>
-</tr>
-<tr>
-<td><strong>Not aligned</strong></td>
-<td><strong>Run</strong> + timestamp</td>
-<td>Click <strong>Run</strong> → read all groups from phone → save DB → tickets refresh</td>
+<td>Standby</td>
+<td><strong>Last update</strong> timestamp</td>
+<td>Full scrape via <strong>Sync → Scrape now</strong> when needed</td>
 </tr>
 <tr>
 <td>Running</td>
-<td><em>Reading groups…</em> / progress</td>
+<td><em>Reading groups…</em> / progress + <strong>Cancel scrape</strong></td>
 <td>Wait (can take minutes for large group lists)</td>
 </tr>
 </tbody></table>
@@ -627,15 +625,16 @@
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Run</strong></td>
-<td>Full scrape — all groups written to database</td>
+<td><strong>Scrape now</strong></td>
+<td>Full scrape — all groups written to database (modal after Sync)</td>
 </tr>
 <tr>
 <td><strong>Sync</strong></td>
 <td>Session check + summary counts — not always a full scrape</td>
 </tr>
 </tbody></table>
-<p>After login, you may see: <em>Login OK. Device group &amp; admin counts are updated. Save the full group list to the database now?</em> → choose <strong>Run scraper</strong> or <strong>Later</strong>.</p>
+<p>There is <strong>no separate Run button</strong> in the grid.</p>
+<p>After login, you may see: <em>Login OK. Device group &amp; admin counts are updated. Save the full group list to the database now?</em> → choose <strong>Scrape now</strong> or <strong>Later</strong>.</p>
 <h3 id="4-7-group-link-modal">4.7 Group link modal</h3>
 <p>Open via <strong>Action → Group link</strong>. Choose a mode:</p>
 <table>
@@ -679,7 +678,7 @@
 </tr>
 </tbody></table>
 <p><strong>Admin vs master</strong> total matches the Groups/Admin denominator (X) and the <strong>WA x Group</strong> badge — device junk groups are <strong>not</strong> listed here (see Tickets → Junk).</p>
-<p>Empty list? Run <strong>Run</strong> scraper first. Message: <em>No links. Run scraper first.</em></p>
+<p>Empty list? <strong>Sync</strong> → <strong>Scrape now</strong> first. Message: <em>No links. Scrape via Sync first.</em></p>
 <h3 id="4-8-remove-account-from-slot">4.8 Remove account from slot</h3>
 <table>
 <thead>
@@ -1328,11 +1327,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>This guide matches application version <strong>1.0.17</strong>. Update this document when new features ship.</em></p>
+<p><em>This guide matches application version <strong>1.0.28</strong>. Ticket tab removed since 1.0.24; update PDF/Word after each release via <code>npm run build:handbook-docs</code>.</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — Resource Management v1.0.17</p>
+    <p>Internal use only — Resource Management v1.0.28</p>
   </footer>
 </body>
 </html>

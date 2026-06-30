@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     start: (payload: {
       sessionId: string;
       platform: Platform;
+      accountId?: string;
       mode?: LoginMode;
       phone?: string;
       skipDiskRestore?: boolean;
@@ -89,6 +90,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     tryRestore: (payload: {
       sessionId: string;
       platform: Platform;
+      accountId?: string;
       storedSessionString?: string | null;
     }) => ipcRenderer.invoke('platform-login:try-restore', payload),
     hasWaDiskAuth: (sessionId: string) =>

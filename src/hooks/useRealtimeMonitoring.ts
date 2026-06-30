@@ -76,39 +76,51 @@ export function useRealtimeMonitoring({
 
     const pendingBrandPlatform = new Set<string>();
     let masterFlushTimer: ReturnType<typeof setTimeout> | null = null;
+    let masterFlushInFlight = false;
 
-    const flushMasterPatches = () => {
+    const readGroupsSnapshot = (): Promise<AccountBrandGroup[]> =>
+      new Promise((resolve) => {
+        onGroupsChangeRef.current((current) => {
+          resolve(current);
+          return current;
+        });
+      });
+
+    const flushMasterPatches = async () => {
       const keys = [...pendingBrandPlatform];
       pendingBrandPlatform.clear();
-      if (!keys.length) return;
+      if (!keys.length || masterFlushInFlight) return;
 
-      onGroupsChangeRef.current((latest) => {
-        void (async () => {
-          let working = latest;
-          for (const key of keys) {
-            const sep = key.indexOf('|');
-            if (sep < 0) continue;
-            const brand = key.slice(0, sep);
-            const platform = key.slice(sep + 1) as Platform;
-            if (platform !== 'whatsapp' && platform !== 'telegram') continue;
-            const hasSuspended = working.some((g) =>
-              g.brandName.trim() === brand.trim()
-                ? g.accounts.some(
-                    (a) =>
-                      a.platform === platform && suspendedRef.current.includes(a.id),
-                  )
-                : false,
-            );
-            if (hasSuspended) continue;
-            working = await patchBrandPlatformMasterInGroups(working, brand, platform);
-          }
-          const patched = working;
-          onGroupsChangeRef.current((current) => mergeGroupsAccountMetrics(current, patched));
-          onMasterDataChangedRef.current?.();
-          notifyChange();
-        })();
-        return latest;
-      });
+      masterFlushInFlight = true;
+      try {
+        let working = await readGroupsSnapshot();
+        for (const key of keys) {
+          const sep = key.indexOf('|');
+          if (sep < 0) continue;
+          const brand = key.slice(0, sep);
+          const platform = key.slice(sep + 1) as Platform;
+          if (platform !== 'whatsapp' && platform !== 'telegram') continue;
+          const hasSuspended = working.some((g) =>
+            g.brandName.trim() === brand.trim()
+              ? g.accounts.some(
+                  (a) =>
+                    a.platform === platform && suspendedRef.current.includes(a.id),
+                )
+              : false,
+          );
+          if (hasSuspended) continue;
+          working = await patchBrandPlatformMasterInGroups(working, brand, platform);
+        }
+        const patched = working;
+        onGroupsChangeRef.current((current) => mergeGroupsAccountMetrics(current, patched));
+        onMasterDataChangedRef.current?.();
+        notifyChange();
+      } finally {
+        masterFlushInFlight = false;
+        if (pendingBrandPlatform.size > 0) {
+          void flushMasterPatches();
+        }
+      }
     };
 
     const scheduleBrandPlatformPatch = (brand: string, platform: Platform) => {
@@ -118,7 +130,7 @@ export function useRealtimeMonitoring({
       if (masterFlushTimer) clearTimeout(masterFlushTimer);
       masterFlushTimer = setTimeout(() => {
         masterFlushTimer = null;
-        flushMasterPatches();
+        void flushMasterPatches();
       }, 400);
     };
 
@@ -186,10 +198,10 @@ export function useRealtimeMonitoring({
         { event: '*', schema: 'public', table: TABLES.groupScrapeDaily },
         (payload) => {
           const row = (payload.new ?? payload.old) as DailyRow | undefined;
-          handleMasterChange(row);
           const accountId = row?.account_id;
           if (!accountId || suspendedRef.current.includes(accountId)) return;
 
+          // patchAccountGridAfterDailyWrite sudah patch daily + master; jangan double-patch master di sini.
           onAccountDailyChangedRef.current?.(accountId);
           notifyChange();
         },

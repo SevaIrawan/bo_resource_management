@@ -5,7 +5,7 @@ export type AccountActionProcessIntent = 'sync' | 'scraper';
 export type AccountActionColumnKind =
   | 'none'
   | 'group-link'
-  | 'cancel-run'
+  | 'cancel-scrape'
   | 'proc-sync';
 
 /**
@@ -45,14 +45,14 @@ function isActiveScraperProcess(
 
 /**
  * Kolom Action — prioritas:
- * Cancel Run (scrape aktif) → Proc Sync → Group link (hanya >0/>0) → kosong (fallback).
+ * Cancel scrape (scrape aktif) → Proc Sync → Group link (hanya >0/>0) → kosong (fallback).
  */
 export function resolveAccountActionColumn(
   row: AccountBrandRow,
   activeProcessIntent: AccountActionProcessIntent | null = null,
 ): AccountActionColumnKind {
   if (isActiveScraperProcess(row, activeProcessIntent)) {
-    return 'cancel-run';
+    return 'cancel-scrape';
   }
   if (row.actionProcess === 'sync') {
     return 'proc-sync';

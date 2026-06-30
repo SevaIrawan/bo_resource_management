@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -50,7 +50,7 @@
 <ul>
   <li>Supabase <strong>036</strong>: master PK <code>(brand, platform, group_id)</code> — fixes scrape duplicate key</li>
   <li>Single atomic <code>rm_commit_account_scrape</code> RPC (daily + master)</li>
-  <li>Multi-account parallel scrape UI (progress + Cancel Run per row)</li>
+  <li>Multi-account parallel scrape UI (progress + Cancel scrape per row)</li>
   <li>Idle scrape watchdog (no fixed 3600s wall-clock)</li>
 </ul>
 
@@ -121,13 +121,13 @@
   <tr><td>In brand</td><td>Joined in brand master (joinedInMaster / groupsTotal)</td></tr>
   <tr><td>Admin</td><td>Y/X admins on device vs standard</td></tr>
   <tr><td>Scraper</td><td>Timestamp / RUN / progress bar</td></tr>
-  <tr><td>Action</td><td>Sync, Run Scraper, edit account, group links</td></tr>
+  <tr><td>Action</td><td>Sync, Scrape (via Sync), edit account, group links</td></tr>
 </table>
 
-<h3>5.2 Sync &amp; Run Scraper</h3>
+<h3>5.2 Sync &amp; Scrape (via Sync)</h3>
 <ul>
   <li><strong>Sync (↻):</strong> probe device session → update group/admin counts → prompt Scraper Now / Later</li>
-  <li><strong>Run Scraper:</strong> full device scrape → write daily → rebuild master → reconcile tickets → realtime UI refresh</li>
+  <li><strong>Scrape (via Sync):</strong> full device scrape → write daily → rebuild master → refresh grid & reporting → realtime UI refresh</li>
   <li><strong>Later:</strong> close modal without scraping</li>
   <li><strong>Cancel scrape:</strong> full stop + release Chrome</li>
 </ul>
@@ -298,7 +298,7 @@
   <li>Install once from latest installer</li>
   <li>Login to dashboard (users)</li>
   <li>Add account → login WA/TG on marketing phone</li>
-  <li>Sync / Run Scraper / monitor tickets &amp; reporting</li>
+  <li>Sync / Scrape (via Sync) / monitor alignment & reporting &amp; reporting</li>
   <li>Restart app when update notification appears</li>
 </ol>
 
@@ -318,7 +318,7 @@
 <h2>15. Daily Operator Flow Diagram</h2>
 <pre>[Login app] → [Add account + login WA/TG]
       ↓
-[Sync] → (optional) [Run Scraper]
+[Sync] → (optional) [Scrape (via Sync)]
       ↓
 Daily + Master updated → Ticket auto-reconcile
       ↓

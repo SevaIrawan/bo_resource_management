@@ -7,7 +7,7 @@ import { getExecuteSlotStats } from './executeSlotPool';
 import { accountJobStepTotal, isAccountJobQueueBusy, isJobQueueBlockingExecutes, listBusyAccountIds } from './jobQueueBatchHelpers';
 import { listSettlingSessionIds, markSessionSettleAfterJob } from './jobQueueSettle';
 import { getActiveScrapeSessionCount, isScrapeActiveForSession, listActiveScrapeSessionIds } from '../scraper/scrapeCancel';
-import { getActiveAutoScrapeSessionCount, listActiveAutoScrapeSessionIds } from '../scraper/autoScrapeCancel';
+import { getActiveAutoScrapeSessionCount, isAutoScrapeActiveForSession, listActiveAutoScrapeSessionIds } from '../scraper/autoScrapeCancel';
 import type {
   AutomationJobEnqueueInput,
   AutomationJobListFilter,
@@ -343,6 +343,7 @@ export function pickQueuedJobsForDispatch(limit: number): AutomationJobRecord[] 
     if (picked.length >= dispatchBudget) break;
     if (runningAccountIds.has(job.accountId)) continue;
     if (isScrapeActiveForSession(job.sessionId)) continue;
+    if (isAutoScrapeActiveForSession(job.sessionId)) continue;
     if (picked.some((row) => row.accountId === job.accountId)) continue;
     picked.push(job);
     runningAccountIds.add(job.accountId);
@@ -371,11 +372,6 @@ export function markJobRunning(jobId: string): boolean {
     started = true;
   });
   return started;
-}
-
-export function isJobQueueBlockingOtherExecutes(): boolean {
-  ensureLoaded();
-  return false;
 }
 
 /** Jobs stuck in running (browser hang) — fail so queue can continue. */

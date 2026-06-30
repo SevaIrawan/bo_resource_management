@@ -30,49 +30,28 @@ const STEPS = [
     where: '~~refreshSessionsFromDeviceProbe~~ (removed)',
     action: 'REMOVED dari load — probe Puppeteer 25–90s × jumlah akun',
     blocksUi: false,
-    note: 'INI penyebab nunggu berhari-hari; cek device hanya di SYNC/RUN',
+    note: 'INI penyebab nunggu berhari-hari; cek device hanya di SYNC/Scrape',
   },
   {
     row: 5,
-    where: 'scheduleTicketReconcile (background)',
-    action: 'reconcileOpenTicketsForUser → reload tickets (debounce 1.5s)',
-    blocksUi: false,
-    note: 'Tidak block spinner; missing_group + link master untuk 30/1893',
-  },
-  {
-    row: 6,
-    where: 'loadOpenTicketsForUser',
-    action: 'Paralel dengan load groups',
-    blocksUi: true,
-    note: 'OK',
-  },
-  {
-    row: 7,
-    where: 'setGroups + setTickets',
-    action: 'Tampilkan grid',
+    where: 'setGroups',
+    action: 'Tampilkan grid akun',
     blocksUi: false,
     note: 'UI harus muncul di sini',
   },
   {
-    row: 8,
+    row: 6,
     where: 'finally setLoading(false)',
     action: 'Hilangkan "Loading accounts..."',
     blocksUi: false,
     note: 'WAJIB selalu jalan',
   },
   {
-    row: 9,
-    where: 'reloadTicketHandles',
-    action: 'Background (tidak block)',
-    blocksUi: false,
-    note: 'OK',
-  },
-  {
-    row: 10,
+    row: 7,
     where: 'SYNC / scrape / login',
-    action: 'patchAccountGridAfterDailyWrite + dispatchMonitoringReloadAfterDailyWrite',
+    action: 'applyResult lalu realtime → patchAccountGridAfterDailyWrite + scheduleMonitoringReload',
     blocksUi: false,
-    note: 'Realtime group_scrape_daily → debounce 400ms',
+    note: 'Realtime group_scrape_daily → debounce 400ms; groups_master tidak double-patch di daily handler',
   },
 ];
 
@@ -89,4 +68,4 @@ for (const s of STEPS) {
 }
 
 console.log('\nDevTools Autofill errors di terminal Electron = BUKAN penyebab loading macet.');
-console.log('Session device: INVALID→SYNC=login | VALID→SYNC/RUN=check device (syncFlowService).');
+console.log('Session device: INVALID→SYNC=login | VALID→SYNC/Scrape=check device (syncFlowService).');

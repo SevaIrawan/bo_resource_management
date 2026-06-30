@@ -2,7 +2,7 @@
 
 **Versi dokumen:** 1.0  
 **Tanggal:** 2026-06-03  
-**Versi aplikasi acuan:** `1.0.28` (`package.json`)  
+**Versi aplikasi acuan:** `1.0.29` (`package.json`)  
 **Status:** **In progress** — Fase 1–5 diimplementasi (runtime, skrip build, electron-builder, validator, CI draft). Mac/Linux installer perlu build di runner native + QA pilot.
 **Audience:** Developer / IT release / stakeholder operasional  
 

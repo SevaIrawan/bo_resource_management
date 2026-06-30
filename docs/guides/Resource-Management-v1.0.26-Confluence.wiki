@@ -1,4 +1,4 @@
-h1. Resource Management (GM App) — Dokumentasi Rilis v1.0.26
+﻿h1. Resource Management (GM App) — Dokumentasi Rilis v1.0.26
 
 {info:title=Informasi Rilis}
 * *Produk:* Resource Management (UI: Backend Operation)
@@ -22,7 +22,7 @@ Aplikasi desktop untuk memantau dan mengoperasikan *banyak akun WhatsApp dan Tel
 *Highlight v1.0.26:*
 * Supabase *036*: PK `groups_master` = `(brand, platform, group_id)` — fix duplicate key scrape
 * Satu RPC atomik `rm_commit_account_scrape` (daily + master)
-* Multi-akun scrape paralel: progress + Cancel Run per baris
+* Multi-akun scrape paralel: progress + Cancel scrape per baris
 * Scrape idle watchdog (bukan wall-clock 3600s)
 
 ----
@@ -93,12 +93,12 @@ h3. 5.1 Grid Akun (9 kolom)
 |In brand|Joined di master brand (joinedInMaster / groupsTotal)|
 |Admin|Y/X admin di device vs standar|
 |Scraper|Timestamp / RUN / progress bar|
-|Action|Sync, Run Scraper, edit akun, group links|
+|Action|Sync, Scrape (via Sync), edit akun, group links|
 
-h3. 5.2 Sync & Run Scraper
+h3. 5.2 Sync & Scrape (via Sync)
 
 * *Sync (↻):* probe session device → update hitungan grup/admin → prompt Scraper Now / Later
-* *Run Scraper:* scrape penuh device → tulis daily → rebuild master → reconcile ticket → refresh UI realtime
+* *Scrape (via Sync):* scrape penuh device → tulis daily → rebuild master → refresh grid & reporting → refresh UI realtime
 * *Later:* tutup modal tanpa scrape
 * *Cancel scrape:* stop total + lepas Chrome
 
@@ -262,7 +262,7 @@ h3. 13.2 Tim Operator (pakai)
 # Install sekali dari installer terbaru
 # Login dashboard (users)
 # Tambah akun → login WA/TG di HP marketing
-# Sync / Run Scraper / pantau ticket & reporting
+# Sync / Scrape (via Sync) / pantau selisih & reporting & reporting
 # Restart app saat ada notifikasi update
 
 ----
@@ -282,7 +282,7 @@ h2. 15. Diagram Alur Operator (Harian)
 {code}
 [Login app] → [Tambah akun + login WA/TG]
       ↓
-[Sync] → (opsional) [Run Scraper]
+[Sync] → (opsional) [Scrape (via Sync)]
       ↓
 Daily + Master terupdate → Ticket auto-reconcile
       ↓

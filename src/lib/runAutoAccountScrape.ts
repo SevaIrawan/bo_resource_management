@@ -1,5 +1,6 @@
-import { patchBrandGroup, rebuildGroupMetrics } from '@/lib/accountBrandUtils';
-import { applyScrapeMetricsToGroups } from '@/lib/applyScrapeMetricsToGroups';import { accountMissingRequiredPhone } from '@/lib/accountPhone';
+import { patchBrandStandardCountForPlatform } from '@/lib/accountBrandUtils';
+import { applyScrapeMetricsToGroups } from '@/lib/applyScrapeMetricsToGroups';
+import { accountMissingRequiredPhone } from '@/lib/accountPhone';
 import { patchAccountSessionInGroups } from '@/lib/accountSessionPatch';
 import { buildMetricsFromScrapeDaily } from '@/lib/accountSyncData';
 import { teardownAutoScrapeDevice } from '@/lib/autoScrapeDeviceTeardown';
@@ -13,7 +14,6 @@ import {
   isAccountSessionSettling,
   isHeavyDeviceExecuteBlockedForAccount,
 } from '@/lib/automationJobQueueClient';
-import { dispatchMonitoringReloadAfterDailyWrite } from '@/lib/monitoringRealtimeEvents';
 import { runAutoAccountScraper } from '@/lib/runAutoAccountScraper';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
 import {
@@ -172,20 +172,7 @@ export async function runAutoAccountScrape(input: {
 
     if (brandX > 0) {
       onGroupsChange((prev) =>
-        patchBrandGroup(prev, group.id, (g) =>
-          rebuildGroupMetrics({
-            ...g,
-            standardGroupCountByPlatform: {
-              ...g.standardGroupCountByPlatform,
-              [account.platform]: brandX,
-            },
-            accounts: g.accounts.map((row) =>
-              row.platform === account.platform && row.id !== account.id
-                ? { ...row, groupsTotal: brandX, adminTotal: brandX }
-                : row,
-            ),
-          }),
-        ),
+        patchBrandStandardCountForPlatform(prev, group.id, account.platform, account.id, brandX),
       );
     }
 
@@ -200,7 +187,6 @@ export async function runAutoAccountScrape(input: {
       message: `auto_scrape:${built.groupsCurrent}/${built.groupsTotal}`,
     });
 
-    dispatchMonitoringReloadAfterDailyWrite();
     return 'success';
   } catch (error) {
     const message = normalizeScrapeErrorMessage(

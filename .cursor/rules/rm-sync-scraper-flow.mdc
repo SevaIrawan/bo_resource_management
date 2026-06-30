@@ -1,22 +1,22 @@
 ---
-description: Sync, Run Scraper, login QR — alur kolom session
+description: Sync, Scrape, login QR — alur kolom session & Last update
 alwaysApply: true
 ---
 
-# Sync & Run Scraper (logic_sync_scraper.txt)
+# Sync & Scrape (logic_sync_scraper.txt)
 
 - Metrik: GROUP (Y/X) + ADMIN (Y/X). Grup dari device, bukan isi pesan.
 - **VALID** Sync: probe device → update grid → [Now|Later] atau resume-empty.
-- **INVALID**: login → sukses → auto-scrape (tanpa Now/Later).
-- **RUN Scraper**: VALID langsung scrape; INVALID login dulu.
+- **INVALID**: login → sukses → [Now|Later] (scrape intent → auto-scrape tanpa prompt).
+- **Scrape manual**: hanya lewat Sync → Scrape Now; kolom **Last update** read-only (tanpa tombol Run).
 - **Later** = tutup modal, **tidak** scrape. **Cancel scrape** = stop total.
 
-# Kolom Scraper
+# Kolom Last update
 
 - INVALID: "Use Sync to log in first"
-- VALID+MATCH: timestamp; VALID+NOT MATCH: RUN + timestamp
+- VALID+MATCH: timestamp; VALID+NOT MATCH: timestamp
 - RUNNING: progress bar + marquee
-- Selesai: update group+admin + timestamp; lalu reconcile ticket
+- Selesai: update group+admin + timestamp
 
 # Telegram QR (jangan regresi)
 
@@ -25,12 +25,13 @@ alwaysApply: true
 - Poll retry, jangan stop pada error sementara
 - Sebelum merge: `npm run validate:telegram-login`
 
-# Engine tunggal grid + ticket + modal
+# Engine tunggal grid + Issue + modal
 
-- `accountMasterDailyCompare.ts` — Y/X, dedupe group_id raw
+- `accountMasterDailyCompare.ts` — Y/X, dedupe group_id raw, `computeAccountTicketBreakdown` (in-memory)
 - `buildTicketSummariesFromEngine.ts` — kartu Issue
 - `fetchAccountGroupLinks` — modal Admin vs master (X saja)
 - `fetchAccountDailyGroupLinks` — modal Groups on account (daily)
+- Realtime reload: `GroupMonitoringProvider.scheduleMonitoringReload` (bukan dispatch ganda dari caller scrape)
 
 # Sebelum edit scrape/sync/automation
 

@@ -85,7 +85,7 @@ check('clear session module', () => {
 check('accountActionColumn resolver', () => {
   const t = read('src/lib/accountActionColumn.ts');
   if (!t.includes('resolveAccountActionColumn')) return fail('missing resolveAccountActionColumn');
-  if (!t.includes("row.actionProcess === 'scraper'")) return fail('cancel-run condition missing');
+  if (!t.includes("return 'cancel-scrape'")) return fail('cancel-scrape branch missing');
   if (!t.includes("row.actionProcess === 'sync'")) return fail('proc-sync condition missing');
   if (!t.includes("row.actionProcess === 'session_check'")) return fail('session_check proc condition missing');
   if (t.includes('accountNeedsRelogin')) return fail('Action must not gate on relogin');

@@ -147,7 +147,9 @@ export function OperationsJobQueueDetailModal({
       const result = await onQueueDeleteFromExit(record.id);
       if (!result.ok) {
         setQueueError(mapEnqueueJobQueueError(result.error, t));
+        return;
       }
+      onClose();
     } finally {
       setQueueingDelete(false);
     }

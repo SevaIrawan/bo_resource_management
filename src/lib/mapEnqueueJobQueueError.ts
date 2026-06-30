@@ -19,8 +19,6 @@ export function mapEnqueueJobQueueError(error: string, t: (key: string) => strin
       return t('operations.jobQueue.desktopRequired');
     case 'JOB_NOT_FOUND':
       return t('operations.jobQueue.enqueueJobNotFound');
-    case 'RUN_FAILED':
-      return t('operations.jobQueue.runFailed');
     default:
       return t('operations.jobQueue.enqueueFailed');
   }

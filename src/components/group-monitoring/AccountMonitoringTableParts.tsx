@@ -1,6 +1,6 @@
 import { useLanguage } from '@/hooks/useLanguage';
 
-/** 9 kolom — lebar via CSS % (total 100%). */
+/** 9 kolom card view — lebar via CSS % (total 100%). */
 export const ACCOUNT_TABLE_COLUMN_COUNT = 9;
 
 export type AccountMonitoringTableLayout = 'brandCard' | 'flat';
@@ -29,13 +29,13 @@ export function AccountMonitoringTableColGroup({
   return (
     <colgroup>
       <col className="brand-col brand-col--account" />
-      <col className="brand-col brand-col--brand" />
+      <col className="brand-col brand-col--location" />
       <col className="brand-col brand-col--status" />
       <col className="brand-col brand-col--session" />
       <col className="brand-col brand-col--on-device" />
       <col className="brand-col brand-col--in-brand" />
       <col className="brand-col brand-col--admin" />
-      <col className="brand-col brand-col--scraper" />
+      <col className="brand-col brand-col--last-update" />
       <col className="brand-col brand-col--action" />
     </colgroup>
   );
@@ -90,7 +90,7 @@ export function AccountMonitoringTableHead({
         <th className="brand-col-head brand-col-head--account">
           {t('groupMonitoring.accountCard.colAccount')}
         </th>
-        <th className="brand-col-head brand-col-head--brand">
+        <th className="brand-col-head brand-col-head--location">
           {t('groupMonitoring.accountCard.colLocation')}
         </th>
         <th className="brand-col-head brand-col-head--status">
@@ -108,8 +108,8 @@ export function AccountMonitoringTableHead({
         <th className="brand-col-head brand-col-head--admin">
           {t('groupMonitoring.accountCard.colAdmin')}
         </th>
-        <th className="brand-col-head brand-col-head--scraper">
-          {t('groupMonitoring.accountCard.colScraper')}
+        <th className="brand-col-head brand-col-head--last-update">
+          {t('groupMonitoring.accountCard.colLastUpdate')}
         </th>
         <th className="brand-col-head brand-col-head--action">
           {t('groupMonitoring.accountCard.colAction')}

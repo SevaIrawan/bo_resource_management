@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.28 |
+| **App version** | 1.0.29 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (Admin → Language) |
@@ -248,7 +248,7 @@ Sync behavior depends on **Session** column value.
 | 2 | Platform login modal opens (QR default, or phone login) |
 | 3 | Scan QR on marketing phone (WA: Linked devices; TG: Link Desktop Device) |
 | 4 | On success: session saved, group counts refresh |
-| 5 | App may prompt **Run scraper** to save full group list to DB |
+| 5 | App may prompt **Scrape now** to save full group list to DB |
 
 #### Session = **Valid**
 
@@ -265,21 +265,22 @@ Sync behavior depends on **Session** column value.
 - If QR does not appear within ~10 seconds: close modal, wait a few seconds, **Sync** again.
 - Long sync (>3 min) on Telegram with many groups: retry or restart app.
 
-### 4.6 Scraper column — **Run** button
+### 4.6 Last update column (full scrape via Sync)
 
 | Condition | Display | Action |
 |-----------|---------|--------|
 | Session invalid | *Use Sync (↻) to log in first* | Sync first |
-| Already aligned | **Last update** time only | Run usually not needed |
-| **Not aligned** | **Run** + timestamp | Click **Run** → read all groups from phone → save DB → tickets refresh |
-| Running | *Reading groups…* / progress | Wait (can take minutes for large group lists) |
+| Standby | **Last update** timestamp | Full scrape via **Sync → Scrape now** when needed |
+| Running | *Reading groups…* / progress + **Cancel scrape** | Wait (can take minutes for large group lists) |
 
 | Term | Meaning |
 |------|---------|
-| **Run** | Full scrape — all groups written to database |
+| **Scrape now** | Full scrape — all groups written to database (modal after Sync) |
 | **Sync** | Session check + summary counts — not always a full scrape |
 
-After login, you may see: *Login OK. Device group & admin counts are updated. Save the full group list to the database now?* → choose **Run scraper** or **Later**.
+There is **no separate Run button** in the grid.
+
+After login, you may see: *Login OK. Device group & admin counts are updated. Save the full group list to the database now?* → choose **Scrape now** or **Later**.
 
 ### 4.7 Group link modal
 
@@ -299,7 +300,7 @@ Open via **Action → Group link**. Choose a mode:
 
 **Admin vs master** total matches the Groups/Admin denominator (X) and the **WA x Group** badge — device junk groups are **not** listed here (see Tickets → Junk).
 
-Empty list? Run **Run** scraper first. Message: *No links. Run scraper first.*
+Empty list? **Sync** → **Scrape now** first. Message: *No links. Scrape via Sync first.*
 
 ### 4.8 Remove account from slot
 
@@ -660,4 +661,4 @@ Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type,
 
 ---
 
-*This guide matches application version **1.0.28**. Ticket tab removed since 1.0.24; update PDF/Word after each release via `npm run build:handbook-docs`.*
+*This guide matches application version **1.0.29**. Update PDF/Word after each release via `npm run build:handbook-docs`.*

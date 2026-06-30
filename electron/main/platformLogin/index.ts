@@ -25,6 +25,8 @@ type LoginMode = 'qr' | 'phone';
 interface StartPayload {
   sessionId: string;
   platform: Platform;
+  /** UUID baris `messaging_accounts` — guard job queue per akun. */
+  accountId?: string;
   mode?: LoginMode;
   phone?: string;
   /** true = paksa QR baru (logout di HP), jangan restore disk/string DB */
@@ -59,6 +61,15 @@ export function registerPlatformLoginIpc() {
   ipcMain.handle('platform-login:start', async (_event, payload: StartPayload) => {
     const win = getWindow();
     const mode = payload.mode ?? 'qr';
+    const accountId = payload.accountId ?? payload.sessionId;
+
+    try {
+      const jobs = getJobQueueSnapshot().jobs;
+      assertAccountExecuteAllowed(payload.sessionId, accountId, jobs);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'EXECUTE_BLOCKED';
+      throw new Error(message);
+    }
 
     if (payload.platform === 'whatsapp') {
       if (mode === 'phone') {
@@ -161,14 +172,16 @@ export function registerPlatformLoginIpc() {
       payload: {
         sessionId: string;
         platform: Platform;
+        accountId?: string;
         storedSessionString?: string | null;
       },
     ) => {
       try {
         const jobs = getJobQueueSnapshot().jobs;
+        const accountId = payload.accountId ?? payload.sessionId;
         assertAccountExecuteAllowed(
           payload.sessionId,
-          payload.sessionId,
+          accountId,
           jobs,
         );
       } catch (error) {

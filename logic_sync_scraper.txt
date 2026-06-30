@@ -1,4 +1,4 @@
-BAGIAN 1: ALUR UTAMA (SYNC & RUN SCRAPER)
+BAGIAN 1: ALUR UTAMA (SYNC & SCRAPE)
 Setiap update metrik mencakup GROUP (Y/X) dan ADMIN (Y/X).
 Daftar grup di device dibaca di Electron/sidecar (bukan isi pesan). Pencocokan master↔daily di Postgres RPC.
 
@@ -7,14 +7,15 @@ VALID: tanpa modal login → hitung grup+admin di device → update grid → [No
 INVALID: modal login → sukses: save session, update group+admin, tutup login → [Now|Later].
 Login FAIL: WA auto-QR; TG error + pesan (tanpa auto-loop). Tutup modal = batalkan, session tetap INVALID.
 
-B. RUN SCRAPER:
+B. SCRAPE (hanya lewat Sync → Scrape Now; kolom Last update read-only):
 VALID (+ probe device; gagal → login meski grid valid): langsung scraper.
 INVALID: login → sukses → auto-scrape tanpa Now/Later.
 
-BAGIAN 2: KOLOM SCRAPER (real-time)
-STANDBY: INVALID → "Use Sync (↻) to log in first"; VALID+MATCH → timestamp saja; VALID+NOT MATCH → RUN + timestamp; pending → "—".
+BAGIAN 2: KOLOM LAST UPDATE (real-time)
+STANDBY: INVALID → "Use Sync (↻) to log in first"; VALID+MATCH → timestamp saja; VALID+NOT MATCH → timestamp; pending → "—".
 RUNNING: bar + X/Y + marquee "Reading groups…".
 SELESAI: update group+admin + timestamp; MATCH/NOT MATCH seperti standby.
+Tidak ada tombol Run di grid — scrape hanya dari modal Sync.
 
 BAGIAN 3: MODAL LOGIN & QR
 Panel lebar (min ~36rem), kotak QR besar (~14rem), skeleton saat generate, overlay expired/gagal + tombol Refresh QR.
@@ -22,34 +23,36 @@ WA: auto-regenerate QR. TG: error dulu, refresh manual.
 
 BAGIAN 4: PERFORMA (3000 grup)
 - quickDeviceCount: hanya total dari device; tidak merge ribuan group_id ke daily di renderer.
-- rm_account_master_stats (Supabase RPC): agregasi master↔daily di SQL, fallback loop JS jika RPC belum deploy.
-- reconcile ticket: setelah scrape selesai → `await refreshIssues(accountId)`; realtime daily/scrape_runs → reconcile per akun.
+- Agregasi master↔daily: accountMasterDailyCompare.ts (in-memory) + RPC rm_commit_account_scrape saat tulis scrape.
+- Issue/kartu: buildTicketSummariesFromEngine.ts dari engine yang sama dengan grid; patch grid setelah scrape via patchAccountGridAfterDailyWrite.
 
 BAGIAN 5: CLEAR SESSION (tombol X di kolom Session Valid, hover baris)
 Purge session lokal (WA: wa-sessions) + platform_sessions is_active=false + UI Invalid.
 Sync berikutnya → open_login (QR bersih). Bukan remove slot. File: clearAccountSession.ts, useAccountSyncFlow.handleClearSession.
 
-BAGIAN 6: METRIK GRID, TICKET & MODAL GROUP LINK (satu engine)
+BAGIAN 6: METRIK GRID, ISSUE & MODAL GROUP LINK (satu engine)
 - Y/X groups & admin: accountMasterDailyCompare.ts — dedupe group_id raw; X = master brand.
-- Tab Ticket: buildTicketSummariesFromEngine.ts — angka kartu dari engine (bukan hitung baris DB mentah).
-- Reconcile: reconcileTickets.ts memakai computeAccountTicketBreakdown yang sama dengan grid.
-- Modal Admin vs master list: fetchAccountGroupLinks — hanya baris master (X); junk device hanya di tab Ticket.
-- Modal Groups on account: fetchAccountDailyGroupLinks — 7 kolom (member/admin count, invite link).
-- Grid: kolom On device (groupsCurrent), In brand (joinedInMaster/groupsTotal).
+- Kartu Issue: buildTicketSummariesFromEngine.ts — angka dari engine (bukan hitung baris DB mentah).
+- Breakdown ticket: computeAccountTicketBreakdown (in-memory; sama dengan grid).
+- Modal Admin vs master list: fetchAccountGroupLinks — hanya baris master (X).
+- Modal Groups on account: fetchAccountDailyGroupLinks — daily akun.
+- Grid: kolom On device (groupsCurrent), In brand (joinedInMaster/groupsTotal), Last update (timestamp read-only).
 - Export group link: RM-[nama akun]-YYYYMMDD.xlsx.
 
 BAGIAN 7: SESSION PROBE & RESOLVE AKUN (1.0.17)
-- Probe device VALID+Sync/Run: timeout 20s, retry busy — bukan skala grup; busy → alert SESSION_CHECK_BUSY (bukan modal login).
+- Probe device VALID+Sync/Scrape: timeout 20s, retry busy — bukan skala grup; busy → alert SESSION_CHECK_BUSY (bukan modal login).
 - Device key = messaging_accounts.id baris grid (accountSessionResolve.ts); bukan label global.
 - shouldInvalidate DB hanya session mati (UNPAIRED/logout), bukan timeout/busy.
 
-BAGIAN 8: DATA FRESH TICKET / REPORTING (1.0.17)
-- Scrape: DELETE daily → INSERT → rebuild master → invalidateMasterDailyCacheForScrape.
-- Reconcile + kartu Issue + patch grid: forceFresh baca Supabase (bukan cache warm load).
-- Reporting: fetch langsung DB + dedupe scraped_at; reload via rm-reporting-reload setelah scrape/reconcile.
+BAGIAN 8: DATA FRESH & REALTIME (1.0.17+)
+- Scrape: RPC rm_commit_account_scrape atomik (DELETE daily → INSERT → rebuild master).
+- Patch grid: patchAccountGridAfterDailyWrite; realtime group_scrape_daily → onAccountDailyChanged (tanpa double-patch master).
+- Reload Reporting + Operations: scheduleMonitoringReload di GroupMonitoringProvider (debounce 500ms) — bukan dispatch ganda dari caller scrape.
+- Reporting: fetch langsung DB + dedupe scraped_at; reload via rm-reporting-reload.
 - Matrix filter kolom Yes/No kosong: header tabel tetap + Back to all groups.
 
-Implementasi: useAccountSyncFlow.ts, clearAccountSession.ts, accountMonitoringEngine.ts, accountMasterDailyCompare.ts,
+Implementasi: useAccountSyncFlow.ts, clearAccountSession.ts, accountMasterDailyCompare.ts,
 buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx, ReportingMonitoringPanel.tsx,
 ReportingJoinMatrixTable.tsx, loadJoinGroupReport.ts, masterDailyLoadCache.ts, accountSessionResolve.ts,
-PlatformLoginModal.tsx, electron/main/scraper/countWhatsApp.ts, migrations/028_rm_account_master_stats_rpc.sql
+PlatformLoginModal.tsx, GroupMonitoringProvider.tsx, useRealtimeMonitoring.ts,
+electron/main/scraper/countWhatsApp.ts

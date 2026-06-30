@@ -6,15 +6,15 @@ export function ScraperStatusMarquee({ label }: { label: string }) {
 
   return (
     <span
-      className="brand-scraper-marquee"
+      className="brand-last-update-marquee"
       role="status"
       aria-busy="true"
       aria-label={label}
       style={{ '--marquee-duration': `${durationSec}s` } as CSSProperties}
     >
-      <span className="brand-scraper-marquee__track" aria-hidden="true">
-        <span className="brand-scraper-marquee__item">{label}</span>
-        <span className="brand-scraper-marquee__item">{label}</span>
+      <span className="brand-last-update-marquee__track" aria-hidden="true">
+        <span className="brand-last-update-marquee__item">{label}</span>
+        <span className="brand-last-update-marquee__item">{label}</span>
       </span>
     </span>
   );

@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-30  
-**Versi aplikasi:** `1.0.28` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.29` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
@@ -349,6 +349,7 @@ release/                Output installer (gitignore)
 | [INSTALL-MACOS.md](./INSTALL-MACOS.md) | Panduan install Mac (setelah rilis multi-platform) |
 | [INSTALL-LINUX.md](./INSTALL-LINUX.md) | Panduan install Linux (setelah rilis multi-platform) |
 | [README.md](./README.md) | Quick start developer |
+| [docs/PANDUAN-PENGGUNA-SIMPLE.md](./docs/PANDUAN-PENGGUNA-SIMPLE.md) | **Panduan Group Monitoring** — tim R&M (operasional) |
 | [.cursorrules](./.cursorrules) | Kontrak bisnis ticket & multi-akun untuk AI/dev |
 
 ---
@@ -361,4 +362,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.28**. Scrape tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase; Job Queue create group permission per payload job.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.29**. Scrape tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase; Job Queue create group permission per payload job.*

@@ -202,14 +202,14 @@ function ActionColumnCell({
     );
   }
 
-  if (kind === 'cancel-run') {
+  if (kind === 'cancel-scrape') {
     if (operateLocked) {
       return (
         <PermissionLockedButton
           variant="text"
-          className="brand-card-action-btn brand-card-action-btn--nowrap brand-card-action-btn--cancel-run"
+          className="brand-card-action-btn brand-card-action-btn--nowrap brand-card-action-btn--cancel-scrape"
         >
-          {t('groupMonitoring.accountCard.cancelRun')}
+          {t('groupMonitoring.accountCard.cancelScrape')}
         </PermissionLockedButton>
       );
     }
@@ -217,11 +217,11 @@ function ActionColumnCell({
     return (
       <button
         type="button"
-        className="brand-card-action-btn brand-card-action-btn--nowrap brand-card-action-btn--cancel-run"
-        title={t('groupMonitoring.accountCard.cancelRunHint')}
+        className="brand-card-action-btn brand-card-action-btn--nowrap brand-card-action-btn--cancel-scrape"
+        title={t('groupMonitoring.accountCard.cancelScrapeHint')}
         onClick={() => onCancelScrape?.()}
       >
-        {t('groupMonitoring.accountCard.cancelRun')}
+        {t('groupMonitoring.accountCard.cancelScrape')}
       </button>
     );
   }
@@ -269,18 +269,14 @@ export function AdminProgress({ current, total }: { current: number; total: numb
   );
 }
 
-function ScraperColumnCell({
+function LastUpdateColumnCell({
   row,
   scraperLoading,
   scrapeProgress,
-  onRunScraper,
-  operateLocked = false,
 }: {
   row: AccountBrandRow;
   scraperLoading: boolean;
   scrapeProgress?: UiScrapeProgress | null;
-  onRunScraper?: () => void;
-  operateLocked?: boolean;
 }) {
   const { t, locale } = useLanguage();
   const dateLocale = locale === 'zh' ? 'zh-CN' : 'en-GB';
@@ -290,7 +286,7 @@ function ScraperColumnCell({
 
   if (accountNeedsRelogin(row)) {
     return (
-      <span className="brand-account-slot-muted text-xs">
+      <span className="brand-last-update-hint brand-account-slot-muted">
         {t('groupMonitoring.accountCard.useSyncToLogin')}
       </span>
     );
@@ -301,9 +297,9 @@ function ScraperColumnCell({
     const bar = resolveScrapeBarDisplay(row, scrapeProgress, fallbackLabel);
 
     return (
-      <div className="brand-scraper-cell-stack">
+      <div className="brand-last-update-cell-stack">
         <div
-          className="brand-scraper-progress"
+          className="brand-last-update-progress"
           role="progressbar"
           aria-valuenow={bar.percent}
           aria-valuemin={0}
@@ -311,13 +307,13 @@ function ScraperColumnCell({
           aria-busy="true"
           aria-label={bar.label}
         >
-          <div className="brand-scraper-progress-bar">
+          <div className="brand-last-update-progress-bar">
             <div
-              className="brand-scraper-progress-fill"
+              className="brand-last-update-progress-fill"
               style={{ width: `${bar.percent}%` }}
             />
           </div>
-          <span className="brand-scraper-progress-pct">
+          <span className="brand-last-update-progress-pct">
             {bar.current}/{bar.total}
           </span>
         </div>
@@ -326,52 +322,16 @@ function ScraperColumnCell({
     );
   }
 
-  const canRunScraper =
-    row.sessionStatus === 'valid' &&
-    row.syncState !== 'pending' &&
-    (onRunScraper || operateLocked);
-
-  if (canRunScraper) {
+  if (canShowLastUpdate) {
     return (
-      <div className="brand-scraper-cell-stack">
-        {operateLocked ? (
-          <PermissionLockedButton
-            variant="text"
-            className="brand-scraper-run-link permission-locked-btn--run"
-          >
-            {t('groupMonitoring.accountCard.run')}
-          </PermissionLockedButton>
-        ) : (
-          <button
-            type="button"
-            className="brand-scraper-run-link"
-            disabled={scraperLoading}
-            onClick={() => onRunScraper?.()}
-            aria-label={t('groupMonitoring.accountCard.runScraper')}
-          >
-            {t('groupMonitoring.accountCard.run')}
-          </button>
-        )}
-        {canShowLastUpdate ? (
-          <time className="brand-scraper-last-update-time" dateTime={row.lastSyncAt ?? undefined}>
-            {formatLastSyncAt(row.lastSyncAt, dateLocale)}
-          </time>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (row.syncState === 'synced' && canShowLastUpdate) {
-    return (
-      <div className="brand-scraper-cell-stack">
-        <time className="brand-scraper-last-update-time" dateTime={row.lastSyncAt ?? undefined}>
+      <div className="brand-last-update-cell-stack">
+        <time className="brand-last-update-time" dateTime={row.lastSyncAt ?? undefined}>
           {formatLastSyncAt(row.lastSyncAt, dateLocale)}
         </time>
       </div>
     );
   }
 
-  // pending / belum synced: tampilan netral (—)
   return <span className="brand-account-slot-muted text-xs">—</span>;
 }
 
@@ -489,7 +449,6 @@ export function AccountTableRow({
   layout = 'brandCard',
   showAction = true,
   onSync,
-  onRunScraper,
   onCancelScrape,
   onRemoveFromSlot,
   onEditAccount,
@@ -505,7 +464,6 @@ export function AccountTableRow({
   layout?: 'brandCard' | 'flat';
   showAction?: boolean;
   onSync?: () => void;
-  onRunScraper?: () => void;
   onCancelScrape?: () => void;
   onRemoveFromSlot?: () => void;
   onEditAccount?: () => void;
@@ -595,12 +553,7 @@ export function AccountTableRow({
             </div>
           </td>
         ) : null}
-        <td
-          className={cn(
-            'brand-col-cell',
-            isFlatLayout ? 'brand-col-cell--location' : 'brand-col-cell--brand',
-          )}
-        >
+        <td className="brand-col-cell brand-col-cell--location">
           <div className="brand-col-cell-inner">
             <span className="truncate text-text-secondary">
               {row.locationDevice?.trim() ? row.locationDevice : '—'}
@@ -661,14 +614,12 @@ export function AccountTableRow({
           </div>
         </td>
         {!isFlatLayout ? (
-          <td className="brand-col-cell brand-col-cell--scraper">
+          <td className="brand-col-cell brand-col-cell--last-update">
             <div className="brand-col-cell-inner">
-              <ScraperColumnCell
+              <LastUpdateColumnCell
                 row={row}
                 scraperLoading={scraperLoading}
                 scrapeProgress={scrapeProgress}
-                onRunScraper={onRunScraper}
-                operateLocked={operateLocked}
               />
             </div>
           </td>
@@ -734,7 +685,7 @@ export function AccountEmptySlotRow({
           </div>
         </div>
       </td>
-      <td className="brand-col-cell brand-col-cell--brand">
+      <td className="brand-col-cell brand-col-cell--location">
         <div className="brand-col-cell-inner">
           <span className="brand-account-slot-muted truncate">{slot.brandName}</span>
         </div>
@@ -767,7 +718,7 @@ export function AccountEmptySlotRow({
           </div>
         </div>
       </td>
-      <td className="brand-col-cell brand-col-cell--scraper">
+      <td className="brand-col-cell brand-col-cell--last-update">
         <div className="brand-col-cell-inner">
           <span className="brand-account-slot-muted text-xs">—</span>
         </div>

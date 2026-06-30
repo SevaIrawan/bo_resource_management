@@ -8,7 +8,7 @@ import {
 } from '@/components/group-monitoring/OperationsJobQueueSetupModal';
 import { buildAutomationJobRunContext } from '@/lib/automationJobRunContext';
 import {
-  enqueueAutomationJob,
+  enqueueAndTryRunAutomationJob,
   fetchJobQueueSnapshot,
   subscribeJobQueueChanged,
 } from '@/lib/automationJobQueueClient';
@@ -329,7 +329,7 @@ export function OperationsJobQueueAddBar({
         if (maxPerRun > 0) groups = groups.slice(0, maxPerRun);
 
         const ctx = await buildAutomationJobRunContext(account, 'join_by_invite_link');
-        const result = await enqueueAutomationJob({
+        const result = await enqueueAndTryRunAutomationJob({
           brandName: activeBrand,
           platform,
           accountId: account.id,
@@ -382,7 +382,7 @@ export function OperationsJobQueueAddBar({
     try {
       for (const account of selectedAccounts) {
         const ctx = await buildAutomationJobRunContext(account, 'create_group');
-        const result = await enqueueAutomationJob({
+        const result = await enqueueAndTryRunAutomationJob({
           brandName: activeBrand,
           platform,
           accountId: account.id,
@@ -448,7 +448,7 @@ export function OperationsJobQueueAddBar({
       });
 
       const ctx = await buildAutomationJobRunContext(superAdminAccount, 'set_admin');
-      const result = await enqueueAutomationJob({
+      const result = await enqueueAndTryRunAutomationJob({
         brandName: activeBrand,
         platform,
         accountId: superAdminAccount.id,
@@ -515,7 +515,7 @@ export function OperationsJobQueueAddBar({
     setSubmitting(true);
     try {
       const ctx = await buildAutomationJobRunContext(account, 'leave_group');
-      const result = await enqueueAutomationJob({
+      const result = await enqueueAndTryRunAutomationJob({
         brandName: activeBrand,
         platform,
         accountId: account.id,

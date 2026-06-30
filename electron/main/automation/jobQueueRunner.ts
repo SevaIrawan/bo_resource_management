@@ -356,8 +356,3 @@ export function scheduleRunnerTick(delayMs = 0): void {
   }
   void runnerTick();
 }
-
-export function notifyRunnerStateChanged(): void {
-  broadcastJobQueueChanged();
-  scheduleRunnerTick(0);
-}

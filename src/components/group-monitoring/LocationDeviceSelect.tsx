@@ -43,6 +43,7 @@ export function LocationDeviceSelect({
       ariaLabel={t('groupMonitoring.accountCard.locationDeviceLabel')}
       className="brand-modal-select-wrap"
       triggerClassName="brand-modal-select-trigger"
+      menuPlacement="up"
     />
   );
 }

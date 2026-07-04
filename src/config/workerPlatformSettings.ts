@@ -134,9 +134,9 @@ const SAFE_SET_ADMIN: WorkerSetAdminSettings = {
 
 const SAFE_LEAVE_DELETE: WorkerLeaveDeleteSettings = {
   leaveEnabled: true,
-  deleteEnabled: false,
+  deleteEnabled: true,
   requireOwnerForDelete: true,
-  clearChatHistoryOnDelete: false,
+  clearChatHistoryOnDelete: true,
   betweenGroupsSec: 60,
 };
 

@@ -320,14 +320,6 @@ export function jobQueueViewSubtitle(
   );
 }
 
-export function jobQueueViewResultSummary(
-  job: AutomationJobRecord,
-  t: (key: string, vars?: Record<string, string | number>) => string,
-): string {
-  if (job.status === 'failed' && job.error) return job.error;
-  return jobQueueResultText(job, t);
-}
-
 export type JobQueueViewTableColumnId =
   | 'groupName'
   | 'groupId'

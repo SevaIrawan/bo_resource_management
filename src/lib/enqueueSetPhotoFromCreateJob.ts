@@ -2,6 +2,7 @@ import { buildAutomationJobRunContext } from '@/lib/automationJobRunContext';
 import { enqueueAutomationJob } from '@/lib/automationJobQueueClient';
 import { accountRowFromAutomationJob } from '@/lib/accountRowFromAutomationJob';
 import { resolveCreatedGroupsFromCreateJob } from '@/lib/createSetPhotoFlow';
+import { resolveCurrentUserId } from '@/lib/brandGroupPhotoStorage';
 import type { AutomationJobRecord } from '@/types/automationJob';
 
 /** Set group photo hanya grup created di VIEW result create — satu foto per brand. */
@@ -17,6 +18,7 @@ export async function enqueueSetPhotoFromCreateJob(
 
   const account = accountRowFromAutomationJob(createJob);
   const ctx = await buildAutomationJobRunContext(account, 'set_group_photo');
+  const userId = await resolveCurrentUserId();
 
   return enqueueAutomationJob({
     brandName: createJob.brandName,
@@ -30,6 +32,7 @@ export async function enqueueSetPhotoFromCreateJob(
       sourceCreateJobId: createJob.id,
       setPhotoPhase: 'apply',
       photoPath: trimmedPhoto,
+      userId: userId ?? undefined,
     },
     storedSessionString: createJob.storedSessionString ?? ctx.storedSessionString,
     expectedPhone: createJob.expectedPhone ?? ctx.expectedPhone,

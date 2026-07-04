@@ -7,17 +7,13 @@ import {
   isExitDeleteDeleteJob,
   isExitDeleteExitJob,
 } from '@/lib/exitDeleteFlow';
-import {
-  isCreateGroupSourceJob,
-  isSetPhotoFromCreateJob,
-} from '@/lib/createSetPhotoFlow';
+import { isCreateGroupSourceJob } from '@/lib/createSetPhotoFlow';
 import { exportJobQueueViewExcel } from '@/lib/exportExcel';
 import { mapEnqueueJobQueueError } from '@/lib/mapEnqueueJobQueueError';
 import { OperationsJobQueueCreateGroupViewModal } from '@/components/group-monitoring/OperationsJobQueueCreateGroupViewModal';
 import { accountPlatformSubtitle } from '@/lib/platformSyncCopy';
 import {
   jobQueueViewMetaText,
-  jobQueueViewResultSummary,
   jobQueueViewSubtitle,
   jobQueueViewTableColumnIds,
   jobQueueViewTableColumnLabel,
@@ -137,7 +133,6 @@ export function OperationsJobQueueDetailModal({
     canQueueDeleteFromExitJob(record, allJobs) &&
     Boolean(onQueueDeleteFromExit);
   const isDeletePhaseView = isExitDeleteDeleteJob(record);
-  const isSetPhotoPhaseView = isSetPhotoFromCreateJob(record);
 
   async function handleQueueDelete() {
     if (!onQueueDeleteFromExit || queueingDelete) return;
@@ -193,15 +188,11 @@ export function OperationsJobQueueDetailModal({
         </header>
 
         <div className="brand-modal-form">
-          <p className="sync-modal-message">{jobQueueViewResultSummary(record, t)}</p>
           {isExitDeleteExitJob(record) ? (
             <p className="operations-job-queue-form-note">{t('operations.jobQueue.exitViewDeleteHint')}</p>
           ) : null}
           {isDeletePhaseView ? (
             <p className="operations-job-queue-form-note">{t('operations.jobQueue.deleteFromExitViewHint')}</p>
-          ) : null}
-          {isSetPhotoPhaseView ? (
-            <p className="operations-job-queue-form-note">{t('operations.jobQueue.setPhotoFromCreateViewHint')}</p>
           ) : null}
 
           {rows.length > 0 ? (

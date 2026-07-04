@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImagePlus, Loader2, X } from 'lucide-react';
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { cn } from '@/lib/utils';
 import {
-  readTelegramWorkerSettings,
-  readWhatsAppWorkerSettings,
-} from '@/config/workerPlatformSettings';
-import {
   readCreateGroupWorkerSettings,
 } from '@/lib/createGroupWorkerSettings';
 import { collectCreateGroupSetupValidationCodes } from '@/lib/createGroupSetupValidation';
+import {
+  brandGroupPhotoPreviewUrl,
+  resolveBrandGroupPhotoPath,
+} from '@/lib/brandGroupPhotoClient';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
   isEnqueueErrorResult,
@@ -40,6 +40,7 @@ export interface JobQueueCreateGroupDraft {
     infoAdminsOnly: boolean;
   };
   hideChatHistoryForMembers?: boolean;
+  photoPath?: string;
 }
 
 export interface JobQueueSetAdminDraft {
@@ -165,9 +166,10 @@ export function OperationsJobQueueSetupModal({
     [],
   );
   const [filteringSetAdminGroups, setFilteringSetAdminGroups] = useState(false);
+  const [createPhotoPath, setCreatePhotoPath] = useState<string | null>(null);
+  const [createPhotoPreviewUrl, setCreatePhotoPreviewUrl] = useState<string | null>(null);
+  const [createPhotoLoading, setCreatePhotoLoading] = useState(false);
 
-  const workerSettings =
-    platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
   const createTotalParsed = Math.max(1, Math.min(500, Math.floor(Number(createTotalToCreate)) || 1));
 
   const setAdminTargetOptions = useMemo(
@@ -295,7 +297,29 @@ export function OperationsJobQueueSetupModal({
     setExitGroupProcessedAlertOpen(false);
     setSelectedSetAdminTargetAccountId('');
     setEligibleSetAdminGroups([]);
+    setCreatePhotoPath(null);
+    setCreatePhotoPreviewUrl(null);
   }, [open, taskType, activeBrand, platform]);
+
+  useEffect(() => {
+    if (!open || taskType !== 'create_group' || !activeBrand) return;
+    let cancelled = false;
+    setCreatePhotoLoading(true);
+    void resolveBrandGroupPhotoPath(activeBrand).then(async (result) => {
+      if (cancelled) return;
+      if (result.ok) {
+        setCreatePhotoPath(result.path);
+        const url = await brandGroupPhotoPreviewUrl(result.path);
+        if (!cancelled) setCreatePhotoPreviewUrl(url);
+      } else {
+        setCreatePhotoPath(null);
+        setCreatePhotoPreviewUrl(null);
+      }
+    }).finally(() => {
+      if (!cancelled) setCreatePhotoLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [open, taskType, activeBrand]);
 
   useEffect(() => {
     setExitGroupPage(1);
@@ -469,6 +493,7 @@ export function OperationsJobQueueSetupModal({
             : undefined,
         hideChatHistoryForMembers:
           platform === 'telegram' ? permissionDraft.hideChatHistoryForMembers : undefined,
+        photoPath: createPhotoPath ?? undefined,
       });
     } else if (taskType === 'set_admin') {
       if (selectedSetAdminGroupIds.size === 0) {
@@ -541,7 +566,8 @@ export function OperationsJobQueueSetupModal({
       : `${activeBrand} · ${t(tabLabelKey)}`;
 
   const canSaveJoin = selectedJoinGroupIds.size > 0 && selectedAccounts.length > 0;
-  const canSaveCreate = createGroupName.trim().length > 0 && selectedAccounts.length > 0;
+  const canSaveCreate =
+    createGroupName.trim().length > 0 && selectedAccounts.length > 0 && Boolean(createPhotoPath);
   const canSaveSetAdmin =
     Boolean(superAdminAccount) &&
     selectedSetAdminGroupIds.size > 0 &&
@@ -767,9 +793,6 @@ export function OperationsJobQueueSetupModal({
                   <h4 className="operations-job-queue-create-card__title">
                     {t('operations.jobQueue.createSetupCardPermissions')}
                   </h4>
-                  <p className="operations-job-queue-create-card-hint">
-                    {t('operations.jobQueue.createSetupCardPermissionsHint')}
-                  </p>
                   <section className="operations-job-queue-create-card">
                   {platform === 'whatsapp' ? (
                     <>
@@ -808,27 +831,43 @@ export function OperationsJobQueueSetupModal({
                   )}
                   </section>
                 </div>
+
+                <div className="operations-job-queue-create-column">
+                  <h4 className="operations-job-queue-create-card__title">
+                    {t('admin.brandPhoto.previewCard')}
+                    <span className="operations-job-queue-required-mark" aria-hidden="true"> *</span>
+                  </h4>
+                  <section className="operations-job-queue-create-card operations-job-queue-create-card--photo">
+                    {createPhotoLoading ? (
+                      <div className="operations-job-queue-photo-loading">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      </div>
+                    ) : createPhotoPreviewUrl ? (
+                      <div className="operations-job-queue-photo-preview">
+                        <img
+                          src={createPhotoPreviewUrl}
+                          alt={activeBrand}
+                          className="operations-job-queue-photo-preview__img"
+                        />
+                      </div>
+                    ) : (
+                      <div className="operations-job-queue-photo-empty">
+                        <ImagePlus className="operations-job-queue-photo-empty__icon" size={24} />
+                        <p className="operations-job-queue-photo-empty__caption">
+                          {t('admin.brandPhoto.brandNotAvailable')}
+                        </p>
+                      </div>
+                    )}
+                  </section>
+                </div>
               </div>
-              <p className="operations-job-queue-form-note operations-job-queue-setup-form__full">
-                {t('operations.jobQueue.createPerRunHint', {
-                  perRun: workerSettings.standard.perRun,
-                  total: createTotalParsed,
-                })}
-              </p>
             </div>
           ) : null}
 
           {taskType === 'set_admin' ? (
             <div className="operations-job-queue-setup-form operations-job-queue-setup-form--set-admin">
               <p className="operations-job-queue-form-note">
-                {superAdminAccount
-                  ? t('operations.jobQueue.setAdminSuperAccountHintNamed', {
-                      account: superAdminAccount.accountName,
-                    })
-                  : t('operations.jobQueue.setAdminSuperAccountHint')}
-              </p>
-              <p className="operations-job-queue-form-note">
-                {t('operations.jobQueue.setAdminTargetAccountsHint')}
+                {t('operations.jobQueue.setAdminHint')}
               </p>
               <div className="operations-job-queue-field">
                 <span>{t('operations.jobQueue.setAdminTargetAccounts')}</span>

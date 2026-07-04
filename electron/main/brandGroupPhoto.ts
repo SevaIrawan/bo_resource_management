@@ -118,6 +118,59 @@ export function resolveBrandGroupPhotoPath(brandName: string): string | null {
   return latest?.path ?? null;
 }
 
+/**
+ * Build public URL untuk foto brand di Supabase Storage.
+ * Pattern: {SUPABASE_URL}/storage/v1/object/public/brand-group-photos/{userId}/{brand}.jpg
+ */
+export function buildBrandPhotoPublicUrl(userId: string, brandName: string): string | null {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim();
+  if (!supabaseUrl) return null;
+  const safe = sanitizeBrandPhotoBaseName(brandName);
+  return `${supabaseUrl}/storage/v1/object/public/brand-group-photos/${userId}/${safe}.jpg`;
+}
+
+/**
+ * Download foto dari Supabase public URL → simpan ke local cache.
+ * Dipakai worker saat file lokal belum ada.
+ */
+export async function downloadAndCacheBrandPhoto(
+  brandName: string,
+  publicUrl: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(publicUrl);
+    if (!res.ok) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+
+    const dir = getBrandGroupPhotosDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const base = sanitizeBrandPhotoBaseName(brandName);
+    const dest = path.join(dir, `${base}.jpg`);
+    fs.writeFileSync(dest, buffer);
+    return dest;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve foto brand: lokal dulu → fallback download dari Supabase.
+ * Untuk worker yang butuh path file lokal.
+ */
+export async function resolveBrandPhotoWithFallback(
+  brandName: string,
+  userId?: string,
+): Promise<string | null> {
+  const local = resolveBrandGroupPhotoPath(brandName);
+  if (local) return local;
+
+  if (!userId) return null;
+  const url = buildBrandPhotoPublicUrl(userId, brandName);
+  if (!url) return null;
+
+  return downloadAndCacheBrandPhoto(brandName, url);
+}
+
 export function expectedBrandGroupPhotoFileName(brandName: string): string {
   return `${sanitizeBrandPhotoBaseName(brandName)}.jpg`;
 }
@@ -240,5 +293,23 @@ export function registerBrandGroupPhotoIpc(): void {
       return { ok: false as const };
     }
     return { ok: true as const, dataUrl };
+  });
+
+  ipcMain.handle('brandGroupPhoto:saveBlob', (_event, brandName: string, base64Data: string) => {
+    const trimmed = String(brandName ?? '').trim();
+    if (!trimmed || !base64Data) return { ok: false as const };
+
+    const dir = getBrandGroupPhotosDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const base = sanitizeBrandPhotoBaseName(trimmed);
+    const dest = path.join(dir, `${base}.jpg`);
+
+    try {
+      const buffer = Buffer.from(base64Data, 'base64');
+      fs.writeFileSync(dest, buffer);
+      return { ok: true as const, path: dest };
+    } catch {
+      return { ok: false as const };
+    }
   });
 }

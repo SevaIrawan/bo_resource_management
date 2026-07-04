@@ -11,7 +11,17 @@ import {
   type PlatformWorkerSettings,
   type TelegramAdminRightsSettings,
 } from '@/config/workerPlatformSettings';
+import { TABLES } from '@/config/tables';
+import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
+import {
+  brandGroupPhotoPreviewUrl,
+  pickAndSaveBrandGroupPhoto,
+  resolveBrandGroupPhotoPath,
+} from '@/lib/brandGroupPhotoClient';
+import { resolveMonitoringUserId } from '@/lib/monitoringDataUser';
+import { getSupabase } from '@/lib/supabase';
+import { ImagePlus, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type WorkerPlatform = 'whatsapp' | 'telegram';
@@ -85,6 +95,174 @@ function NumberRow({
         className="worker-settings-number__input"
       />
     </div>
+  );
+}
+
+interface BrandPhotoRow {
+  brandName: string;
+  photoPath: string | null;
+  previewUrl: string | null;
+}
+
+async function loadAllUserBrandNames(userId: string): Promise<string[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from(TABLES.brands)
+    .select('name')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+
+  if (error || !data) return [];
+  return (data as { name: string }[])
+    .map((b) => b.name.trim())
+    .filter(Boolean);
+}
+
+function BrandPhotoSection() {
+  const { t } = useLanguage();
+  const { user } = useAuth();
+  const [rows, setRows] = useState<BrandPhotoRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadPhotos = useCallback(async () => {
+    if (!user?.id) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+      const brandNames = await loadAllUserBrandNames(dataUserId);
+
+      const photoRows: BrandPhotoRow[] = await Promise.all(
+        brandNames.map(async (brandName) => {
+          const resolved = await resolveBrandGroupPhotoPath(brandName, dataUserId);
+          let previewUrl: string | null = null;
+          if (resolved.ok) {
+            previewUrl = await brandGroupPhotoPreviewUrl(resolved.path, dataUserId, brandName);
+          }
+          return {
+            brandName,
+            photoPath: resolved.ok ? resolved.path : null,
+            previewUrl,
+          };
+        }),
+      );
+      setRows(photoRows);
+    } catch {
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, user?.userName]);
+
+  useEffect(() => {
+    void loadPhotos();
+  }, [loadPhotos]);
+
+  useEffect(() => {
+    const reload = () => void loadPhotos();
+    window.addEventListener('rm-operations-reload', reload);
+    window.addEventListener('rm-reporting-reload', reload);
+    return () => {
+      window.removeEventListener('rm-operations-reload', reload);
+      window.removeEventListener('rm-reporting-reload', reload);
+    };
+  }, [loadPhotos]);
+
+  async function handleUpload(brandName: string) {
+    if (!user?.id) return;
+    const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+    const result = await pickAndSaveBrandGroupPhoto(brandName, dataUserId);
+    if (result.ok) {
+      setRows((prev) =>
+        prev.map((r) =>
+          r.brandName === brandName
+            ? { ...r, photoPath: result.path, previewUrl: result.dataUrl ?? r.previewUrl }
+            : r,
+        ),
+      );
+    }
+  }
+
+  const [expanded, setExpanded] = useState(false);
+
+  if (loading) {
+    return (
+      <section className="worker-settings-section">
+        <h4 className="worker-settings-section__title">{t('admin.brandPhoto.title')}</h4>
+        <div className="brand-photo-loading">
+          <Loader2 className="animate-spin" size={16} />
+        </div>
+      </section>
+    );
+  }
+
+  if (rows.length === 0) return null;
+
+  const configuredCount = rows.filter((r) => r.photoPath).length;
+
+  return (
+    <section className="worker-settings-section">
+      <button
+        type="button"
+        className="worker-settings-section__expand-header"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <span className="worker-settings-section__expand-title">{t('admin.brandPhoto.title')}</span>
+        <span className="worker-settings-section__expand-badge">
+          {configuredCount}/{rows.length}
+        </span>
+        <svg
+          className={`worker-settings-section__expand-chevron${expanded ? ' worker-settings-section__expand-chevron--open' : ''}`}
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {expanded && (
+        <div className="brand-photo-list">
+          {rows.map((row) => (
+            <div key={row.brandName} className="brand-photo-item">
+              <div className="brand-photo-item__preview">
+                {row.previewUrl ? (
+                  <img src={row.previewUrl} alt={row.brandName} className="brand-photo-item__img" />
+                ) : (
+                  <div className="brand-photo-item__placeholder">
+                    <ImagePlus size={20} />
+                  </div>
+                )}
+              </div>
+              <div className="brand-photo-item__info">
+                <span className="brand-photo-item__name">{row.brandName}</span>
+                {!row.photoPath && (
+                  <span className="brand-photo-item__hint">{t('admin.brandPhoto.notSet')}</span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="brand-photo-item__btn"
+                onClick={() => void handleUpload(row.brandName)}
+              >
+                {row.photoPath ? t('admin.brandPhoto.change') : t('admin.brandPhoto.upload')}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -526,6 +704,8 @@ function WorkerPlatformSettingsPanel({ platform }: { platform: WorkerPlatform })
           />
         </div>
       </section>
+
+      <BrandPhotoSection />
 
       <div className="operations-stock-policy-footer">
         {saveMessage ? (

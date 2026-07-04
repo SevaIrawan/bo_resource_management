@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import pkg from 'whatsapp-web.js';
 import { withWhatsAppClient } from '../platformLogin/whatsapp';
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
+import { resolveBrandPhotoWithFallback } from '../brandGroupPhoto';
 import { withPromiseTimeout } from './promiseTimeout';
 import { resolveSetAdminGroups } from './jobQueueBatchHelpers';
 import type {
@@ -73,7 +74,16 @@ export async function runWaSetGroupPhoto(
   payload: AutomationRunPayload,
   onProgress?: AutomationProgressCallback,
 ): Promise<AutomationRunResult> {
-  const photoPath = payload.photoPath?.trim();
+  let photoPath = payload.photoPath?.trim() ?? '';
+
+  if (!photoPath || !fs.existsSync(photoPath)) {
+    const brandName = payload.brandName?.trim();
+    if (brandName) {
+      const resolved = await resolveBrandPhotoWithFallback(brandName, payload.userId);
+      if (resolved) photoPath = resolved;
+    }
+  }
+
   if (!photoPath) {
     return {
       status: 'error',

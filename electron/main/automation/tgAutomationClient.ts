@@ -1,5 +1,6 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
 import { withNetworkRetry } from '../lib/networkRetry';
+import { resolveBrandPhotoWithFallback } from '../brandGroupPhoto';
 import { resolveJoinGroups, resolveLeaveDeleteGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
 import type { AutomationRunPayload, AutomationRunResult, AutomationProgressCallback } from './types';
 import {
@@ -117,7 +118,16 @@ export async function runTelegramAutomation(
   }
 
   if (payload.action === 'set_group_photo') {
-    const photoPath = payload.photoPath?.trim();
+    let photoPath = payload.photoPath?.trim() ?? '';
+
+    if (!photoPath) {
+      const brandName = payload.brandName?.trim();
+      if (brandName) {
+        const resolved = await resolveBrandPhotoWithFallback(brandName, payload.userId);
+        if (resolved) photoPath = resolved;
+      }
+    }
+
     if (!photoPath) {
       return {
         status: 'error',

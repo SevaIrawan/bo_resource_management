@@ -65,6 +65,8 @@ export interface AutomationJobPayload {
   setPhotoPhase?: 'apply';
   /** Path absolut file foto brand (satu foto untuk semua grup). */
   photoPath?: string;
+  /** User ID untuk resolve foto dari Supabase Storage di PC lain. */
+  userId?: string;
   /** Hasil per grup setelah create / set photo / exit / delete. */
   groupOutcomes?: Array<{
     groupId: string;

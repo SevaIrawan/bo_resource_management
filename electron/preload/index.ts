@@ -245,6 +245,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ok: boolean;
         photos?: Array<{ path: string; fileName: string; savedAt: string }>;
       }>,
+    saveBlob: (brandName: string, base64Data: string) =>
+      ipcRenderer.invoke('brandGroupPhoto:saveBlob', brandName, base64Data) as Promise<{
+        ok: boolean;
+        path?: string;
+      }>,
   },
   executeSlots: {
     tryAcquire: (accountId: string, kind: 'sync' | 'scraper') =>

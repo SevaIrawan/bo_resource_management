@@ -75,8 +75,11 @@ export interface AutomationRunPayload {
     inviteLink?: string;
     groupLink?: string;
   }>;
-  /** set_group_photo — path absolut foto brand */
+  /** set_group_photo — path absolut foto brand (atau brand name untuk resolve dari Supabase) */
   photoPath?: string;
+  brandName?: string;
+  /** User ID untuk resolve foto dari Supabase Storage */
+  userId?: string;
   /** exit_delete_group — frozen from Admin leaveDelete settings */
   leaveDelete?: {
     clearChatHistoryOnDelete?: boolean;

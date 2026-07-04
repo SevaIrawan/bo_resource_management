@@ -69,6 +69,7 @@ export function useRemoveAccountFromSlot(
       }
 
       setRemoveTarget(null);
+      window.dispatchEvent(new Event('rm-operations-reload'));
     } catch (error) {
       setRemoveError(
         getErrorMessage(error, t('groupMonitoring.accountCard.removeAccountFailed')),

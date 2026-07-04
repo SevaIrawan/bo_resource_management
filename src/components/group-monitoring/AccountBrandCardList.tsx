@@ -127,6 +127,7 @@ export function AccountBrandCardList({
 
       onGroupsChange((prev) => prev.filter((g) => g.id !== group.id));
       setRemoveTarget(null);
+      window.dispatchEvent(new Event('rm-operations-reload'));
     } catch (error) {
       setRemoveError(getErrorMessage(error, t('groupMonitoring.removeBrandFailed')));
     } finally {

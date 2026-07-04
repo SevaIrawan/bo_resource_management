@@ -7,6 +7,7 @@ import {
   type JobQueueSetAdminDraft,
 } from '@/components/group-monitoring/OperationsJobQueueSetupModal';
 import { buildAutomationJobRunContext } from '@/lib/automationJobRunContext';
+import { resolveCurrentUserId } from '@/lib/brandGroupPhotoStorage';
 import {
   enqueueAndTryRunAutomationJob,
   fetchJobQueueSnapshot,
@@ -380,6 +381,7 @@ export function OperationsJobQueueAddBar({
     setSubmitting(true);
     let queued = 0;
     try {
+      const currentUserId = await resolveCurrentUserId();
       for (const account of selectedAccounts) {
         const ctx = await buildAutomationJobRunContext(account, 'create_group');
         const result = await enqueueAndTryRunAutomationJob({
@@ -398,6 +400,8 @@ export function OperationsJobQueueAddBar({
             perRun: workerSettings.standard.perRun,
             hideChatHistory: enqueueSettings.hideChatHistoryForMembers,
             createGroupSettings: enqueueSettings.createGroupSettings,
+            photoPath: draft.photoPath,
+            userId: currentUserId ?? undefined,
           },
           storedSessionString: ctx.storedSessionString,
           expectedPhone: ctx.expectedPhone,

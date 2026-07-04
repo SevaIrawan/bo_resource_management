@@ -275,6 +275,10 @@ declare global {
           ok: boolean;
           photos?: Array<{ path: string; fileName: string; savedAt: string }>;
         }>;
+        saveBlob: (brandName: string, base64Data: string) => Promise<{
+          ok: boolean;
+          path?: string;
+        }>;
       };
       executeSlots?: {
         tryAcquire: (

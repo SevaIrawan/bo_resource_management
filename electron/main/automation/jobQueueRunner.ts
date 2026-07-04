@@ -150,6 +150,8 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
     groups: job.payload.groups,
     leaveDelete: job.payload.leaveDelete,
     photoPath: job.payload.photoPath,
+    brandName: job.brandName,
+    userId: job.payload.userId,
     jobId: job.id,
   };
 }

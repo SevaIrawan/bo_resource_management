@@ -55,6 +55,7 @@ export interface AutomationJobPayload {
   sourceCreateJobId?: string;
   setPhotoPhase?: 'apply';
   photoPath?: string;
+  userId?: string;
   groupOutcomes?: Array<{
     groupId: string;
     groupName?: string;

@@ -362,6 +362,57 @@ export function OperationsJobQueueAddBar({
     }
   }
 
+  async function saveJoinCsvBatch(
+    groups: Array<{ groupId: string; groupName: string; inviteLink: string }>,
+  ): Promise<string | null> {
+    if (selectedAccounts.length === 0 || groups.length === 0) return null;
+
+    const workerSettings =
+      platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+    const maxPerRun = workerSettings.inviteLink.maxPerRun;
+
+    setSubmitting(true);
+    let queuedAccounts = 0;
+    let totalGroups = 0;
+
+    try {
+      for (const account of selectedAccounts) {
+        let batch = groups;
+        if (maxPerRun > 0) batch = batch.slice(0, maxPerRun);
+
+        const ctx = await buildAutomationJobRunContext(account, 'join_by_invite_link');
+        const result = await enqueueAndTryRunAutomationJob({
+          brandName: activeBrand,
+          platform,
+          accountId: account.id,
+          accountName: account.accountName,
+          sessionId: ctx.sessionId,
+          action: 'join_by_invite_link',
+          payload: { groups: batch },
+          storedSessionString: ctx.storedSessionString,
+          expectedPhone: ctx.expectedPhone,
+          delay: ctx.delay,
+        });
+        if (!result.ok) {
+          return returnEnqueueError(result.error, t, setFeedback);
+        }
+        queuedAccounts += 1;
+        totalGroups += batch.length;
+      }
+
+      if (queuedAccounts > 0) {
+        await reloadMissingGroups();
+        return t('operations.jobQueue.queuedJoinAccountsOk', {
+          accounts: queuedAccounts,
+          groups: totalGroups,
+        });
+      }
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function saveCreateBatch(draft: JobQueueCreateGroupDraft): Promise<string | null> {
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
@@ -730,6 +781,11 @@ export function OperationsJobQueueAddBar({
         saving={submitting}
         onSaveJoin={async (groupIds) => {
           const message = await saveJoinBatch(groupIds);
+          if (message && !isEnqueueErrorResult(message)) handleSetupSaved(message);
+          return message;
+        }}
+        onSaveJoinCsv={async (groups) => {
+          const message = await saveJoinCsvBatch(groups);
           if (message && !isEnqueueErrorResult(message)) handleSetupSaved(message);
           return message;
         }}

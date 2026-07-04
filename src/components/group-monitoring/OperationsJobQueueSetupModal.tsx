@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, ImagePlus, Loader2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, FileUp, ImagePlus, Loader2, X } from 'lucide-react';
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,11 @@ import {
   brandGroupPhotoPreviewUrl,
   resolveBrandGroupPhotoPath,
 } from '@/lib/brandGroupPhotoClient';
+import { parseJoinImportFile } from '@/lib/parseCsvJoinImport';
+import {
+  validateCsvJoinAgainstMaster,
+  type ValidatedCsvJoinRow,
+} from '@/lib/validateCsvJoinAgainstMaster';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
   isEnqueueErrorResult,
@@ -67,6 +72,7 @@ interface OperationsJobQueueSetupModalProps {
   loadingAccountDailyGroups: boolean;
   saving: boolean;
   onSaveJoin: (groupIds: string[]) => Promise<string | null>;
+  onSaveJoinCsv: (groups: Array<{ groupId: string; groupName: string; inviteLink: string }>) => Promise<string | null>;
   onSaveCreate: (draft: JobQueueCreateGroupDraft) => Promise<string | null>;
   onSaveSetAdmin: (draft: JobQueueSetAdminDraft) => Promise<string | null>;
   onSaveExitDelete: (groupIds: string[]) => Promise<string | null>;
@@ -137,6 +143,7 @@ export function OperationsJobQueueSetupModal({
   loadingAccountDailyGroups,
   saving,
   onSaveJoin,
+  onSaveJoinCsv,
   onSaveCreate,
   onSaveSetAdmin,
   onSaveExitDelete,
@@ -144,6 +151,13 @@ export function OperationsJobQueueSetupModal({
   const { t } = useLanguage();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedJoinGroupIds, setSelectedJoinGroupIds] = useState<Set<string>>(() => new Set());
+  const [csvValidatedRows, setCsvValidatedRows] = useState<ValidatedCsvJoinRow[]>([]);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [masterListExpanded, setMasterListExpanded] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [joinActiveSource, setJoinActiveSource] = useState<'none' | 'csv' | 'master'>('none');
+  const [joinSwitchConfirmPending, setJoinSwitchConfirmPending] = useState(false);
+  const csvFileRef = useRef<HTMLInputElement>(null);
   const [createGroupName, setCreateGroupName] = useState('');
   const [createTotalToCreate, setCreateTotalToCreate] = useState('10');
   const [createUseGroupNumbering, setCreateUseGroupNumbering] = useState(false);
@@ -299,7 +313,61 @@ export function OperationsJobQueueSetupModal({
     setEligibleSetAdminGroups([]);
     setCreatePhotoPath(null);
     setCreatePhotoPreviewUrl(null);
+    setCsvValidatedRows([]);
+    setCsvLoading(false);
+    setMasterListExpanded(false);
+    setDragOver(false);
+    setJoinActiveSource('none');
+    setJoinSwitchConfirmPending(false);
   }, [open, taskType, activeBrand, platform]);
+
+  const processJoinImportFile = useCallback(async (file: File) => {
+    setCsvLoading(true);
+    setCsvValidatedRows([]);
+    setJoinActiveSource('csv');
+    setSelectedJoinGroupIds(new Set());
+    setMasterListExpanded(false);
+    setJoinSwitchConfirmPending(false);
+    try {
+      const parsed = await parseJoinImportFile(file);
+      if (parsed.rows.length === 0) {
+        setCsvLoading(false);
+        return;
+      }
+      const accountIds = selectedAccounts.map((a) => a.id);
+      const result = await validateCsvJoinAgainstMaster({
+        csvRows: parsed.rows,
+        brandName: activeBrand,
+        platform,
+        accountIds,
+      });
+      setCsvValidatedRows(result.rows);
+    } catch {
+      setCsvValidatedRows([]);
+    } finally {
+      setCsvLoading(false);
+    }
+  }, [activeBrand, platform, selectedAccounts]);
+
+  const handleCsvFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (event.target) event.target.value = '';
+    if (!file) return;
+    await processJoinImportFile(file);
+  }, [processJoinImportFile]);
+
+  const handleCsvFileDrop = useCallback(async (file: File) => {
+    await processJoinImportFile(file);
+  }, [processJoinImportFile]);
+
+  const csvMatchedGroups = useMemo(
+    () => csvValidatedRows.filter((r) => r.status === 'matched'),
+    [csvValidatedRows],
+  );
+  const csvSkippedCount = useMemo(
+    () => csvValidatedRows.filter((r) => r.status !== 'matched').length,
+    [csvValidatedRows],
+  );
 
   useEffect(() => {
     if (!open || taskType !== 'create_group' || !activeBrand) return;
@@ -385,7 +453,20 @@ export function OperationsJobQueueSetupModal({
 
   if (!open) return null;
 
+  function switchToMasterSource() {
+    setJoinActiveSource('master');
+    setCsvValidatedRows([]);
+    setCsvLoading(false);
+    setJoinSwitchConfirmPending(false);
+    if (csvFileRef.current) csvFileRef.current.value = '';
+  }
+
   function toggleJoinGroup(groupId: string) {
+    if (joinActiveSource === 'csv' && csvValidatedRows.length > 0) {
+      setJoinSwitchConfirmPending(true);
+      return;
+    }
+    if (joinActiveSource !== 'master') setJoinActiveSource('master');
     setSelectedJoinGroupIds((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) next.delete(groupId);
@@ -395,11 +476,21 @@ export function OperationsJobQueueSetupModal({
   }
 
   function toggleAllJoinGroups() {
+    if (joinActiveSource === 'csv' && csvValidatedRows.length > 0) {
+      setJoinSwitchConfirmPending(true);
+      return;
+    }
+    if (joinActiveSource !== 'master') setJoinActiveSource('master');
     if (allJoinGroupsSelected) {
       setSelectedJoinGroupIds(new Set());
       return;
     }
     setSelectedJoinGroupIds(new Set(visibleJoinGroups.map((group) => group.groupId)));
+  }
+
+  function confirmSwitchToMaster() {
+    switchToMasterSource();
+    setMasterListExpanded(true);
   }
 
   function toggleSetAdminGroup(groupId: string) {
@@ -464,11 +555,20 @@ export function OperationsJobQueueSetupModal({
     let message: string | null = null;
 
     if (taskType === 'join') {
-      if (selectedJoinGroupIds.size === 0) {
-        setSaveError(t('operations.jobQueue.selectMissingGroup'));
+      if (joinActiveSource === 'csv' && csvMatchedGroups.length > 0) {
+        message = await onSaveJoinCsv(
+          csvMatchedGroups.map((r) => ({
+            groupId: r.groupId,
+            groupName: r.groupName,
+            inviteLink: r.inviteLink,
+          })),
+        );
+      } else if (joinActiveSource === 'master' && selectedJoinGroupIds.size > 0) {
+        message = await onSaveJoin([...selectedJoinGroupIds]);
+      } else {
+        setSaveError(t('operations.jobQueue.csvNoMatchedGroups'));
         return;
       }
-      message = await onSaveJoin([...selectedJoinGroupIds]);
     } else if (taskType === 'create_group') {
       const validationMessages = collectCreateGroupValidationMessages();
       if (validationMessages.length > 0) {
@@ -565,7 +665,10 @@ export function OperationsJobQueueSetupModal({
         ].join(' | ')
       : `${activeBrand} · ${t(tabLabelKey)}`;
 
-  const canSaveJoin = selectedJoinGroupIds.size > 0 && selectedAccounts.length > 0;
+  const canSaveJoin =
+    selectedAccounts.length > 0 &&
+    ((joinActiveSource === 'csv' && csvMatchedGroups.length > 0) ||
+     (joinActiveSource === 'master' && selectedJoinGroupIds.size > 0));
   const canSaveCreate =
     createGroupName.trim().length > 0 && selectedAccounts.length > 0 && Boolean(createPhotoPath);
   const canSaveSetAdmin =
@@ -660,58 +763,175 @@ export function OperationsJobQueueSetupModal({
         <div className="brand-modal-form operations-job-queue-setup-modal-body">
           {taskType === 'join' ? (
             <div className="operations-job-queue-setup-form operations-job-queue-setup-form--join">
-              <p className="operations-job-queue-form-note">{t('operations.jobQueue.modalHint')}</p>
-              <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
-                <table className="operations-job-queue-table operations-job-queue-table--missing">
-                  <thead>
-                    <tr>
-                      <th className="operations-job-queue-select-col">
-                        <label className="operations-job-queue-select-all">
-                          <input
-                            type="checkbox"
-                            checked={allJoinGroupsSelected}
-                            onChange={toggleAllJoinGroups}
-                            disabled={loadingJoinGroups || visibleJoinGroups.length === 0 || saving}
-                          />
-                          <span>{t('operations.jobQueue.selectAll')}</span>
-                        </label>
-                      </th>
-                      <th>{t('operations.jobQueue.colGroup')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingJoinGroups ? (
-                      <tr>
-                        <td colSpan={2} className="operations-job-queue-empty">
-                          <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
-                          {t('operations.jobQueue.loadingMissing')}
-                        </td>
-                      </tr>
-                    ) : visibleJoinGroups.length === 0 ? (
-                      <tr>
-                        <td colSpan={2} className="operations-job-queue-empty">
-                          {t('operations.jobQueue.noMissingGroups')}
-                        </td>
-                      </tr>
-                    ) : (
-                      visibleJoinGroups.map((group) => (
-                        <tr key={group.groupId}>
-                          <td className="operations-job-queue-select-col">
-                            <input
-                              type="checkbox"
-                              className="operations-job-queue-row-checkbox"
-                              checked={selectedJoinGroupIds.has(group.groupId)}
-                              onChange={() => toggleJoinGroup(group.groupId)}
-                              disabled={saving}
-                            />
-                          </td>
-                          <td>{group.groupName}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              {/* Drop zone — primary import action */}
+              <div
+                className={cn(
+                  'operations-job-queue-dropzone',
+                  dragOver && 'operations-job-queue-dropzone--dragover',
+                  joinActiveSource === 'master' && 'operations-job-queue-dropzone--inactive',
+                )}
+                onClick={() => csvFileRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) void handleCsvFileDrop(file);
+                }}
+              >
+                <input
+                  ref={csvFileRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="operations-job-queue-csv-file-input"
+                  onChange={(e) => void handleCsvFileChange(e)}
+                  disabled={saving || csvLoading}
+                />
+                <FileUp className="operations-job-queue-dropzone__icon" size={28} aria-hidden />
+                <p className="operations-job-queue-dropzone__text">
+                  {t('operations.jobQueue.csvDropzoneText')}
+                </p>
               </div>
+
+              {/* CSV validation results */}
+              {csvLoading ? (
+                <p className="operations-job-queue-empty">
+                  <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
+                  {t('operations.jobQueue.csvValidating')}
+                </p>
+              ) : csvValidatedRows.length > 0 ? (
+                <>
+                  <p className="operations-job-queue-csv-summary">
+                    {t('operations.jobQueue.csvSummary', {
+                      matched: String(csvMatchedGroups.length),
+                      skipped: String(csvSkippedCount),
+                    })}
+                  </p>
+                  <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
+                    <table className="operations-job-queue-table operations-job-queue-table--missing">
+                      <thead>
+                        <tr>
+                          <th>{t('operations.jobQueue.csvColGroup')}</th>
+                          <th>{t('operations.jobQueue.csvColGroupId')}</th>
+                          <th>{t('operations.jobQueue.csvColStatus')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {csvValidatedRows.map((row, idx) => (
+                          <tr key={row.groupId || idx}>
+                            <td>{row.groupName}</td>
+                            <td className="group-links-table__id">{row.groupId || '—'}</td>
+                            <td>
+                              <span className={`operations-job-queue-csv-status operations-job-queue-csv-status--${row.status.replace('_', '-')}`}>
+                                {row.status === 'matched'
+                                  ? t('operations.jobQueue.csvStatusMatched')
+                                  : row.status === 'already_joined'
+                                    ? t('operations.jobQueue.csvStatusAlreadyJoined')
+                                    : t('operations.jobQueue.csvStatusNotInMaster')}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : null}
+
+              {/* Micro-confirmation: switching from CSV to master */}
+              {joinSwitchConfirmPending ? (
+                <div className="operations-job-queue-switch-confirm">
+                  <span>{t('operations.jobQueue.csvSwitchConfirm')}</span>
+                  <button type="button" onClick={confirmSwitchToMaster}>
+                    {t('operations.jobQueue.csvSwitchYes')}
+                  </button>
+                  <button type="button" onClick={() => setJoinSwitchConfirmPending(false)}>
+                    {t('operations.jobQueue.csvSwitchNo')}
+                  </button>
+                </div>
+              ) : null}
+
+              {/* Accordion — select from master list (secondary) */}
+              <div className={cn(joinActiveSource === 'csv' && 'operations-job-queue-section--inactive')}>
+                <button
+                  type="button"
+                  className={cn('operations-job-queue-master-accordion', masterListExpanded && 'operations-job-queue-master-accordion--open')}
+                  onClick={() => setMasterListExpanded((v) => !v)}
+                >
+                  <ChevronRight className="operations-job-queue-master-accordion__chevron" size={14} />
+                  <span>
+                    {t('operations.jobQueue.csvMasterAccordion', {
+                      count: String(visibleJoinGroups.length),
+                    })}
+                  </span>
+                </button>
+
+                {masterListExpanded ? (
+                  <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
+                    <table className="operations-job-queue-table operations-job-queue-table--missing">
+                      <thead>
+                        <tr>
+                          <th className="operations-job-queue-select-col">
+                            <label className="operations-job-queue-select-all">
+                              <input
+                                type="checkbox"
+                                checked={allJoinGroupsSelected}
+                                onChange={toggleAllJoinGroups}
+                                disabled={loadingJoinGroups || visibleJoinGroups.length === 0 || saving}
+                              />
+                              <span>{t('operations.jobQueue.selectAll')}</span>
+                            </label>
+                          </th>
+                          <th>{t('operations.jobQueue.colGroup')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loadingJoinGroups ? (
+                          <tr>
+                            <td colSpan={2} className="operations-job-queue-empty">
+                              <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
+                              {t('operations.jobQueue.loadingMissing')}
+                            </td>
+                          </tr>
+                        ) : visibleJoinGroups.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="operations-job-queue-empty">
+                              {t('operations.jobQueue.noMissingGroups')}
+                            </td>
+                          </tr>
+                        ) : (
+                          visibleJoinGroups.map((group) => (
+                            <tr key={group.groupId}>
+                              <td className="operations-job-queue-select-col">
+                                <input
+                                  type="checkbox"
+                                  className="operations-job-queue-row-checkbox"
+                                  checked={selectedJoinGroupIds.has(group.groupId)}
+                                  onChange={() => toggleJoinGroup(group.groupId)}
+                                  disabled={saving}
+                                />
+                              </td>
+                              <td>{group.groupName}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Queue summary */}
+              {joinActiveSource === 'csv' && csvMatchedGroups.length > 0 ? (
+                <p className="operations-job-queue-join-summary">
+                  {t('operations.jobQueue.joinQueueSummaryCsv', { count: String(csvMatchedGroups.length) })}
+                </p>
+              ) : joinActiveSource === 'master' && selectedJoinGroupIds.size > 0 ? (
+                <p className="operations-job-queue-join-summary">
+                  {t('operations.jobQueue.joinQueueSummaryMaster', { count: String(selectedJoinGroupIds.size) })}
+                </p>
+              ) : null}
             </div>
           ) : null}
 

@@ -1,7 +1,7 @@
 # GM App — Job Queue & Execute Worker Troubleshooting Reference
 
 **Product:** Resource Management (Electron)  
-**Version:** v1.0.29  
+**Version:** v1.0.30  
 **Audience:** Developers and ops maintaining WhatsApp / Telegram automation  
 **Scope:** Job Queue, execute slot pool, Sync / Scrape interaction — not Reporting or Supabase schema
 
@@ -14,9 +14,10 @@
 | Nothing runs; all actions queue | `executeSlotsActive` vs max (4) | Ghost slot after crash **or** 4 real jobs running |
 | One account stuck; others OK | Row busy indicator / job table | Scrape + job conflict, settling, or active job on that account |
 | Job `failed` immediately | Job error / `errorCode` | Invalid session, payload, or platform error |
-| Job `running` forever | Duration vs action timeout | Chrome hang; wait 30m stale sweep or restart app |
+| Job `running` forever | Duration vs action timeout | Chrome hang; wait 90m stale sweep or restart app |
 | TG jobs fail in batch | `FLOOD_WAIT` in error | Telegram rate limit exceeded |
-| Sync blocked right after job | Within ~5s of job end | `SESSION_SETTLING` — **expected** |
+| Sync blocked right after job | Within ~15s of job end | `SESSION_SETTLING` — **expected** |
+| Many rows for one account | Queue count vs groups selected | **Expected (v1.0.30):** auto-split ≤30 groups per job |
 
 **First actions:** Open global Job Queue panel → read error message → restart app if global queue stuck → relogin **affected account only**.
 
@@ -25,9 +26,10 @@
 ## 2. Architecture (do not misdiagnose)
 
 - **Max 4 parallel accounts** — shared pool for Sync, Scrape, and Job Queue (`executeSlotPool`).
-- **Per-account isolation** — account A failure or block does not stop account B.
+- **Per-account isolation** — account A failure or block does not stop account B; **one account uses at most 1 slot**.
+- **Batch auto-split (v1.0.30)** — large group lists split at enqueue into jobs of ≤ `maxPerRun` (default 30); chunks for the **same account run sequentially** (FIFO), not in parallel.
 - **Single slot source of truth** — main process `executeSlotPool` only; `jobQueueGuard` does **not** check global slot fill.
-- **Post-job settle** — 5s block on the same account after any job (`SESSION_SETTLING`, `POST_JOB_SETTLE_MS`).
+- **Post-job settle** — 15s block on the same account after any job (`SESSION_SETTLING`, `POST_JOB_SETTLE_MS = 15_000`).
 - **Scrape ⊕ Job Queue** — same account cannot run both at once (`JOB_QUEUE_EXECUTE_FULL`).
 
 **Key files**
@@ -90,8 +92,8 @@
 |--|--|
 | **Symptom** | Status `running` long past expected duration |
 | **Root cause** | Chrome/Puppeteer hang; crash after `markJobRunning` |
-| **Fix** | Wait auto-fail (30m `JOB_STALE_TIMEOUT`) or restart app |
-| **Timeouts** | join 20m · set_admin 25m · create_group 90m (+ 5m per step) |
+| **Fix** | Wait auto-fail (90m `STALE_RUNNING_MS`) or restart app |
+| **Timeouts** | join 20m base (+ 5m/step) · set_admin 25m · create_group 90m (+ 5m/step) |
 | **Verify** | Job → `failed` with `JOB_STALE_TIMEOUT` or `JOB_*_TIMEOUT`; queue resumes |
 
 ---
@@ -100,8 +102,9 @@
 
 | Behavior | Why | What to do |
 |----------|-----|------------|
-| 5th action queues | Max 4 slots | Wait; notification is correct |
-| `SESSION_SETTLING` | 5s Chrome cleanup after job | Retry after ~5s |
+| 5th action queues | Max 4 slots (different accounts) | Wait; notification is correct |
+| Multiple queued rows, same account | Auto-split batch (v1.0.30) | Normal — chunks run one after another |
+| `SESSION_SETTLING` | 15s Chrome cleanup after job | Retry after ~15s |
 | Scrape blocks job on same account | Per-account isolation | Finish scrape first |
 
 ---
@@ -112,8 +115,8 @@
 |------|---------|--------|
 | `EXECUTE_SLOTS_FULL` | Pool full (or ghost slot) | Wait, or restart if ghost |
 | `JOB_QUEUE_EXECUTE_FULL` | Scrape or job busy on this account | Wait for current task |
-| `SESSION_SETTLING` | Post-job cooldown (~5s) | Retry shortly |
-| `JOB_STALE_TIMEOUT` | Running longer than 30m | Re-enqueue; investigate hang |
+| `SESSION_SETTLING` | Post-job cooldown (~15s) | Retry shortly |
+| `JOB_STALE_TIMEOUT` | Running longer than 90m | Re-enqueue; investigate hang |
 | `JOB_*_TIMEOUT` | Action exceeded time limit | Smaller batch; check WA/TG |
 | `FLOOD_WAIT` | TG rate limit exceeds cap | Wait + reduce frequency |
 | `FLOOD_WAIT_RETRY` | Short flood; job ended failed | Re-enqueue job |
@@ -140,7 +143,7 @@ npm run validate:desktop
 | T1 | 4 jobs, different accounts | 4 `running` |
 | T2 | 5th job | `queued`; runs when slot frees |
 | T3 | Scrape + job, same account | Job waits until scrape ends |
-| T4 | Job done → Sync within 5s | `SESSION_SETTLING` then OK |
+| T4 | Job done → Sync within 15s | `SESSION_SETTLING` then OK |
 | T5 | Logout WA mid-job | `failed`; slot released |
 | T6 | TG with tight flood cap | `FLOOD_WAIT` or retry message |
 | T7 | Restart app | `executeSlotsActive = 0` |
@@ -181,12 +184,15 @@ npm run validate:desktop
 
 ---
 
-## 8. Create group & set photo (Job Queue)
+## 8. Create group, set photo & join (Job Queue)
 
 | Topic | Expected behavior | If wrong |
 |-------|-------------------|----------|
+| Batch split (join/set admin/leave/delete/set photo) | ≤30 groups per job row; same account sequential | If only first chunk queued, check `allowMultipleQueued` regression |
+| Create group batch | **One job** with internal `perRun` slices + 45–65 min pause between slices | Do not split at enqueue — ban safety |
 | Create permission | Modal SETUP = per job; Admin Worker settings = defaults only | Check `payload.createGroupSettings` on job row, not live Settings |
-| Queue blocked "already queued" | `createJobHasSetPhotoFollowUp` or duplicate join | Read Remark column; partial set photo fail locks VIEW tab |
+| Queue blocked "already queued" | Duplicate guard when single job; split batches bypass via `allowMultipleQueued` | Read error; only one non-split job per account+action |
+| Join VIEW (failed/partial) | Table No / Group / Status / Remark; **Run** retries failed only | Check `groupOutcomes.joinStatus` / `joinError` on job record |
 | Set photo groups | Only from create job `groupOutcomes` (VIEW Result) | Re-run create on app version with outcome persistence |
 | Remark vs tab lock | Same rules in `createSetPhotoFlow.ts` | If mismatch, code regression — run `validate:operations-job-queue` |
 

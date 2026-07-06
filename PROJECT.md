@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
 **Versi dokumen:** 2026-06-30  
-**Versi aplikasi:** `1.0.29` (lihat `package.json`)  
+**Versi aplikasi:** `1.0.30` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
@@ -197,6 +197,14 @@ Bookmark **Job Queue** — antrian otomasi device nyata (WA Puppeteer / TG sidec
 - Foto brand `{brand}.jpg` via IPC `brandGroupPhoto`.
 - Remark kolom queue + lock tab Set Photo: satu modul `createSetPhotoFlow.ts` (`createJobHasSetPhotoFollowUp`).
 
+**Job Queue batch stability (1.0.30):**
+
+- Antrian besar (mis. 100 grup) **auto-split** saat Queue menjadi beberapa job **≤30 grup** per baris tabel (`maxPerRun` dari Settings → Invite by link).
+- Satu akun = **1 slot Chrome**; chunk job **antri berurutan** (FIFO), bukan paralel — slot lain tetap tersedia untuk akun B/C/D.
+- Settle **15s** antar chunk (`POST_JOB_SETTLE_MS`); stale sweep **90 menit** (`STALE_RUNNING_MS`).
+- **Join missing:** drop zone CSV/XLSX + accordion master list; **VIEW** join menampilkan status/remark per grup; **Run** retry hanya yang failed.
+- `create_group` tetap **1 job** dengan slice internal + pause 45–65 menit antar slice (ban safety).
+
 Validasi: `npm run validate:operations-job-queue`, `npm run validate:real-operations-data`.
 
 ### 6.4 Tab Reporting (read-only)
@@ -362,4 +370,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.29**. Scrape tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase; Job Queue create group permission per payload job.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.30**. Scrape tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase; Job Queue batch split 30 grup per job + join VIEW per-grup.*

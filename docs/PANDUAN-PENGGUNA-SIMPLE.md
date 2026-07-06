@@ -1,6 +1,6 @@
 # Panduan Group Monitoring
 
-**Versi app:** 1.0.29  
+**Versi app:** 1.0.30  
 **Untuk:** Tim **Depart Resource Management (R&M)** — semua yang menjalankan monitoring grup WhatsApp & Telegram  
 **Bahasa UI:** English / 中文 → ubah di **Settings → Language**
 
@@ -287,7 +287,9 @@ Bookmark **Job Queue** · pilih **Platform**, **Brand**, **Task type**, **Accoun
 
 **Queued** → **Running** → **Completed** / **Failed** · bisa **PAUSE** / **CANCEL** / **RUN** / **VIEW**.
 
-Satu akun tidak bisa **Sync** bersamaan dengan job di akun yang sama. Maks ~4 akun berbeda bisa jalan paralel.
+Satu akun tidak bisa **Sync** bersamaan dengan job di akun yang sama. Maks ~4 akun **berbeda** bisa jalan paralel (masing-masing 1 slot Chrome).
+
+**Batch besar (v1.0.30):** jika Anda Queue banyak grup (mis. 100), sistem **otomatis memecah** menjadi beberapa baris job (**maks 30 grup per job**, dari Settings → Invite by link). Job untuk **akun yang sama antri berurutan** — bukan paralel — sehingga Chrome stabil. Anda akan melihat beberapa baris job di tabel; tunggu semua selesai sebelum anggap task 100% done.
 
 Setelah **Queue** sukses, job masuk tabel dan runner mencoba jalan otomatis jika slot kosong.
 
@@ -296,8 +298,11 @@ Setelah **Queue** sukses, job masuk tabel dan runner mencoba jalan otomatis jika
 ### Join missing (invite by group link)
 
 1. Pilih akun yang belum join lengkap
-2. SETUP → centang grup master → **Queue**
-3. Selesai → tab Account → **Sync** → **Scrape now**
+2. SETUP → **import CSV/XLSX** (drop zone) **atau** buka accordion **Select from master list** → centang grup → **Queue**
+   - Sumber aktif: yang terakhir Anda pakai (CSV atau master list)
+   - Banyak grup → beberapa baris job (30 per job)
+3. Jika **Failed** sebagian → **VIEW** → lihat tabel No / Group / Status / Remark → **Run** (retry hanya yang gagal)
+4. Selesai semua chunk → tab Account → **Sync** → **Scrape now**
 
 ---
 
@@ -440,4 +445,4 @@ Tim developer internal. Tim R&M hanya **pakai** Group Monitoring — laporkan bu
 
 ---
 
-*Panduan ini untuk modul **Group Monitoring** v1.0.29 — tim operasional Depart Resource Management.*
+*Panduan ini untuk modul **Group Monitoring** v1.0.30 — tim operasional Depart Resource Management.*

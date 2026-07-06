@@ -42,7 +42,7 @@
   <div class="panel-title">Document information</div>
   <table>
     <tr><th>Product</th><td>Resource Management (GM App) — Electron desktop</td></tr>
-    <tr><th>Version</th><td>v1.0.26</td></tr>
+    <tr><th>Version</th><td>v1.0.30</td></tr>
     <tr><th>Audience</th><td>Developers and ops maintaining WhatsApp / Telegram automation</td></tr>
     <tr><th>Scope</th><td>Job Queue, execute slot pool, Sync / Scrape interaction</td></tr>
     <tr><th>Out of scope</th><td>Reporting tab, Supabase schema migrations</td></tr>
@@ -61,9 +61,10 @@
   <tr><td>Nothing runs; all actions queue</td><td><code>executeSlotsActive</code> vs max (4)</td><td>Ghost slot after crash <strong>or</strong> 4 real jobs running</td></tr>
   <tr><td>One account stuck; others OK</td><td>Row busy indicator / job table</td><td>Scrape + job conflict, settling, or active job on that account</td></tr>
   <tr><td>Job <code>failed</code> immediately</td><td>Job error / <code>errorCode</code></td><td>Invalid session, payload, or platform error</td></tr>
-  <tr><td>Job <code>running</code> forever</td><td>Duration vs action timeout</td><td>Chrome hang; wait 30m stale sweep or restart app</td></tr>
+  <tr><td>Job <code>running</code> forever</td><td>Duration vs action timeout</td><td>Chrome hang; wait 90m stale sweep or restart app</td></tr>
   <tr><td>TG jobs fail in batch</td><td><code>FLOOD_WAIT</code> in error</td><td>Telegram rate limit exceeded</td></tr>
-  <tr><td>Sync blocked right after job</td><td>Within ~5s of job end</td><td><code>SESSION_SETTLING</code> — <strong>expected</strong></td></tr>
+  <tr><td>Sync blocked right after job</td><td>Within ~15s of job end</td><td><code>SESSION_SETTLING</code> — <strong>expected</strong></td></tr>
+  <tr><td>Many rows for one account</td><td>Queue count vs groups selected</td><td><strong>Expected (v1.0.30):</strong> auto-split ≤30 groups per job</td></tr>
 </table>
 
 <div class="panel warning">
@@ -80,9 +81,10 @@
 <h2>2. Architecture (do not misdiagnose)</h2>
 <ul>
   <li><strong>Max 4 parallel accounts</strong> — shared pool for Sync, Scrape, and Job Queue (<code>executeSlotPool</code>).</li>
-  <li><strong>Per-account isolation</strong> — account A failure or block does not stop account B.</li>
+  <li><strong>Per-account isolation</strong> — account A failure or block does not stop account B; <strong>one account uses at most 1 slot</strong>.</li>
+  <li><strong>Batch auto-split (v1.0.30)</strong> — large group lists split at enqueue into jobs of ≤ <code>maxPerRun</code> (default 30); chunks for the <strong>same account run sequentially</strong> (FIFO).</li>
   <li><strong>Single slot source of truth</strong> — main process only; <code>jobQueueGuard</code> does <strong>not</strong> check global slot fill.</li>
-  <li><strong>Post-job settle</strong> — ~5s block on same account after any job (<code>SESSION_SETTLING</code>).</li>
+  <li><strong>Post-job settle</strong> — ~15s block on same account after any job (<code>SESSION_SETTLING</code>).</li>
   <li><strong>Scrape + Job Queue</strong> — same account cannot run both (<code>JOB_QUEUE_EXECUTE_FULL</code>).</li>
 </ul>
 
@@ -139,7 +141,7 @@
   <tr><th>Field</th><th>Detail</th></tr>
   <tr><td>Symptom</td><td>Status <code>running</code> long past expected duration</td></tr>
   <tr><td>Root cause</td><td>Chrome/Puppeteer hang; crash after <code>markJobRunning</code></td></tr>
-  <tr><td>Fix</td><td>Wait auto-fail (30m <code>JOB_STALE_TIMEOUT</code>) or restart app</td></tr>
+  <tr><td>Fix</td><td>Wait auto-fail (90m <code>STALE_RUNNING_MS</code>) or restart app</td></tr>
   <tr><td>Timeouts</td><td>join 20m · set_admin 25m · create_group 90m (+ 5m per step)</td></tr>
   <tr><td>Verify</td><td>Job → <code>failed</code>; queue resumes</td></tr>
 </table>
@@ -147,8 +149,9 @@
 <h3>E. Expected behavior (not bugs)</h3>
 <table>
   <tr><th>Behavior</th><th>Why</th><th>What to do</th></tr>
-  <tr><td>5th action queues</td><td>Max 4 slots</td><td>Wait; notification is correct</td></tr>
-  <tr><td><code>SESSION_SETTLING</code></td><td>5s Chrome cleanup after job</td><td>Retry after ~5s</td></tr>
+  <tr><td>5th action queues</td><td>Max 4 slots (different accounts)</td><td>Wait; notification is correct</td></tr>
+  <tr><td>Multiple queued rows, same account</td><td>Auto-split batch (v1.0.30)</td><td>Normal — chunks run one after another</td></tr>
+  <tr><td><code>SESSION_SETTLING</code></td><td>15s Chrome cleanup after job</td><td>Retry after ~15s</td></tr>
   <tr><td>Scrape blocks job (same account)</td><td>Per-account isolation</td><td>Finish scrape first</td></tr>
 </table>
 

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **产品** | 后端运营 — 资源管理（Backend Operation — Resource Management） |
-| **应用版本** | 1.0.29 |
+| **应用版本** | 1.0.30 |
 | **适用对象** | 内部运营团队（营销 / WhatsApp 与 Telegram 群组监控） |
 | **平台** | Windows / macOS / Linux 桌面安装包 |
 | **界面语言** | English / 中文（**管理** → **语言**） |
@@ -659,4 +659,4 @@ Telegram 在会话**有效**时其他 PC 可用（会话在云端）。交接请
 
 ---
 
-*本手册对应应用版本 **1.0.29**。每次发布后请运行 `npm run build:handbook-docs` 更新 PDF/Word。*
+*本手册对应应用版本 **1.0.30**。每次发布后请运行 `npm run build:handbook-docs` 更新 PDF/Word。*

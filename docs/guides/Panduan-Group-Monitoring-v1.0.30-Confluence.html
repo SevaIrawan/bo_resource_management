@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panduan Group Monitoring v1.0.30 — Confluence Paste</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.55; max-width: 920px; margin: 24px auto; color: #172b4d; }
+    h1 { font-size: 24px; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-top: 0; }
+    h2 { font-size: 18px; margin-top: 28px; color: #0052cc; border-bottom: 1px solid #dfe1e6; padding-bottom: 4px; }
+    h3 { font-size: 15px; margin-top: 20px; color: #172b4d; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 13px; }
+    th, td { border: 1px solid #c1c7d0; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f4f5f7; font-weight: 600; }
+    .panel { border-radius: 4px; padding: 12px 14px; margin: 16px 0; border-left: 4px solid; }
+    .info { background: #deebff; border-color: #0052cc; }
+    .warning { background: #fffae6; border-color: #ff991f; }
+    .tip { background: #e3fcef; border-color: #00875a; }
+    .panel-title { font-weight: 700; margin-bottom: 6px; }
+    pre { background: #f4f5f7; border: 1px solid #dfe1e6; padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.4; white-space: pre-wrap; }
+    code { background: #f4f5f7; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    ul, ol { margin: 8px 0 16px; padding-left: 24px; }
+    li { margin: 4px 0; }
+    a { color: #0052cc; }
+    hr { border: none; border-top: 1px solid #dfe1e6; margin: 24px 0; }
+    blockquote { margin: 16px 0; padding: 12px 14px; background: #deebff; border-left: 4px solid #0052cc; border-radius: 0 4px 4px 0; }
+    blockquote p { margin: 0; }
+    .paste-hint { font-size: 12px; color: #5e6c84; margin-bottom: 20px; }
+    .doc-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #dfe1e6; font-size: 12px; color: #5e6c84; }
+
+  </style>
+</head>
+<body>
+
+<p class="paste-hint"><strong>Cara paste ke Confluence:</strong> Buka file ini di browser → pilih semua isi halaman (Ctrl+A) → salin (Ctrl+C) → tempel di editor Confluence. Atau salin hanya bagian di bawah garis horizontal pertama jika tidak ingin menyertakan petunjuk ini.</p>
+
+<hr />
+
+<h1>Panduan Group Monitoring</h1>
+
+<div class="panel info">
+  <div class="panel-title">Informasi dokumen</div>
+  <table>
+    <tr><th>Versi app</th><td>1.0.30</td></tr>
+    <tr><th>Audiens</th><td>Tim Depart Resource Management (R&amp;M)</td></tr>
+    <tr><th>Bahasa UI</th><td>English / 中文 — Settings → Language</td></tr>
+    <tr><th>Modul</th><td>Group Monitoring — WhatsApp &amp; Telegram</td></tr>
+  </table>
+</div>
+
+<blockquote><p>Aplikasi ini adalah modul <strong>Group Monitoring</strong> — bagian dari pekerjaan harian R&amp;M: memastikan akun marketing per <strong>brand</strong> masih login, grup di HP selaras dengan standar brand, admin lengkap, dan stock grup terkontrol.</p></blockquote>
+
+<h2 id="daftar-isi">Daftar isi</h2>
+<ol><li><a href="#1-tujuan-fungsi-group-monitoring">1. Tujuan & fungsi Group Monitoring</a></li>
+<li><a href="#2-buka-aplikasi-navigasi">2. Buka aplikasi & navigasi</a></li>
+<li><a href="#3-ringkasan-semua-fitur">3. Ringkasan semua fitur</a></li>
+<li><a href="#4-tab-account-monitoring-akun">4. Tab Account — monitoring akun</a></li>
+<li><a href="#5-tombol-sync">5. Tombol Sync (↻)</a></li>
+<li><a href="#6-scrape-lengkap-kolom-last-update">6. Scrape lengkap & kolom Last update</a></li>
+<li><a href="#7-group-link-full-group-full-admin-junk">7. Group link — full group, full admin, junk</a></li>
+<li><a href="#8-tab-operations-overview-stock">8. Tab Operations — Overview (stock)</a></li>
+<li><a href="#9-tab-operations-job-queue">9. Tab Operations — Job Queue</a></li>
+<li><a href="#10-tab-reporting">10. Tab Reporting</a></li>
+<li><a href="#11-settings-apa-yang-perlu-di-set">11. Settings — apa yang perlu di-set</a></li>
+<li><a href="#12-di-mana-melihat-apa">12. Di mana melihat apa</a></li>
+<li><a href="#13-alur-harian-faq">13. Alur harian & FAQ</a></li></ol>
+<hr />
+
+<h2 id="1-tujuan-fungsi-group-monitoring">1. Tujuan & fungsi Group Monitoring</h2>
+<h3 id="kenapa-modul-ini-ada">Kenapa modul ini ada</h3>
+<p>Tim R&amp;M mengelola <strong>banyak akun WA/TG</strong> untuk banyak <strong>brand</strong>. Tanpa alat ini, sulit mengecek:</p>
+<ul>
+<li>Akun masih <strong>login</strong> di PC atau sudah putus?</li>
+<li>Grup di <strong>HP</strong> sudah sama dengan <strong>daftar standar brand</strong> (master)?</li>
+<li>Akun sudah <strong>admin</strong> di semua grup yang seharusnya?</li>
+<li>Ada <strong>grup sampah</strong> di HP yang tidak termasuk standar brand?</li>
+<li><strong>Stock grup</strong> (NEW / customer aktif / recycle) masih cukup?</li>
+</ul>
+<p><strong>Group Monitoring</strong> menjawab itu lewat dashboard + otomasi (Job Queue).</p>
+<h3 id="dua-login-jangan-dicampur">Dua login — jangan dicampur</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Login <strong>aplikasi</strong> (dashboard)</th>
+<th>Login <strong>WA/TG</strong> (akun marketing)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Cara</strong></td>
+<td>Username + password</td>
+<td>Tombol <strong>Sync (↻)</strong> → QR di HP</td>
+</tr>
+<tr>
+<td><strong>Untuk</strong></td>
+<td>Masuk modul Group Monitoring</td>
+<td>Hubungkan HP marketing ke PC</td>
+</tr>
+</tbody></table>
+<p>Logout dari sidebar <strong>tidak</strong> logout WA/TG. Untuk putuskan WA/TG di PC → <strong>Clear Session</strong> (X di kolom Session saat Valid).</p>
+<hr />
+<h2 id="2-buka-aplikasi-navigasi">2. Buka aplikasi & navigasi</h2>
+<h3 id="install-login-sekali-per-pc">Install & login (sekali per PC)</h3>
+<ol>
+<li>Jalankan installer dari tim IT (Windows <code>.exe</code> / Mac <code>.dmg</code> / Linux <code>.AppImage</code>)</li>
+<li>Buka app → login username/password</li>
+<li>Masuk halaman <strong>Group Monitoring</strong></li>
+</ol>
+<h3 id="layar-utama">Layar utama</h3>
+<pre><code>Sidebar                    Area kerja
+─────────                  ─────────────────────────────────────
+Group Monitoring    →      Tab: Account | Operations | Reporting
+Settings            →      KPI + isi tab
+Logout
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>Fungsi</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Account</strong></td>
+<td>Daftar akun per brand, Sync, scrape via Sync, Group link</td>
+</tr>
+<tr>
+<td><strong>Operations</strong></td>
+<td><strong>Overview</strong> = stock grup · <strong>Job Queue</strong> = otomasi join/create/set admin/exit/set photo</td>
+</tr>
+<tr>
+<td><strong>Reporting</strong></td>
+<td>Laporan join &amp; admin (baca saja)</td>
+</tr>
+<tr>
+<td><strong>Settings</strong></td>
+<td>Bahasa, jadwal auto-scrape, kebijakan stock &amp; worker</td>
+</tr>
+</tbody></table>
+<p>Menu <strong>Refresh</strong> di header tab = muat ulang data tab aktif dari server.</p>
+<hr />
+<h2 id="3-ringkasan-semua-fitur">3. Ringkasan semua fitur</h2>
+<table>
+<thead>
+<tr>
+<th>Fitur</th>
+<th>Lokasi</th>
+<th>Apa yang dilakukan</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Daftar akun WA/TG per brand</td>
+<td>Account</td>
+<td>Tambah/edit/hapus akun, slot kosong</td>
+</tr>
+<tr>
+<td>Cek session</td>
+<td>Account → kolom Session</td>
+<td>Valid / Invalid</td>
+</tr>
+<tr>
+<td><strong>Sync (↻)</strong></td>
+<td>Account</td>
+<td>Cek login + update angka ringkas + pintu scrape penuh</td>
+</tr>
+<tr>
+<td><strong>Scrape penuh</strong></td>
+<td>Sync → <strong>Scrape now</strong> (modal)</td>
+<td>Baca <strong>semua</strong> grup dari HP → simpan ke sistem</td>
+</tr>
+<tr>
+<td>Group link</td>
+<td>Account → Action</td>
+<td>Lihat full group / admin vs master / junk + export Excel</td>
+</tr>
+<tr>
+<td>Stock grup (Active, Ready, …)</td>
+<td>Operations → Overview</td>
+<td>Monitoring klasifikasi master brand</td>
+</tr>
+<tr>
+<td>Join grup via link invite</td>
+<td>Job Queue → Join missing</td>
+<td>Otomatis join grup master yang belum ada di akun</td>
+</tr>
+<tr>
+<td>Create group (batch)</td>
+<td>Job Queue → Create &amp; set photo</td>
+<td>Buat banyak grup baru di HP</td>
+</tr>
+<tr>
+<td>Set photo</td>
+<td>VIEW setelah create</td>
+<td>Pasang foto JPG per brand ke grup hasil create</td>
+</tr>
+<tr>
+<td>Set admin</td>
+<td>Job Queue → Set admin</td>
+<td>Promote akun target jadi admin grup</td>
+</tr>
+<tr>
+<td>Exit &amp; delete group</td>
+<td>Job Queue → Exit &amp; delete</td>
+<td>Keluar / hapus grup di HP</td>
+</tr>
+<tr>
+<td>Matrix join/admin</td>
+<td>Reporting</td>
+<td>Tabel Yes/No semua akun × grup master</td>
+</tr>
+<tr>
+<td>Full Group / Full Admin</td>
+<td>Reporting</td>
+<td>Detail per akun</td>
+</tr>
+<tr>
+<td>Auto-scrape harian</td>
+<td>Settings</td>
+<td>Scrape otomatis (jam tertentu, app harus terbuka)</td>
+</tr>
+<tr>
+<td>Kebijakan stock &amp; worker</td>
+<td>Settings</td>
+<td>Target Ready %, penamaan SOP, delay otomasi</td>
+</tr>
+</tbody></table>
+<p>Cek selisih grup/admin lewat kolom <strong>In brand</strong>, <strong>Admin</strong>, badge <strong>not aligned</strong>, <strong>Group link</strong> (junk), dan tab <strong>Reporting</strong>.</p>
+<hr />
+<h2 id="4-tab-account-monitoring-akun">4. Tab Account — monitoring akun</h2>
+<h3 id="kpi-4-angka-di-atas">KPI (4 angka di atas)</h3>
+<table>
+<thead>
+<tr>
+<th>KPI</th>
+<th>Arti</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Brands</strong></td>
+<td>Jumlah kartu brand</td>
+</tr>
+<tr>
+<td><strong>Accounts</strong></td>
+<td>Total akun terisi</td>
+</tr>
+<tr>
+<td><strong>Online</strong></td>
+<td>Akun session <strong>Valid</strong></td>
+</tr>
+<tr>
+<td><strong>Aligned</strong></td>
+<td>Akun sudah selaras (In brand &amp; Admin cocok standar)</td>
+</tr>
+</tbody></table>
+<h3 id="filter-toolbar">Filter toolbar</h3>
+<p>Search · Brand · Platform (WA/TG) · Status · <strong>Card view</strong> / <strong>Table view</strong> · <strong>Export</strong> Excel akun terfilter.</p>
+<h3 id="kartu-brand">Kartu brand</h3>
+<table>
+<thead>
+<tr>
+<th>Elemen</th>
+<th>Fungsi</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>WA/TG x std</strong> (klik)</td>
+<td>Modal daftar grup <strong>standar brand</strong> (master)</td>
+</tr>
+<tr>
+<td><strong>All aligned</strong> / <strong>N not aligned</strong></td>
+<td>Ringkasan akun yang masih selisih</td>
+</tr>
+<tr>
+<td><strong>+ Add</strong></td>
+<td>Tambah akun WA atau TG</td>
+</tr>
+<tr>
+<td><strong>X</strong></td>
+<td>Hapus brand card (semua data brand ikut terhapus)</td>
+</tr>
+</tbody></table>
+<p><strong>Tambah akun:</strong> + Add → platform → nama + nomor HP → Save → <strong>Sync (↻)</strong>.</p>
+<p><strong>Edit akun:</strong> ikon pensil → ubah label, nomor, location.</p>
+<h3 id="kolom-tabel-9-kolom-card-view">Kolom tabel (9 kolom — Card view)</h3>
+<table>
+<thead>
+<tr>
+<th>Kolom</th>
+<th>Isi</th>
+<th>Cara baca</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Account</strong></td>
+<td>Platform, nama, nomor</td>
+<td>Identitas akun</td>
+</tr>
+<tr>
+<td><strong>Location</strong></td>
+<td>Label lokasi device</td>
+<td>Bukan nama brand card</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Active / Logout</td>
+<td>Titik hijau/merah</td>
+</tr>
+<tr>
+<td><strong>Session</strong></td>
+<td>Valid / Invalid</td>
+<td>Invalid = wajib Sync dulu</td>
+</tr>
+<tr>
+<td><strong>On device</strong></td>
+<td>Angka tunggal</td>
+<td><strong>Total grup di HP</strong> akun ini</td>
+</tr>
+<tr>
+<td><strong>In brand</strong></td>
+<td><code>y/x</code></td>
+<td><strong>y</strong> = grup standar brand yang sudah di-join · <strong>x</strong> = total standar brand</td>
+</tr>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Bar + <code>a/x</code></td>
+<td><strong>a</strong> = grup tempat akun ini admin · <strong>x</strong> = seharusnya admin</td>
+</tr>
+<tr>
+<td><strong>Last update</strong></td>
+<td>Waktu / progress</td>
+<td>Lihat <a href="#6-scrape-lengkap--kolom-last-update">§6</a></td>
+</tr>
+<tr>
+<td><strong>Action</strong></td>
+<td>Group link</td>
+<td>Lihat <a href="#7-group-link--full-group-full-admin-junk">§7</a></td>
+</tr>
+</tbody></table>
+<p><strong>Table view</strong> (satu tabel semua brand): kolom <strong>Brand</strong> tambahan; <strong>tanpa</strong> kolom Last update. Untuk <strong>Sync</strong>, <strong>Scrape now</strong>, dan <strong>Clear Session</strong> — pakai <strong>Card view</strong>.</p>
+<h3 id="selisih-yang-perlu-diperbaiki">Selisih yang perlu diperbaiki</h3>
+<p>Akun <strong>not aligned</strong> jika <strong>On device ≠ standar</strong> atau <strong>Admin belum penuh</strong> — badge di header kartu brand.</p>
+<table>
+<thead>
+<tr>
+<th>Gejala di grid</th>
+<th>Kemungkinan penyebab</th>
+<th>Tindakan</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>In brand <code>y/x</code> kurang</td>
+<td>Belum join grup master</td>
+<td>Join manual atau Job Queue <strong>Join missing</strong> → Queue</td>
+</tr>
+<tr>
+<td>Admin <code>a/x</code> kurang</td>
+<td>Belum jadi admin</td>
+<td>Job Queue <strong>Set admin</strong> → Queue</td>
+</tr>
+<tr>
+<td>On device &gt; In brand</td>
+<td>Ada grup di HP di luar master</td>
+<td>Group link → <strong>Junk (not in master)</strong> → Exit manual atau Job Queue</td>
+</tr>
+<tr>
+<td>Session Invalid</td>
+<td>Putus login</td>
+<td><strong>Sync (↻)</strong></td>
+</tr>
+</tbody></table>
+<hr />
+<h2 id="5-tombol-sync">5. Tombol Sync (↻)</h2>
+<p><strong>Fungsi:</strong> cek apakah WA/TG masih terhubung + perbarui angka <strong>On device / In brand / Admin</strong> (baca ringkas, bukan scrape penuh).</p>
+<h3 id="session-invalid">Session = Invalid</h3>
+<ol>
+<li>Klik <strong>↻</strong></li>
+<li>Modal login → scan <strong>QR</strong> (atau login nomor HP)</li>
+<li>Sukses → angka update</li>
+<li>Muncul <strong>Scrape now atau Later?</strong><ul>
+<li><strong>Scrape now</strong> = langsung scrape penuh</li>
+<li><strong>Later</strong> = tutup; scrape manual nanti lewat Sync lagi</li>
+</ul>
+</li>
+</ol>
+<h3 id="session-valid">Session = Valid</h3>
+<ol>
+<li>Klik <strong>↻</strong></li>
+<li>App probe device (~20 detik)</li>
+<li>OK → angka update · gagal → login ulang</li>
+<li>Jika ada data scrape hari ini dan angka belum selaras → bisa muncul prompt <strong>Scrape now / Later</strong> (sama seperti setelah login)</li>
+</ol>
+<h3 id="situasi-lain">Situasi lain</h3>
+<table>
+<thead>
+<tr>
+<th>Pesan / kondisi</th>
+<th>Tindakan</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Device busy</td>
+<td>Scrape atau Job Queue sedang jalan di akun ini — tunggu</td>
+</tr>
+<tr>
+<td>QR tidak muncul</td>
+<td>Tutup modal, tunggu, Sync lagi</td>
+</tr>
+<tr>
+<td><strong>Clear Session</strong> (X di Session)</td>
+<td>Logout WA/TG di PC ini; Sync berikutnya QR baru</td>
+</tr>
+</tbody></table>
+<hr />
+<h2 id="6-scrape-lengkap-kolom-last-update">6. Scrape lengkap & kolom Last update</h2>
+<p><strong>Fungsi scrape penuh:</strong> baca <strong>semua</strong> grup dari HP → simpan ke database → perbarui <strong>On device, In brand, Admin, Reporting, stock Overview</strong>.</p>
+<p><strong>Cara menjalankan scrape penuh:</strong></p>
+<ul>
+<li><strong>Sync (↻)</strong> → pilih <strong>Scrape now</strong> di modal</li>
+<li><strong>Settings → Automatic account scrape</strong> (jadwal harian, app harus terbuka)</li>
+</ul>
+<p>Kolom <strong>Last update</strong> (Card view) menampilkan waktu scrape terakhir atau progress saat scrape berjalan.</p>
+<h3 id="kapan-scrape-penuh">Kapan scrape penuh</h3>
+<ul>
+<li>Setelah join grup baru</li>
+<li>Setelah Set admin / Exit di Job Queue</li>
+<li>Angka di grid masih salah padahal sudah Sync</li>
+<li>Setelah login WA/TG (jika tidak pilih Scrape now saat Sync)</li>
+</ul>
+<h3 id="langkah-manual">Langkah (manual)</h3>
+<ol>
+<li>Session <strong>Valid</strong> (Sync dulu jika Invalid)</li>
+<li>Klik <strong>↻</strong> → pilih <strong>Scrape now</strong> (atau setelah login otomatis ditawarkan)</li>
+<li>Kolom <strong>Last update</strong> menampilkan progress — <strong>jangan tutup app</strong></li>
+<li>Selesai → timestamp + angka update</li>
+</ol>
+<h3 id="tampilan-kolom-last-update">Tampilan kolom Last update</h3>
+<table>
+<thead>
+<tr>
+<th>Tampilan</th>
+<th>Arti</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><em>Use Sync (↻) to log in first</em></td>
+<td>Belum login platform</td>
+</tr>
+<tr>
+<td>Waktu saja</td>
+<td>Scrape terakhir selesai (aligned atau belum — tetap tampil waktu)</td>
+</tr>
+<tr>
+<td>Progress <em>Reading groups…</em></td>
+<td>Sedang scrape</td>
+</tr>
+<tr>
+<td><strong>Cancel scrape</strong> (saat progress)</td>
+<td>Batalkan — data tidak disimpan</td>
+</tr>
+</tbody></table>
+<p><strong>Scrape penuh ≠ Sync ringkas.</strong> Sync = cek session + hitung ringkas. Scrape = baca lengkap semua grup ke database.</p>
+<hr />
+<h2 id="7-group-link-full-group-full-admin-junk">7. Group link — full group, full admin, junk</h2>
+<p>Klik <strong>Group link</strong> → pilih mode:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Data yang ditampilkan</th>
+<th>Kapan dipakai</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Groups on this account</strong></td>
+<td>Semua grup di HP (hasil scrape) — nama, ID, member, admin, invite link</td>
+<td>Cek isi HP / export daftar lengkap</td>
+</tr>
+<tr>
+<td><strong>Admin vs master list</strong></td>
+<td>Hanya grup <strong>standar brand</strong> + status admin akun ini</td>
+<td>Cek admin vs master (denominator kolom Admin)</td>
+</tr>
+<tr>
+<td><strong>Junk (not in master)</strong></td>
+<td>Grup di HP yang <strong>tidak</strong> ada di master brand</td>
+<td>Bersihkan grup di luar standar</td>
+</tr>
+</tbody></table>
+<p>Export Excel: <code>RM-[nama akun]-tanggal.xlsx</code>.<br>Kosong → <strong>Sync</strong> → <strong>Scrape now</strong> dulu.</p>
+<hr />
+<h2 id="8-tab-operations-overview-stock">8. Tab Operations — Overview (stock)</h2>
+<p>Bookmark <strong>Overview</strong> · filter <strong>Platform</strong> + <strong>Brand</strong>.</p>
+<h3 id="header-kartu-brand">Header kartu brand</h3>
+<pre><code>Brand | Avg ND | To prep  ···  [ WA n Group ] [ Active | Ready | Recycle | Review | Other ]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Chip</th>
+<th>Makna operasi (sederhana)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Active</strong></td>
+<td>Grup customer — ada 1 member non-admin</td>
+</tr>
+<tr>
+<td><strong>Ready</strong></td>
+<td>Stock NEW kosong — siap assign customer baru</td>
+</tr>
+<tr>
+<td><strong>Recycle</strong></td>
+<td>Grup LG — customer sudah left, bisa daur ulang</td>
+</tr>
+<tr>
+<td><strong>Review</strong></td>
+<td>Perlu cek manual (member count anomali / nama belum sync)</td>
+</tr>
+<tr>
+<td><strong>Other</strong></td>
+<td>Junk / penamaan tidak sesuai SOP</td>
+</tr>
+<tr>
+<td><strong>To prep</strong></td>
+<td>Berapa grup Ready masih <strong>kurang</strong> vs target minimum (0 = OK)</td>
+</tr>
+<tr>
+<td><strong>Avg ND</strong></td>
+<td>Rata-rata depositor baru brand (window hari di Settings)</td>
+</tr>
+</tbody></table>
+<p><strong>Double-click</strong> chip → modal daftar grup di bucket itu.</p>
+<p>Overview <strong>hanya monitoring</strong> — untuk buat grup NEW pakai Job Queue.</p>
+<hr />
+<h2 id="9-tab-operations-job-queue">9. Tab Operations — Job Queue</h2>
+<p>Bookmark <strong>Job Queue</strong> · pilih <strong>Platform</strong>, <strong>Brand</strong>, <strong>Task type</strong>, <strong>Account</strong> → <strong>SETUP</strong> → <strong>Queue</strong>.</p>
+<h3 id="task-type-sesuai-ui">Task type (sesuai UI)</h3>
+<table>
+<thead>
+<tr>
+<th>Task di UI</th>
+<th>Fungsi</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Join missing</strong></td>
+<td>Join grup master yang belum ada di akun (pakai invite link dari master)</td>
+</tr>
+<tr>
+<td><strong>Create &amp; set photo</strong></td>
+<td>Buat grup batch di HP; setelah selesai bisa pasang foto via VIEW</td>
+</tr>
+<tr>
+<td><strong>Set admin</strong></td>
+<td>Jadikan akun target admin di grup yang eligible</td>
+</tr>
+<tr>
+<td><strong>Exit &amp; delete group</strong></td>
+<td>Keluar dari grup (exit); opsional delete setelah exit</td>
+</tr>
+</tbody></table>
+<h3 id="status-antrian">Status antrian</h3>
+<p><strong>Queued</strong> → <strong>Running</strong> → <strong>Completed</strong> / <strong>Failed</strong> · bisa <strong>PAUSE</strong> / <strong>CANCEL</strong> / <strong>RUN</strong> / <strong>VIEW</strong>.</p>
+<p>Satu akun tidak bisa <strong>Sync</strong> bersamaan dengan job di akun yang sama. Maks ~4 akun <strong>berbeda</strong> bisa jalan paralel (masing-masing 1 slot Chrome).</p>
+<p><strong>Batch besar (v1.0.30):</strong> jika Anda Queue banyak grup (mis. 100), sistem <strong>otomatis memecah</strong> menjadi beberapa baris job (<strong>maks 30 grup per job</strong>, dari Settings → Invite by link). Job untuk <strong>akun yang sama antri berurutan</strong> — bukan paralel — sehingga Chrome stabil. Anda akan melihat beberapa baris job di tabel; tunggu semua selesai sebelum anggap task 100% done.</p>
+<p>Setelah <strong>Queue</strong> sukses, job masuk tabel dan runner mencoba jalan otomatis jika slot kosong.</p>
+<hr />
+<h3 id="join-missing-invite-by-group-link">Join missing (invite by group link)</h3>
+<ol>
+<li>Pilih akun yang belum join lengkap</li>
+<li>SETUP → <strong>import CSV/XLSX</strong> (drop zone) <strong>atau</strong> buka accordion <strong>Select from master list</strong> → centang grup → <strong>Queue</strong><ul>
+<li>Sumber aktif: yang terakhir Anda pakai (CSV atau master list)</li>
+<li>Banyak grup → beberapa baris job (30 per job)</li>
+</ul>
+</li>
+<li>Jika <strong>Failed</strong> sebagian → <strong>VIEW</strong> → lihat tabel No / Group / Status / Remark → <strong>Run</strong> (retry hanya yang gagal)</li>
+<li>Selesai semua chunk → tab Account → <strong>Sync</strong> → <strong>Scrape now</strong></li>
+</ol>
+<hr />
+<h3 id="create-set-photo">Create & set photo</h3>
+<p><strong>SETUP — Group batch</strong></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Isi</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Group name</td>
+<td>Nama dasar grup</td>
+</tr>
+<tr>
+<td>Total groups to create</td>
+<td>Jumlah grup</td>
+</tr>
+<tr>
+<td>Start Number</td>
+<td>Nomor urut (jika penomoran aktif)</td>
+</tr>
+</tbody></table>
+<p><strong>SETUP — Group permissions</strong> (per job; default dari Settings bisa diubah di modal):</p>
+<ul>
+<li>WA: messages admins only, add members admins only, edit info admins only</li>
+<li>TG: hide chat history, admin rights toggles</li>
+</ul>
+<p><strong>Queue</strong> → tunggu <strong>Completed</strong> → <strong>VIEW</strong>:</p>
+<ul>
+<li>Tab <strong>Result</strong> — Group ID, invite link tiap grup berhasil dibuat</li>
+<li>Tab <strong>Set Photo</strong> — upload <code>{brand}.jpg</code> → <strong>Queue</strong> (opsional)</li>
+</ul>
+<hr />
+<h3 id="set-admin">Set admin</h3>
+<ol>
+<li>Pilih akun <strong>OWNER/ADMIN</strong> (sudah admin di grup)</li>
+<li>Pilih <strong>akun target</strong></li>
+<li>SETUP → centang grup (target sudah join tapi belum admin) → <strong>Queue</strong></li>
+<li><strong>Sync</strong> → <strong>Scrape now</strong> di akun target</li>
+</ol>
+<hr />
+<h3 id="exit-delete-group">Exit & delete group</h3>
+<ol>
+<li>Pilih akun</li>
+<li>SETUP → centang grup dari daftar daily (grup di HP) → Queue exit</li>
+<li><strong>VIEW</strong> hasil → antrikan delete jika diizinkan policy Settings</li>
+</ol>
+<hr />
+<h2 id="10-tab-reporting">10. Tab Reporting</h2>
+<p><strong>Hanya baca</strong> — tidak mengubah session, scrape, atau antrian job.</p>
+<h3 id="filter">Filter</h3>
+<p>Platform · Brand · <strong>Acc Name</strong> (All = matrix) · <strong>Status</strong> (Active/Ready/Recycle/Review/Other/all) · Search nama grup · bookmark <strong>Full Group</strong> / <strong>Full Admin</strong></p>
+<h3 id="full-group-per-akun-atau-matrix">Full Group (per akun atau matrix)</h3>
+<ul>
+<li><strong>Acc Name = All:</strong> matrix — baris = grup master, kolom = akun, isi <strong>Yes/No</strong> join</li>
+<li><strong>Acc Name = satu akun:</strong> tabel semua grup daily akun (7 kolom)</li>
+</ul>
+<h3 id="full-admin">Full Admin</h3>
+<ul>
+<li>Daftar grup master + status admin akun terpilih</li>
+</ul>
+<p>Klik header kolom akun di matrix → filter Yes/No. Export Excel tersedia di panel Reporting.</p>
+<p>Data ikut update setelah scrape selesai (realtime ~500 ms).</p>
+<hr />
+<h2 id="11-settings-apa-yang-perlu-di-set">11. Settings — apa yang perlu di-set</h2>
+<p>Buka <strong>Settings</strong> di sidebar.</p>
+<table>
+<thead>
+<tr>
+<th>Bagian</th>
+<th>Perlu di-set?</th>
+<th>Isi</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Language</strong></td>
+<td>Opsional</td>
+<td>English / 中文</td>
+</tr>
+<tr>
+<td><strong>Check for updates</strong></td>
+<td>Opsional</td>
+<td>Update app</td>
+</tr>
+<tr>
+<td><strong>Automatic account scrape</strong></td>
+<td><strong>Ya, jika mau</strong></td>
+<td>On/Off + jam harian (app harus terbuka)</td>
+</tr>
+<tr>
+<td><strong>Operations stock policy</strong></td>
+<td><strong>Ya, per brand</strong></td>
+<td>% minimum Ready, window hari Avg ND</td>
+</tr>
+<tr>
+<td><strong>SOP naming (prefix)</strong></td>
+<td><strong>Ya, jika SOP berubah</strong></td>
+<td>Pola penamaan Active/Ready/Recycle</td>
+</tr>
+<tr>
+<td><strong>WhatsApp worker</strong></td>
+<td><strong>Ya, default otomasi</strong></td>
+<td>Delay, max per run, permission create group default, join throttle</td>
+</tr>
+<tr>
+<td><strong>Telegram worker</strong></td>
+<td><strong>Ya, default otomasi</strong></td>
+<td>Delay, flood-wait, permission TG, set photo retry</td>
+</tr>
+</tbody></table>
+<p><strong>Penting create group:</strong> nilai permission di <strong>Settings</strong> = default saat buka modal SETUP. Perubahan di modal SETUP hanya untuk <strong>job itu</strong> — tidak menulis balik ke Settings.</p>
+<hr />
+<h2 id="12-di-mana-melihat-apa">12. Di mana melihat apa</h2>
+<table>
+<thead>
+<tr>
+<th>Yang ingin dilihat</th>
+<th>Buka di</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Akun masih login?</td>
+<td>Account → Session Valid/Invalid</td>
+</tr>
+<tr>
+<td>Total grup di HP</td>
+<td>Account → <strong>On device</strong></td>
+</tr>
+<tr>
+<td>Sudah join berapa grup standar</td>
+<td>Account → <strong>In brand</strong> <code>y/x</code></td>
+</tr>
+<tr>
+<td>Sudah admin berapa</td>
+<td>Account → <strong>Admin</strong> <code>a/x</code></td>
+</tr>
+<tr>
+<td>Kapan scrape terakhir</td>
+<td>Account → <strong>Last update</strong></td>
+</tr>
+<tr>
+<td>Daftar lengkap grup di HP</td>
+<td>Group link → Groups on this account</td>
+</tr>
+<tr>
+<td>Admin vs master saja</td>
+<td>Group link → Admin vs master</td>
+</tr>
+<tr>
+<td>Grup di HP di luar master</td>
+<td>Group link → Junk (not in master)</td>
+</tr>
+<tr>
+<td>Stock Active/Ready/Recycle/…</td>
+<td>Operations → Overview</td>
+</tr>
+<tr>
+<td>Detail grup per bucket stock</td>
+<td>Overview → double-click chip</td>
+</tr>
+<tr>
+<td>Antrian join/create/admin/exit</td>
+<td>Operations → Job Queue</td>
+</tr>
+<tr>
+<td>Matrix join semua akun</td>
+<td>Reporting → Full Group, Acc=All</td>
+</tr>
+<tr>
+<td>Matrix admin semua akun</td>
+<td>Reporting → Full Admin, Acc=All</td>
+</tr>
+<tr>
+<td>Detail satu akun</td>
+<td>Reporting → pilih Acc Name</td>
+</tr>
+<tr>
+<td>Filter grup by status stock</td>
+<td>Reporting → Status</td>
+</tr>
+</tbody></table>
+<hr />
+<h2 id="13-alur-harian-faq">13. Alur harian & FAQ</h2>
+<h3 id="ceklist-harian-r-m">Ceklist harian R&M</h3>
+<p><strong>Pagi</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Account → filter brand Anda</li>
+<li><input disabled="" type="checkbox"> Session Invalid → <strong>Sync</strong></li>
+<li><input disabled="" type="checkbox"> Not aligned → catat akun</li>
+</ul>
+<p><strong>Siang</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Perbaiki: Join / Set admin / Exit sesuai temuan</li>
+<li><input disabled="" type="checkbox"> <strong>Sync → Scrape now</strong> setiap kali ada perubahan di HP atau job selesai</li>
+<li><input disabled="" type="checkbox"> Pantau Job Queue Failed</li>
+</ul>
+<p><strong>Sore</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Reporting matrix brand Anda</li>
+<li><input disabled="" type="checkbox"> Operations Overview — To prep &amp; Ready</li>
+</ul>
+<h3 id="faq">FAQ</h3>
+<p><strong>Sync atau scrape penuh dulu?</strong><br>Session Invalid → Sync dulu. Sudah Valid tapi angka salah → Sync → <strong>Scrape now</strong>.</p>
+<p><strong>Kenapa Job Queue selesai tapi grid belum berubah?</strong><br>Wajib <strong>Sync → Scrape now</strong> setelah job mengubah grup di HP.</p>
+<p><strong>Boleh Sync saat job jalan?</strong><br>Tidak di akun yang sama — tunggu job selesai.</p>
+<p><strong>Auto-scrape tidak jalan?</strong><br>App harus terbuka pada jam yang di-set. Tidak ada catch-up jika app tutup.</p>
+<p><strong>Siapa yang develop app?</strong><br>Tim developer internal. Tim R&amp;M hanya <strong>pakai</strong> Group Monitoring — laporkan bug ke developer, bukan dijelaskan di panduan operasional ini.</p>
+<hr />
+<p><em>Panduan ini untuk modul <strong>Group Monitoring</strong> v1.0.30 — tim operasional Depart Resource Management.</em></p>
+
+
+<p class="doc-footer">Panduan operasional Group Monitoring v1.0.30 — tim Depart Resource Management. Internal use only.</p>
+
+</body>
+</html>

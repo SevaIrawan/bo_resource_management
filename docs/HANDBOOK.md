@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.29 |
+| **Versi app** | 1.0.30 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Admin → Language) |
@@ -124,7 +124,7 @@ Angka berubah sesuai tab aktif.
 | Issue | Akun **not aligned** |
 | Open issues | Ringkasan mismatch grup/admin (engine sama dengan kolom Groups/Admin) |
 
-**Tab Operations (Job Queue):** antrian task per akun — SETUP modal untuk create group (batch + permission per job), VIEW hasil create → tab Set Photo (satu foto per brand).
+**Tab Operations (Job Queue):** antrian task per akun — SETUP modal untuk create group (batch + permission per job), VIEW hasil create → tab Set Photo (satu foto per brand). **v1.0.30:** batch besar auto-split 30 grup per job; VIEW join menampilkan status/remark per grup.
 
 **Tab Ticket (historis — dihapus v1.0.24):**
 
@@ -513,4 +513,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.29**.*
+*Handbook ini selaras dengan aplikasi versi **1.0.30**.*

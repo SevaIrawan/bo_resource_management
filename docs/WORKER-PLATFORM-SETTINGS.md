@@ -79,7 +79,7 @@ Settings are read in the renderer at **enqueue** time via `readWhatsAppWorkerSet
 |---------|----------|
 | Standard delays + human profile jitter | create_group batch, set_admin between targets, TG flood-wait |
 | Create group toggles | **Defaults only** — modal SETUP seeds from Settings but enqueues **per-job draft** in `payload.createGroupSettings` (`buildCreateGroupEnqueueFromJobDraft`) |
-| Invite by link | join throttle (`invite_delay_*`, batch rest), `maxPerRun` at enqueue |
+| Invite by link | join throttle (`invite_delay_*`, batch rest), `maxPerRun` at enqueue (auto-split chunks) |
 | Set admin | `betweenTargetsSec`, `maxAdminSlots`, `resolveEntityMaxAttempts` (TG) |
 | Leave & delete | exit/delete job guards + delays at enqueue |
 

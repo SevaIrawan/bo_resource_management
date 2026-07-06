@@ -28,6 +28,7 @@ interface OperationsJobQueueDetailModalProps {
   job: AutomationJobRecord | null;
   allJobs?: AutomationJobRecord[];
   onClose: () => void;
+  onRetryFailed?: (jobId: string) => void;
   onQueueDeleteFromExit?: (exitJobId: string) => Promise<QueueFromViewResult> | QueueFromViewResult;
   onQueueSetPhotoFromCreate?: (
     createJobId: string,
@@ -37,6 +38,8 @@ interface OperationsJobQueueDetailModalProps {
 
 function cellClassName(columnId: JobQueueViewTableColumnId): string | undefined {
   switch (columnId) {
+    case 'no':
+      return 'tabular-nums text-text-secondary';
     case 'groupName':
       return 'group-links-table__name';
     case 'groupId':
@@ -45,6 +48,8 @@ function cellClassName(columnId: JobQueueViewTableColumnId): string | undefined 
       return 'group-links-table__link';
     case 'status':
       return 'group-links-table__status';
+    case 'remark':
+      return 'text-text-secondary';
     case 'count':
       return 'tabular-nums text-text-secondary';
     default:
@@ -54,6 +59,8 @@ function cellClassName(columnId: JobQueueViewTableColumnId): string | undefined 
 
 function cellValue(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumnId): string {
   switch (columnId) {
+    case 'no':
+      return row.no;
     case 'groupName':
       return row.groupName;
     case 'groupId':
@@ -68,6 +75,8 @@ function cellValue(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumnI
       return row.count;
     case 'status':
       return row.status;
+    case 'remark':
+      return row.remark;
     default:
       return '—';
   }
@@ -89,6 +98,7 @@ export function OperationsJobQueueDetailModal({
   job,
   allJobs = [],
   onClose,
+  onRetryFailed,
   onQueueDeleteFromExit,
   onQueueSetPhotoFromCreate,
 }: OperationsJobQueueDetailModalProps) {
@@ -128,6 +138,10 @@ export function OperationsJobQueueDetailModal({
   const record = job;
   const columns = jobQueueViewTableColumnIds(record);
   const rows = jobQueueViewTableRows(record, t);
+  const showRetryFailed =
+    record.status === 'failed' &&
+    record.action === 'join_by_invite_link' &&
+    Boolean(onRetryFailed);
   const showQueueDelete =
     isExitDeleteExitJob(record) &&
     canQueueDeleteFromExitJob(record, allJobs) &&
@@ -233,6 +247,18 @@ export function OperationsJobQueueDetailModal({
           ) : null}
 
           <div className="brand-modal-actions">
+            {showRetryFailed ? (
+              <button
+                type="button"
+                className="brand-modal-btn brand-modal-btn--primary"
+                onClick={() => {
+                  onRetryFailed?.(record.id);
+                  onClose();
+                }}
+              >
+                {t('operations.jobQueue.retryFailedRun')}
+              </button>
+            ) : null}
             {showQueueDelete ? (
               <button
                 type="button"

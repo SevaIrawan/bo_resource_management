@@ -67,13 +67,15 @@ export interface AutomationJobPayload {
   photoPath?: string;
   /** User ID untuk resolve foto dari Supabase Storage di PC lain. */
   userId?: string;
-  /** Hasil per grup setelah create / set photo / exit / delete. */
+  /** Hasil per grup setelah create / join / set photo / exit / delete. */
   groupOutcomes?: Array<{
     groupId: string;
     groupName?: string;
     inviteLink?: string;
     groupLink?: string;
     createStatus?: 'created' | 'failed';
+    joinStatus?: 'joined' | 'already_member' | 'failed';
+    joinError?: string;
     photoStatus?: 'set' | 'failed';
     exitStatus?: 'left' | 'failed' | 'pending';
     deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
@@ -144,6 +146,8 @@ export interface AutomationJobEnqueueInput {
   storedSessionString?: string | null;
   expectedPhone?: string;
   delay?: AutomationJobDelayConfig;
+  /** Allow multiple queued jobs per account+action (batch split). */
+  allowMultipleQueued?: boolean;
 }
 
 export interface AutomationJobQueueSnapshot {

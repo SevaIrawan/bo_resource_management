@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
 import { getExecuteSlotStats } from './executeSlotPool';
-import { accountJobStepTotal, isAccountJobQueueBusy, isJobQueueBlockingExecutes, listBusyAccountIds } from './jobQueueBatchHelpers';
+import { accountJobStepTotal, isJobQueueBlockingExecutes, listBusyAccountIds } from './jobQueueBatchHelpers';
 import { listSettlingSessionIds, markSessionSettleAfterJob } from './jobQueueSettle';
 import { getActiveScrapeSessionCount, isScrapeActiveForSession, listActiveScrapeSessionIds } from '../scraper/scrapeCancel';
 import { getActiveAutoScrapeSessionCount, isAutoScrapeActiveForSession, listActiveAutoScrapeSessionIds } from '../scraper/autoScrapeCancel';
@@ -154,14 +154,16 @@ export function setRunnerPaused(paused: boolean): AutomationJobRunnerState {
 export function enqueueAutomationJob(input: AutomationJobEnqueueInput): AutomationJobRecord {
   ensureLoaded();
 
-  const duplicateAccount = jobs.some(
-    (job) =>
-      job.accountId === input.accountId &&
-      job.action === input.action &&
-      (job.status === 'queued' || job.status === 'running'),
-  );
-  if (duplicateAccount) {
-    throw new Error('JOB_ALREADY_QUEUED_FOR_ACCOUNT');
+  if (!input.allowMultipleQueued) {
+    const duplicateAccount = jobs.some(
+      (job) =>
+        job.accountId === input.accountId &&
+        job.action === input.action &&
+        (job.status === 'queued' || job.status === 'running'),
+    );
+    if (duplicateAccount) {
+      throw new Error('JOB_ALREADY_QUEUED_FOR_ACCOUNT');
+    }
   }
 
   const totalToCreate = Math.max(1, Math.floor(Number(input.payload.totalToCreate) || 1));

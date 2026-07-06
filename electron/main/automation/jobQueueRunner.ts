@@ -30,7 +30,7 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let tickInProgress = false;
 let tickPending = false;
 
-const STALE_RUNNING_MS = 30 * 60 * 1000;
+const STALE_RUNNING_MS = 90 * 60 * 1000;
 
 const JOB_TIMEOUT_BASE_MS: Record<string, number> = {
   join_by_invite_link: 20 * 60 * 1000,

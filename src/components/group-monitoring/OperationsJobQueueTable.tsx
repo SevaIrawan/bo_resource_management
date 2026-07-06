@@ -200,6 +200,7 @@ export function OperationsJobQueueTable({
         job={viewJob}
         allJobs={allJobs}
         onClose={() => setViewJobId(null)}
+        onRetryFailed={(jobId) => { onRun?.(jobId); setViewJobId(null); }}
         onQueueDeleteFromExit={handleQueueDeleteFromExit}
         onQueueSetPhotoFromCreate={handleQueueSetPhotoFromCreate}
       />
@@ -239,6 +240,29 @@ function JobQueueRowActions({
   if (mode === 'view') {
     return (
       <div className="operations-job-queue-row-actions">
+        <button
+          type="button"
+          className="operations-job-queue-btn operations-job-queue-btn--row"
+          onClick={() => onView?.(job.id)}
+        >
+          {t('operations.jobQueue.actionView')}
+        </button>
+      </div>
+    );
+  }
+
+  if (mode === 'run_view') {
+    const canRun = jobQueueCanRun(job) && Boolean(onRun);
+    return (
+      <div className="operations-job-queue-row-actions">
+        <button
+          type="button"
+          className="operations-job-queue-btn operations-job-queue-btn--row"
+          disabled={!canRun}
+          onClick={() => onRun?.(job.id)}
+        >
+          {t('operations.jobQueue.actionRun')}
+        </button>
         <button
           type="button"
           className="operations-job-queue-btn operations-job-queue-btn--row"

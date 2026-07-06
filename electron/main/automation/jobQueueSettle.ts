@@ -1,5 +1,5 @@
-/** Jeda setelah job automation selesai — Chrome/WA lock lepas dulu sebelum Sync/Run. */
-export const POST_JOB_SETTLE_MS = 5_000;
+/** Jeda setelah job automation selesai — Chrome/WA cleanup sebelum job berikutnya. */
+export const POST_JOB_SETTLE_MS = 15_000;
 
 const settleUntilBySession = new Map<string, number>();
 

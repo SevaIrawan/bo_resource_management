@@ -36,6 +36,28 @@ async function postTelegramAutomation(
   });
 }
 
+function humanizeTgJoinError(raw: string, link: string): string {
+  if (!raw || raw.length <= 3) {
+    return `Invite link rejected — link may be expired, revoked, or group is full (${link})`;
+  }
+  if (/timeout/i.test(raw)) {
+    return `Timeout waiting for Telegram to accept invite (${link})`;
+  }
+  if (/revoke|reset|invalid|expire|INVITE_HASH_EXPIRED/i.test(raw)) {
+    return `Invite link expired or revoked (${link})`;
+  }
+  if (/flood/i.test(raw)) {
+    return `FloodWait — too many join requests, try again later (${link})`;
+  }
+  if (/USER_ALREADY_PARTICIPANT/i.test(raw)) {
+    return `Already a member of this group (${link})`;
+  }
+  if (/CHANNELS_TOO_MUCH/i.test(raw)) {
+    return `Account has joined too many groups/channels (${link})`;
+  }
+  return raw;
+}
+
 export async function runTelegramAutomation(
   payload: AutomationRunPayload,
   onProgress?: AutomationProgressCallback,
@@ -384,6 +406,13 @@ export async function runTelegramAutomation(
 
     let success = 0;
     const failed: string[] = [];
+    const groupOutcomes: Array<{
+      groupId: string;
+      groupName?: string;
+      inviteLink?: string;
+      joinStatus: 'joined' | 'already_member' | 'failed';
+      joinError?: string;
+    }> = [];
     for (let i = 0; i < groups.length; i += 1) {
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
@@ -398,9 +427,25 @@ export async function runTelegramAutomation(
       );
       if (result.status === 'ok') {
         success += 1;
+        const alreadyMember = result.result?.already_member === true;
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          inviteLink: group.inviteLink,
+          joinStatus: alreadyMember ? 'already_member' : 'joined',
+        });
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Joined');
       } else {
-        failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+        const rawErr = result.message ?? 'failed';
+        const errMsg = humanizeTgJoinError(rawErr, group.inviteLink ?? '');
+        failed.push(`${group.groupName ?? group.groupId}: ${errMsg}`);
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          inviteLink: group.inviteLink,
+          joinStatus: 'failed',
+          joinError: errMsg,
+        });
       }
     }
     return {
@@ -408,7 +453,7 @@ export async function runTelegramAutomation(
       action: 'join_by_invite_link',
       message: `${success}/${groups.length} joined`,
       errorCode: success > 0 ? undefined : 'JOIN_BATCH_FAILED',
-      result: { success, total: groups.length, failed },
+      result: { success, total: groups.length, failed, groupOutcomes },
     };
   }
 

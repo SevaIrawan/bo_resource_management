@@ -62,6 +62,8 @@ export interface AutomationJobPayload {
     inviteLink?: string;
     groupLink?: string;
     createStatus?: 'created' | 'failed';
+    joinStatus?: 'joined' | 'already_member' | 'failed';
+    joinError?: string;
     photoStatus?: 'set' | 'failed';
     exitStatus?: 'left' | 'failed' | 'pending';
     deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
@@ -130,6 +132,8 @@ export interface AutomationJobEnqueueInput {
   storedSessionString?: string | null;
   expectedPhone?: string;
   delay?: AutomationJobDelayConfig;
+  /** Allow multiple queued jobs per account+action (batch split). */
+  allowMultipleQueued?: boolean;
 }
 
 export interface AutomationJobQueueSnapshot {

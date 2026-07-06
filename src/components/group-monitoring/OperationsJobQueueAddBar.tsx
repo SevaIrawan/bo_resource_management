@@ -295,7 +295,7 @@ export function OperationsJobQueueAddBar({
 
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
-    const maxPerRun = workerSettings.inviteLink.maxPerRun;
+    const maxPerRun = Math.max(1, workerSettings.inviteLink.maxPerRun || 20);
 
     const groupsByAccount = new Map<
       string,
@@ -320,39 +320,47 @@ export function OperationsJobQueueAddBar({
     }
 
     setSubmitting(true);
-    let queuedAccounts = 0;
+    let queuedJobs = 0;
     let totalGroups = 0;
 
     try {
       for (const account of selectedAccounts) {
-        let groups = groupsByAccount.get(account.id) ?? [];
-        if (groups.length === 0) continue;
-        if (maxPerRun > 0) groups = groups.slice(0, maxPerRun);
+        const allGroups = groupsByAccount.get(account.id) ?? [];
+        if (allGroups.length === 0) continue;
+
+        const chunks: Array<typeof allGroups> = [];
+        for (let i = 0; i < allGroups.length; i += maxPerRun) {
+          chunks.push(allGroups.slice(i, i + maxPerRun));
+        }
 
         const ctx = await buildAutomationJobRunContext(account, 'join_by_invite_link');
-        const result = await enqueueAndTryRunAutomationJob({
-          brandName: activeBrand,
-          platform,
-          accountId: account.id,
-          accountName: account.accountName,
-          sessionId: ctx.sessionId,
-          action: 'join_by_invite_link',
-          payload: { groups },
-          storedSessionString: ctx.storedSessionString,
-          expectedPhone: ctx.expectedPhone,
-          delay: ctx.delay,
-        });
-        if (!result.ok) {
-          return returnEnqueueError(result.error, t, setFeedback);
+        const needsSplit = chunks.length > 1;
+        for (const chunk of chunks) {
+          const result = await enqueueAndTryRunAutomationJob({
+            brandName: activeBrand,
+            platform,
+            accountId: account.id,
+            accountName: account.accountName,
+            sessionId: ctx.sessionId,
+            action: 'join_by_invite_link',
+            payload: { groups: chunk },
+            storedSessionString: ctx.storedSessionString,
+            expectedPhone: ctx.expectedPhone,
+            delay: ctx.delay,
+            allowMultipleQueued: needsSplit,
+          });
+          if (!result.ok) {
+            return returnEnqueueError(result.error, t, setFeedback);
+          }
+          queuedJobs += 1;
+          totalGroups += chunk.length;
         }
-        queuedAccounts += 1;
-        totalGroups += groups.length;
       }
 
-      if (queuedAccounts > 0) {
+      if (queuedJobs > 0) {
         await reloadMissingGroups();
         return t('operations.jobQueue.queuedJoinAccountsOk', {
-          accounts: queuedAccounts,
+          accounts: queuedJobs,
           groups: totalGroups,
         });
       }
@@ -369,41 +377,47 @@ export function OperationsJobQueueAddBar({
 
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
-    const maxPerRun = workerSettings.inviteLink.maxPerRun;
+    const maxPerRun = Math.max(1, workerSettings.inviteLink.maxPerRun || 20);
 
     setSubmitting(true);
-    let queuedAccounts = 0;
+    let queuedJobs = 0;
     let totalGroups = 0;
 
     try {
       for (const account of selectedAccounts) {
-        let batch = groups;
-        if (maxPerRun > 0) batch = batch.slice(0, maxPerRun);
+        const chunks: Array<typeof groups> = [];
+        for (let i = 0; i < groups.length; i += maxPerRun) {
+          chunks.push(groups.slice(i, i + maxPerRun));
+        }
 
         const ctx = await buildAutomationJobRunContext(account, 'join_by_invite_link');
-        const result = await enqueueAndTryRunAutomationJob({
-          brandName: activeBrand,
-          platform,
-          accountId: account.id,
-          accountName: account.accountName,
-          sessionId: ctx.sessionId,
-          action: 'join_by_invite_link',
-          payload: { groups: batch },
-          storedSessionString: ctx.storedSessionString,
-          expectedPhone: ctx.expectedPhone,
-          delay: ctx.delay,
-        });
-        if (!result.ok) {
-          return returnEnqueueError(result.error, t, setFeedback);
+        const needsSplit = chunks.length > 1;
+        for (const chunk of chunks) {
+          const result = await enqueueAndTryRunAutomationJob({
+            brandName: activeBrand,
+            platform,
+            accountId: account.id,
+            accountName: account.accountName,
+            sessionId: ctx.sessionId,
+            action: 'join_by_invite_link',
+            payload: { groups: chunk },
+            storedSessionString: ctx.storedSessionString,
+            expectedPhone: ctx.expectedPhone,
+            delay: ctx.delay,
+            allowMultipleQueued: needsSplit,
+          });
+          if (!result.ok) {
+            return returnEnqueueError(result.error, t, setFeedback);
+          }
+          queuedJobs += 1;
+          totalGroups += chunk.length;
         }
-        queuedAccounts += 1;
-        totalGroups += batch.length;
       }
 
-      if (queuedAccounts > 0) {
+      if (queuedJobs > 0) {
         await reloadMissingGroups();
         return t('operations.jobQueue.queuedJoinAccountsOk', {
-          accounts: queuedAccounts,
+          accounts: queuedJobs,
           groups: totalGroups,
         });
       }
@@ -488,10 +502,11 @@ export function OperationsJobQueueAddBar({
     const targets = targetAccounts.map((row) => row.phoneNumber.trim()).filter(Boolean);
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+    const maxPerRun = Math.max(1, workerSettings.inviteLink.maxPerRun || 30);
 
     setSubmitting(true);
     try {
-      const groups = draft.groupIds.map((groupId) => {
+      const allGroups = draft.groupIds.map((groupId) => {
         const group = superAdminGroups.find((row) => row.groupId === groupId);
         const inviteLink = group?.inviteLink?.trim() || undefined;
         return {
@@ -502,31 +517,46 @@ export function OperationsJobQueueAddBar({
         };
       });
 
-      const ctx = await buildAutomationJobRunContext(superAdminAccount, 'set_admin');
-      const result = await enqueueAndTryRunAutomationJob({
-        brandName: activeBrand,
-        platform,
-        accountId: superAdminAccount.id,
-        accountName: superAdminAccount.accountName,
-        sessionId: ctx.sessionId,
-        action: 'set_admin',
-        payload: {
-          groups,
-          targets,
-          targetAccountNames: targetAccounts.map((row) => row.accountName),
-          adminRights:
-            platform === 'telegram' ? toTelegramAdminRightsPayload(workerSettings) : undefined,
-        },
-        storedSessionString: ctx.storedSessionString,
-        expectedPhone: ctx.expectedPhone,
-        delay: ctx.delay,
-      });
-      if (!result.ok) {
-        return returnEnqueueError(result.error, t, setFeedback);
+      const chunks: Array<typeof allGroups> = [];
+      for (let i = 0; i < allGroups.length; i += maxPerRun) {
+        chunks.push(allGroups.slice(i, i + maxPerRun));
       }
 
-      await reloadSuperAdminGroups();
-      return t('operations.jobQueue.queuedSetAdminOk', { count: groups.length });
+      const ctx = await buildAutomationJobRunContext(superAdminAccount, 'set_admin');
+      const needsSplit = chunks.length > 1;
+      let queuedJobs = 0;
+
+      for (const chunk of chunks) {
+        const result = await enqueueAndTryRunAutomationJob({
+          brandName: activeBrand,
+          platform,
+          accountId: superAdminAccount.id,
+          accountName: superAdminAccount.accountName,
+          sessionId: ctx.sessionId,
+          action: 'set_admin',
+          payload: {
+            groups: chunk,
+            targets,
+            targetAccountNames: targetAccounts.map((row) => row.accountName),
+            adminRights:
+              platform === 'telegram' ? toTelegramAdminRightsPayload(workerSettings) : undefined,
+          },
+          storedSessionString: ctx.storedSessionString,
+          expectedPhone: ctx.expectedPhone,
+          delay: ctx.delay,
+          allowMultipleQueued: needsSplit,
+        });
+        if (!result.ok) {
+          return returnEnqueueError(result.error, t, setFeedback);
+        }
+        queuedJobs += 1;
+      }
+
+      if (queuedJobs > 0) {
+        await reloadSuperAdminGroups();
+        return t('operations.jobQueue.queuedSetAdminOk', { count: allGroups.length });
+      }
+      return null;
     } finally {
       setSubmitting(false);
     }
@@ -538,6 +568,7 @@ export function OperationsJobQueueAddBar({
     const account = selectedAccounts[0];
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+    const maxPerRun = Math.max(1, workerSettings.inviteLink.maxPerRun || 30);
 
     if (!workerSettings.leaveDelete.leaveEnabled) {
       setFeedback(t('operations.jobQueue.exitLeaveDisabledInSettings'));
@@ -567,31 +598,46 @@ export function OperationsJobQueueAddBar({
       return enqueueErrorResult(t('operations.jobQueue.exitGroupAlreadyProcessed'));
     }
 
+    const chunks: Array<typeof selectedGroups> = [];
+    for (let i = 0; i < selectedGroups.length; i += maxPerRun) {
+      chunks.push(selectedGroups.slice(i, i + maxPerRun));
+    }
+
     setSubmitting(true);
     try {
       const ctx = await buildAutomationJobRunContext(account, 'leave_group');
-      const result = await enqueueAndTryRunAutomationJob({
-        brandName: activeBrand,
-        platform,
-        accountId: account.id,
-        accountName: account.accountName,
-        sessionId: ctx.sessionId,
-        action: 'leave_group',
-        payload: {
-          groups: selectedGroups,
-          exitDeletePhase: 'exit',
-          leaveDelete: toLeaveDeleteJobPayload(workerSettings),
-        },
-        storedSessionString: ctx.storedSessionString,
-        expectedPhone: ctx.expectedPhone,
-        delay: ctx.delay,
-      });
-      if (!result.ok) {
-        return returnEnqueueError(result.error, t, setFeedback);
+      const needsSplit = chunks.length > 1;
+      let queuedJobs = 0;
+
+      for (const chunk of chunks) {
+        const result = await enqueueAndTryRunAutomationJob({
+          brandName: activeBrand,
+          platform,
+          accountId: account.id,
+          accountName: account.accountName,
+          sessionId: ctx.sessionId,
+          action: 'leave_group',
+          payload: {
+            groups: chunk,
+            exitDeletePhase: 'exit',
+            leaveDelete: toLeaveDeleteJobPayload(workerSettings),
+          },
+          storedSessionString: ctx.storedSessionString,
+          expectedPhone: ctx.expectedPhone,
+          delay: ctx.delay,
+          allowMultipleQueued: needsSplit,
+        });
+        if (!result.ok) {
+          return returnEnqueueError(result.error, t, setFeedback);
+        }
+        queuedJobs += 1;
       }
 
-      await reloadAccountExitGroups();
-      return t('operations.jobQueue.queuedExitOk', { count: selectedGroups.length });
+      if (queuedJobs > 0) {
+        await reloadAccountExitGroups();
+        return t('operations.jobQueue.queuedExitOk', { count: selectedGroups.length });
+      }
+      return null;
     } finally {
       setSubmitting(false);
     }

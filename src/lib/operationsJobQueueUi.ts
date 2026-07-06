@@ -302,11 +302,12 @@ export function jobQueueCanDelete(_job: AutomationJobRecord): boolean {
   return true;
 }
 
-/** Satu tombol per status: completed→VIEW, running→PAUSE+CANCEL, queue/failed→RUN. */
-export type JobQueueRowActionMode = 'view' | 'run' | 'active';
+/** Satu tombol per status: completed→VIEW, running→PAUSE+CANCEL, queue/failed→RUN, failed+outcomes→RUN+VIEW. */
+export type JobQueueRowActionMode = 'view' | 'run' | 'run_view' | 'active';
 
 export function jobQueueRowActionMode(job: AutomationJobRecord): JobQueueRowActionMode {
   if (job.status === 'completed') return 'view';
+  if (job.status === 'failed' && job.payload.groupOutcomes?.length) return 'run_view';
   if (job.status === 'running') return 'active';
   return 'run';
 }
@@ -321,16 +322,19 @@ export function jobQueueViewSubtitle(
 }
 
 export type JobQueueViewTableColumnId =
+  | 'no'
   | 'groupName'
   | 'groupId'
   | 'inviteLink'
   | 'targetJoin'
   | 'targetAdmin'
   | 'count'
-  | 'status';
+  | 'status'
+  | 'remark';
 
 export interface JobQueueViewTableRow {
   key: string;
+  no: string;
   groupName: string;
   groupId: string;
   inviteLink: string;
@@ -338,9 +342,11 @@ export interface JobQueueViewTableRow {
   targetAdmin: string;
   count: string;
   status: string;
+  remark: string;
 }
 
 const VIEW_COL_I18N: Record<JobQueueViewTableColumnId, string> = {
+  no: 'operations.jobQueue.viewColNo',
   groupName: 'operations.jobQueue.viewColGroupName',
   groupId: 'operations.jobQueue.viewColGroupId',
   inviteLink: 'operations.jobQueue.viewColInviteLink',
@@ -348,11 +354,15 @@ const VIEW_COL_I18N: Record<JobQueueViewTableColumnId, string> = {
   targetAdmin: 'operations.jobQueue.viewColTargetAdmin',
   count: 'operations.jobQueue.viewColCount',
   status: 'operations.jobQueue.viewColStatus',
+  remark: 'operations.jobQueue.viewColRemark',
 };
 
 export function jobQueueViewTableColumnIds(
   job: AutomationJobRecord,
 ): JobQueueViewTableColumnId[] {
+  if (job.action === 'join_by_invite_link') {
+    return ['no', 'groupName', 'groupId', 'inviteLink', 'status', 'remark'];
+  }
   if (job.action === 'create_group') {
     return ['groupName', 'groupId', 'inviteLink', 'status'];
   }
@@ -423,6 +433,7 @@ export function jobQueueCreateGroupResultTableRows(
   if (createdOutcomes.length > 0) {
     return createdOutcomes.map((row, index) => ({
       key: row.groupId || String(index),
+      no: String(index + 1),
       groupName: row.groupName?.trim() || row.groupId || '—',
       groupId: row.groupId || '—',
       inviteLink: resolveInviteLink(row),
@@ -430,12 +441,14 @@ export function jobQueueCreateGroupResultTableRows(
       targetAdmin: '—',
       count: '—',
       status: '—',
+      remark: '',
     }));
   }
 
   return [
     {
       key: 'create-batch',
+      no: '1',
       groupName: jobQueueCreateGroupViewName(job),
       groupId: '—',
       inviteLink: '—',
@@ -443,20 +456,73 @@ export function jobQueueCreateGroupResultTableRows(
       targetAdmin: '—',
       count: '—',
       status: '—',
+      remark: '',
     },
   ];
+}
+
+function resolveJoinViewTableRows(
+  job: AutomationJobRecord,
+  t: (key: string) => string,
+): JobQueueViewTableRow[] {
+  const outcomes = job.payload.groupOutcomes;
+  const groups = job.payload.groups ?? [];
+
+  if (outcomes?.length) {
+    return outcomes.map((row, index) => {
+      const joinStatus = (row as { joinStatus?: string }).joinStatus;
+      const joinError = (row as { joinError?: string }).joinError;
+      const status =
+        joinStatus === 'joined'
+          ? t('operations.jobQueue.joinStatusJoined')
+          : joinStatus === 'already_member'
+            ? t('operations.jobQueue.joinStatusAlreadyMember')
+            : joinStatus === 'failed'
+              ? t('operations.jobQueue.joinStatusFailed')
+              : jobQueueViewRowStatusLabel(job, index, t);
+      return {
+        key: row.groupId || String(index),
+        no: String(index + 1),
+        groupName: row.groupName?.trim() || row.groupId || '—',
+        groupId: row.groupId || '—',
+        inviteLink: resolveInviteLink(row),
+        targetJoin: '—',
+        targetAdmin: '—',
+        count: '—',
+        status,
+        remark: joinError ?? '',
+      };
+    });
+  }
+
+  return groups.map((group, index) => ({
+    key: group.groupId || String(index),
+    no: String(index + 1),
+    groupName: group.groupName?.trim() || group.groupId || '—',
+    groupId: group.groupId || '—',
+    inviteLink: resolveInviteLink(group),
+    targetJoin: '—',
+    targetAdmin: '—',
+    count: '—',
+    status: jobQueueViewRowStatusLabel(job, index, t),
+    remark: '',
+  }));
 }
 
 export function jobQueueViewTableRows(
   job: AutomationJobRecord,
   t: (key: string) => string,
 ): JobQueueViewTableRow[] {
+  if (job.action === 'join_by_invite_link') {
+    return resolveJoinViewTableRows(job, t);
+  }
   if (job.action === 'create_group') {
     const createdOutcomes = resolveCreateGroupResultOutcomes(job);
 
     if (createdOutcomes.length > 0) {
       return createdOutcomes.map((row, index) => ({
         key: row.groupId || String(index),
+        no: String(index + 1),
         groupName: row.groupName?.trim() || row.groupId || '—',
         groupId: row.groupId || '—',
         inviteLink: resolveInviteLink(row),
@@ -464,6 +530,7 @@ export function jobQueueViewTableRows(
         targetAdmin: '—',
         count: '—',
         status: t('operations.jobQueue.createStatusCreated'),
+        remark: '',
       }));
     }
 
@@ -475,6 +542,7 @@ export function jobQueueViewTableRows(
     return [
       {
         key: 'create-batch',
+        no: '1',
         groupName: jobQueueCreateGroupViewName(job),
         groupId: '—',
         inviteLink: '—',
@@ -482,6 +550,7 @@ export function jobQueueViewTableRows(
         targetAdmin: '—',
         count,
         status: jobQueueViewRowStatusLabel(job, 0, t),
+        remark: '',
       },
     ];
   }
@@ -501,6 +570,7 @@ export function jobQueueViewTableRows(
         }));
     return outcomes.map((row, index) => ({
       key: row.groupId || String(index),
+      no: String(index + 1),
       groupName: row.groupName?.trim() || row.groupId || '—',
       groupId: row.groupId || '—',
       inviteLink: resolveInviteLink(row),
@@ -513,12 +583,14 @@ export function jobQueueViewTableRows(
           : row.exitStatus === 'failed'
             ? t('operations.jobQueue.exitStatusFailed')
             : jobQueueViewRowStatusLabel(job, index, t),
+      remark: '',
     }));
   }
 
   if (isExitDeleteDeleteJob(job)) {
     return groups.map((group, index) => ({
       key: group.groupId || String(index),
+      no: String(index + 1),
       groupName: group.groupName?.trim() || group.groupId || '—',
       groupId: group.groupId || '—',
       inviteLink: resolveInviteLink(group),
@@ -526,12 +598,14 @@ export function jobQueueViewTableRows(
       targetAdmin: '—',
       count: '—',
       status: jobQueueViewRowStatusLabel(job, index, t),
+      remark: '',
     }));
   }
 
   if (job.action === 'set_admin') {
     return groups.map((group, index) => ({
       key: group.groupId || String(index),
+      no: String(index + 1),
       groupName: group.groupName?.trim() || group.groupId || '—',
       groupId: group.groupId || '—',
       inviteLink: resolveInviteLink(group),
@@ -539,6 +613,7 @@ export function jobQueueViewTableRows(
       targetAdmin,
       count: '—',
       status: jobQueueViewRowStatusLabel(job, index, t),
+      remark: '',
     }));
   }
 
@@ -554,6 +629,7 @@ export function jobQueueViewTableRows(
           }));
     return outcomes.map((row, index) => ({
       key: row.groupId || String(index),
+      no: String(index + 1),
       groupName: row.groupName?.trim() || row.groupId || '—',
       groupId: row.groupId || '—',
       inviteLink: resolveInviteLink(row),
@@ -566,12 +642,14 @@ export function jobQueueViewTableRows(
           : row.photoStatus === 'failed'
             ? t('operations.jobQueue.photoStatusFailed')
             : jobQueueViewRowStatusLabel(job, index, t),
+      remark: '',
     }));
   }
 
   if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
     return groups.map((group, index) => ({
       key: group.groupId || String(index),
+      no: String(index + 1),
       groupName: group.groupName?.trim() || group.groupId || '—',
       groupId: group.groupId || '—',
       inviteLink: resolveInviteLink(group),
@@ -579,11 +657,13 @@ export function jobQueueViewTableRows(
       targetAdmin: '—',
       count: '—',
       status: jobQueueViewRowStatusLabel(job, index, t),
+      remark: '',
     }));
   }
 
   return groups.map((group, index) => ({
     key: group.groupId || String(index),
+    no: String(index + 1),
     groupName: group.groupName?.trim() || group.groupId || '—',
     groupId: group.groupId || '—',
     inviteLink: resolveInviteLink(group),
@@ -591,6 +671,7 @@ export function jobQueueViewTableRows(
     targetAdmin: '—',
     count: '—',
     status: jobQueueViewRowStatusLabel(job, index, t),
+    remark: '',
   }));
 }
 

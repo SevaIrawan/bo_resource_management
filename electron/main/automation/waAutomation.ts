@@ -323,6 +323,25 @@ async function applyJoinInviteDelay(payload: AutomationRunPayload): Promise<void
   await sleep(jitterMs(sec * 1000, delay?.jitter_percent));
 }
 
+function humanizeJoinError(raw: string, link: string): string {
+  if (!raw || raw.length <= 3) {
+    return `Invite link rejected — link may be expired, revoked, or group is full (${link})`;
+  }
+  if (/timeout/i.test(raw)) {
+    return `Timeout waiting for WhatsApp to accept invite (${link})`;
+  }
+  if (/revoke|reset|invalid|expire/i.test(raw)) {
+    return `Invite link expired or revoked (${link})`;
+  }
+  if (/full|limit/i.test(raw)) {
+    return `Group is full — member limit reached (${link})`;
+  }
+  if (/ban|block|restrict/i.test(raw)) {
+    return `Account banned or restricted from joining this group (${link})`;
+  }
+  return raw;
+}
+
 async function runJoinByInviteLink(
   client: InstanceType<typeof Client>,
   payload: AutomationRunPayload,
@@ -378,14 +397,15 @@ async function runJoinByInviteLink(
       },
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/already/i.test(msg)) {
+    const raw = err instanceof Error ? err.message : String(err);
+    if (/already/i.test(raw)) {
       return {
         status: 'ok',
         action: 'join_by_invite_link',
         result: { invite_link: link, already_member: true },
       };
     }
+    const msg = humanizeJoinError(raw, link);
     return {
       status: 'error',
       action: 'join_by_invite_link',
@@ -570,6 +590,13 @@ export async function runWhatsAppAutomation(
         await assertWhatsAppAccount(client, payload.expectedPhone);
         let success = 0;
         const failed: string[] = [];
+        const groupOutcomes: Array<{
+          groupId: string;
+          groupName?: string;
+          inviteLink?: string;
+          joinStatus: 'joined' | 'already_member' | 'failed';
+          joinError?: string;
+        }> = [];
         for (let i = 0; i < joinGroups.length; i += 1) {
           const group = joinGroups[i];
           onProgress?.(i, joinGroups.length, group.groupName ?? group.groupId);
@@ -586,9 +613,24 @@ export async function runWhatsAppAutomation(
           );
           if (result.status === 'ok') {
             success += 1;
+            const alreadyMember = result.result?.already_member === true;
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              inviteLink: group.inviteLink,
+              joinStatus: alreadyMember ? 'already_member' : 'joined',
+            });
             onProgress?.(i + 1, joinGroups.length, group.groupName ?? 'Joined');
           } else {
-            failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+            const errMsg = result.message ?? 'failed';
+            failed.push(`${group.groupName ?? group.groupId}: ${errMsg}`);
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              inviteLink: group.inviteLink,
+              joinStatus: 'failed',
+              joinError: errMsg,
+            });
           }
         }
         return {
@@ -596,7 +638,7 @@ export async function runWhatsAppAutomation(
           action: 'join_by_invite_link',
           message: `${success}/${joinGroups.length} joined`,
           errorCode: success > 0 ? undefined : 'JOIN_BATCH_FAILED',
-          result: { success, total: joinGroups.length, failed },
+          result: { success, total: joinGroups.length, failed, groupOutcomes },
         };
       },
       { purpose: 'operation' },

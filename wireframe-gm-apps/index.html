@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Apps — Wireframe v1.0.30</title>
+  <style>
+:root {
+  --color-bg-base: #07060f;
+  --color-bg-shell: #0c0b16;
+  --color-bg-card: #12101f;
+  --color-bg-content-shell: rgba(18, 16, 31, 0.52);
+  --color-bg-content-body: rgba(7, 6, 15, 0.38);
+  --color-bg-content-header: #141226;
+  --color-bg-nested-panel: #12101f;
+  --color-bg-input: #eef1f8;
+  --color-bg-hover: #1a1830;
+  --color-bg-active: #252243;
+  --color-border: #2a2744;
+  --color-border-subtle: #1e1c32;
+  --color-text-primary: #f4f4f8;
+  --color-text-secondary: #a8a4c0;
+  --color-text-muted: #6b6788;
+  --color-accent: #6366f1;
+  --color-accent-hover: #5558e3;
+  --color-accent-glow: rgba(99, 102, 241, 0.25);
+  --color-wa: #25d366;
+  --color-wa-glow: rgba(37, 211, 102, 0.12);
+  --color-tg: #3b9fd9;
+  --color-tg-glow: rgba(59, 159, 217, 0.12);
+  --color-danger: #ef4444;
+  --color-danger-hover: #dc2626;
+  --color-brand-gold-bright: #f0d978;
+  --color-brand-gold: #d4af37;
+  --color-brand-gold-deep: #9a7b28;
+  --sidebar-collapsed-width: 3.75rem;
+  --sidebar-expanded-width: 16rem;
+  --header-height: 4rem;
+  --subheader-height: 3rem;
+  --layout-gap: 1.25rem;
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+button, input, select { font: inherit; }
+button { cursor: pointer; border: none; background: none; color: inherit; }
+a { color: inherit; text-decoration: none; }
+table { border-collapse: collapse; width: 100%; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 999px; }
+
+.demo-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: #7c2d12; color: #ffedd5; font-size: 11px; font-weight: 600;
+  text-align: center; padding: 4px 8px; letter-spacing: 0.02em;
+}
+.app-root { height: 100%; padding-top: 22px; }
+
+/* Login */
+.login-page {
+  min-height: 100%; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background:
+    radial-gradient(ellipse at 20% 0%, rgba(99,102,241,0.15), transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(212,175,55,0.08), transparent 45%),
+    var(--color-bg-base);
+}
+.login-card {
+  width: 100%; max-width: 420px; background: var(--color-bg-card);
+  border: 1px solid var(--color-border-subtle); border-radius: 16px; padding: 28px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+}
+.login-card-header { display: flex; align-items: center; gap: 14px; }
+.login-card-title { margin: 0; font-size: 20px; font-weight: 700; }
+.login-card-subtitle { margin: 2px 0 0; color: var(--color-text-secondary); font-size: 13px; }
+.login-divider { height: 1px; background: var(--color-border-subtle); margin: 20px 0; }
+.login-field { margin-bottom: 14px; }
+.login-field-label { display: block; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; }
+.login-input-wrap { position: relative; }
+.login-input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--color-text-muted); }
+.login-input {
+  width: 100%; border-radius: 10px; border: 1px solid var(--color-border);
+  background: var(--color-bg-input); color: #111; padding: 10px 40px 10px 38px;
+}
+.login-input:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.login-toggle-pass { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #555; }
+.login-error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #fecaca; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+.login-submit {
+  width: 100%; margin-top: 8px; border-radius: 10px; padding: 11px;
+  background: var(--color-accent); color: white; font-weight: 600;
+}
+.login-submit:hover { background: var(--color-accent-hover); }
+.login-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.login-hint { margin-top: 14px; font-size: 11px; color: var(--color-text-muted); line-height: 1.45; }
+
+.brand-mark {
+  width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
+  box-shadow: 0 0 0 2px var(--color-brand-gold-deep), 0 0 0 4px var(--color-brand-gold);
+}
+.brand-mark--sm { width: 32px; height: 32px; }
+
+/* Shell */
+.shell { display: flex; height: 100%; overflow: hidden; background: var(--color-bg-base); }
+.sidebar {
+  width: var(--sidebar-expanded-width); flex-shrink: 0; display: flex; flex-direction: column;
+  background: var(--color-bg-shell); border-right: 1px solid var(--color-border-subtle);
+  transition: width 280ms cubic-bezier(0.4,0,0.2,1);
+}
+.sidebar.is-collapsed { width: var(--sidebar-collapsed-width); }
+.sidebar-logo {
+  height: var(--header-height); display: flex; align-items: center; gap: 10px;
+  padding: 0 12px; border-bottom: 1px solid var(--color-border-subtle); overflow: hidden;
+}
+.sidebar-logo-text { white-space: nowrap; font-size: 13px; font-weight: 700; }
+.sidebar-logo-sub { font-size: 10px; color: var(--color-text-muted); font-weight: 500; }
+.sidebar.is-collapsed .sidebar-logo-text,
+.sidebar.is-collapsed .nav-label { display: none; }
+.nav { flex: 1; padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px;
+  border-radius: 12px; color: var(--color-text-muted); transition: 0.2s;
+}
+.nav-item:hover { background: rgba(255,255,255,0.04); color: var(--color-text-secondary); }
+.nav-item.is-active { background: rgba(99,102,241,0.18); color: #fff; box-shadow: inset 0 0 0 1px rgba(99,102,241,0.35); }
+.nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+.nav-footer { border-top: 1px solid var(--color-border-subtle); padding: 8px; }
+.nav-item.danger:hover { color: var(--color-danger); background: rgba(239,68,68,0.08); }
+
+.main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.header {
+  height: var(--header-height); display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; border-bottom: 1px solid var(--color-border-subtle); background: var(--color-bg-shell);
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+  color: var(--color-text-secondary); background: transparent;
+}
+.icon-btn:hover { background: var(--color-bg-hover); }
+.header-title { font-size: 16px; font-weight: 650; margin: 0; }
+.header-right { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--color-text-secondary); }
+.role-switch {
+  display: flex; align-items: center; gap: 6px; background: var(--color-bg-card);
+  border: 1px solid var(--color-border-subtle); border-radius: 999px; padding: 4px 10px;
+}
+.role-switch select {
+  background: transparent; border: none; color: var(--color-text-primary); outline: none;
+}
+.flag { width: 22px; height: 14px; object-fit: cover; border-radius: 2px; }
+
+.subheader {
+  height: var(--subheader-height); display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; border-bottom: 1px solid var(--color-border-subtle); background: rgba(12,11,22,0.85);
+}
+.tabs { display: flex; gap: 4px; }
+.tab-btn {
+  height: 32px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  color: var(--color-text-muted);
+}
+.tab-btn:hover { color: var(--color-text-secondary); background: rgba(255,255,255,0.04); }
+.tab-btn.is-active { color: #fff; background: rgba(99,102,241,0.2); }
+.refresh-btn {
+  height: 32px; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--color-border-subtle); color: var(--color-text-secondary);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.refresh-btn:hover { background: var(--color-bg-hover); }
+.refresh-btn.is-spinning svg { animation: spin 0.8s linear infinite; }
+
+.main-shell { flex: 1; min-height: 0; overflow: hidden; padding: var(--layout-gap); }
+.page-stack { height: 100%; display: flex; flex-direction: column; gap: var(--layout-gap); min-height: 0; }
+
+/* KPI */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; flex-shrink: 0; }
+.kpi-card {
+  background: var(--color-bg-card); border: 1px solid var(--color-border-subtle);
+  border-radius: 14px; padding: 14px 16px;
+}
+.kpi-label { font-size: 12px; color: var(--color-text-muted); margin-bottom: 6px; }
+.kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+
+.content-shell {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--color-border-subtle); border-radius: 14px;
+  background: var(--color-bg-content-shell);
+}
+.content-header {
+  flex-shrink: 0; padding: 12px 14px; background: var(--color-bg-content-header);
+  border-bottom: 1px solid var(--color-border-subtle); display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.content-body { flex: 1; min-height: 0; overflow: auto; padding: 14px; background: var(--color-bg-content-body); }
+
+.slicer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1; }
+.field {
+  height: 34px; border-radius: 8px; border: 1px solid var(--color-border);
+  background: var(--color-bg-nested-panel); color: var(--color-text-primary); padding: 0 10px; font-size: 12px;
+}
+.field:focus { outline: 1px solid var(--color-accent); }
+.btn {
+  height: 34px; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-active); color: var(--color-text-primary);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover { border-color: var(--color-border); }
+.btn-primary { background: var(--color-accent); border-color: transparent; }
+.btn-primary:hover { background: var(--color-accent-hover); }
+.btn-wa { background: rgba(37,211,102,0.12); color: var(--color-wa); border-color: rgba(37,211,102,0.3); }
+.btn-danger { background: rgba(239,68,68,0.12); color: #fca5a5; border-color: rgba(239,68,68,0.3); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.seg { display: inline-flex; border: 1px solid var(--color-border-subtle); border-radius: 8px; overflow: hidden; }
+.seg button { height: 34px; padding: 0 12px; font-size: 12px; font-weight: 600; color: var(--color-text-muted); }
+.seg button.is-active { background: var(--color-bg-active); color: #fff; }
+
+/* Brand cards */
+.brand-list { display: flex; flex-direction: column; gap: 14px; }
+.brand-card {
+  border: 1px solid var(--color-border-subtle); border-radius: 14px; overflow: hidden;
+  background: var(--color-bg-card);
+}
+.brand-card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid var(--color-border-subtle); background: rgba(255,255,255,0.02);
+}
+.brand-card-title { font-weight: 700; font-size: 14px; }
+.brand-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px;
+  border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary); background: rgba(255,255,255,0.03);
+}
+.badge-wa { color: var(--color-wa); border-color: rgba(37,211,102,0.35); background: var(--color-wa-glow); }
+.badge-tg { color: var(--color-tg); border-color: rgba(59,159,217,0.35); background: var(--color-tg-glow); }
+
+.acct-table { font-size: 12px; }
+.acct-table th {
+  text-align: left; padding: 10px 8px; color: var(--color-text-muted); font-weight: 600;
+  border-bottom: 1px solid var(--color-border-subtle); background: rgba(0,0,0,0.15); position: sticky; top: 0;
+}
+.acct-table td { padding: 10px 8px; border-bottom: 1px solid rgba(42,39,68,0.55); vertical-align: middle; }
+.acct-table tr:hover td { background: rgba(255,255,255,0.02); }
+.plat-icon { width: 16px; height: 16px; vertical-align: middle; margin-right: 6px; }
+.status-pill {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+}
+.status-active { background: rgba(37,211,102,0.15); color: var(--color-wa); }
+.status-logout { background: rgba(239,68,68,0.15); color: #fca5a5; }
+.session-valid { color: var(--color-wa); font-weight: 650; }
+.session-invalid { color: #fca5a5; font-weight: 650; }
+.yx { font-variant-numeric: tabular-nums; font-weight: 650; }
+.yx.ok { color: var(--color-wa); }
+.yx.bad { color: #fca5a5; }
+.yx .den { color: var(--color-text-muted); font-weight: 500; }
+.muted { color: var(--color-text-muted); }
+.row-actions { display: flex; gap: 6px; align-items: center; }
+.tiny-btn {
+  width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  border: 1px solid var(--color-border-subtle); color: var(--color-text-secondary);
+}
+.tiny-btn:hover { background: var(--color-bg-hover); }
+.tiny-btn:disabled { opacity: 0.4; }
+.progress-cell { min-width: 140px; }
+.progress-bar {
+  height: 6px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; margin-top: 4px;
+}
+.progress-bar > i { display: block; height: 100%; background: var(--color-accent); width: 0%; transition: width 0.3s; }
+.marquee {
+  font-size: 11px; color: var(--color-accent); white-space: nowrap; overflow: hidden;
+  animation: blink 1.2s ease-in-out infinite;
+}
+@keyframes blink { 50% { opacity: 0.45; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Ops stock */
+.ops-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
+.stock-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 12px 14px; }
+.stock-chip {
+  border: 1px solid var(--color-border-subtle); border-radius: 10px; padding: 10px 8px; text-align: center;
+  background: rgba(255,255,255,0.02); cursor: pointer;
+}
+.stock-chip:hover { border-color: var(--color-accent); background: rgba(99,102,241,0.08); }
+.stock-chip-label { font-size: 11px; color: var(--color-text-muted); margin-bottom: 4px; }
+.stock-chip-value { font-size: 18px; font-weight: 700; }
+.ops-meta { display: flex; gap: 16px; font-size: 12px; color: var(--color-text-secondary); padding: 0 14px 12px; }
+.ops-meta strong { color: var(--color-text-primary); }
+.ops-meta .warn { color: #fbbf24; }
+
+/* Job queue */
+.jq-add {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;
+  padding: 12px; border: 1px solid var(--color-border-subtle); border-radius: 12px; background: var(--color-bg-card);
+}
+.jq-table th, .jq-table td { padding: 10px 8px; font-size: 12px; border-bottom: 1px solid rgba(42,39,68,0.55); text-align: left; }
+.jq-table th { color: var(--color-text-muted); background: rgba(0,0,0,0.2); }
+.job-status {
+  display: inline-flex; height: 22px; align-items: center; padding: 0 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; text-transform: capitalize;
+}
+.job-queued { background: rgba(168,164,192,0.15); color: var(--color-text-secondary); }
+.job-running { background: rgba(99,102,241,0.2); color: #c7d2fe; }
+.job-completed { background: rgba(37,211,102,0.15); color: var(--color-wa); }
+.job-failed { background: rgba(239,68,68,0.18); color: #fca5a5; }
+.job-cancelled, .job-paused { background: rgba(251,191,36,0.15); color: #fbbf24; }
+
+/* Reporting */
+.report-table th, .report-table td { padding: 8px; font-size: 12px; border-bottom: 1px solid rgba(42,39,68,0.55); text-align: left; }
+.report-table th { color: var(--color-text-muted); background: rgba(0,0,0,0.2); position: sticky; top: 0; }
+.yes { color: var(--color-wa); font-weight: 700; }
+.no { color: #fca5a5; font-weight: 700; }
+.footer-bar {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 10px 14px; border-top: 1px solid var(--color-border-subtle); background: var(--color-bg-content-header);
+  font-size: 12px; color: var(--color-text-secondary);
+}
+.empty-state {
+  padding: 40px 20px; text-align: center; color: var(--color-text-muted); font-size: 13px;
+}
+
+/* Settings */
+.settings-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.settings-list { display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.settings-card {
+  border: 1px solid var(--color-border-subtle); border-radius: 12px; background: var(--color-bg-card); overflow: hidden;
+}
+.settings-card-head {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px; text-align: left; font-weight: 650;
+}
+.settings-card-head:hover { background: rgba(255,255,255,0.03); }
+.settings-card-body { padding: 0 16px 16px; border-top: 1px solid var(--color-border-subtle); display: none; }
+.settings-card.is-open .settings-card-body { display: block; padding-top: 14px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-row label { display: block; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.switch {
+  width: 40px; height: 22px; border-radius: 999px; background: var(--color-border); position: relative;
+}
+.switch.on { background: var(--color-accent); }
+.switch::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; transition: 0.2s;
+}
+.switch.on::after { left: 21px; }
+
+/* Modal */
+.modal-root {
+  position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.65); padding: 24px;
+}
+.modal-root.is-open { display: flex; }
+.modal {
+  width: min(720px, 100%); max-height: min(85vh, 800px); overflow: auto;
+  background: var(--color-bg-card); border: 1px solid var(--color-border);
+  border-radius: 16px; box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+}
+.modal--lg { width: min(960px, 100%); }
+.modal-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 14px 16px; border-bottom: 1px solid var(--color-border-subtle); position: sticky; top: 0;
+  background: var(--color-bg-card); z-index: 1;
+}
+.modal-title { margin: 0; font-size: 15px; font-weight: 700; }
+.modal-body { padding: 16px; }
+.modal-foot {
+  display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px;
+  border-top: 1px solid var(--color-border-subtle); position: sticky; bottom: 0; background: var(--color-bg-card);
+}
+.qr-box {
+  width: 200px; height: 200px; margin: 12px auto; border-radius: 12px;
+  background: repeating-linear-gradient(45deg, #111 0 8px, #222 8px 16px);
+  border: 1px solid var(--color-border); position: relative; overflow: hidden;
+}
+.qr-box::after {
+  content: 'QR'; position: absolute; inset: 0; display: grid; place-items: center;
+  font-weight: 800; color: rgba(255,255,255,0.35); letter-spacing: 0.2em;
+}
+.qr-box.loading::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.25), transparent);
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.picker-list { display: flex; flex-direction: column; gap: 8px; }
+.picker-item {
+  text-align: left; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--color-border-subtle);
+  background: rgba(255,255,255,0.02);
+}
+.picker-item:hover { border-color: var(--color-accent); background: rgba(99,102,241,0.08); }
+.picker-item strong { display: block; margin-bottom: 2px; }
+.picker-item span { font-size: 12px; color: var(--color-text-muted); }
+.check-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow: auto; }
+.check-item {
+  display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.02); font-size: 12px;
+}
+.toast {
+  position: fixed; right: 20px; bottom: 20px; z-index: 1100; display: none;
+  background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 10px;
+  padding: 12px 14px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); max-width: 320px;
+}
+.toast.is-open { display: block; }
+
+@media (max-width: 1100px) {
+  .kpi-grid, .settings-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 960px) {
+  .stock-strip { grid-template-columns: repeat(3, 1fr); }
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+/* Desktop review target (≥1280px) — keep dense app layout */
+@media (min-width: 1280px) {
+  .main-shell { padding: 16px; }
+  .acct-table { font-size: 12.5px; }
+}
+
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; }
+
+/* Layout parity layer: mirrors the v1.0.30 production component structure. */
+.demo-banner {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.demo-role-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+.demo-role-switch select {
+  height: 17px;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 4px;
+  background: #431407;
+  color: #ffedd5;
+  font-size: 10px;
+}
+.shell { display: flex; height: 100%; overflow: hidden; background: var(--color-bg-base); }
+.sidebar-shell {
+  width: var(--sidebar-expanded-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-bg-shell);
+  border-right: 1px solid var(--color-border-subtle);
+  transition: width 280ms cubic-bezier(.4,0,.2,1);
+}
+.sidebar-shell.is-collapsed { width: var(--sidebar-collapsed-width); }
+.sidebar-brand-wrap {
+  height: var(--header-height);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.sidebar-brand-block { display:flex; min-width:0; align-items:center; gap:.75rem; width:100%; }
+.brand-logo-mark {
+  display:block; flex-shrink:0; overflow:hidden; border-radius:9999px; background:#000;
+  box-shadow:0 0 0 2px var(--color-brand-gold),0 0 12px rgba(212,175,55,.28);
+}
+.brand-logo-mark--md { width:2.5rem; height:2.5rem; }
+.brand-logo-mark--lg { width:2.75rem; height:2.75rem; }
+.brand-logo-mark__img { display:block; width:100%; height:100%; object-fit:cover; }
+.sidebar-label {
+  overflow:hidden; white-space:nowrap; margin-left:.75rem; max-width:9rem; opacity:1;
+  transition:max-width 280ms cubic-bezier(.4,0,.2,1),opacity 180ms cubic-bezier(.4,0,.2,1),margin 280ms cubic-bezier(.4,0,.2,1);
+}
+.sidebar-brand-block .sidebar-label { margin-left:0; }
+.sidebar-brand-label { max-width:11rem; line-height:1.2; }
+.sidebar-brand-title { display:block; overflow:hidden; text-overflow:ellipsis; font-size:.875rem; font-weight:600; letter-spacing:.02em; }
+.sidebar-brand-tagline { display:block; overflow:hidden; text-overflow:ellipsis; margin-top:.125rem; font-size:.6875rem; font-weight:500; color:var(--color-text-muted); }
+.sidebar-shell.is-collapsed .sidebar-label { max-width:0; margin-left:0; opacity:0; }
+.sidebar-nav { display:flex; flex:1; flex-direction:column; gap:4px; padding:12px 8px 8px; }
+.sidebar-footer { flex-shrink:0; border-top:1px solid var(--color-border-subtle); padding:8px; }
+.nav-item {
+  display:flex; width:100%; height:40px; align-items:center; border-radius:12px; padding:0 12px;
+  color:var(--color-text-muted); transition:background-color .2s,color .2s;
+}
+.nav-item svg { width:20px; height:20px; flex-shrink:0; }
+.nav-item:hover:not(.nav-item-active) { background:rgba(255,255,255,.06); color:var(--color-text-secondary); }
+.nav-item-active { background:rgba(99,102,241,.18); color:var(--color-text-primary); box-shadow:inset 0 0 0 1px rgba(99,102,241,.12); }
+.main-col { display:flex; min-width:0; flex:1; flex-direction:column; overflow:hidden; }
+.header {
+  position:sticky; top:0; z-index:30; display:flex; height:var(--header-height); flex-shrink:0;
+  align-items:center; justify-content:space-between; padding:0 24px;
+  border-bottom:1px solid var(--color-border-subtle); background:var(--color-bg-shell);
+}
+.header-left { display:flex; min-width:0; align-items:center; gap:12px; }
+.header-title-block { min-width:0; }
+.header-page-title { min-height:1.35rem; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:1.125rem; line-height:1.25; font-weight:600; }
+.live-clock { display:block; margin-top:2px; font-size:.6875rem; color:var(--color-text-muted); }
+.header-right { display:flex; flex-shrink:0; align-items:center; gap:12px; }
+.header-welcome { display:inline-flex; max-width:11rem; min-width:6.5rem; align-items:baseline; gap:.25rem; overflow:hidden; white-space:nowrap; font-size:.875rem; color:var(--color-text-secondary); }
+.header-welcome strong { color:var(--color-text-primary); font-weight:500; }
+.header-flag { width:28px; height:28px; flex-shrink:0; border-radius:999px; object-fit:cover; box-shadow:0 0 0 1px rgba(255,255,255,.15); }
+.subheader {
+  position:sticky; top:var(--header-height); z-index:20; display:flex; height:var(--subheader-height);
+  flex-shrink:0; align-items:center; justify-content:flex-end; padding:0 24px;
+  border-bottom:1px solid var(--color-border-subtle); background:var(--color-bg-base);
+}
+.monitoring-subheader-actions { display:inline-flex; align-items:center; gap:8px; }
+.monitoring-tabs { display:inline-flex; align-items:center; gap:4px; border-radius:8px; background:var(--color-bg-base); padding:4px; }
+.monitoring-tab-btn {
+  display:inline-flex; align-items:center; border-radius:6px; padding:6px 16px; font-size:.875rem; font-weight:500;
+  color:var(--color-text-muted); transition:background-color .15s,color .15s;
+}
+.monitoring-tab-btn:hover { color:var(--color-text-secondary); }
+.monitoring-tab-btn.is-active { background:var(--color-bg-shell); color:var(--color-text-primary); box-shadow:0 1px 2px rgba(0,0,0,.3); }
+.monitoring-tab-btn--account { min-width:4.75rem; }
+.monitoring-tab-btn--operations { min-width:6.25rem; }
+.monitoring-tab-btn--reporting { min-width:6.5rem; }
+.monitoring-refresh-btn {
+  display:inline-flex; width:36px; height:36px; align-items:center; justify-content:center;
+  border:1px solid var(--color-border-subtle); border-radius:8px; color:var(--color-text-secondary);
+}
+.monitoring-refresh-btn:hover { background:var(--color-bg-hover); color:var(--color-text-primary); }
+.monitoring-refresh-btn.is-spinning svg { animation:spin .8s linear infinite; }
+.main-shell { flex:1; min-height:0; overflow:hidden; padding:var(--layout-gap); }
+
+/* Account page: production sizing and hierarchy */
+.page-stack { display:flex; height:100%; min-height:0; flex-direction:column; gap:var(--layout-gap); }
+.kpi-grid { display:grid; flex-shrink:0; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--layout-gap); }
+.kpi-card { border-radius:12px; border:1px solid var(--color-border-subtle); background:var(--color-bg-card); padding:8px 16px; }
+.kpi-value { margin:0; font-size:1.5rem; line-height:1; font-weight:600; font-variant-numeric:tabular-nums; }
+.kpi-label { min-height:0; margin:4px 0 0; font-size:.75rem; line-height:1.25; color:var(--color-text-muted); }
+.kpi-value.success { color:var(--color-wa); }
+.kpi-value.danger { color:var(--color-danger); }
+.content-area-shell {
+  display:flex; min-height:0; flex:1; flex-direction:column; overflow:hidden; border-radius:12px;
+  border:1px solid rgba(255,255,255,.07); background:var(--color-bg-content-shell);
+  box-shadow:0 0 0 1px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.22);
+}
+.content-area-header {
+  position:relative; z-index:2; flex-shrink:0;
+  background:linear-gradient(180deg,rgba(22,20,38,.98),var(--color-bg-content-header));
+  border-bottom:1px solid rgba(255,255,255,.08);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 14px rgba(0,0,0,.28);
+}
+.content-slicer-bar { display:flex; min-height:48px; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 20px; }
+.account-slicer-row { display:flex; width:100%; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.account-slicer-left { display:flex; min-width:0; flex-shrink:0; align-items:center; }
+.account-slicer-search-group { display:flex; height:32px; overflow:hidden; border:1px solid rgba(255,255,255,.08); border-radius:6px; background:rgba(0,0,0,.22); }
+.account-slicer-search { width:14rem; min-width:10rem; max-width:18rem; border:0; background:transparent; padding:0 10px; font-size:.75rem; color:var(--color-text-primary); outline:none; }
+.account-slicer-search-btn { min-width:4.25rem; height:100%; border-left:1px solid rgba(37,211,102,.35); background:var(--color-wa); padding:0 12px; font-size:.75rem; font-weight:600; color:#fff; }
+.account-slicer-right,.account-slicer-filters { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.account-slicer-right { flex-shrink:0; justify-content:flex-end; margin-left:auto; }
+.dark-select,.account-slicer-select {
+  height:32px; min-width:8.25rem; border:1px solid rgba(255,255,255,.08); border-radius:6px;
+  background:rgba(0,0,0,.22); padding:0 10px; font-size:.75rem; font-weight:500; color:var(--color-text-primary);
+}
+.account-slicer-view-toggle { display:inline-flex; gap:2px; border-radius:6px; background:rgba(0,0,0,.28); padding:2px; }
+.account-slicer-view-btn { border-radius:5px; padding:6px 12px; font-size:.75rem; font-weight:500; color:var(--color-text-muted); }
+.account-slicer-view-btn--active { background:var(--color-bg-active); color:var(--color-text-primary); }
+.account-slicer-export-btn {
+  display:inline-flex; width:32px; height:32px; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.1); border-radius:6px; background:rgba(0,0,0,.28); color:var(--color-text-muted);
+}
+.account-slicer-export-btn:hover { border-color:rgba(255,255,255,.18); background:var(--color-bg-hover); color:var(--color-text-primary); }
+.account-slicer-export-btn svg { width:16px; height:16px; }
+.content-area-body { position:relative; z-index:1; display:flex; min-height:0; flex:1; flex-direction:column; overflow:hidden; padding:var(--layout-gap); background:var(--color-bg-content-body); }
+.brand-card-list { display:flex; min-height:0; flex:1; flex-direction:column; gap:var(--layout-gap); overflow-y:auto; }
+.brand-card { display:flex; flex-shrink:0; flex-direction:column; overflow:visible; border-radius:12px; border:1px solid var(--color-border-subtle); background:var(--color-bg-nested-panel); box-shadow:0 2px 8px rgba(0,0,0,.18); }
+.brand-card-header { display:flex; width:100%; flex-shrink:0; align-items:center; justify-content:space-between; gap:8px; padding:10px 4px 10px 14px; background:rgba(255,255,255,.03); }
+.brand-card-header-toggle { display:flex; min-width:0; flex:1; align-items:center; gap:8px; padding:0; text-align:left; }
+.brand-card-chevron { width:16px; height:16px; flex-shrink:0; color:var(--color-text-muted); transition:transform .18s; }
+.brand-card.collapsed .brand-card-chevron { transform:rotate(-90deg); }
+.brand-card-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.8125rem; font-weight:600; }
+.brand-card-header-actions { display:flex; min-width:0; flex:1 1 auto; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:6px; margin-left:auto; }
+.brand-card-badge { display:inline-flex; align-items:center; border-radius:999px; padding:2px 8px; font-size:.6875rem; font-weight:500; line-height:20px; }
+.brand-card-badge--neutral { background:rgba(255,255,255,.06); color:var(--color-text-secondary); }
+.brand-card-badge--success { background:rgba(37,211,102,.12); color:var(--color-wa); }
+.brand-card-badge--danger { background:rgba(239,68,68,.12); color:var(--color-danger); }
+.brand-card-badge--platform-groups { width:118px; justify-content:space-between; border:0; cursor:pointer; }
+.brand-add-account-btn { display:inline-flex; align-items:center; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(255,255,255,.06); padding:2px 8px; font-size:.6875rem; line-height:20px; color:var(--color-wa); }
+.card-header-dismiss-btn { display:inline-flex; width:26px; height:26px; align-items:center; justify-content:center; border-radius:6px; color:var(--color-text-muted); }
+.brand-card-body { overflow-x:auto; border-top:1px solid rgba(255,255,255,.06); border-bottom:1px solid rgba(255,255,255,.06); padding:8px 12px 12px; }
+.brand-card.collapsed .brand-card-body { display:none; }
+.brand-card-table { width:100%; min-width:100%; table-layout:fixed; border-collapse:collapse; font-size:.75rem; }
+.brand-card-table .brand-col--account { width:25%; }
+.brand-card-table .brand-col--location { width:9%; }
+.brand-card-table .brand-col--status { width:9%; }
+.brand-card-table .brand-col--session { width:9%; }
+.brand-card-table .brand-col--on-device { width:9%; }
+.brand-card-table .brand-col--in-brand { width:9%; }
+.brand-card-table .brand-col--admin { width:9%; }
+.brand-card-table .brand-col--last-update { width:13%; }
+.brand-card-table .brand-col--action { width:8%; }
+.brand-card-table th { position:static; padding:8px 6px; border-bottom:1px solid rgba(255,255,255,.06); background:transparent; text-align:left; font-size:.6875rem; font-weight:500; color:var(--color-text-muted); }
+.brand-card-table td { height:48px; padding:6px; border-bottom:1px solid rgba(255,255,255,.045); vertical-align:middle; }
+.brand-card-table tbody tr:last-child td { border-bottom:0; }
+.account-cell { display:flex; min-width:0; align-items:center; gap:8px; }
+.platform-badge { display:inline-flex; width:28px; height:28px; flex-shrink:0; align-items:center; justify-content:center; border-radius:6px; }
+.platform-badge.wa { background:rgba(37,211,102,.15); }
+.platform-badge.tg { background:rgba(59,159,217,.15); }
+.platform-badge img { width:16px; height:16px; }
+.account-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; color:var(--color-text-primary); }
+.account-phone { margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.6875rem; color:var(--color-text-muted); }
+.status-pill { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:500; }
+.status-pill::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.status-active { background:rgba(37,211,102,.1); color:var(--color-wa); }
+.status-logout { background:rgba(239,68,68,.1); color:var(--color-danger); }
+.session-pill { display:inline-flex; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+.session-valid { background:rgba(37,211,102,.15); color:var(--color-wa); }
+.session-invalid { background:rgba(239,68,68,.15); color:var(--color-danger); }
+.metric-ratio { font-size:.75rem; font-variant-numeric:tabular-nums; }
+.metric-ratio.aligned { color:var(--color-wa); }
+.metric-ratio.short .current { color:var(--color-danger); }
+.admin-progress { width:100%; max-width:82px; }
+.admin-progress-track { height:3px; margin-top:4px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.09); }
+.admin-progress-track i { display:block; height:100%; background:var(--color-danger); }
+.admin-progress-track i.good { background:var(--color-wa); }
+.last-update { font-size:.6875rem; line-height:1.35; color:var(--color-text-muted); }
+.row-action-wrap { display:flex; align-items:center; justify-content:flex-end; gap:5px; }
+.sync-btn,.edit-btn { display:inline-flex; width:26px; height:26px; align-items:center; justify-content:center; border-radius:6px; color:var(--color-text-muted); }
+.sync-btn:hover,.edit-btn:hover { background:rgba(255,255,255,.06); color:var(--color-text-primary); }
+.brand-card-action-btn { border:0; background:transparent; padding:0; font-size:.6875rem; font-weight:500; color:#93c5fd; white-space:nowrap; }
+.brand-card-action-btn--cancel-scrape { color:var(--color-danger); }
+
+/* Operations overview and global queue */
+.operations-overview-panel { display:flex; min-height:0; flex:1; flex-direction:column; overflow:auto; border-radius:12px; border:1px solid var(--color-border-subtle); background:var(--color-bg-nested-panel); padding:16px; }
+.operations-brand-card-list { --ops-header-col-chevron:16px; --ops-header-col-brand:112px; --ops-header-col-divider:18px; --ops-header-col-metric:80px; }
+.brand-card-header.operations-brand-card-header { gap:12px; padding-right:12px; }
+.operations-brand-card-toggle {
+  display:grid; flex:0 0 auto; min-width:404px;
+  grid-template-columns:var(--ops-header-col-chevron) var(--ops-header-col-brand) var(--ops-header-col-divider) var(--ops-header-col-metric) var(--ops-header-col-divider) var(--ops-header-col-metric);
+  align-items:center;
+}
+.operations-brand-col-brand { width:112px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.operations-brand-meta-divider { display:flex; width:18px; align-items:center; justify-content:center; font-size:12px; font-weight:300; color:rgba(255,255,255,.16); }
+.operations-brand-col-metric { display:flex; width:80px; align-items:baseline; justify-content:space-between; gap:4px; padding:0 2px; font-size:11px; line-height:20px; white-space:nowrap; }
+.operations-brand-meta-label { overflow:hidden; text-overflow:ellipsis; color:var(--color-text-muted); }
+.operations-brand-meta-value { min-width:2.75ch; text-align:right; font-variant-numeric:tabular-nums; font-weight:600; color:var(--color-text-secondary); }
+.operations-brand-col-metric--warning .operations-brand-meta-label,.operations-brand-meta-value--warning { color:#fb923c; }
+.operations-brand-card-metrics { display:flex; min-width:0; flex:1 1 auto; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px 10px; margin-left:auto; }
+.operations-stock-panel { flex:0 1 auto; width:auto; min-width:min(100%,448px); max-width:512px; border:1px solid rgba(255,255,255,.08); border-radius:8px; background:rgba(0,0,0,.22); padding:3px; box-shadow:inset 0 1px 0 rgba(255,255,255,.04); }
+.operations-group-stock-strip { display:grid; width:100%; grid-template-columns:repeat(5,minmax(0,1fr)); }
+.operations-stock-chip { display:inline-flex; min-width:0; align-items:center; justify-content:center; gap:4px; border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:11px; font-weight:500; line-height:20px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.operations-stock-chip:not(:first-child) { box-shadow:-1px 0 0 rgba(255,255,255,.06); }
+.operations-stock-chip-label { overflow:hidden; text-overflow:ellipsis; }
+.operations-stock-chip-count { flex-shrink:0; min-width:1.25ch; font-weight:700; }
+.operations-stock-chip--active { border-color:rgba(37,211,102,.35); background:rgba(37,211,102,.12); color:#4ade80; }
+.operations-stock-chip--ready { border-color:rgba(59,130,246,.35); background:rgba(59,130,246,.12); color:#60a5fa; }
+.operations-stock-chip--recycle { border-color:rgba(245,158,11,.4); background:rgba(245,158,11,.12); color:#fbbf24; }
+.operations-stock-chip--review { border-color:rgba(249,115,22,.4); background:rgba(249,115,22,.12); color:#fb923c; }
+.operations-stock-chip--other { border-color:rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:var(--color-text-secondary); }
+.operations-job-queue-only { display:flex; min-height:0; flex:1; flex-direction:column; gap:var(--layout-gap); overflow:hidden; }
+.operations-job-queue-zone { display:flex; flex-direction:column; gap:10px; padding:16px 20px; border:1px solid var(--color-border-subtle); border-radius:12px; background:var(--color-bg-shell); }
+.operations-job-queue-zone--add { flex:0 0 auto; }
+.operations-job-queue-zone--table { min-height:0; max-height:min(55vh,512px); overflow:hidden; }
+.operations-job-queue-add,.operations-job-queue-add-filters { display:flex; gap:10px 16px; }
+.operations-job-queue-add { flex-direction:column; }
+.operations-job-queue-add-filters { flex-wrap:wrap; align-items:center; }
+.operations-job-queue-field { display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 216px; max-width:240px; font-size:12px; color:var(--color-text-muted); }
+.operations-job-queue-field>span { flex-shrink:0; }
+.operations-job-queue-select { width:100%; min-width:0; }
+.operations-job-queue-add-filters__actions { display:flex; min-height:32px; align-items:center; }
+.operations-job-queue-setup-btn { display:inline-flex; width:32px; height:32px; align-items:center; justify-content:center; border-radius:6px; color:var(--color-text-muted); }
+.operations-job-queue-setup-btn:hover:not(:disabled) { background:rgba(255,255,255,.06); color:var(--color-text-primary); }
+.operations-job-queue-setup-btn:disabled { opacity:.45; cursor:not-allowed; }
+.operations-job-queue-submit { height:32px; border-radius:6px; border:1px solid rgba(37,211,102,.35); background:rgba(37,211,102,.12); padding:0 14px; font-size:12px; font-weight:600; color:var(--color-wa); }
+.operations-job-queue-submit:disabled { opacity:.45; cursor:not-allowed; }
+.operations-job-queue-zone-head { display:flex; align-items:center; justify-content:space-between; }
+.operations-job-queue-zone-title { margin:0; font-size:13px; font-weight:600; color:var(--color-text-secondary); text-transform:capitalize; }
+.operations-job-queue-table-wrap { min-height:0; flex:1; overflow:auto; }
+.operations-job-queue-table { width:100%; border-collapse:collapse; font-size:12px; }
+.operations-job-queue-table th,.operations-job-queue-table td { padding:8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:left; }
+.operations-job-queue-table thead th { position:sticky; top:0; z-index:1; background:var(--color-bg-shell); color:var(--color-text-muted); font-size:11px; font-weight:500; }
+.operations-job-queue-select-col { width:42px; }
+.operations-job-queue-row-actions { display:flex; gap:6px; align-items:center; }
+.operations-job-queue-btn { display:inline-flex; height:28px; align-items:center; border:1px solid var(--color-border-subtle); border-radius:6px; background:rgba(255,255,255,.04); padding:0 10px; font-size:11px; font-weight:600; color:var(--color-text-secondary); }
+.operations-job-queue-btn--danger { color:var(--color-danger); }
+.operations-job-queue-empty { padding:20px 12px; text-align:center; font-size:12px; color:var(--color-text-muted); }
+
+/* Reporting */
+.content-area-header--reporting,.reporting-slicer-bar { overflow:visible; }
+.reporting-slicer-row .account-slicer-left { flex:1; min-width:0; }
+.reporting-slicer-right { flex-wrap:wrap; justify-content:flex-end; gap:10px 12px; padding-right:4px; }
+.reporting-slicer-filters { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:12px 16px; }
+.reporting-slicer-field { display:flex; align-items:center; gap:8px; }
+.reporting-slicer-label { font-size:11px; font-weight:600; color:var(--color-text-muted); white-space:nowrap; }
+.reporting-slicer-field .account-slicer-select { height:28px; min-width:104px; padding:0 8px; font-size:11px; }
+.reporting-nested-panel { display:flex; min-height:0; flex:1; flex-direction:column; overflow:hidden; border-radius:12px; border:1px solid var(--color-border-subtle); background:var(--color-bg-nested-panel); }
+.reporting-table-panel { display:flex; min-height:0; flex:1; flex-direction:column; overflow:hidden; }
+.join-report-table-wrap { flex:1; min-height:0; overflow:auto; padding:12px 20px; }
+.join-report-table { width:max-content; min-width:100%; border-collapse:collapse; font-size:12px; }
+.join-report-table th,.join-report-table td { border-bottom:1px solid var(--color-border-subtle); padding:8px 12px; text-align:left; vertical-align:middle; white-space:nowrap; }
+.join-report-table thead th { position:sticky; top:0; z-index:2; background:var(--color-bg-shell); font-weight:600; color:var(--color-text-secondary); }
+.join-report-table__yes,.join-report-table__no { text-align:center!important; font-weight:600; }
+.join-report-table__yes { color:#22c55e; }
+.join-report-table__no { color:#ff4d4f; }
+.reporting-card-footer { display:flex; flex-shrink:0; align-items:center; justify-content:space-between; gap:8px 12px; padding:8px 20px 12px; border-top:1px solid rgba(255,255,255,.06); }
+.reporting-card-footer-meta { display:flex; flex:1; gap:8px 12px; font-size:11px; color:var(--color-text-muted); }
+.reporting-card-footer-actions { display:inline-flex; gap:6px; }
+
+/* Settings */
+.settings-content-body { overflow:auto; padding:24px; }
+.settings-version-card { flex-shrink:0; border:1px solid var(--color-border-subtle); border-radius:12px; background:var(--color-bg-shell); padding:16px; margin-bottom:32px; }
+.settings-version-title { margin:0; font-size:14px; font-weight:500; }
+.settings-version-note { margin:4px 0 12px; font-size:12px; color:var(--color-text-muted); }
+.admin-page-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.admin-expand-card { display:flex; min-height:52px; flex-direction:column; overflow:hidden; border:1px solid var(--color-border-subtle); border-radius:12px; background:var(--color-bg-shell); }
+.admin-expand-card-header { display:flex; width:100%; align-items:center; gap:12px; padding:16px 20px; }
+.admin-expand-card-header:hover { background:var(--color-bg-hover); }
+.admin-expand-card-header-toggle { display:flex; min-width:0; flex:1; align-items:center; gap:8px; padding:0; text-align:left; }
+.admin-expand-card-chevron { width:16px; height:16px; flex-shrink:0; color:var(--color-text-muted); transition:transform .15s; }
+.admin-expand-card-chevron--collapsed { transform:rotate(-90deg); }
+.admin-expand-card-title { flex:1; min-width:0; font-size:14px; font-weight:600; }
+.admin-expand-card-summary { flex-shrink:0; font-size:12px; color:var(--color-text-muted); }
+.admin-expand-card-body { display:none; flex-direction:column; gap:12px; padding:16px 20px 20px; border-top:1px solid var(--color-border-subtle); }
+.admin-expand-card.is-open .admin-expand-card-body { display:flex; }
+.locale-toggle { display:inline-flex; gap:4px; border-radius:8px; background:var(--color-bg-base); padding:4px; }
+.locale-toggle-btn { border-radius:6px; padding:8px 16px; font-size:13px; font-weight:500; color:var(--color-text-muted); }
+.locale-toggle-btn.is-active { background:var(--color-bg-shell); color:var(--color-text-primary); box-shadow:0 1px 2px rgba(0,0,0,.3); }
+.group-links-page-btn { min-height:24px; border:1px solid rgba(255,255,255,.12); border-radius:6px; background:rgba(255,255,255,.04); padding:4px 10px; font-size:11px; color:var(--color-text-secondary); }
+.group-links-page-btn:disabled { opacity:.4; cursor:not-allowed; }
+.group-links-export-btn { min-height:24px; border:1px solid rgba(37,211,102,.5); border-radius:4px; background:var(--color-wa); padding:3px 8px; font-size:11px; font-weight:600; color:#fff; }
+.reporting-table-shell { display:flex; min-height:0; flex:1; flex-direction:column; overflow:hidden; padding:12px 20px 0; }
+.reporting-table-scroll { min-height:0; flex:1; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:6px; }
+@media (max-width:960px) { .admin-page-grid { grid-template-columns:1fr; } }
+
+/* Production modal proportions */
+.modal-root { z-index:10000; background:rgba(0,0,0,.78); padding:16px; backdrop-filter:blur(8px); }
+.modal.brand-modal-panel {
+  position:relative; width:min(100%,384px); max-height:96vh; overflow:auto;
+  border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#12101f;
+  box-shadow:0 24px 64px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.06);
+}
+.modal.brand-modal-panel.modal--lg { display:flex; width:min(92vw,1152px); max-width:96vw; flex-direction:column; }
+.modal-head.brand-modal-header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.08); }
+.brand-modal-title { margin:0; font-size:14px; font-weight:600; }
+.modal-body { padding:12px 14px; }
+.modal-foot.brand-modal-actions { display:flex; position:static; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:6px; padding:10px 14px; border-top:1px solid rgba(255,255,255,.08); }
+.group-links-picker-body { display:flex; flex-direction:column; gap:10px; padding:0; }
+.group-links-picker-option { display:flex; width:100%; flex-direction:column; align-items:flex-start; gap:4px; padding:12px 14px; border:1px solid rgba(255,255,255,.1); border-radius:8px; background:rgba(255,255,255,.03); text-align:left; }
+.group-links-picker-option:hover { border-color:rgba(37,211,102,.45); background:rgba(37,211,102,.06); }
+.group-links-picker-option-title { font-size:13px; font-weight:600; }
+.group-links-picker-option-desc { font-size:11px; line-height:1.4; color:var(--color-text-muted); }
+
+@media (max-width:1100px) {
+  .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .account-slicer-left,.account-slicer-right { width:100%; }
+  .account-slicer-right { justify-content:flex-start; margin-left:0; }
+}
+
+/* Login values copied from the production v1.0.30 stylesheet. */
+.login-page {
+  position:relative; display:flex; min-height:100%; align-items:center; justify-content:center;
+  background:#06050c; padding:12px;
+}
+.login-page::before {
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 55% 45% at 50% 46%,rgba(12,18,38,.55),transparent 68%);
+}
+.login-card {
+  position:relative; z-index:1; width:100%; max-width:280px; overflow:hidden; border-radius:12px;
+  border:1px solid rgba(255,255,255,.05);
+  background:linear-gradient(168deg,#141a2e 0%,#101525 42%,#0c0f1a 100%);
+  padding:14px 14px 13px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),inset 0 -1px 0 rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.55),0 14px 32px rgba(0,0,0,.55),0 4px 10px rgba(0,0,0,.4);
+}
+.login-card::before { content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit; background:linear-gradient(180deg,rgba(20,28,48,.65),rgba(12,15,26,.2) 35%,transparent 55%); }
+.login-card>* { position:relative; z-index:1; }
+.login-card-header { display:flex; align-items:center; gap:12px; padding-bottom:12px; }
+.login-card-title { margin:0; font-size:15px; font-weight:600; line-height:1.25; letter-spacing:.02em; }
+.login-card-subtitle { margin:2px 0 0; font-size:11px; line-height:1.3; color:var(--color-text-muted); }
+.login-divider { height:1px; margin:0 0 10px; background:rgba(255,255,255,.06); }
+.login-field { margin-bottom:9px; }
+.login-field-label { display:block; margin-bottom:4px; font-size:11px; font-weight:500; color:var(--color-text-secondary); }
+.login-input-icon { left:10px; width:13px; height:13px; color:#8b8fa3; }
+.login-input { width:100%; height:auto; border:0; border-radius:7px; background:#e8ebf2; padding:8px 34px 8px 32px; font-size:12px; line-height:18px; color:#111827; outline:none; }
+.login-input--plain { padding-right:10px; }
+.login-input-toggle { position:absolute; right:10px; top:50%; display:flex; transform:translateY(-50%); border:0; background:transparent; padding:0; color:#8b8fa3; }
+.login-error { margin-bottom:9px; border-radius:7px; border:1px solid rgba(239,68,68,.22); background:rgba(239,68,68,.08); padding:7px 10px; font-size:11px; color:#fca5a5; }
+.login-submit { margin-top:2px; width:100%; border:0; border-radius:7px; background:#4f46e5; padding:9px 14px; font-size:13px; font-weight:600; color:#fff; box-shadow:0 3px 10px rgba(0,0,0,.35); }
+.login-submit:hover:not(:disabled) { background:#4338ca; }
+.login-hint { margin:10px 0 0; font-size:10px; color:var(--color-text-muted); }
+
+/* Wireframe review: keep every table header and value centered. */
+table th,
+table td {
+  text-align: center !important;
+}
+.row-action-wrap,
+.operations-job-queue-row-actions {
+  justify-content: center;
+}
+.brand-card-table th:first-child,
+.brand-card-table td:first-child,
+.account-name,
+.account-phone {
+  text-align: left !important;
+}
+.account-cell {
+  justify-content: flex-start;
+}
+.admin-progress {
+  margin-inline: auto;
+}
+
+.app-root{padding-top:0}
+  </style>
+</head>
+<body data-page="app">
+  <div class="app-root">
+    <div class="locale-switch-surface shell">
+      <aside class="sidebar-shell sidebar" id="sidebar">
+        <div class="sidebar-brand-wrap">
+          <div class="sidebar-brand-block">
+            <span class="brand-logo-mark brand-logo-mark--md">
+              <img class="brand-logo-mark__img" src="data:image/jpeg;base64,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" alt="GM Apps" />
+            </span>
+            <span class="sidebar-label sidebar-label--expanded sidebar-brand-label">
+              <span class="sidebar-brand-title">Backend Operation</span>
+              <span class="sidebar-brand-tagline">Resource Management</span>
+            </span>
+          </div>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="#" class="nav-item nav-item-active" data-nav="monitoring" title="Group Monitoring">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span class="sidebar-label sidebar-label--expanded">Group Monitoring</span>
+          </a>
+          <a href="#" class="nav-item" data-nav="settings" id="nav-settings" title="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="sidebar-label sidebar-label--expanded">Settings</span>
+          </a>
+        </nav>
+        <div class="sidebar-footer">
+          <a href="#" class="nav-item danger" id="btn-logout" title="Logout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            <span class="sidebar-label sidebar-label--expanded">Logout</span>
+          </a>
+        </div>
+      </aside>
+
+      <div class="main-col">
+        <header class="header">
+          <div class="header-left">
+            <button type="button" class="icon-btn" id="btn-toggle-sidebar" aria-label="Toggle sidebar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <div class="header-title-block">
+              <h1 class="header-page-title" id="header-title">Group Monitoring</h1>
+              <span class="live-clock" id="live-clock">—</span>
+            </div>
+          </div>
+          <div class="header-right">
+            <span class="header-welcome"><span class="header-welcome-greeting">Welcome,</span> <strong id="welcome-user">admin</strong></span>
+            <img class="header-flag" src="data:image/png;base64,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" alt="Malaysia" />
+          </div>
+        </header>
+
+        <div class="subheader" id="subheader">
+          <div class="monitoring-subheader-actions">
+            <div class="monitoring-tabs">
+              <button type="button" class="monitoring-tab-btn monitoring-tab-btn--account is-active" data-tab="account">Account</button>
+              <button type="button" class="monitoring-tab-btn monitoring-tab-btn--operations" data-tab="operations">Operations</button>
+              <button type="button" class="monitoring-tab-btn monitoring-tab-btn--reporting" data-tab="reporting">Reporting</button>
+            </div>
+            <button type="button" class="monitoring-refresh-btn" id="btn-refresh" title="Refresh" aria-label="Refresh">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <main class="main-shell" id="page-root"></main>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-root" id="modal-root"></div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+window.WF_ASSETS = {"whatsapp": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+CiAgPHBhdGggZD0iTTEyIDJDNi41IDIgMiA2LjEgMiAxMWMwIDEuOC41IDMuNSAxLjQgNUwyIDIybDYuMi0xLjZjMS40LjggMyAxLjIgNC44IDEuMiA1LjUgMCAxMC00LjEgMTAtOS4yUzE3LjUgMiAxMiAyWiIgZmlsbD0iIzI1RDM2NiIvPgogIDxwYXRoIGQ9Ik05LjUgOS41Yy4yLS41LjQtLjUuNy0uNWguNmMuMiAwIC40IDAgLjYuNC4yLjUuNyAxLjcuOCAxLjguMS4yLjEuNCAwIC42LS4xLjItLjIuMy0uMy40LS4xLjItLjMuMy0uMS42LjIuMy45IDEuNSAyIDIuNCAxLjIgMSAyLjIgMS4zIDIuNSAxLjUuMy4xLjUuMS43LS4xLjItLjIuOC0xIDEtMS4zLjItLjMuNC0uMi43LS4xLjMuMSAxLjcuOCAyIC45LjMuMS41LjEuNi4yLjEuMi4xIDEtLjMgMS45LS40IDEtMS43IDEuNi0yLjQgMS42LS42IDAtMS4zLS4yLTIuMi0uNi0zLTEuMy01LTQuNC01LjEtNC42LS4xLS4yLTEuMi0xLjYtMS4yLTMgMC0xLjQuNy0yLjEgMS0yLjRaIiBmaWxsPSIjZmZmIi8+Cjwvc3ZnPgo=", "telegram": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+CiAgPHBhdGggZD0iTTIxLjUgMy41IDIuOCAxMC42Yy0uOS40LS45IDEuNi4xIDEuOWw0LjggMS42IDEuOCA1LjZjLjMuOSAxLjUgMSAyIC4ybDIuNi0zLjggNC45IDMuNmMuOC42IDIgLjEgMi4yLS45TDIyLjUgNWMuMi0uOS0uNi0xLjctMS41LTEuNVoiIGZpbGw9IiMzQjlGRDkiLz4KICA8cGF0aCBkPSJtOS41IDE0LjIgNy44LTUuNSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPgo="};
+/* Synthetic demo data only — not production / not Supabase */
+window.WF_DATA = {
+  version: '1.0.30',
+  brands: [
+    {
+      id: 'b-fwsg',
+      brandName: 'FWSG',
+      brandLabel: 'FWSG',
+      accountCount: 3,
+      standardGroupCountByPlatform: { whatsapp: 12, telegram: 10 },
+      stock: { active: 8, ready: 3, recycle: 2, review: 1, other: 1 },
+      avgNd: 4.2,
+      toPrep: 1,
+      accounts: [
+        {
+          id: 'a-fwsg-wa-1',
+          platform: 'whatsapp',
+          accountName: 'FWSG WA Main',
+          phoneNumber: '+60111222333',
+          brandName: 'FWSG',
+          status: 'active',
+          locationDevice: 'MY',
+          groupsCurrent: 15,
+          groupsTotal: 12,
+          joinedInMaster: 11,
+          adminCurrent: 9,
+          adminTotal: 12,
+          sessionStatus: 'valid',
+          syncState: 'synced',
+          actionProcess: null,
+          isMisaligned: true,
+          lastSyncAt: '2026-07-16T09:15:00.000Z',
+          scrapeProgress: null,
+        },
+        {
+          id: 'a-fwsg-tg-1',
+          platform: 'telegram',
+          accountName: 'FWSG TG Ops',
+          phoneNumber: '+60119876543',
+          brandName: 'FWSG',
+          status: 'active',
+          locationDevice: 'MY',
+          groupsCurrent: 10,
+          groupsTotal: 10,
+          joinedInMaster: 10,
+          adminCurrent: 10,
+          adminTotal: 10,
+          sessionStatus: 'valid',
+          syncState: 'synced',
+          actionProcess: null,
+          isMisaligned: false,
+          lastSyncAt: '2026-07-16T08:40:00.000Z',
+          scrapeProgress: null,
+        },
+        {
+          id: 'a-fwsg-wa-2',
+          platform: 'whatsapp',
+          accountName: 'FWSG WA Spare',
+          phoneNumber: '',
+          brandName: 'FWSG',
+          status: 'logout',
+          locationDevice: 'MY',
+          groupsCurrent: 0,
+          groupsTotal: 12,
+          joinedInMaster: 0,
+          adminCurrent: 0,
+          adminTotal: 12,
+          sessionStatus: 'invalid',
+          syncState: 'pending',
+          actionProcess: null,
+          isMisaligned: true,
+          lastSyncAt: null,
+          scrapeProgress: null,
+        },
+      ],
+    },
+    {
+      id: 'b-sbmy',
+      brandName: 'SBMY',
+      brandLabel: 'SBMY',
+      accountCount: 2,
+      standardGroupCountByPlatform: { whatsapp: 8, telegram: 8 },
+      stock: { active: 5, ready: 2, recycle: 1, review: 0, other: 0 },
+      avgNd: 2.8,
+      toPrep: 0,
+      accounts: [
+        {
+          id: 'a-sbmy-wa-1',
+          platform: 'whatsapp',
+          accountName: 'SBMY WA 01',
+          phoneNumber: '+60123334455',
+          brandName: 'SBMY',
+          status: 'active',
+          locationDevice: 'MY',
+          groupsCurrent: 9,
+          groupsTotal: 8,
+          joinedInMaster: 7,
+          adminCurrent: 6,
+          adminTotal: 8,
+          sessionStatus: 'valid',
+          syncState: 'synced',
+          actionProcess: null,
+          isMisaligned: true,
+          lastSyncAt: '2026-07-15T18:20:00.000Z',
+          scrapeProgress: null,
+        },
+        {
+          id: 'a-sbmy-tg-1',
+          platform: 'telegram',
+          accountName: 'SBMY TG 01',
+          phoneNumber: '+60126667788',
+          brandName: 'SBMY',
+          status: 'logout',
+          locationDevice: 'MY',
+          groupsCurrent: 4,
+          groupsTotal: 8,
+          joinedInMaster: 4,
+          adminCurrent: 2,
+          adminTotal: 8,
+          sessionStatus: 'invalid',
+          syncState: 'synced',
+          actionProcess: null,
+          isMisaligned: true,
+          lastSyncAt: '2026-07-14T11:00:00.000Z',
+          scrapeProgress: null,
+        },
+      ],
+    },
+  ],
+  masterGroups: {
+    FWSG: [
+      { groupId: '12036310001', groupName: 'FWSG John', inviteLink: 'https://chat.whatsapp.com/demo1', status: 'active', members: 42, admins: 3, isAdmin: true },
+      { groupId: '12036310002', groupName: 'FWSG NEW', inviteLink: 'https://chat.whatsapp.com/demo2', status: 'ready', members: 2, admins: 2, isAdmin: true },
+      { groupId: '12036310003', groupName: 'FWSG Alice LG', inviteLink: 'https://chat.whatsapp.com/demo3', status: 'recycle', members: 1, admins: 1, isAdmin: false },
+      { groupId: '12036310004', groupName: 'FWSG Bob', inviteLink: 'https://chat.whatsapp.com/demo4', status: 'active', members: 38, admins: 2, isAdmin: true },
+      { groupId: '12036310005', groupName: 'FWSG Carol NEW', inviteLink: 'https://chat.whatsapp.com/demo5', status: 'ready', members: 2, admins: 2, isAdmin: false },
+      { groupId: '-1002003001', groupName: 'FWSG TG Info', inviteLink: 'https://t.me/+demoTG1', status: 'other', members: 12, admins: 2, isAdmin: true },
+    ],
+    SBMY: [
+      { groupId: '12036320001', groupName: 'SBMY User01', inviteLink: 'https://chat.whatsapp.com/sb1', status: 'active', members: 30, admins: 2, isAdmin: true },
+      { groupId: '12036320002', groupName: 'SBMY NEW', inviteLink: 'https://chat.whatsapp.com/sb2', status: 'ready', members: 2, admins: 2, isAdmin: true },
+      { groupId: '12036320003', groupName: 'SBMY User02 LG', inviteLink: 'https://chat.whatsapp.com/sb3', status: 'recycle', members: 1, admins: 1, isAdmin: false },
+    ],
+  },
+  junkGroups: [
+    { groupId: '9990001', groupName: 'CO group temp', inviteLink: '', status: 'other', members: 5, admins: 1, isAdmin: false },
+    { groupId: '9990002', groupName: 'Feedback Level 1', inviteLink: '', status: 'other', members: 8, admins: 1, isAdmin: true },
+  ],
+  jobs: [
+    {
+      id: 'job-1',
+      action: 'join_by_invite_link',
+      taskType: 'join',
+      brandName: 'FWSG',
+      accountId: 'a-fwsg-wa-1',
+      accountName: 'FWSG WA Main',
+      platform: 'whatsapp',
+      status: 'completed',
+      progress: { current: 3, total: 3 },
+      createdAt: '2026-07-16T07:00:00.000Z',
+      remark: 'All groups joined',
+      outcomes: [
+        { groupId: '12036310005', groupName: 'FWSG Carol NEW', status: 'ok', remark: 'Joined' },
+        { groupId: '12036310002', groupName: 'FWSG NEW', status: 'ok', remark: 'Already in group' },
+        { groupId: '12036310004', groupName: 'FWSG Bob', status: 'ok', remark: 'Joined' },
+      ],
+    },
+    {
+      id: 'job-2',
+      action: 'create_group',
+      taskType: 'create_group',
+      brandName: 'FWSG',
+      accountId: 'a-fwsg-wa-1',
+      accountName: 'FWSG WA Main',
+      platform: 'whatsapp',
+      status: 'running',
+      progress: { current: 2, total: 5 },
+      createdAt: '2026-07-16T09:30:00.000Z',
+      remark: 'Creating batch…',
+      outcomes: [
+        { groupId: 'g-new-1', groupName: 'FWSG NEW 01', status: 'created', inviteLink: 'https://chat.whatsapp.com/new1' },
+        { groupId: 'g-new-2', groupName: 'FWSG NEW 02', status: 'created', inviteLink: 'https://chat.whatsapp.com/new2' },
+      ],
+    },
+    {
+      id: 'job-2b',
+      action: 'create_group',
+      taskType: 'create_group',
+      brandName: 'FWSG',
+      accountId: 'a-fwsg-wa-1',
+      accountName: 'FWSG WA Main',
+      platform: 'whatsapp',
+      status: 'completed',
+      progress: { current: 3, total: 3 },
+      createdAt: '2026-07-15T14:00:00.000Z',
+      remark: 'Create finished — Set Photo available in VIEW',
+      outcomes: [
+        { groupId: 'g-done-1', groupName: 'FWSG NEW 11', status: 'created', inviteLink: 'https://chat.whatsapp.com/done1' },
+        { groupId: 'g-done-2', groupName: 'FWSG NEW 12', status: 'created', inviteLink: 'https://chat.whatsapp.com/done2' },
+        { groupId: 'g-done-3', groupName: 'FWSG NEW 13', status: 'created', inviteLink: 'https://chat.whatsapp.com/done3' },
+      ],
+    },
+    {
+      id: 'job-3',
+      action: 'set_admin',
+      taskType: 'set_admin',
+      brandName: 'SBMY',
+      accountId: 'a-sbmy-wa-1',
+      accountName: 'SBMY WA 01',
+      platform: 'whatsapp',
+      status: 'failed',
+      progress: { current: 1, total: 2 },
+      createdAt: '2026-07-15T16:10:00.000Z',
+      remark: '1 group failed — target not in group',
+      outcomes: [
+        { groupId: '12036320001', groupName: 'SBMY User01', status: 'ok', remark: 'Promoted' },
+        { groupId: '12036320002', groupName: 'SBMY NEW', status: 'failed', remark: 'Target not in group' },
+      ],
+    },
+    {
+      id: 'job-4',
+      action: 'exit_delete_group',
+      taskType: 'exit_delete_group',
+      brandName: 'FWSG',
+      accountId: 'a-fwsg-tg-1',
+      accountName: 'FWSG TG Ops',
+      platform: 'telegram',
+      status: 'queued',
+      progress: { current: 0, total: 2 },
+      createdAt: '2026-07-16T10:00:00.000Z',
+      remark: 'Waiting in queue',
+      outcomes: [],
+    },
+    {
+      id: 'job-5',
+      action: 'join_by_invite_link',
+      taskType: 'join',
+      brandName: 'SBMY',
+      accountId: 'a-sbmy-tg-1',
+      accountName: 'SBMY TG 01',
+      platform: 'telegram',
+      status: 'cancelled',
+      progress: { current: 0, total: 4 },
+      createdAt: '2026-07-14T12:00:00.000Z',
+      remark: 'Cancelled by operator',
+      outcomes: [],
+    },
+  ],
+  reportingAccounts: ['FWSG WA Main', 'FWSG TG Ops', 'SBMY WA 01'],
+  settings: {
+    autoScrapeEnabled: true,
+    autoScrapeHour: 9,
+    language: 'en',
+    stockPolicy: [
+      { brand: 'FWSG', readyMinPercent: 10, avgNdDays: 7 },
+      { brand: 'SBMY', readyMinPercent: 10, avgNdDays: 7 },
+    ],
+    sopNaming: { prefix1: '{brand} {user}', prefix2: '{brand} NEW', prefix3: '{brand} {user} LG' },
+    brandPhotoSet: { FWSG: true, SBMY: false },
+    leaveDelete: { leaveEnabled: true, deleteEnabled: true, requireOwner: true },
+  },
+};
+
+window.WF_STATE = {
+  role: localStorage.getItem('wf_role') || 'admin', // admin | operator
+  userName: 'admin',
+  page: 'account', // account | operations | reporting | settings
+  opsBookmark: 'overview', // overview | job_queue
+  accountView: 'card',
+  filters: {
+    account: { search: '', brand: 'all', platform: 'all', status: 'all' },
+    ops: { platform: 'whatsapp', brand: 'FWSG' },
+    reporting: { search: '', platform: 'whatsapp', brand: 'FWSG', accName: 'all', status: 'all', bookmark: 'full_group' },
+  },
+  jq: { taskType: '', brand: 'FWSG', accountId: '' },
+  sidebarCollapsed: false,
+  refreshing: false,
+  settingsOpen: '',
+  modal: null, // { type, payload }
+  toast: null,
+  brands: null,
+  jobs: null,
+};
+
+window.WF_STATE.brands = JSON.parse(JSON.stringify(window.WF_DATA.brands));
+window.WF_STATE.jobs = JSON.parse(JSON.stringify(window.WF_DATA.jobs));
+
+window.WF = {
+  get isAdmin() { return WF_STATE.role === 'admin'; },
+  setRole(role) {
+    WF_STATE.role = role;
+    localStorage.setItem('wf_role', role);
+    if (role !== 'admin' && WF_STATE.page === 'settings') WF_STATE.page = 'account';
+  },
+  login(user, pass) {
+    if (!user || !pass) throw new Error('INVALID_CREDENTIALS');
+    if (user === 'fail') throw new Error('INVALID_CREDENTIALS');
+    WF_STATE.userName = user;
+    localStorage.setItem('wf_user', user);
+    if (user.toLowerCase() === 'operator') WF.setRole('operator');
+    else WF.setRole('admin');
+  },
+  logout() {
+    WF_STATE.userName = 'admin';
+    WF_STATE.page = 'account';
+    WF_STATE.opsBookmark = 'overview';
+    location.hash = '#/account';
+    if (window.WF_UI) WF_UI.renderShell();
+    this.toast('Demo reset');
+  },
+  requireAuth() { WF_STATE.userName = 'admin'; },
+  toast(msg) {
+    WF_STATE.toast = msg;
+    if (window.WF_UI) WF_UI.renderToast();
+    setTimeout(() => { WF_STATE.toast = null; if (window.WF_UI) WF_UI.renderToast(); }, 2800);
+  },
+  openModal(type, payload) {
+    WF_STATE.modal = { type, payload: payload || {} };
+    if (window.WF_UI) WF_UI.renderModal();
+  },
+  closeModal() {
+    WF_STATE.modal = null;
+    if (window.WF_UI) WF_UI.renderModal();
+  },
+  findAccount(id) {
+    for (const b of WF_STATE.brands) {
+      const a = b.accounts.find((x) => x.id === id);
+      if (a) return { brand: b, account: a };
+    }
+    return null;
+  },
+  allAccounts() {
+    return WF_STATE.brands.flatMap((b) => b.accounts);
+  },
+};
+
+/* High-fidelity wireframe UI — synthetic interactions only */
+(function () {
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtTime = (iso) => {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  };
+  const platIcon = (p) => WF_ASSETS[p === 'telegram' ? 'telegram' : 'whatsapp'];
+
+  function yx(cur, tot, aligned) {
+    const cls = aligned || cur >= tot ? 'ok' : 'bad';
+    return `<span class="yx ${cls}">${cur}<span class="den">/${tot}</span></span>`;
+  }
+
+  function clockTick() {
+    const el = $('#live-clock');
+    if (!el) return;
+    el.textContent = new Date().toLocaleString();
+  }
+
+  function kpiAccount() {
+    const accounts = WF.allAccounts();
+    const brands = WF_STATE.brands.length;
+    const online = accounts.filter((a) => a.sessionStatus === 'valid').length;
+    const aligned = accounts.filter((a) => !a.isMisaligned && a.sessionStatus === 'valid').length;
+    return [
+      { label: 'Brands', value: brands },
+      { label: 'Accounts', value: accounts.length },
+      { label: 'Online', value: online },
+      { label: 'Aligned', value: aligned },
+    ];
+  }
+
+  function filteredBrands() {
+    const f = WF_STATE.filters.account;
+    return WF_STATE.brands.map((b) => {
+      let accounts = [...b.accounts];
+      if (f.brand !== 'all' && b.brandName !== f.brand) accounts = [];
+      if (f.platform !== 'all') accounts = accounts.filter((a) => a.platform === f.platform);
+      if (f.status === 'online') accounts = accounts.filter((a) => a.sessionStatus === 'valid');
+      if (f.status === 'offline') accounts = accounts.filter((a) => a.sessionStatus !== 'valid');
+      if (f.status === 'misaligned') accounts = accounts.filter((a) => a.isMisaligned);
+      if (f.search) {
+        const q = f.search.toLowerCase();
+        accounts = accounts.filter((a) => a.accountName.toLowerCase().includes(q) || a.phoneNumber.includes(q));
+      }
+      return { ...b, accounts };
+    }).filter((b) => b.accounts.length || f.brand === 'all' || b.brandName === f.brand);
+  }
+
+  function renderShell() {
+    const collapsed = WF_STATE.sidebarCollapsed;
+    const page = WF_STATE.page;
+    const titles = { account: 'Group Monitoring', operations: 'Group Monitoring', reporting: 'Group Monitoring', settings: 'Settings' };
+    $('#sidebar').classList.toggle('is-collapsed', collapsed);
+    $('#nav-settings').style.display = WF.isAdmin ? '' : 'none';
+    $$('.nav-item[data-nav]').forEach((el) => {
+      const nav = el.dataset.nav;
+      const active = (nav === 'monitoring' && page !== 'settings') || (nav === 'settings' && page === 'settings');
+      el.classList.toggle('nav-item-active', active);
+    });
+    $('#header-title').textContent = titles[page] || 'Group Monitoring';
+    $('#welcome-user').textContent = WF_STATE.userName || 'admin';
+    if ($('#role-select')) $('#role-select').value = WF_STATE.role;
+    $('#subheader').style.display = page === 'settings' ? 'none' : '';
+    $$('.monitoring-tab-btn').forEach((btn) => btn.classList.toggle('is-active', btn.dataset.tab === page));
+    renderPage();
+  }
+
+  function renderPage() {
+    const root = $('#page-root');
+    if (WF_STATE.page === 'account') root.innerHTML = renderAccount();
+    else if (WF_STATE.page === 'operations') root.innerHTML = renderOperations();
+    else if (WF_STATE.page === 'reporting') root.innerHTML = renderReporting();
+    else root.innerHTML = renderSettings();
+    bindPageEvents();
+  }
+
+  function renderAccount() {
+    const kpis = kpiAccount();
+    const f = WF_STATE.filters.account;
+    const brands = filteredBrands();
+    return `
+      <div class="page-stack">
+        <div class="kpi-grid">${kpis.map((k, i) => `<div class="kpi-card"><p class="kpi-value ${i > 1 ? 'success' : ''}">${k.value}</p><p class="kpi-label">${esc(k.label)}</p></div>`).join('')}</div>
+        <section class="content-area-shell">
+          <header class="content-area-header">
+            <div class="content-slicer-bar" data-slicer="account">
+              <div class="account-slicer-row">
+                <div class="account-slicer-left">
+                  <form class="account-slicer-search-group">
+                    <input type="search" class="account-slicer-search" id="acc-search" placeholder="Search Acc Name/Number" value="${esc(f.search)}" />
+                    <button type="submit" class="account-slicer-search-btn">Enter</button>
+                  </form>
+                </div>
+                <div class="account-slicer-right">
+                  <div class="account-slicer-filters">
+                    <select class="account-slicer-select dark-select" id="acc-brand">
+                      <option value="all">All brands</option>
+                      ${WF_STATE.brands.map((b) => `<option value="${esc(b.brandName)}" ${f.brand===b.brandName?'selected':''}>${esc(b.brandName)}</option>`).join('')}
+                    </select>
+                    <select class="account-slicer-select dark-select" id="acc-platform">
+                      <option value="all">All platforms</option>
+                      <option value="whatsapp" ${f.platform==='whatsapp'?'selected':''}>WhatsApp</option>
+                      <option value="telegram" ${f.platform==='telegram'?'selected':''}>Telegram</option>
+                    </select>
+                    <select class="account-slicer-select dark-select" id="acc-status">
+                      <option value="all">All status</option>
+                      <option value="online" ${f.status==='online'?'selected':''}>Active</option>
+                      <option value="offline" ${f.status==='offline'?'selected':''}>Logout</option>
+                    </select>
+                  </div>
+                  <div class="account-slicer-view-toggle">
+                    <button type="button" data-view="card" class="account-slicer-view-btn ${WF_STATE.accountView==='card'?'account-slicer-view-btn--active':''}">Card view</button>
+                    <button type="button" data-view="table" class="account-slicer-view-btn ${WF_STATE.accountView==='table'?'account-slicer-view-btn--active':''}">Table view</button>
+                  </div>
+                  <button class="account-slicer-export-btn" type="button" id="btn-export-acc" title="Export filtered accounts">${iconDownload()}</button>
+                  <button class="account-slicer-export-btn" type="button" id="btn-add-brand" title="Add brand">${WF.isAdmin ? iconPlus() : iconLock()}</button>
+                </div>
+              </div>
+            </div>
+          </header>
+          <div class="content-area-body">
+            ${WF_STATE.accountView === 'card' ? renderAccountCards(brands) : renderAccountFlatTable(brands)}
+          </div>
+        </section>
+      </div>`;
+  }
+
+  function iconDownload() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`; }
+  function iconPlus() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`; }
+  function iconLock() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`; }
+  function iconChevron() { return `<svg class="brand-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`; }
+  function iconSync() { return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg>`; }
+  function iconEdit() { return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`; }
+
+  function accountRowCells(a, showBrand) {
+    const alignedG = a.joinedInMaster >= a.groupsTotal;
+    const alignedA = a.adminCurrent >= a.adminTotal;
+    const last = a.actionProcess === 'scraper' && a.scrapeProgress
+      ? `<div class="progress-cell"><div class="marquee">Scraping ${a.scrapeProgress.current}/${a.scrapeProgress.total}</div><div class="progress-bar"><i style="width:${Math.round(100*a.scrapeProgress.current/a.scrapeProgress.total)}%"></i></div></div>`
+      : a.actionProcess === 'sync' || a.actionProcess === 'session_check'
+        ? `<span class="marquee">${a.actionProcess === 'sync' ? 'Syncing…' : 'Checking session…'}</span>`
+        : a.sessionStatus === 'invalid' && !a.lastSyncAt
+          ? `<span class="muted">Use Sync to log in first</span>`
+          : `<span class="muted">${esc(fmtTime(a.lastSyncAt))}</span>`;
+    const action = a.actionProcess === 'scraper'
+      ? `<button class="brand-card-action-btn brand-card-action-btn--cancel-scrape" data-cancel-scrape="${a.id}">Cancel scrape</button>`
+      : a.actionProcess
+        ? `<span class="brand-card-action-btn">PROC SYNC</span>`
+        : (a.joinedInMaster > 0 && a.groupsTotal > 0
+          ? `<button class="brand-card-action-btn" data-group-link="${a.id}">Group link</button>`
+          : `<span class="muted">—</span>`);
+    const adminPct = a.adminTotal ? Math.round(a.adminCurrent / a.adminTotal * 100) : 0;
+    return `
+      <td class="brand-col-cell brand-col-cell--account">
+        <div class="account-cell">
+          <span class="platform-badge ${a.platform==='whatsapp'?'wa':'tg'}"><img src="${platIcon(a.platform)}" alt="${a.platform}" /></span>
+          <div style="min-width:0;flex:1"><div class="account-name">${esc(a.accountName)}</div><div class="account-phone">${a.phoneNumber ? esc(a.phoneNumber) : '<span style="color:var(--color-danger)">Phone number missing</span>'}</div></div>
+          ${!showBrand ? `<button class="edit-btn" title="Edit account">${iconEdit()}</button><button class="sync-btn" title="Sync account" data-sync="${a.id}" ${a.actionProcess?'disabled':''}>${iconSync()}</button>` : ''}
+        </div>
+      </td>
+      ${showBrand ? `<td>${esc(a.brandName)}</td>` : ''}
+      <td>${esc(a.locationDevice || '—')}</td>
+      <td><span class="status-pill ${a.status==='active'?'status-active':'status-logout'}">${a.status==='active'?'Active':'Logout'}</span></td>
+      <td><span class="session-pill ${a.sessionStatus==='valid'?'session-valid':'session-invalid'}">${a.sessionStatus === 'valid' ? 'Valid' : 'Invalid'}</span></td>
+      <td>${a.groupsCurrent}</td>
+      <td><span class="metric-ratio ${alignedG?'aligned':'short'}"><span class="current">${a.joinedInMaster}</span>/${a.groupsTotal}</span></td>
+      <td><div class="admin-progress"><span class="metric-ratio ${alignedA?'aligned':'short'}"><span class="current">${a.adminCurrent}</span>/${a.adminTotal}</span><div class="admin-progress-track"><i class="${alignedA?'good':''}" style="width:${adminPct}%"></i></div></div></td>
+      ${showBrand ? '' : `<td><div class="last-update">${last}</div></td>`}
+      <td>
+        <div class="row-action-wrap">
+          ${action}
+        </div>
+      </td>`;
+  }
+
+  function renderAccountCards(brands) {
+    if (!brands.length) return `<div class="empty-state">No accounts match filters.</div>`;
+    return `<div class="brand-card-list">${brands.map((b) => `
+      <div class="brand-card">
+        <div class="brand-card-header">
+          <button type="button" class="brand-card-header-toggle" data-collapse-brand="${esc(b.brandName)}">
+            ${iconChevron()}<span class="brand-card-title">Brand : ${esc(b.brandLabel)}</span>
+          </button>
+          <div class="brand-card-header-actions">
+            <span class="brand-card-badge brand-card-badge--neutral">WA ${b.accounts.filter(a=>a.platform==='whatsapp').length} Acc | TG ${b.accounts.filter(a=>a.platform==='telegram').length} ACC</span>
+            <button class="brand-card-badge brand-card-badge--neutral brand-card-badge--platform-groups" type="button" data-master="${esc(b.brandName)}"><span>WA ${b.standardGroupCountByPlatform.whatsapp}</span><span>Group</span></button>
+            <button class="brand-card-badge brand-card-badge--neutral brand-card-badge--platform-groups" type="button" data-master="${esc(b.brandName)}"><span>TG ${b.standardGroupCountByPlatform.telegram}</span><span>Group</span></button>
+            <span class="brand-card-badge ${b.accounts.some(a=>a.isMisaligned)?'brand-card-badge--danger':'brand-card-badge--success'}">${b.accounts.some(a=>a.isMisaligned)?`${b.accounts.filter(a=>a.isMisaligned).length} accounts not aligned`:'All aligned'}</span>
+            <button class="brand-add-account-btn" data-add-account="${esc(b.brandName)}">${WF.isAdmin ? '+ Add account' : '🔒'}</button>
+          </div>
+          <button class="card-header-dismiss-btn" title="Remove brand card">×</button>
+        </div>
+        <div class="brand-card-body">
+        <table class="brand-card-table">
+          <colgroup><col class="brand-col--account"/><col class="brand-col--location"/><col class="brand-col--status"/><col class="brand-col--session"/><col class="brand-col--on-device"/><col class="brand-col--in-brand"/><col class="brand-col--admin"/><col class="brand-col--last-update"/><col class="brand-col--action"/></colgroup>
+          <thead><tr>
+            <th>Account</th><th>Location</th><th>Status</th><th>Session</th><th>On device</th><th>In brand</th><th>Admin</th><th>Last update</th><th>Action</th>
+          </tr></thead>
+          <tbody>
+            ${b.accounts.map((a) => `<tr>${accountRowCells(a, false)}</tr>`).join('') || `<tr><td colspan="9" class="muted">No accounts</td></tr>`}
+          </tbody>
+        </table>
+        </div>
+      </div>`).join('')}</div>`;
+  }
+
+  function renderAccountFlatTable(brands) {
+    const rows = brands.flatMap((b) => b.accounts);
+    if (!rows.length) return `<div class="empty-state">No accounts match filters.</div>`;
+    return `<div class="brand-card" style="overflow:auto"><div class="brand-card-body"><table class="brand-card-table">
+      <thead><tr>
+        <th>Account</th><th>Brand</th><th>Location</th><th>Status</th><th>Session</th><th>On device</th><th>In brand</th><th>Admin</th><th>Action</th>
+      </tr></thead>
+      <tbody>${rows.map((a) => `<tr>${accountRowCells(a, true)}</tr>`).join('')}</tbody>
+    </table></div></div>`;
+  }
+
+  function renderOperations() {
+    const f = WF_STATE.filters.ops;
+    const brand = WF_STATE.brands.find((b) => b.brandName === f.brand) || WF_STATE.brands[0];
+    return `
+      <div class="page-stack">
+        <section class="content-area-shell">
+          <header class="content-area-header">
+            <div class="content-slicer-bar">
+              <div class="account-slicer-row operations-slicer-row">
+                <div class="account-slicer-left"><div class="account-slicer-filters">
+              <select class="account-slicer-select dark-select" id="ops-platform">
+                <option value="whatsapp" ${f.platform==='whatsapp'?'selected':''}>WhatsApp</option>
+                <option value="telegram" ${f.platform==='telegram'?'selected':''}>Telegram</option>
+              </select>
+              ${WF_STATE.opsBookmark==='overview'?`<select class="account-slicer-select dark-select" id="ops-brand">
+                <option value="all">All brands</option>
+                ${WF_STATE.brands.map((b) => `<option value="${esc(b.brandName)}" ${f.brand===b.brandName?'selected':''}>${esc(b.brandName)}</option>`).join('')}
+              </select>`:''}
+                </div></div>
+                <div class="account-slicer-right">
+                  <div class="account-slicer-view-toggle">
+                    <button type="button" data-ops-bm="overview" class="account-slicer-view-btn ${WF_STATE.opsBookmark==='overview'?'account-slicer-view-btn--active':''}">Overview</button>
+                    <button type="button" data-ops-bm="job_queue" class="account-slicer-view-btn ${WF_STATE.opsBookmark==='job_queue'?'account-slicer-view-btn--active':''}">Job Queue</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+          <div class="content-area-body">
+            ${WF_STATE.opsBookmark === 'overview' ? renderOpsOverview(brand, f.platform) : renderJobQueue()}
+          </div>
+        </section>
+      </div>`;
+  }
+
+  function renderOpsOverview(brand, platform) {
+    const brands = WF_STATE.filters.ops.brand === 'all'
+      ? WF_STATE.brands
+      : WF_STATE.brands.filter((b) => b.brandName === WF_STATE.filters.ops.brand);
+    if (!brands.length) return `<div class="empty-state">No data found</div>`;
+    return `<div class="content-nested-panel operations-overview-panel"><div class="brand-card-list operations-brand-card-list">
+      ${brands.map((item) => {
+        const x = item.standardGroupCountByPlatform[platform] || 0;
+        const s = item.stock;
+        return `<article class="brand-card operations-brand-card">
+          <div class="brand-card-header operations-brand-card-header">
+            <div class="brand-card-header-toggle operations-brand-card-toggle">
+              <span class="operations-brand-col-chevron"></span>
+              <span class="brand-card-title operations-brand-col-brand">Brand : ${esc(item.brandName)}</span>
+              <span class="operations-brand-meta-divider">|</span>
+              <span class="operations-brand-col-metric"><span class="operations-brand-meta-label">Avg ND</span><span class="operations-brand-meta-value">${item.avgNd}</span></span>
+              <span class="operations-brand-meta-divider">|</span>
+              <span class="operations-brand-col-metric ${item.toPrep?'operations-brand-col-metric--warning':''}"><span class="operations-brand-meta-label">To prep</span><span class="operations-brand-meta-value ${item.toPrep?'operations-brand-meta-value--warning':''}">${item.toPrep}</span></span>
+            </div>
+            <div class="operations-brand-card-metrics">
+              <span class="brand-card-badge brand-card-badge--neutral">${platform==='whatsapp'?'WA':'TG'} ${x} Group</span>
+              <div class="operations-stock-panel">
+                <div class="operations-group-stock-strip">
+                  ${['active','ready','recycle','review','other'].map((k) => `<button type="button" class="operations-stock-chip operations-stock-chip--${k} operations-stock-chip--interactive" data-stock="${k}" data-stock-brand="${esc(item.brandName)}"><span class="operations-stock-chip-label">${k[0].toUpperCase()+k.slice(1)}</span><span class="operations-stock-chip-count">${s[k]}</span></button>`).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>`;
+      }).join('')}
+    </div></div>`;
+  }
+
+  function renderJobQueue() {
+    const jq = WF_STATE.jq;
+    const accounts = WF.allAccounts().filter((a) => a.brandName === jq.brand && a.platform === (WF_STATE.filters.ops.platform || 'whatsapp'));
+    const jobs = WF_STATE.jobs.filter((j) => !jq.taskType || j.taskType === jq.taskType);
+    return `<div class="operations-job-queue-only">
+      <section class="operations-job-queue-zone operations-job-queue-zone--add">
+        <div class="operations-job-queue-add">
+        <div class="operations-job-queue-add-filters">
+        <label class="operations-job-queue-field operations-job-queue-field--inline"><span>Task</span><select class="operations-job-queue-select dark-select" id="jq-task">
+          <option value="">Select task type</option>
+          <option value="join" ${jq.taskType==='join'?'selected':''}>Join missing</option>
+          <option value="create_group" ${jq.taskType==='create_group'?'selected':''}>Create & set photo</option>
+          <option value="set_admin" ${jq.taskType==='set_admin'?'selected':''}>Set admin</option>
+          <option value="exit_delete_group" ${jq.taskType==='exit_delete_group'?'selected':''}>Exit & delete group</option>
+        </select></label>
+        <label class="operations-job-queue-field operations-job-queue-field--inline"><span>Brand</span><select class="operations-job-queue-select dark-select" id="jq-brand">
+          ${WF_STATE.brands.map((b) => `<option value="${esc(b.brandName)}" ${jq.brand===b.brandName?'selected':''}>${esc(b.brandName)}</option>`).join('')}
+        </select></label>
+        <label class="operations-job-queue-field operations-job-queue-field--inline"><span>Account</span><select class="operations-job-queue-select dark-select" id="jq-account">
+          <option value="">Select account</option>
+          ${accounts.map((a) => `<option value="${a.id}" ${jq.accountId===a.id?'selected':''}>${esc(a.accountName)} (${a.sessionStatus})</option>`).join('')}
+        </select></label>
+        <div class="operations-job-queue-add-filters__actions"><button class="operations-job-queue-setup-btn" id="jq-setup" title="Setup" ${!jq.taskType || !jq.accountId ? 'disabled' : ''}>⚙</button></div>
+        </div></div>
+      </section>
+      <section class="operations-job-queue-zone operations-job-queue-zone--table">
+        <div class="operations-job-queue-zone-head"><h3 class="operations-job-queue-zone-title">${jq.taskType ? `${esc(jq.taskType.replaceAll('_',' '))} queue` : 'Queue — select a task type'}</h3></div>
+      ${!jq.taskType ? `<div class="operations-job-queue-empty">Select a task type to view the queue.</div>` : `
+      <div class="operations-job-queue-table-wrap"><table class="operations-job-queue-table">
+        <thead><tr>
+          <th class="operations-job-queue-select-col"></th><th>Status</th><th>Brand</th><th>Account</th><th>Progress</th><th>Created</th><th>Remark</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${jobs.length ? jobs.map((j) => `
+            <tr>
+              <td class="operations-job-queue-select-col"><input class="operations-job-queue-row-checkbox" type="checkbox" data-job-sel="${j.id}" /></td>
+              <td><span class="job-status job-${j.status}">${j.status}</span></td>
+              <td>${esc(j.brandName)}</td>
+              <td><img class="plat-icon" src="${platIcon(j.platform)}" alt="" />${esc(j.accountName)}</td>
+              <td>${j.progress.current}/${j.progress.total}</td>
+              <td class="muted">${esc(fmtTime(j.createdAt))}</td>
+              <td>${esc(j.remark || '—')}</td>
+              <td><div class="operations-job-queue-row-actions">
+                ${j.status==='queued' || j.status==='paused' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-run="${j.id}">RUN</button>` : ''}
+                ${j.status==='running' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-pause="${j.id}">PAUSE</button><button class="operations-job-queue-btn operations-job-queue-btn--row operations-job-queue-btn--danger" data-job-cancel="${j.id}">CANCEL</button>` : ''}
+                ${j.status==='completed' || j.status==='failed' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-view="${j.id}">VIEW</button>` : ''}
+                ${j.status==='failed' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-run="${j.id}">RUN</button>` : ''}
+              </div>
+              </td>
+            </tr>`).join('') : `<tr><td colspan="8" class="muted">No ${esc(jq.taskType)} tasks in queue.</td></tr>`}
+        </tbody>
+      </table></div>
+      <div style="margin-top:8px"><button class="operations-job-queue-btn operations-job-queue-btn--danger" id="jq-delete-sel">Delete selected</button></div>`}
+      </section>
+    </div>`;
+  }
+
+  function renderReporting() {
+    const f = WF_STATE.filters.reporting;
+    const groups = (WF_DATA.masterGroups[f.brand] || []).filter((g) => {
+      if (f.status !== 'all' && g.status !== f.status) return false;
+      if (f.search && !g.groupName.toLowerCase().includes(f.search.toLowerCase())) return false;
+      return true;
+    });
+    const accs = WF_DATA.reportingAccounts.filter((n) => {
+      const a = WF.allAccounts().find((x) => x.accountName === n);
+      return a && a.brandName === f.brand && a.platform === f.platform;
+    });
+
+    let body;
+    if (f.search.trim().toLowerCase() === 'error') {
+      body = `<p class="reporting-empty" style="padding:16px 20px;color:var(--color-danger)">Failed to load report. (demo state)</p>`;
+    } else if (!groups.length) {
+      body = `<div class="empty-state">No rows for current filters. <button class="btn" id="report-clear">Clear status filter</button></div>`;
+    } else if (f.accName === 'all') {
+      body = `<div class="reporting-table-shell"><div class="reporting-table-scroll"><table class="join-report-table"><thead class="reporting-table-head"><tr>
+        <th class="join-report-table__col-no">No</th><th>Group Name</th><th>Group ID</th><th>Group Link</th><th>Status</th>
+        ${accs.map((n) => `<th class="join-report-table__account-col">${esc(n)}</th>`).join('')}
+      </tr></thead><tbody>
+        ${groups.map((g, i) => `<tr>
+          <td class="join-report-table__col-no">${i+1}</td><td>${esc(g.groupName)}</td><td class="join-report-table__mono">${esc(g.groupId)}</td>
+          <td>${g.inviteLink ? `<a class="join-report-table__link" href="${esc(g.inviteLink)}">link</a>` : '—'}</td>
+          <td><span class="operations-stock-chip operations-stock-chip--${esc(g.status)}"><span class="operations-stock-chip-label">${esc(g.status[0].toUpperCase()+g.status.slice(1))}</span></span></td>
+          ${accs.map((_, idx) => `<td class="${(i+idx)%3===0?'join-report-table__no':'join-report-table__yes'}">${(i+idx)%3===0?'No':'Yes'}</td>`).join('')}
+        </tr>`).join('')}
+      </tbody></table></div></div>`;
+    } else {
+      const isAdminView = f.bookmark === 'full_admin';
+      body = `<div class="reporting-table-shell"><div class="reporting-table-scroll"><table class="join-report-table ${isAdminView?'join-report-table--daily-admin':'join-report-table--daily-group'}"><thead class="reporting-table-head"><tr>
+        <th class="join-report-table__col-no">No</th><th>Group Name</th><th>Group ID</th>${isAdminView?'':'<th class="join-report-table__col-center">Member Count</th><th class="join-report-table__col-center">Admin Count</th>'}<th>Group Link</th><th>Status</th><th class="join-report-table__col-center">Is Admin</th>
+      </tr></thead><tbody>
+        ${groups.map((g, i) => `<tr>
+          <td class="join-report-table__col-no">${i+1}</td><td>${esc(g.groupName)}</td><td class="join-report-table__mono">${esc(g.groupId)}</td>
+          ${isAdminView?'':`<td class="join-report-table__col-center">${g.members}</td><td class="join-report-table__col-center">${g.admins}</td>`}
+          <td class="join-report-table__col-link">${g.inviteLink ? `<a class="join-report-table__link" href="${esc(g.inviteLink)}">link</a>` : '—'}</td>
+          <td><span class="operations-stock-chip operations-stock-chip--${esc(g.status)}"><span class="operations-stock-chip-label">${esc(g.status[0].toUpperCase()+g.status.slice(1))}</span></span></td>
+          <td class="${g.isAdmin?'join-report-table__yes':'join-report-table__no'}">${g.isAdmin?'Yes':'No'}</td>
+        </tr>`).join('')}
+      </tbody></table></div></div>`;
+    }
+
+    return `
+      <div class="page-stack">
+        <section class="content-area-shell">
+          <header class="content-area-header content-area-header--reporting">
+            <div class="content-slicer-bar reporting-slicer-bar">
+              <div class="account-slicer-row reporting-slicer-row">
+                <div class="account-slicer-left">
+                  <form class="account-slicer-search-group"><input type="search" class="account-slicer-search" id="rep-search" placeholder="Search Group Name" value="${esc(f.search)}" /><button type="submit" class="account-slicer-search-btn">Enter</button></form>
+                </div>
+                <div class="account-slicer-right reporting-slicer-right">
+                  <div class="reporting-slicer-filters">
+              <label class="reporting-slicer-field"><span class="reporting-slicer-label">Platform</span><select class="account-slicer-select dark-select" id="rep-platform">
+                <option value="whatsapp" ${f.platform==='whatsapp'?'selected':''}>WhatsApp</option>
+                <option value="telegram" ${f.platform==='telegram'?'selected':''}>Telegram</option>
+              </select></label>
+              <label class="reporting-slicer-field"><span class="reporting-slicer-label">Brand</span><select class="account-slicer-select dark-select" id="rep-brand">
+                ${WF_STATE.brands.map((b) => `<option value="${esc(b.brandName)}" ${f.brand===b.brandName?'selected':''}>${esc(b.brandName)}</option>`).join('')}
+              </select></label>
+              <label class="reporting-slicer-field"><span class="reporting-slicer-label">Acc Name</span><select class="account-slicer-select dark-select" id="rep-acc">
+                <option value="all" ${f.accName==='all'?'selected':''}>All</option>
+                ${accs.map((n) => `<option value="${esc(n)}" ${f.accName===n?'selected':''}>${esc(n)}</option>`).join('')}
+              </select></label>
+              <label class="reporting-slicer-field"><span class="reporting-slicer-label">Status</span><select class="account-slicer-select dark-select" id="rep-status">
+                <option value="all">All</option>
+                ${['active','ready','recycle','review','other'].map((s) => `<option value="${s}" ${f.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join('')}
+              </select></label>
+                  </div>
+                  <div class="account-slicer-view-toggle">
+                    <button type="button" data-rep-bm="full_group" class="account-slicer-view-btn ${f.bookmark==='full_group'?'account-slicer-view-btn--active':''}">Full Group</button>
+                    <button type="button" data-rep-bm="full_admin" class="account-slicer-view-btn ${f.bookmark==='full_admin'?'account-slicer-view-btn--active':''}">Full Admin</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+          <div class="content-area-body">
+            <div class="content-nested-panel reporting-nested-panel">
+              <div class="reporting-table-panel">${body}</div>
+              <div class="reporting-card-footer">
+                <div class="reporting-card-footer-meta"><span>${groups.length} row(s)</span><span>Page 1 of 1</span></div>
+                <div class="reporting-card-footer-actions"><button class="group-links-page-btn" disabled>Previous</button><button class="group-links-page-btn" disabled>Next</button><button class="group-links-export-btn" id="rep-export">Export</button></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>`;
+  }
+
+  function renderSettings() {
+    if (!WF.isAdmin) return `<div class="empty-state">Settings is admin-only in this wireframe.</div>`;
+    const s = WF_DATA.settings;
+    const open = WF_STATE.settingsOpen;
+    const cards = [
+      { id: 'auto-sync', title: 'Automatic account scrape', summary: s.autoScrapeEnabled ? `On · ${String(s.autoScrapeHour).padStart(2,'0')}:00` : 'Off', body: `
+        <label class="toggle"><span class="switch ${s.autoScrapeEnabled?'on':''}" id="auto-scrape-switch"></span> Enabled</label>
+        <div class="form-row" style="margin-top:12px"><label>Daily hour</label>
+          <input class="field" type="number" min="0" max="23" id="auto-hour" value="${s.autoScrapeHour}" /></div>
+        <p class="muted" style="font-size:12px;margin-top:8px">App must remain open at scheduled time (demo note).</p>` },
+      { id: 'language', title: 'Language', summary: 'English', body: `
+        <p class="muted" style="font-size:12px;margin:0 0 10px">Choose the display language for captions across the dashboard.</p>
+        <div class="locale-toggle" role="group" aria-label="Language">
+          <button type="button" class="locale-toggle-btn is-active" data-lang="en">English</button>
+          <button type="button" class="locale-toggle-btn" data-lang="zh">中文</button>
+        </div>` },
+      { id: 'stock', title: 'Stock & Avg ND', summary: `Default ${s.stockPolicy[0]?.readyMinPercent ?? 30}% per brand`, body: `
+        <table class="acct-table"><thead><tr><th>Brand</th><th>Ready min %</th><th>Avg ND days</th></tr></thead>
+        <tbody>${s.stockPolicy.map((p) => `<tr><td>${esc(p.brand)}</td><td>${p.readyMinPercent}</td><td>${p.avgNdDays}</td></tr>`).join('')}</tbody></table>` },
+      { id: 'naming', title: 'SOP Naming', summary: 'P1 * · P2 NEW · P3 LG', body: `
+        <div class="form-grid">
+          <div class="form-row"><label>Active (Prefix1)</label><input class="field" value="${esc(s.sopNaming.prefix1)}" readonly /></div>
+          <div class="form-row"><label>Ready / NEW (Prefix2)</label><input class="field" value="${esc(s.sopNaming.prefix2)}" readonly /></div>
+          <div class="form-row"><label>Recycle / LG (Prefix3)</label><input class="field" value="${esc(s.sopNaming.prefix3)}" readonly /></div>
+        </div>` },
+      { id: 'worker-wa', title: 'WhatsApp worker', summary: 'Configured', body: `
+        <div class="form-grid">
+          <div class="form-row"><label>Max per run</label><input class="field" value="20" readonly /></div>
+          <div class="form-row"><label>Delay between groups (sec)</label><input class="field" value="120" readonly /></div>
+          <div class="form-row"><label>Allow leave group job</label><input class="field" value="${s.leaveDelete.leaveEnabled?'On':'Off'}" readonly /></div>
+          <div class="form-row"><label>Allow delete group job</label><input class="field" value="${s.leaveDelete.deleteEnabled?'On':'Off'}" readonly /></div>
+        </div>
+        <p class="muted" style="font-size:12px;margin-top:10px">Brand group photo: FWSG ${s.brandPhotoSet.FWSG?'set':'not set'} · SBMY ${s.brandPhotoSet.SBMY?'set':'not set'}</p>` },
+      { id: 'worker-tg', title: 'Telegram worker', summary: 'Configured', body: `
+        <div class="form-grid">
+          <div class="form-row"><label>Max per run</label><input class="field" value="30" readonly /></div>
+          <div class="form-row"><label>Human delay profile</label><input class="field" value="Safe" readonly /></div>
+          <div class="form-row"><label>Delete only if owner/creator</label><input class="field" value="${s.leaveDelete.requireOwner?'On':'Off'}" readonly /></div>
+        </div>` },
+    ];
+    return `
+      <div class="page-stack">
+        <div class="kpi-grid">
+          <div class="kpi-card"><p class="kpi-value success" style="font-size:18px">Connected</p><p class="kpi-label">Supabase</p></div>
+          <div class="kpi-card"><p class="kpi-value">42</p><p class="kpi-label">Active sessions</p></div>
+          <div class="kpi-card"><p class="kpi-value success" style="font-size:18px">Desktop</p><p class="kpi-label">Platform</p></div>
+          <div class="kpi-card"><p class="kpi-value success">9</p><p class="kpi-label">Session tables</p></div>
+        </div>
+        <section class="content-area-shell">
+          <div class="content-area-body settings-content-body">
+            <div class="settings-version-card">
+              <p class="settings-version-title">Current app version: v${WF_DATA.version}</p>
+              <p class="settings-version-note">You are on the latest release.</p>
+              <button class="btn" id="btn-check-update">Check for app updates</button>
+              <p class="muted" style="font-size:12px;margin:8px 0 0" id="update-msg"></p>
+            </div>
+            <div class="admin-page-grid">
+              ${cards.map((c) => `
+                <article class="admin-expand-card ${open===c.id?'is-open':''}" data-settings-card="${c.id}">
+                  <div class="admin-expand-card-header">
+                    <button type="button" class="admin-expand-card-header-toggle" data-settings-toggle="${c.id}">
+                      <svg class="admin-expand-card-chevron ${open===c.id?'':'admin-expand-card-chevron--collapsed'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                      <span class="admin-expand-card-title">${esc(c.title)}</span>
+                    </button>
+                    <span class="admin-expand-card-summary">${esc(c.summary)}</span>
+                  </div>
+                  <div class="admin-expand-card-body">${c.body}</div>
+                </article>`).join('')}
+            </div>
+          </div>
+        </section>
+      </div>`;
+  }
+
+  /* ---------- Modals ---------- */
+  function renderModal() {
+    const root = $('#modal-root');
+    const m = WF_STATE.modal;
+    if (!m) { root.classList.remove('is-open'); root.innerHTML = ''; return; }
+    root.classList.add('is-open');
+    const map = {
+      'scrape-prompt': modalScrapePrompt,
+      'platform-login': modalPlatformLogin,
+      'missing-phone': modalMissingPhone,
+      'sync-error': modalAlert,
+      'scrape-cancel': modalScrapeCancel,
+      'group-link-picker': modalGroupLinkPicker,
+      'group-links': modalGroupLinks,
+      'master-groups': modalMasterGroups,
+      'stock-detail': modalStockDetail,
+      'jq-setup': modalJqSetup,
+      'jq-view': modalJqView,
+      'add-brand': modalAddBrand,
+      'add-account': modalAddAccount,
+    };
+    const fn = map[m.type] || modalAlert;
+    root.innerHTML = fn(m.payload || {});
+    bindModalEvents();
+  }
+
+  function modalShell(title, body, foot, lg) {
+    return `<div class="modal brand-modal-panel ${lg?'modal--lg brand-modal-panel--group-links':''}" role="dialog">
+      <div class="modal-head brand-modal-header"><h3 class="modal-title brand-modal-title">${title}</h3>
+        <button type="button" class="icon-btn brand-modal-close" data-close-modal aria-label="Close">✕</button></div>
+      <div class="modal-body">${body}</div>
+      ${foot ? `<div class="modal-foot brand-modal-actions">${foot}</div>` : ''}
+    </div>`;
+  }
+
+  function modalScrapePrompt(p) {
+    const plat = p.platform === 'telegram' ? 'Telegram' : 'WhatsApp';
+    return modalShell(`${esc(p.accountName)} · ${plat}`,
+      `<p style="margin:0;font-size:13px;line-height:1.5;color:var(--color-text-secondary)">Session is Valid. Run <strong>Scrape now</strong> for a full group refresh, or choose Later.</p>`,
+      `<button class="btn" data-close-modal>Later</button><button class="btn btn-primary" data-scrape-now="${p.accountId}">Scrape now</button>`);
+  }
+
+  function modalPlatformLogin(p) {
+    const loading = p.phase === 'loading';
+    return modalShell(`${p.platform === 'telegram' ? 'Telegram' : 'WhatsApp'} login`,
+      `<p class="muted" style="font-size:13px;margin-top:0">Scan QR on the marketing phone for <strong>${esc(p.accountName)}</strong>.</p>
+       <div class="qr-box ${loading?'loading':''}"></div>
+       <p style="text-align:center;font-size:12px;color:var(--color-text-secondary)">${loading ? 'Generating QR…' : 'QR ready — scan to continue (demo: click Simulate scan)'}</p>`,
+      `<button class="btn" data-close-modal>Cancel</button>
+       ${loading ? '' : `<button class="btn btn-primary" data-simulate-scan="${p.accountId}">Simulate scan success</button>`}`);
+  }
+
+  function modalMissingPhone(p) {
+    return modalShell('Phone number required',
+      `<p style="margin:0;font-size:13px;color:var(--color-text-secondary)">Account <strong>${esc(p.accountName)}</strong> has no phone number. Add a phone before Sync.</p>
+       <div class="form-row" style="margin-top:12px"><label>Phone</label><input class="field" id="missing-phone-input" placeholder="+6012…" style="width:100%" /></div>`,
+      `<button class="btn" data-close-modal>Cancel</button><button class="btn btn-primary" data-save-phone="${p.accountId}">Save & continue</button>`);
+  }
+
+  function modalAlert(p) {
+    return modalShell(p.title || 'Notice', `<p style="margin:0;font-size:13px;color:var(--color-text-secondary)">${esc(p.message || '')}</p>`,
+      `<button class="btn btn-primary" data-close-modal>OK</button>`);
+  }
+
+  function modalScrapeCancel(p) {
+    return modalShell('Cancel scrape?',
+      `<p style="margin:0;font-size:13px;color:var(--color-text-secondary)">Stop scraping <strong>${esc(p.accountName)}</strong>?</p>`,
+      `<button class="btn" data-close-modal>Keep scraping</button><button class="btn btn-danger" data-confirm-cancel-scrape="${p.accountId}">Cancel scrape</button>`);
+  }
+
+  function modalGroupLinkPicker(p) {
+    return modalShell('Which group list?',
+      `<p class="brand-modal-subtitle" style="margin:0 0 10px">${esc(p.accountName || '')}</p>
+      <div class="picker-list group-links-picker-body">
+        <button class="picker-item group-links-picker-option" data-open-links="${p.accountId}" data-mode="account"><strong class="group-links-picker-option-title">Groups on this account</strong><span class="group-links-picker-option-desc">All groups from latest daily scrape</span></button>
+        <button class="picker-item group-links-picker-option" data-open-links="${p.accountId}" data-mode="adminMaster"><strong class="group-links-picker-option-title">Admin vs master list</strong><span class="group-links-picker-option-desc">Standard brand groups + admin status</span></button>
+        <button class="picker-item group-links-picker-option" data-open-links="${p.accountId}" data-mode="junk"><strong class="group-links-picker-option-title">Junk (not in master)</strong><span class="group-links-picker-option-desc">Groups on device outside brand standard</span></button>
+      </div>`,
+      `<button class="btn" data-close-modal>Close</button>`);
+  }
+
+  function modalGroupLinks(p) {
+    const found = WF.findAccount(p.accountId);
+    const brand = found?.account.brandName || 'FWSG';
+    let rows = p.mode === 'junk' ? WF_DATA.junkGroups : (WF_DATA.masterGroups[brand] || []);
+    return modalShell(`Group links — ${esc(p.mode)}`,
+      `<div style="margin-bottom:10px"><select class="field" id="gl-admin-filter"><option value="all">Admin: All</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+       <table class="acct-table"><thead><tr><th>Name</th><th>Id</th><th>Members</th><th>Admins</th><th>IsAdmin</th><th>Link</th></tr></thead>
+       <tbody>${rows.map((g) => `<tr data-isadmin="${g.isAdmin}">
+         <td>${esc(g.groupName)}</td><td class="muted">${esc(g.groupId)}</td><td>${g.members??'—'}</td><td>${g.admins??'—'}</td>
+         <td class="${g.isAdmin?'yes':'no'}">${g.isAdmin?'Yes':'No'}</td><td class="muted">${g.inviteLink?'link':'—'}</td>
+       </tr>`).join('') || '<tr><td colspan="6" class="muted">Empty</td></tr>'}</tbody></table>`,
+      `<button class="btn" data-close-modal>Close</button><button class="btn" id="gl-export">Export Excel</button>`, true);
+  }
+
+  function modalMasterGroups(p) {
+    const rows = WF_DATA.masterGroups[p.brand] || [];
+    return modalShell(`Master groups — ${esc(p.brand)}`,
+      `<table class="acct-table"><thead><tr><th>Name</th><th>Id</th><th>Link</th><th>Status</th></tr></thead>
+       <tbody>${rows.map((g) => `<tr><td>${esc(g.groupName)}</td><td class="muted">${esc(g.groupId)}</td><td class="muted">${g.inviteLink?'link':'—'}</td><td>${esc(g.status)}</td></tr>`).join('')}</tbody></table>`,
+      `<button class="btn" data-close-modal>Close</button>`, true);
+  }
+
+  function modalStockDetail(p) {
+    const rows = (WF_DATA.masterGroups[p.brand] || []).filter((g) => g.status === p.bucket);
+    return modalShell(`Stock — ${esc(p.brand)} / ${esc(p.bucket)}`,
+      rows.length
+        ? `<table class="acct-table"><thead><tr><th>Name</th><th>Id</th><th>Members</th><th>Status</th></tr></thead>
+           <tbody>${rows.map((g) => `<tr><td>${esc(g.groupName)}</td><td class="muted">${esc(g.groupId)}</td><td>${g.members}</td><td>${esc(g.status)}</td></tr>`).join('')}</tbody></table>`
+        : `<div class="empty-state">No groups in this bucket.</div>`,
+      `<button class="btn" data-close-modal>Close</button><button class="btn" data-toast="Export started (demo)">Export Excel</button>`, true);
+  }
+
+  function modalJqSetup(p) {
+    const type = p.taskType;
+    let body = '';
+    if (type === 'join') {
+      const groups = (WF_DATA.masterGroups[p.brand] || []).slice(0, 5);
+      body = `<p class="muted" style="font-size:12px;margin-top:0">Select missing master groups or import CSV (demo checklist).</p>
+        <div class="check-list">${groups.map((g,i)=>`<label class="check-item"><input type="checkbox" ${i<2?'checked':''}/> ${esc(g.groupName)}</label>`).join('')}</div>`;
+    } else if (type === 'create_group') {
+      const hasPhoto = WF_DATA.settings.brandPhotoSet[p.brand];
+      body = `<div class="form-grid">
+        <div class="form-row"><label>Base name</label><input class="field" value="${esc(p.brand)} NEW" style="width:100%" /></div>
+        <div class="form-row"><label>Count</label><input class="field" type="number" value="5" style="width:100%" /></div>
+      </div>
+      <p style="font-size:12px;margin:12px 0 0;color:var(--color-text-secondary)">Brand photo: ${hasPhoto ? '<strong style="color:var(--color-wa)">Preview available</strong> (already set in Settings)' : '<strong style="color:#fbbf24">Not set</strong> — configure in Settings before create in production app.'}</p>`;
+    } else if (type === 'set_admin') {
+      body = `<div class="form-row"><label>Target account</label>
+        <select class="field" style="width:100%">${WF.allAccounts().filter(a=>a.brandName===p.brand).map(a=>`<option>${esc(a.accountName)}</option>`).join('')}</select></div>
+        <div class="check-list" style="margin-top:10px">${(WF_DATA.masterGroups[p.brand]||[]).slice(0,4).map(g=>`<label class="check-item"><input type="checkbox" checked/> ${esc(g.groupName)}</label>`).join('')}</div>`;
+    } else {
+      body = `<p class="muted" style="font-size:12px;margin-top:0">Select groups to exit (leave). Delete is queued later from VIEW if Settings allow.</p>
+        <div class="check-list">${WF_DATA.junkGroups.map(g=>`<label class="check-item"><input type="checkbox" checked/> ${esc(g.groupName)}</label>`).join('')}</div>`;
+    }
+    return modalShell(`SETUP — ${esc(type)}`, body,
+      `<button class="btn" data-close-modal>Cancel</button><button class="btn btn-primary" data-setup-save>Queue</button>`, true);
+  }
+
+  function modalJqView(p) {
+    const job = WF_STATE.jobs.find((j) => j.id === p.jobId);
+    if (!job) return modalAlert({ title: 'Not found', message: 'Job not found.' });
+    if (job.taskType === 'create_group') {
+      return modalShell(`VIEW Create — ${esc(job.accountName)}`,
+        `<div class="seg" style="margin-bottom:12px">
+          <button type="button" class="is-active" data-create-tab="result">Result</button>
+          <button type="button" data-create-tab="photo">Set Photo</button>
+        </div>
+        <div id="create-tab-body">
+          <table class="acct-table"><thead><tr><th>Name</th><th>Id</th><th>Invite</th><th>Status</th></tr></thead>
+          <tbody>${(job.outcomes||[]).map(o=>`<tr><td>${esc(o.groupName)}</td><td class="muted">${esc(o.groupId)}</td><td class="muted">${o.inviteLink?'link':'—'}</td><td>${esc(o.status)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No results yet</td></tr>'}</tbody></table>
+        </div>`,
+        `<button class="btn" data-close-modal>Close</button><button class="btn btn-primary" data-queue-set-photo="${job.id}">Queue Set Photo</button>`, true);
+    }
+    return modalShell(`VIEW — ${esc(job.taskType)}`,
+      `<p class="muted" style="font-size:12px;margin-top:0">${esc(job.remark || '')}</p>
+       <table class="acct-table"><thead><tr><th>Group</th><th>Id</th><th>Status</th><th>Remark</th></tr></thead>
+       <tbody>${(job.outcomes||[]).map(o=>`<tr><td>${esc(o.groupName)}</td><td class="muted">${esc(o.groupId)}</td><td>${esc(o.status)}</td><td>${esc(o.remark||'—')}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No per-group outcomes</td></tr>'}</tbody></table>`,
+      `${job.taskType==='exit_delete_group'?'<button class="btn btn-danger" data-toast="Delete queued for Left groups (demo)">Queue delete</button>':''}
+       ${job.status==='failed'?'<button class="btn btn-wa" data-job-run="'+job.id+'" data-close-modal>Run failed only</button>':''}
+       <button class="btn" data-close-modal>Close</button>`, true);
+  }
+
+  function modalAddBrand() {
+    return modalShell('Add Brand',
+      `<div class="form-row"><label>Brand name</label><input class="field" id="new-brand-name" placeholder="e.g. DEMO" style="width:100%" /></div>`,
+      `<button class="btn" data-close-modal>Cancel</button><button class="btn btn-primary" id="save-brand">Save</button>`);
+  }
+
+  function modalAddAccount(p) {
+    return modalShell(`Add Account — ${esc(p.brand)}`,
+      `<div class="form-grid">
+        <div class="form-row"><label>Platform</label><select class="field" id="new-acc-plat" style="width:100%"><option value="whatsapp">WhatsApp</option><option value="telegram">Telegram</option></select></div>
+        <div class="form-row"><label>Account name</label><input class="field" id="new-acc-name" style="width:100%" /></div>
+        <div class="form-row"><label>Phone</label><input class="field" id="new-acc-phone" style="width:100%" /></div>
+        <div class="form-row"><label>Location</label><select class="field" id="new-acc-loc" style="width:100%"><option>MY</option><option>KH</option></select></div>
+      </div>`,
+      `<button class="btn" data-close-modal>Cancel</button><button class="btn btn-primary" id="save-account" data-brand="${esc(p.brand)}">Save</button>`);
+  }
+
+  function renderToast() {
+    const el = $('#toast');
+    if (!el) return;
+    if (!WF_STATE.toast) { el.classList.remove('is-open'); el.textContent = ''; return; }
+    el.textContent = WF_STATE.toast;
+    el.classList.add('is-open');
+  }
+
+  /* ---------- Actions ---------- */
+  function startSync(accountId) {
+    const found = WF.findAccount(accountId);
+    if (!found) return;
+    const { account } = found;
+    if (!account.phoneNumber) {
+      WF.openModal('missing-phone', { accountId, accountName: account.accountName });
+      return;
+    }
+    account.actionProcess = 'session_check';
+    renderPage();
+    setTimeout(() => {
+      if (account.sessionStatus === 'invalid') {
+        account.actionProcess = null;
+        WF.openModal('platform-login', { accountId, accountName: account.accountName, platform: account.platform, phase: 'loading' });
+        renderPage();
+        setTimeout(() => {
+          if (WF_STATE.modal?.type === 'platform-login') {
+            WF_STATE.modal.payload.phase = 'ready';
+            renderModal();
+          }
+        }, 900);
+        return;
+      }
+      account.actionProcess = null;
+      WF.openModal('scrape-prompt', { accountId, accountName: account.accountName, platform: account.platform });
+      renderPage();
+    }, 700);
+  }
+
+  function startScrape(accountId) {
+    const found = WF.findAccount(accountId);
+    if (!found) return;
+    const { account } = found;
+    account.actionProcess = 'scraper';
+    account.scrapeProgress = { current: 0, total: 8 };
+    WF.closeModal();
+    renderPage();
+    const t = setInterval(() => {
+      if (account.actionProcess !== 'scraper') { clearInterval(t); return; }
+      account.scrapeProgress.current += 1;
+      if (account.scrapeProgress.current >= account.scrapeProgress.total) {
+        clearInterval(t);
+        account.actionProcess = null;
+        account.scrapeProgress = null;
+        account.lastSyncAt = new Date().toISOString();
+        account.sessionStatus = 'valid';
+        account.status = 'active';
+        account.syncState = 'synced';
+        WF.toast('Scrape completed (demo)');
+        renderPage();
+        return;
+      }
+      renderPage();
+    }, 450);
+  }
+
+  function bindPageEvents() {
+    $('#acc-search')?.addEventListener('input', (e) => { WF_STATE.filters.account.search = e.target.value; renderPage(); });
+    $('#acc-brand')?.addEventListener('change', (e) => { WF_STATE.filters.account.brand = e.target.value; renderPage(); });
+    $('#acc-platform')?.addEventListener('change', (e) => { WF_STATE.filters.account.platform = e.target.value; renderPage(); });
+    $('#acc-status')?.addEventListener('change', (e) => { WF_STATE.filters.account.status = e.target.value; renderPage(); });
+    $$('[data-view]').forEach((b) => b.addEventListener('click', () => { WF_STATE.accountView = b.dataset.view; renderPage(); }));
+    $('#btn-export-acc')?.addEventListener('click', () => WF.toast('Export Excel (demo)'));
+    $('#btn-add-brand')?.addEventListener('click', () => WF.isAdmin ? WF.openModal('add-brand') : WF.toast('Admin permission required'));
+    $$('[data-add-account]').forEach((b) => b.addEventListener('click', () => WF.isAdmin ? WF.openModal('add-account', { brand: b.dataset.addAccount }) : WF.toast('Admin permission required')));
+    $$('[data-collapse-brand]').forEach((b) => b.addEventListener('click', () => b.closest('.brand-card')?.classList.toggle('collapsed')));
+    $$('[data-master]').forEach((b) => b.addEventListener('click', () => WF.openModal('master-groups', { brand: b.dataset.master })));
+    $$('[data-sync]').forEach((b) => b.addEventListener('click', () => startSync(b.dataset.sync)));
+    $$('[data-clear]').forEach((b) => b.addEventListener('click', () => {
+      const f = WF.findAccount(b.dataset.clear); if (!f) return;
+      f.account.sessionStatus = 'invalid'; f.account.status = 'logout'; WF.toast('Session cleared (demo)'); renderPage();
+    }));
+    $$('[data-group-link]').forEach((b) => b.addEventListener('click', () => {
+      const found = WF.findAccount(b.dataset.groupLink);
+      WF.openModal('group-link-picker', { accountId: b.dataset.groupLink, accountName: found?.account.accountName });
+    }));
+    $$('[data-cancel-scrape]').forEach((b) => b.addEventListener('click', () => {
+      const f = WF.findAccount(b.dataset.cancelScrape);
+      WF.openModal('scrape-cancel', { accountId: b.dataset.cancelScrape, accountName: f?.account.accountName });
+    }));
+
+    $('#ops-platform')?.addEventListener('change', (e) => { WF_STATE.filters.ops.platform = e.target.value; WF_STATE.jq.accountId = ''; renderPage(); });
+    $('#ops-brand')?.addEventListener('change', (e) => { WF_STATE.filters.ops.brand = e.target.value; WF_STATE.jq.brand = e.target.value; renderPage(); });
+    $$('[data-ops-bm]').forEach((b) => b.addEventListener('click', () => {
+      WF_STATE.opsBookmark = b.dataset.opsBm;
+      setHashFromState();
+      renderPage();
+    }));
+    $$('[data-stock]').forEach((b) => b.addEventListener('dblclick', () => WF.openModal('stock-detail', { brand: b.dataset.stockBrand, bucket: b.dataset.stock })));
+
+    $('#jq-task')?.addEventListener('change', (e) => { WF_STATE.jq.taskType = e.target.value; renderPage(); });
+    $('#jq-brand')?.addEventListener('change', (e) => { WF_STATE.jq.brand = e.target.value; WF_STATE.filters.ops.brand = e.target.value; WF_STATE.jq.accountId = ''; renderPage(); });
+    $('#jq-account')?.addEventListener('change', (e) => { WF_STATE.jq.accountId = e.target.value; renderPage(); });
+    $('#jq-setup')?.addEventListener('click', () => WF.openModal('jq-setup', { ...WF_STATE.jq, brand: WF_STATE.jq.brand }));
+    $$('[data-job-run]').forEach((b) => b.addEventListener('click', () => {
+      const job = WF_STATE.jobs.find((j) => j.id === b.dataset.jobRun);
+      if (!job) return;
+      job.status = 'running';
+      job.remark = 'Running…';
+      renderPage();
+      setTimeout(() => { job.status = 'completed'; job.progress.current = job.progress.total; job.remark = 'Completed (demo)'; WF.toast('Job completed'); renderPage(); }, 1600);
+    }));
+    $$('[data-job-pause]').forEach((b) => b.addEventListener('click', () => {
+      const job = WF_STATE.jobs.find((j) => j.id === b.dataset.jobPause);
+      if (job) { job.status = 'paused'; job.remark = 'Paused'; renderPage(); }
+    }));
+    $$('[data-job-cancel]').forEach((b) => b.addEventListener('click', () => {
+      const job = WF_STATE.jobs.find((j) => j.id === b.dataset.jobCancel);
+      if (job) { job.status = 'cancelled'; job.remark = 'Cancelled'; renderPage(); }
+    }));
+    $$('[data-job-view]').forEach((b) => b.addEventListener('click', () => WF.openModal('jq-view', { jobId: b.dataset.jobView })));
+    $('#jq-delete-sel')?.addEventListener('click', () => {
+      const ids = $$('[data-job-sel]:checked').map((c) => c.dataset.jobSel);
+      if (!ids.length) { WF.toast('No rows selected'); return; }
+      WF_STATE.jobs = WF_STATE.jobs.filter((j) => !ids.includes(j.id));
+      WF.toast(`Deleted ${ids.length} job(s) (demo)`);
+      renderPage();
+    });
+
+    $('#rep-search')?.addEventListener('input', (e) => { WF_STATE.filters.reporting.search = e.target.value; renderPage(); });
+    $('#rep-platform')?.addEventListener('change', (e) => { WF_STATE.filters.reporting.platform = e.target.value; renderPage(); });
+    $('#rep-brand')?.addEventListener('change', (e) => { WF_STATE.filters.reporting.brand = e.target.value; WF_STATE.filters.reporting.accName = 'all'; renderPage(); });
+    $('#rep-acc')?.addEventListener('change', (e) => { WF_STATE.filters.reporting.accName = e.target.value; renderPage(); });
+    $('#rep-status')?.addEventListener('change', (e) => { WF_STATE.filters.reporting.status = e.target.value; renderPage(); });
+    $$('[data-rep-bm]').forEach((b) => b.addEventListener('click', () => { WF_STATE.filters.reporting.bookmark = b.dataset.repBm; renderPage(); }));
+    $('#report-clear')?.addEventListener('click', () => { WF_STATE.filters.reporting.status = 'all'; renderPage(); });
+    $('#rep-export')?.addEventListener('click', () => WF.toast('Export Excel (demo)'));
+
+    $$('[data-settings-toggle]').forEach((b) => b.addEventListener('click', () => {
+      WF_STATE.settingsOpen = WF_STATE.settingsOpen === b.dataset.settingsToggle ? '' : b.dataset.settingsToggle;
+      renderPage();
+    }));
+    $('#auto-scrape-switch')?.addEventListener('click', (e) => {
+      WF_DATA.settings.autoScrapeEnabled = !WF_DATA.settings.autoScrapeEnabled;
+      e.currentTarget.classList.toggle('on', WF_DATA.settings.autoScrapeEnabled);
+      WF.toast('Auto-scrape ' + (WF_DATA.settings.autoScrapeEnabled ? 'On' : 'Off'));
+    });
+    $('#btn-check-update')?.addEventListener('click', () => {
+      const msg = $('#update-msg');
+      if (msg) msg.textContent = 'Checking…';
+      setTimeout(() => { if (msg) msg.textContent = `Current v${WF_DATA.version}. You are on the latest release (demo).`; }, 800);
+    });
+  }
+
+  function bindModalEvents() {
+    $$('[data-close-modal]').forEach((b) => b.addEventListener('click', () => WF.closeModal()));
+    $('#modal-root')?.addEventListener('click', (e) => { if (e.target.id === 'modal-root') WF.closeModal(); });
+    $$('[data-scrape-now]').forEach((b) => b.addEventListener('click', () => startScrape(b.dataset.scrapeNow)));
+    $$('[data-simulate-scan]').forEach((b) => b.addEventListener('click', () => {
+      const f = WF.findAccount(b.dataset.simulateScan);
+      if (f) { f.account.sessionStatus = 'valid'; f.account.status = 'active'; }
+      WF.openModal('scrape-prompt', { accountId: b.dataset.simulateScan, accountName: f?.account.accountName, platform: f?.account.platform });
+    }));
+    $$('[data-save-phone]').forEach((b) => b.addEventListener('click', () => {
+      const phone = $('#missing-phone-input')?.value?.trim();
+      const f = WF.findAccount(b.dataset.savePhone);
+      if (!phone) { WF.toast('Enter phone'); return; }
+      if (f) f.account.phoneNumber = phone;
+      WF.closeModal();
+      startSync(b.dataset.savePhone);
+    }));
+    $$('[data-confirm-cancel-scrape]').forEach((b) => b.addEventListener('click', () => {
+      const f = WF.findAccount(b.dataset.confirmCancelScrape);
+      if (f) { f.account.actionProcess = null; f.account.scrapeProgress = null; }
+      WF.openModal('sync-error', { title: 'Scrape cancelled', message: 'Scrape was cancelled.' });
+      renderPage();
+    }));
+    $$('[data-open-links]').forEach((b) => b.addEventListener('click', () => WF.openModal('group-links', { accountId: b.dataset.openLinks, mode: b.dataset.mode })));
+    $('#gl-admin-filter')?.addEventListener('change', (e) => {
+      $$('#modal-root tbody tr').forEach((tr) => {
+        const v = e.target.value;
+        if (v === 'all') tr.style.display = '';
+        else tr.style.display = (String(tr.dataset.isadmin) === 'true') === (v === 'yes') ? '' : 'none';
+      });
+    });
+    $('#gl-export')?.addEventListener('click', () => WF.toast('Export Excel (demo)'));
+    $$('[data-toast]').forEach((b) => b.addEventListener('click', () => WF.toast(b.dataset.toast)));
+    $$('[data-setup-save]').forEach((b) => b.addEventListener('click', () => {
+      const acc = WF.findAccount(WF_STATE.jq.accountId)?.account;
+      if (!acc) { WF.toast('Select account first'); return; }
+      if (acc.sessionStatus !== 'valid') { WF.toast('Session must be Valid'); return; }
+      WF_STATE.jobs.unshift({
+        id: 'job-' + Date.now(),
+        action: WF_STATE.jq.taskType,
+        taskType: WF_STATE.jq.taskType,
+        brandName: acc.brandName,
+        accountId: acc.id,
+        accountName: acc.accountName,
+        platform: acc.platform,
+        status: 'queued',
+        progress: { current: 0, total: 3 },
+        createdAt: new Date().toISOString(),
+        remark: 'Queued from SETUP (demo)',
+        outcomes: [],
+      });
+      WF.toast('Job queued (demo)');
+      WF.closeModal();
+      renderPage();
+    }));
+    $$('[data-lang]').forEach((b) => b.addEventListener('click', () => {
+      $$('[data-lang]').forEach((x) => x.classList.toggle('is-active', x === b));
+      WF.toast('Language: ' + (b.dataset.lang === 'zh' ? '中文' : 'English') + ' (demo)');
+    }));
+    $$('[data-queue-set-photo]').forEach((b) => b.addEventListener('click', () => { WF.toast('Set Photo job queued (demo)'); WF.closeModal(); }));
+    $$('[data-create-tab]').forEach((b) => b.addEventListener('click', () => {
+      $$('[data-create-tab]').forEach((x) => x.classList.remove('is-active'));
+      b.classList.add('is-active');
+      const body = $('#create-tab-body');
+      if (!body) return;
+      if (b.dataset.createTab === 'photo') {
+        body.innerHTML = `<p class="muted" style="font-size:13px">Set Photo tab — brand photo preview / upload (demo). Queue applies photo to created groups only.</p>
+          <div style="width:120px;height:120px;border-radius:12px;border:1px dashed var(--color-border);display:grid;place-items:center;color:var(--color-text-muted)">Preview</div>`;
+      } else {
+        WF.openModal('jq-view', { jobId: WF_STATE.modal.payload.jobId });
+      }
+    }));
+    $('#save-brand')?.addEventListener('click', () => {
+      const name = $('#new-brand-name')?.value?.trim().toUpperCase();
+      if (!name) return;
+      WF_STATE.brands.push({
+        id: 'b-' + name.toLowerCase(), brandName: name, brandLabel: name, accountCount: 0,
+        standardGroupCountByPlatform: { whatsapp: 0, telegram: 0 },
+        stock: { active: 0, ready: 0, recycle: 0, review: 0, other: 0 }, avgNd: 0, toPrep: 0, accounts: [],
+      });
+      WF_DATA.masterGroups[name] = [];
+      WF.toast('Brand added (demo)');
+      WF.closeModal();
+      renderPage();
+    });
+    $('#save-account')?.addEventListener('click', () => {
+      const brandName = $('#save-account').dataset.brand;
+      const brand = WF_STATE.brands.find((b) => b.brandName === brandName);
+      if (!brand) return;
+      brand.accounts.push({
+        id: 'a-' + Date.now(),
+        platform: $('#new-acc-plat').value,
+        accountName: $('#new-acc-name').value || 'New Account',
+        phoneNumber: $('#new-acc-phone').value || '',
+        brandName,
+        status: 'logout',
+        locationDevice: $('#new-acc-loc').value,
+        groupsCurrent: 0, groupsTotal: brand.standardGroupCountByPlatform.whatsapp || 0,
+        joinedInMaster: 0, adminCurrent: 0, adminTotal: brand.standardGroupCountByPlatform.whatsapp || 0,
+        sessionStatus: 'invalid', syncState: 'pending', actionProcess: null, isMisaligned: true, lastSyncAt: null, scrapeProgress: null,
+      });
+      WF.toast('Account added (demo)');
+      WF.closeModal();
+      renderPage();
+    });
+    $$('[data-job-run]').forEach((b) => b.addEventListener('click', () => {
+      const job = WF_STATE.jobs.find((j) => j.id === b.dataset.jobRun);
+      if (job) { job.status = 'running'; setTimeout(() => { job.status = 'completed'; job.remark = 'Retry completed (demo)'; renderPage(); }, 1000); }
+    }));
+  }
+
+  function applyHash() {
+    const raw = (location.hash || '#/account').replace(/^#\/?/, '');
+    const [page, sub] = raw.split('/');
+    const allowed = ['account', 'operations', 'reporting', 'settings'];
+    if (page === 'settings' && !WF.isAdmin) {
+      WF_STATE.page = 'account';
+      location.hash = '#/account';
+      return;
+    }
+    if (allowed.includes(page)) WF_STATE.page = page;
+    if (page === 'operations' && (sub === 'overview' || sub === 'job_queue')) {
+      WF_STATE.opsBookmark = sub;
+    }
+  }
+
+  function setHashFromState() {
+    let h = '#/' + WF_STATE.page;
+    if (WF_STATE.page === 'operations') h += '/' + WF_STATE.opsBookmark;
+    if (location.hash !== h) history.replaceState(null, '', h);
+  }
+
+  function bindShell() {
+    $('#btn-toggle-sidebar')?.addEventListener('click', () => {
+      WF_STATE.sidebarCollapsed = !WF_STATE.sidebarCollapsed;
+      renderShell();
+    });
+    $$('.nav-item[data-nav]').forEach((el) => el.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (el.dataset.nav === 'settings') {
+        if (!WF.isAdmin) { WF.toast('Settings is admin-only'); return; }
+        WF_STATE.page = 'settings';
+      } else {
+        WF_STATE.page = 'account';
+      }
+      setHashFromState();
+      renderShell();
+    }));
+    $('#btn-logout')?.addEventListener('click', () => WF.logout());
+    $$('.monitoring-tab-btn').forEach((btn) => btn.addEventListener('click', () => {
+      WF_STATE.page = btn.dataset.tab;
+      setHashFromState();
+      renderShell();
+    }));
+    $('#btn-refresh')?.addEventListener('click', () => {
+      WF_STATE.refreshing = true;
+      const btn = $('#btn-refresh');
+      btn?.classList.add('is-spinning');
+      setTimeout(() => {
+        WF_STATE.refreshing = false;
+        btn?.classList.remove('is-spinning');
+        WF.toast('Refreshed (demo data)');
+        renderPage();
+      }, 700);
+    });
+    $('#role-select')?.addEventListener('change', (e) => {
+      WF.setRole(e.target.value);
+      if (!WF.isAdmin && WF_STATE.page === 'settings') WF_STATE.page = 'account';
+      setHashFromState();
+      renderShell();
+      WF.toast('Role: ' + e.target.value);
+    });
+    window.addEventListener('hashchange', () => {
+      applyHash();
+      renderShell();
+    });
+  }
+
+  window.WF_UI = { renderShell, renderModal, renderToast, renderPage };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (document.body.dataset.page === 'app') {
+      WF.requireAuth();
+      applyHash();
+      bindShell();
+      setHashFromState();
+      renderShell();
+      clockTick();
+      setInterval(clockTick, 1000);
+    }
+  });
+})();
+
+  </script>
+</body>
+</html>

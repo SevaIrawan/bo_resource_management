@@ -1,21 +1,20 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
-import { DarkSelect } from '@/components/ui/DarkSelect';
 import {
   GROUP_LINKS_PAGE_SIZE,
   GROUP_LINKS_VISIBLE_ROWS,
 } from '@/config/groupLinksTable';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
-  fetchAccountDailyGroupLinks,
-  fetchAccountGroupLinks,
-  fetchAccountJunkGroupLinks,
+  fetchAccountDetailsGroupLinks,
+  fetchAccountMasterGapGroupLinks,
   type AccountGroupLinkRow,
 } from '@/lib/accountGroupLinks';
-import type { GroupLinksViewMode } from '@/components/group-monitoring/GroupLinksPickerModal';
 import { exportGroupLinksExcel } from '@/lib/exportExcel';
 import { cn } from '@/lib/utils';
+
+export type AccountMetricGroupsMode = 'account' | 'junk' | 'missing' | 'notAdmin';
 
 interface GroupLinksModalProps {
   open: boolean;
@@ -23,45 +22,34 @@ interface GroupLinksModalProps {
   accountName: string;
   platform: 'whatsapp' | 'telegram';
   accountId?: string;
-  viewMode: GroupLinksViewMode;
+  /** Mode terkunci dari klik kolom — tanpa tab ganti konteks. */
+  initialViewMode?: AccountMetricGroupsMode;
   onClose: () => void;
+  /** Setelah animasi tutup — parent boleh clear state. */
+  onExited?: () => void;
+  onQuickAction?: (mode: Exclude<AccountMetricGroupsMode, 'account'>) => void;
+  quickActionDisabled?: boolean;
 }
 
-type AdminFilter = 'all' | 'yes' | 'no';
+const MODE_LABEL_KEY: Record<AccountMetricGroupsMode, string> = {
+  account: 'groupMonitoring.groupLinks.modeAccount',
+  junk: 'groupMonitoring.groupLinks.modeJunk',
+  missing: 'groupMonitoring.accountCard.colMissing',
+  notAdmin: 'groupMonitoring.accountCard.colNotAdmin',
+};
 
-function groupLinksModeLabel(
-  viewMode: GroupLinksViewMode,
-  t: (key: string) => string,
-): string {
-  if (viewMode === 'account') return t('groupMonitoring.groupLinks.modeAccount');
-  if (viewMode === 'junk') return t('groupMonitoring.groupLinks.modeJunk');
-  return t('groupMonitoring.groupLinks.modeAdminMaster');
-}
-
-function AdminFilterSlicer({
-  value,
-  onChange,
-  label,
-  options,
-}: {
-  value: AdminFilter;
-  onChange: (value: AdminFilter) => void;
-  label: string;
-  options: { value: AdminFilter; label: string }[];
-}) {
-  return (
-    <div className="group-links-admin-slicer">
-      <span className="group-links-admin-slicer-label">{label}</span>
-      <DarkSelect
-        value={value}
-        onChange={(next) => onChange(next as AdminFilter)}
-        options={options}
-        ariaLabel={label}
-        className="group-links-admin-slicer-select"
-        triggerClassName="account-slicer-select"
-      />
-    </div>
-  );
+async function loadLinksForMode(
+  mode: AccountMetricGroupsMode,
+  brandName: string,
+  platform: 'whatsapp' | 'telegram',
+  accountId?: string,
+): Promise<AccountGroupLinkRow[]> {
+  if (mode === 'missing' || mode === 'notAdmin') {
+    const gaps = await fetchAccountMasterGapGroupLinks(brandName, platform, accountId);
+    return mode === 'missing' ? gaps.missing : gaps.notAdmin;
+  }
+  const details = await fetchAccountDetailsGroupLinks(brandName, platform, accountId);
+  return mode === 'junk' ? details.junk : details.account;
 }
 
 export function GroupLinksModal({
@@ -70,69 +58,61 @@ export function GroupLinksModal({
   accountName,
   platform,
   accountId,
-  viewMode,
+  initialViewMode = 'account',
   onClose,
+  onExited,
+  onQuickAction,
+  quickActionDisabled = false,
 }: GroupLinksModalProps) {
   const { t } = useLanguage();
+  const viewMode = initialViewMode;
   const [links, setLinks] = useState<AccountGroupLinkRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [adminFilter, setAdminFilter] = useState<AdminFilter>('all');
   const [page, setPage] = useState(1);
+  const hasCacheRef = useRef(false);
+
+  useEffect(() => {
+    hasCacheRef.current = links.length > 0;
+  }, [links]);
 
   useEffect(() => {
     if (!open) return;
-    setAdminFilter('all');
     setPage(1);
-  }, [open]);
+  }, [initialViewMode, open]);
 
   useEffect(() => {
-    setPage(1);
-  }, [adminFilter]);
-
-  const filteredLinks = useMemo(() => {
-    if (adminFilter === 'all') return links;
-    return links.filter((row) => row.isAdmin === adminFilter);
-  }, [adminFilter, links]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredLinks.length / GROUP_LINKS_PAGE_SIZE));
-  const currentPage = Math.min(Math.max(1, page), pageCount);
-  const pageOffset = (currentPage - 1) * GROUP_LINKS_PAGE_SIZE;
-  const pageRows = filteredLinks.slice(pageOffset, pageOffset + GROUP_LINKS_PAGE_SIZE);
-  const showPagination = filteredLinks.length > GROUP_LINKS_PAGE_SIZE;
-  const tableNeedsScroll = pageRows.length > GROUP_LINKS_VISIBLE_ROWS;
-
-  const pageFrom = filteredLinks.length === 0 ? 0 : pageOffset + 1;
-  const pageTo = Math.min(pageOffset + GROUP_LINKS_PAGE_SIZE, filteredLinks.length);
-
-  const adminFilterOptions: { value: AdminFilter; label: string }[] = [
-    { value: 'all', label: t('groupMonitoring.groupLinks.filterAll') },
-    { value: 'yes', label: t('groupMonitoring.groupLinks.adminYes') },
-    { value: 'no', label: t('groupMonitoring.groupLinks.adminNo') },
-  ];
-
-  useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setLinks([]);
+      setError(null);
+      setLoading(false);
+      hasCacheRef.current = false;
+      return;
+    }
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
-    const load =
-      viewMode === 'account'
-        ? fetchAccountDailyGroupLinks(accountId)
-        : viewMode === 'junk'
-          ? fetchAccountJunkGroupLinks(brandName, platform, accountId)
-          : fetchAccountGroupLinks(brandName, platform, accountId);
+    const runLoad = (soft = false) => {
+      const keepPrevious = soft && hasCacheRef.current;
+      if (!keepPrevious) {
+        setLoading(true);
+        setError(null);
+        setLinks([]);
+      }
 
-    const runLoad = () => {
-      void load
-        .then((rows) => {
-          if (!cancelled) setLinks(rows);
+      void loadLinksForMode(viewMode, brandName, platform, accountId)
+        .then((next) => {
+          if (cancelled) return;
+          setLinks(next);
+          setError(null);
         })
         .catch((err) => {
-          if (!cancelled) {
-            setError(err instanceof Error ? err.message : t('groupMonitoring.sync.groupLinksFailed'));
+          if (cancelled) return;
+          if (!keepPrevious) {
+            setLinks([]);
+            setError(
+              err instanceof Error ? err.message : t('groupMonitoring.sync.groupLinksFailed'),
+            );
           }
         })
         .finally(() => {
@@ -140,10 +120,10 @@ export function GroupLinksModal({
         });
     };
 
-    runLoad();
+    runLoad(false);
 
     const onDataRefresh = () => {
-      if (!cancelled) runLoad();
+      if (!cancelled) runLoad(true);
     };
     window.addEventListener('rm-reporting-reload', onDataRefresh);
 
@@ -151,24 +131,43 @@ export function GroupLinksModal({
       cancelled = true;
       window.removeEventListener('rm-reporting-reload', onDataRefresh);
     };
-  }, [accountId, accountName, brandName, open, platform, t, viewMode]);
+  }, [accountId, brandName, open, platform, t, viewMode]);
 
-  if (!open) return null;
+  const pageCount = Math.max(1, Math.ceil(links.length / GROUP_LINKS_PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), pageCount);
+  const pageOffset = (currentPage - 1) * GROUP_LINKS_PAGE_SIZE;
+  const pageRows = links.slice(pageOffset, pageOffset + GROUP_LINKS_PAGE_SIZE);
+  const showPagination = links.length > GROUP_LINKS_PAGE_SIZE;
+  const pageFrom = links.length === 0 ? 0 : pageOffset + 1;
+  const pageTo = Math.min(pageOffset + GROUP_LINKS_PAGE_SIZE, links.length);
+  const isAccountDaily = viewMode === 'account';
+  const quickMode = viewMode === 'account' ? null : viewMode;
+  const quickLabel =
+    viewMode === 'missing'
+      ? t('groupMonitoring.accountCard.metricQuickJoin')
+      : viewMode === 'notAdmin'
+        ? t('groupMonitoring.accountCard.metricQuickSetAdmin')
+        : viewMode === 'junk'
+          ? t('groupMonitoring.accountCard.metricQuickLeave')
+          : null;
+  const modeTitle = t(MODE_LABEL_KEY[viewMode]);
 
   function handleExport() {
-    if (!filteredLinks.length) return;
+    if (!links.length) return;
     exportGroupLinksExcel({
       brandName,
       accountName,
-      rows: filteredLinks,
-      viewMode,
+      rows: links,
+      viewMode: viewMode === 'account' ? 'account' : 'junk',
     });
   }
 
+  const showInitialLoading = loading && links.length === 0 && !error;
+
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot open={open} onBackdropClick={onClose} onExited={onExited}>
       <div
-        className="brand-modal-panel brand-modal-panel--group-links"
+        className="brand-modal-panel brand-modal-panel--group-links brand-modal-panel--details-group"
         role="dialog"
         aria-modal="true"
         aria-labelledby="group-links-title"
@@ -177,17 +176,13 @@ export function GroupLinksModal({
         <header className="brand-modal-header group-links-modal-header">
           <div className="group-links-modal-title-block">
             <h2 id="group-links-title" className="brand-modal-title group-links-modal-title">
-              {brandName} {accountName}
+              {modeTitle}
             </h2>
-            <p className="group-links-modal-mode">{groupLinksModeLabel(viewMode, t)}</p>
+            <p className="brand-modal-subtitle">
+              {brandName} · {accountName}
+            </p>
           </div>
           <div className="group-links-header-tools">
-            <AdminFilterSlicer
-              value={adminFilter}
-              onChange={setAdminFilter}
-              label={t('groupMonitoring.groupLinks.filterAdmin')}
-              options={adminFilterOptions}
-            />
             <button
               type="button"
               className="brand-modal-close"
@@ -199,30 +194,36 @@ export function GroupLinksModal({
           </div>
         </header>
 
-        <div className="group-links-modal-body">
-          {loading ? (
-            <div className="group-links-modal-loading">
+        <div className="group-links-modal-body group-links-modal-body--details">
+          {showInitialLoading ? (
+            <div className="group-links-modal-loading group-links-modal-loading--fill">
               <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
             </div>
           ) : error ? (
-            <p className="platform-login-field-error" role="alert">
-              {error}
-            </p>
+            <div className="group-links-empty">
+              <p className="group-links-empty-text" role="alert">
+                {error}
+              </p>
+            </div>
           ) : links.length === 0 ? (
-            <p className="sync-modal-message">
-              {viewMode === 'junk'
-                ? t('groupMonitoring.groupLinks.junkEmpty')
-                : t('groupMonitoring.sync.groupLinksEmpty')}
-            </p>
-          ) : filteredLinks.length === 0 ? (
-            <p className="sync-modal-message">{t('groupMonitoring.groupLinks.filterEmpty')}</p>
+            <div className="group-links-empty">
+              <p className="group-links-empty-text">{t('groupMonitoring.groupLinks.emptyNoData')}</p>
+              <button
+                type="button"
+                className="join-report-table__filter-empty-btn"
+                onClick={onClose}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                {t('groupMonitoring.groupLinks.emptyBack')}
+              </button>
+            </div>
           ) : (
             <>
               <div
                 className={cn(
                   'group-links-table-wrap',
-                  viewMode === 'account' && 'group-links-table-wrap--account-daily',
-                  tableNeedsScroll && 'group-links-table-wrap--scroll',
+                  isAccountDaily && 'group-links-table-wrap--account-daily',
+                  'group-links-table-wrap--scroll',
                 )}
                 style={
                   {
@@ -233,12 +234,12 @@ export function GroupLinksModal({
                 <table
                   className={cn(
                     'group-links-table',
-                    viewMode === 'account' && 'group-links-table--account-daily',
+                    isAccountDaily && 'group-links-table--account-daily',
                   )}
                 >
                   <thead>
                     <tr>
-                      {viewMode === 'account' ? (
+                      {isAccountDaily ? (
                         <>
                           <th>{t('groupMonitoring.groupLinks.colNo')}</th>
                           <th>{t('groupMonitoring.groupLinks.colName')}</th>
@@ -260,8 +261,8 @@ export function GroupLinksModal({
                   </thead>
                   <tbody>
                     {pageRows.map((row, index) => (
-                      <tr key={`${row.groupId}-${row.groupName}`}>
-                        {viewMode === 'account' ? (
+                      <tr key={`${viewMode}-${row.groupId}-${row.groupName}`}>
+                        {isAccountDaily ? (
                           <>
                             <td className="group-links-table__num tabular-nums">
                               {pageOffset + index + 1}
@@ -348,21 +349,21 @@ export function GroupLinksModal({
                   </tbody>
                 </table>
               </div>
-              {viewMode === 'account' && tableNeedsScroll ? (
-                <p className="group-links-table-hint">
-                  {t('groupMonitoring.groupLinks.viewportHint', {
-                    max: GROUP_LINKS_VISIBLE_ROWS,
-                  })}
-                </p>
-              ) : null}
 
+            </>
+          )}
+        </div>
+
+        {!showInitialLoading ? (
+          <footer className="group-links-modal-footer group-links-modal-footer--metric">
+            <div className="group-links-modal-footer-meta">
               {showPagination ? (
-                <nav className="group-links-pagination" aria-label={t('groupMonitoring.groupLinks.pageLabel', { page: currentPage, pages: pageCount })}>
+                <>
                   <span className="group-links-pagination-range">
                     {t('groupMonitoring.groupLinks.pageRange', {
                       from: pageFrom,
                       to: pageTo,
-                      total: filteredLinks.length,
+                      total: links.length,
                     })}
                   </span>
                   <span className="group-links-pagination-label">
@@ -371,45 +372,54 @@ export function GroupLinksModal({
                       pages: pageCount,
                     })}
                   </span>
-                  <div className="group-links-pagination-actions">
-                    <button
-                      type="button"
-                      className="group-links-page-btn"
-                      disabled={currentPage <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      aria-label={t('groupMonitoring.groupLinks.prevPage')}
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                      {t('groupMonitoring.groupLinks.prevPage')}
-                    </button>
-                    <button
-                      type="button"
-                      className="group-links-page-btn"
-                      disabled={currentPage >= pageCount}
-                      onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                      aria-label={t('groupMonitoring.groupLinks.nextPage')}
-                    >
-                      {t('groupMonitoring.groupLinks.nextPage')}
-                      <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-                    </button>
-                  </div>
-                </nav>
+                </>
               ) : null}
-            </>
-          )}
-        </div>
-
-        <footer className="group-links-modal-footer">
-          <button
-            type="button"
-            className="group-links-export-btn"
-            onClick={handleExport}
-            disabled={loading || filteredLinks.length === 0}
-          >
-            <Download className="h-3 w-3" strokeWidth={2} aria-hidden />
-            {t('groupMonitoring.accountCard.export')}
-          </button>
-        </footer>
+            </div>
+            <div className="group-links-modal-footer-actions">
+              {showPagination ? (
+                <>
+                  <button
+                    type="button"
+                    className="group-links-page-btn group-links-page-btn--icon"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    aria-label={t('groupMonitoring.groupLinks.prevPage')}
+                  >
+                    <ChevronLeft className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className="group-links-page-btn group-links-page-btn--icon"
+                    disabled={currentPage >= pageCount}
+                    onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                    aria-label={t('groupMonitoring.groupLinks.nextPage')}
+                  >
+                    <ChevronRight className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                className="group-links-export-btn"
+                onClick={handleExport}
+                disabled={links.length === 0}
+              >
+                <Download className="h-3 w-3" strokeWidth={2} aria-hidden />
+                {t('groupMonitoring.accountCard.export')}
+              </button>
+              {quickMode && quickLabel && onQuickAction ? (
+                <button
+                  type="button"
+                  className="group-links-export-btn"
+                  disabled={quickActionDisabled || links.length === 0}
+                  onClick={() => onQuickAction(quickMode)}
+                >
+                  {quickLabel}
+                </button>
+              ) : null}
+            </div>
+          </footer>
+        ) : null}
       </div>
     </BrandModalRoot>
   );

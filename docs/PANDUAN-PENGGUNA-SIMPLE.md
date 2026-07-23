@@ -17,9 +17,9 @@
 5. [Tombol Sync (↻)](#5-tombol-sync-)
 6. [Scrape lengkap & kolom Last update](#6-scrape-lengkap--kolom-last-update)
 7. [Group link — full group, full admin, junk](#7-group-link--full-group-full-admin-junk)
-8. [Tab Operations — Overview (stock)](#8-tab-operations--overview-stock)
+8. [Stock grup di header Account](#8-stock-grup-di-header-account)
 9. [Tab Operations — Job Queue](#9-tab-operations--job-queue)
-10. [Tab Reporting](#10-tab-reporting)
+10. [Group matrix (header Account)](#10-group-matrix-header-account)
 11. [Settings — apa yang perlu di-set](#11-settings--apa-yang-perlu-di-set)
 12. [Di mana melihat apa](#12-di-mana-melihat-apa)
 13. [Alur harian & FAQ](#13-alur-harian--faq)
@@ -64,17 +64,19 @@ Logout dari sidebar **tidak** logout WA/TG. Untuk putuskan WA/TG di PC → **Cle
 ```
 Sidebar                    Area kerja
 ─────────                  ─────────────────────────────────────
-Group Monitoring    →      Tab: Account | Operations | Reporting
+Group Monitoring    →      Tab: Account | Operations
 Settings            →      KPI + isi tab
 Logout
 ```
 
 | Tab | Fungsi |
 |-----|--------|
-| **Account** | Daftar akun per brand, Sync, scrape via Sync, Group link |
-| **Operations** | **Overview** = stock grup · **Job Queue** = otomasi join/create/set admin/exit/set photo |
-| **Reporting** | Laporan join & admin (baca saja) |
+| **Account** | Daftar akun per brand, Sync, scrape, Group link, **stock chips** + **Group matrix** (header kartu) |
+| **Operations** | **Job Queue** saja — otomasi join/create/set admin/exit/set photo |
 | **Settings** | Bahasa, jadwal auto-scrape, kebijakan stock & worker |
+
+> Stock overview **tidak** di tab Operations. Chip stock + Avg ND / To prep hidup di **header brand card** (tab Account).  
+> Tidak ada tab **Reporting** terpisah. Matrix join/admin dibuka dari **badge jumlah grup** di header brand card.
 
 Menu **Refresh** di header tab = muat ulang data tab aktif dari server.
 
@@ -89,18 +91,18 @@ Menu **Refresh** di header tab = muat ulang data tab aktif dari server.
 | **Sync (↻)** | Account | Cek login + update angka ringkas + pintu scrape penuh |
 | **Scrape penuh** | Sync → **Scrape now** (modal) | Baca **semua** grup dari HP → simpan ke sistem |
 | Group link | Account → Action | Lihat full group / admin vs master / junk + export Excel |
-| Stock grup (Active, Ready, …) | Operations → Overview | Monitoring klasifikasi master brand |
+| Stock grup (Active, Ready, …) | Account → header brand card (chips) | Monitoring klasifikasi master brand |
 | Join grup via link invite | Job Queue → Join missing | Otomatis join grup master yang belum ada di akun |
 | Create group (batch) | Job Queue → Create & set photo | Buat banyak grup baru di HP |
 | Set photo | VIEW setelah create | Pasang foto JPG per brand ke grup hasil create |
 | Set admin | Job Queue → Set admin | Promote akun target jadi admin grup |
 | Exit & delete group | Job Queue → Exit & delete | Keluar / hapus grup di HP |
-| Matrix join/admin | Reporting | Tabel Yes/No semua akun × grup master |
-| Full Group / Full Admin | Reporting | Detail per akun |
+| Matrix join/admin | Account → badge grup (header kartu) | Tabel Yes/No semua akun × grup master |
+| Full Group / Full Admin | Modal Group matrix | Bookmark di modal |
 | Auto-scrape harian | Settings | Scrape otomatis (jam tertentu, app harus terbuka) |
 | Kebijakan stock & worker | Settings | Target Ready %, penamaan SOP, delay otomasi |
 
-Cek selisih grup/admin lewat kolom **In brand**, **Admin**, badge **not aligned**, **Group link** (junk), dan tab **Reporting**.
+Cek selisih grup/admin lewat kolom **In brand**, **Admin**, badge **not aligned**, **Group link** (junk), dan **Group matrix** (badge grup di header kartu).
 
 ---
 
@@ -193,7 +195,7 @@ Akun **not aligned** jika **On device ≠ standar** atau **Admin belum penuh** �
 
 ## 6. Scrape lengkap & kolom Last update
 
-**Fungsi scrape penuh:** baca **semua** grup dari HP → simpan ke database → perbarui **On device, In brand, Admin, Reporting, stock Overview**.
+**Fungsi scrape penuh:** baca **semua** grup dari HP → simpan ke database → perbarui **On device, In brand, Admin, Group matrix, stock chips Account**.
 
 **Cara menjalankan scrape penuh:**
 
@@ -244,9 +246,9 @@ Kosong → **Sync** → **Scrape now** dulu.
 
 ---
 
-## 8. Tab Operations — Overview (stock)
+## 8. Stock grup di header Account
 
-Bookmark **Overview** · filter **Platform** + **Brand**.
+Stock **tidak** punya tab/bookmark terpisah. Lihat di **Account** → header tiap brand card (Avg ND, To prep, chip Active/Ready/…).
 
 ### Header kartu brand
 
@@ -266,13 +268,15 @@ Brand | Avg ND | To prep  ···  [ WA n Group ] [ Active | Ready | Recycle | Re
 
 **Double-click** chip → modal daftar grup di bucket itu.
 
-Overview **hanya monitoring** — untuk buat grup NEW pakai Job Queue.
+Stock chips **hanya monitoring** — untuk buat grup NEW pakai Job Queue (tab Operations).
+
+Detail kontrak klasifikasi: `docs/OPERATIONS-STOCK-ENGINE.md`.
 
 ---
 
 ## 9. Tab Operations — Job Queue
 
-Bookmark **Job Queue** · pilih **Platform**, **Brand**, **Task type**, **Account** → **SETUP** → **Queue**.
+Tab **Operations** = **Job Queue** saja (filter **Platform** di slicer). Brand dan akun dipilih di form SETUP task.
 
 ### Task type (sesuai UI)
 
@@ -287,7 +291,7 @@ Bookmark **Job Queue** · pilih **Platform**, **Brand**, **Task type**, **Accoun
 
 **Queued** → **Running** → **Completed** / **Failed** · bisa **PAUSE** / **CANCEL** / **RUN** / **VIEW**.
 
-Satu akun tidak bisa **Sync** bersamaan dengan job di akun yang sama. Maks ~4 akun **berbeda** bisa jalan paralel (masing-masing 1 slot Chrome).
+Satu akun tidak bisa **Sync** bersamaan dengan job di akun yang sama. Maks **10 akun berbeda per platform** (WA dan TG terpisah) bisa jalan paralel (masing-masing 1 slot).
 
 **Batch besar (v1.0.30):** jika Anda Queue banyak grup (mis. 100), sistem **otomatis memecah** menjadi beberapa baris job (**maks 30 grup per job**, dari Settings → Invite by link). Job untuk **akun yang sama antri berurutan** — bukan paralel — sehingga Chrome stabil. Anda akan melihat beberapa baris job di tabel; tunggu semua selesai sebelum anggap task 100% done.
 
@@ -345,26 +349,22 @@ Setelah **Queue** sukses, job masuk tabel dan runner mencoba jalan otomatis jika
 
 ---
 
-## 10. Tab Reporting
+## 10. Group matrix (header Account)
 
 **Hanya baca** — tidak mengubah session, scrape, atau antrian job.
 
-### Filter
+**Cara buka:** Tab **Account** → header brand card → klik **jumlah grup** pada badge platform (WA/TG). Modal = matrix semua akun brand+platform.
 
-Platform · Brand · **Acc Name** (All = matrix) · **Status** (Active/Ready/Recycle/Review/Other/all) · Search nama grup · bookmark **Full Group** / **Full Admin**
+### Isi modal
 
-### Full Group (per akun atau matrix)
+| Bookmark | Isi |
+|----------|-----|
+| **Full Group** | Baris = grup master; kolom = akun; isi **Yes/No** join |
+| **Full Admin** | Sama, fokus status admin |
 
-- **Acc Name = All:** matrix — baris = grup master, kolom = akun, isi **Yes/No** join
-- **Acc Name = satu akun:** tabel semua grup daily akun (7 kolom)
+Filter Status (Active/Ready/Recycle/Review), search nama grup, dan filter kolom Yes/No tersedia di modal. Export Excel dari modal.
 
-### Full Admin
-
-- Daftar grup master + status admin akun terpilih
-
-Klik header kolom akun di matrix → filter Yes/No. Export Excel tersedia di panel Reporting.
-
-Data ikut update setelah scrape selesai (realtime ~500 ms).
+Data ikut update setelah scrape selesai (event realtime `rm-reporting-reload`, debounce ~500 ms).
 
 ---
 
@@ -398,13 +398,12 @@ Buka **Settings** di sidebar.
 | Daftar lengkap grup di HP | Group link → Groups on this account |
 | Admin vs master saja | Group link → Admin vs master |
 | Grup di HP di luar master | Group link → Junk (not in master) |
-| Stock Active/Ready/Recycle/… | Operations → Overview |
-| Detail grup per bucket stock | Overview → double-click chip |
-| Antrian join/create/admin/exit | Operations → Job Queue |
-| Matrix join semua akun | Reporting → Full Group, Acc=All |
-| Matrix admin semua akun | Reporting → Full Admin, Acc=All |
-| Detail satu akun | Reporting → pilih Acc Name |
-| Filter grup by status stock | Reporting → Status |
+| Stock Active/Ready/Recycle/… | Account → header brand card (chips) |
+| Detail grup per bucket stock | Account → double-click chip |
+| Antrian join/create/admin/exit/set photo | Operations → Job Queue |
+| Matrix join semua akun brand | Account → badge grup di header kartu → Full Group |
+| Matrix admin semua akun brand | Account → badge grup → Full Admin |
+| Filter grup by status stock | Modal Group matrix → Status |
 
 ---
 
@@ -423,8 +422,8 @@ Buka **Settings** di sidebar.
 - [ ] Pantau Job Queue Failed
 
 **Sore**
-- [ ] Reporting matrix brand Anda
-- [ ] Operations Overview — To prep & Ready
+- [ ] Group matrix brand Anda (badge grup di header kartu)
+- [ ] Account — stock chips To prep & Ready
 
 ### FAQ
 

@@ -14,9 +14,10 @@ alwaysApply: true
 # Multi-akun
 
 - Device key: `resolveDeviceSessionId()` — WA LocalAuth `clientId`/UUID DB; TG UUID akun.
-- WA: satu profil per akun, lock per `sessionId`, pool max ~4 Chrome (`waBrowserPool.ts`).
+- WA: satu profil per akun, lock per `sessionId`, pool max **10** Chrome user + **6** auto (`waBrowserPool.ts`, `deviceConcurrencyPolicy.ts`).
 - Jangan dua Puppeteer untuk akun sama. TG: sidecar `SESSIONS[session_id]`.
 - Issue/KPI hanya grup/admin — **bukan** login/logout session.
+- Tabs GM: **Account** | **Operations** (Job Queue). Stock chips + Group matrix di header Account — bukan tab Reporting / Overview Operations.
 
 # Ticket — 5 tipe saja (master vs daily per akun)
 

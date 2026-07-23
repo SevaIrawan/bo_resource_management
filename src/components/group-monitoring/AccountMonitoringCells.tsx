@@ -1,13 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { RefreshCw, Pencil, X } from 'lucide-react';
 import { PermissionLockedButton } from '@/components/ui/PermissionLockedButton';
 import { BrandImage } from '@/components/brand/BrandImage';
-import { GroupLinksModal } from '@/components/group-monitoring/GroupLinksModal';
 import {
-  GroupLinksPickerModal,
-  type GroupLinksViewMode,
-} from '@/components/group-monitoring/GroupLinksPickerModal';
+  GroupLinksModal,
+  type AccountMetricGroupsMode,
+} from '@/components/group-monitoring/GroupLinksModal';
+import { JobQueueSetupHost } from '@/components/group-monitoring/JobQueueSetupHost';
+import {
+  readTelegramWorkerSettings,
+  readWhatsAppWorkerSettings,
+} from '@/config/workerPlatformSettings';
 import { accountNeedsRelogin } from '@/lib/platformSyncCopy';
+import { computeAccountGapMetrics } from '@/lib/accountGapMetrics';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
@@ -18,6 +23,7 @@ import {
   resolveAccountActionColumn,
   resolveActiveProcessIntent,
 } from '@/lib/accountActionColumn';
+import type { JobQueueTaskType } from '@/lib/operationsJobQueueUi';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
 export function PlatformBadge({ platform }: { platform: AccountBrandRow['platform'] }) {
@@ -31,27 +37,6 @@ export function PlatformBadge({ platform }: { platform: AccountBrandRow['platfor
       )}
     >
       <BrandImage asset={asset} alt={platform} className="h-4 w-4" />
-    </span>
-  );
-}
-
-export function StatusBadge({ status }: { status: AccountBrandRow['status'] }) {
-  const { t } = useLanguage();
-  const isActive = status === 'active';
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium',
-        isActive ? 'bg-wa/10 text-wa' : 'bg-danger/10 text-danger',
-      )}
-    >
-      <span
-        className={cn('h-1.5 w-1.5 rounded-full', isActive ? 'bg-wa' : 'bg-danger')}
-      />
-      {isActive
-        ? t('groupMonitoring.accountCard.statusActive')
-        : t('groupMonitoring.accountCard.statusLogout')}
     </span>
   );
 }
@@ -174,14 +159,12 @@ function ActionColumnCell({
   operateLocked,
   activeProcessIntent = null,
   onCancelScrape,
-  onOpenGroupLinks,
 }: {
   row: AccountBrandRow;
   isPending: boolean;
   operateLocked: boolean;
   activeProcessIntent?: 'sync' | 'scraper' | null;
   onCancelScrape?: () => void;
-  onOpenGroupLinks: () => void;
 }) {
   const { t } = useLanguage();
   const kind = resolveAccountActionColumn(row, activeProcessIntent);
@@ -226,46 +209,51 @@ function ActionColumnCell({
     );
   }
 
-  return (
-    <button
-      type="button"
-      className="brand-card-action-btn brand-card-action-btn--nowrap"
-      disabled={isPending}
-      title={t('groupMonitoring.accountCard.groupLinkHint')}
-      onClick={onOpenGroupLinks}
-    >
-      {t('groupMonitoring.accountCard.groupLink')}
-    </button>
-  );
-}
-
-/** Y/X label: Y kurang dari X → Y merah; Y sama X → seluruh ratio hijau. */
-function MetricRatioLabel({ current: y, total: x }: { current: number; total: number }) {
-  const aligned = x > 0 && y === x;
-  const short = x > 0 && y < x;
-
-  return (
-    <span className="brand-metric-ratio text-xs tabular-nums">
-      <span className={cn(aligned && 'text-wa', short && 'text-danger', !aligned && !short && 'text-text-primary')}>
-        {y}
+  if (kind === 'not-aligned') {
+    return (
+      <span className="brand-remark-status brand-remark-status--not-aligned text-xs font-semibold">
+        {t('groupMonitoring.accountCard.remarkNotAligned')}
       </span>
-      <span className={cn(aligned ? 'text-wa' : 'text-text-primary')}>/</span>
-      <span className={cn(aligned ? 'text-wa' : 'text-text-primary')}>{x}</span>
+    );
+  }
+
+  return (
+    <span className="brand-remark-status brand-remark-status--aligned text-xs font-semibold">
+      {t('groupMonitoring.accountCard.remarkAligned')}
     </span>
   );
 }
 
-export function AdminProgress({ current, total }: { current: number; total: number }) {
-  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-  const tone = pct >= 100 ? 'bg-wa' : pct >= 66 ? 'bg-amber-400' : 'bg-danger';
-
+/** Gap: >0 merah + underline klikable; 0 → em dash abu, tidak klik. */
+function GapCountLabel({ gap }: { gap: number }) {
+  const safe = Math.max(0, gap);
+  if (safe === 0) {
+    return <span className="brand-gap-metric brand-gap-metric--none text-xs tabular-nums">-</span>;
+  }
   return (
-    <div className="brand-admin-progress">
-      <div className="brand-admin-progress-bar">
-        <div className={cn('brand-admin-progress-fill', tone)} style={{ width: `${pct}%` }} />
-      </div>
-      <MetricRatioLabel current={current} total={total} />
-    </div>
+    <span className="brand-gap-metric brand-gap-metric--link text-xs tabular-nums">
+      {safe}
+    </span>
+  );
+}
+
+function MetricGapButton({
+  gap,
+  title,
+  onClick,
+}: {
+  gap: number;
+  title: string;
+  onClick: () => void;
+}) {
+  const safe = Math.max(0, gap);
+  if (safe === 0) {
+    return <GapCountLabel gap={0} />;
+  }
+  return (
+    <button type="button" className="brand-metric-hit" title={title} onClick={onClick}>
+      <GapCountLabel gap={safe} />
+    </button>
   );
 }
 
@@ -444,10 +432,11 @@ function AccountRemoveSlotIcon({
   );
 }
 
-export function AccountTableRow({
+﻿export function AccountTableRow({
   row,
   layout = 'brandCard',
   showAction = true,
+  brandAccounts,
   onSync,
   onCancelScrape,
   onRemoveFromSlot,
@@ -463,6 +452,7 @@ export function AccountTableRow({
   row: AccountBrandRow;
   layout?: 'brandCard' | 'flat';
   showAction?: boolean;
+  brandAccounts?: AccountBrandRow[];
   onSync?: () => void;
   onCancelScrape?: () => void;
   onRemoveFromSlot?: () => void;
@@ -476,10 +466,14 @@ export function AccountTableRow({
   scrapeProgress?: UiScrapeProgress | null;
 }) {
   const { t } = useLanguage();
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
-  const [linksViewMode, setLinksViewMode] = useState<GroupLinksViewMode>('adminMaster');
+  const [linksMode, setLinksMode] = useState<AccountMetricGroupsMode>('account');
+  const [setupTask, setSetupTask] = useState<JobQueueTaskType | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [pendingSetupTask, setPendingSetupTask] = useState<JobQueueTaskType | null>(null);
+  const [setupFeedback, setSetupFeedback] = useState<string | null>(null);
   const isPending = row.syncState === 'pending';
+  const gaps = computeAccountGapMetrics(row);
   const activeProcessIntent = resolveActiveProcessIntent(row, {
     sync: syncLoading,
     scraper: scraperLoading,
@@ -500,6 +494,53 @@ export function AccountTableRow({
     !isPending &&
     !isProcessing &&
     row.sessionStatus === 'valid';
+
+  const platformPeers = useMemo(() => {
+    const peers = (brandAccounts ?? []).filter((a) => a.platform === row.platform);
+    return peers.length > 0 ? peers : [row];
+  }, [brandAccounts, row]);
+
+  const validPeers = useMemo(
+    () => platformPeers.filter((a) => a.sessionStatus === 'valid'),
+    [platformPeers],
+  );
+
+  const setAdminOwnerCandidates = useMemo(
+    () => validPeers.filter((a) => a.id !== row.id),
+    [row.id, validPeers],
+  );
+
+  function openMetricModal(mode: AccountMetricGroupsMode) {
+    if (isPending) return;
+    if (mode === 'account' && row.groupsCurrent <= 0) return;
+    if (mode === 'junk' && gaps.junk <= 0) return;
+    if (mode === 'missing' && gaps.missing <= 0) return;
+    if (mode === 'notAdmin' && gaps.notAdmin <= 0) return;
+    setLinksMode(mode);
+    setLinksOpen(true);
+  }
+
+  function handleQuickAction(mode: Exclude<AccountMetricGroupsMode, 'account'>) {
+    if (operateLocked) return;
+    if (row.sessionStatus !== 'valid') {
+      setSetupFeedback(t('groupMonitoring.accountCard.metricQuickNeedValidSession'));
+      return;
+    }
+    const worker =
+      row.platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+    if (mode === 'junk' && !worker.leaveDelete.leaveEnabled) {
+      setSetupFeedback(t('groupMonitoring.accountCard.metricQuickLeaveDisabled'));
+      return;
+    }
+    if (mode === 'notAdmin' && setAdminOwnerCandidates.length === 0) {
+      setSetupFeedback(t('groupMonitoring.accountCard.metricQuickNeedSuperAdmin'));
+      return;
+    }
+    setLinksOpen(false);
+    setPendingSetupTask(
+      mode === 'missing' ? 'join' : mode === 'notAdmin' ? 'set_admin' : 'exit_delete_group',
+    );
+  }
 
   return (
     <>
@@ -560,15 +601,6 @@ export function AccountTableRow({
             </span>
           </div>
         </td>
-        <td className="brand-col-cell brand-col-cell--status">
-          <div className="brand-col-cell-inner">
-            {isPending ? (
-              <span className="brand-account-slot-pill">—</span>
-            ) : (
-              <StatusBadge status={row.status} />
-            )}
-          </div>
-        </td>
         <td
           className={cn(
             'brand-col-cell brand-col-cell--session',
@@ -590,26 +622,58 @@ export function AccountTableRow({
           <div className="brand-col-cell-inner">
             {isPending ? (
               <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
+            ) : row.groupsCurrent > 0 ? (
+              <button
+                type="button"
+                className="brand-metric-hit"
+                title={t('groupMonitoring.accountCard.colOnDeviceHint')}
+                onClick={() => openMetricModal('account')}
+              >
+                <span className="brand-gap-metric brand-gap-metric--link text-xs tabular-nums">
+                  {row.groupsCurrent}
+                </span>
+              </button>
             ) : (
-              <span className="text-xs tabular-nums text-text-primary">{row.groupsCurrent}</span>
+              <span className="brand-gap-metric brand-gap-metric--none text-xs tabular-nums">-</span>
+            )}
+          </div>
+        </td>
+        <td className="brand-col-cell brand-col-cell--junk">
+          <div className="brand-col-cell-inner">
+            {isPending ? (
+              <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
+            ) : (
+              <MetricGapButton
+                gap={gaps.junk}
+                title={t('groupMonitoring.accountCard.colJunkHint')}
+                onClick={() => openMetricModal('junk')}
+              />
             )}
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--in-brand">
           <div className="brand-col-cell-inner">
             {isPending ? (
-              <span className="brand-account-slot-muted text-xs tabular-nums">—/—</span>
+              <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
             ) : (
-              <MetricRatioLabel current={row.joinedInMaster} total={row.groupsTotal} />
+              <MetricGapButton
+                gap={gaps.missing}
+                title={t('groupMonitoring.accountCard.colMissingHint')}
+                onClick={() => openMetricModal('missing')}
+              />
             )}
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--admin">
           <div className="brand-col-cell-inner">
             {isPending ? (
-              <span className="brand-account-slot-muted text-xs">—/—</span>
+              <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
             ) : (
-              <AdminProgress current={row.adminCurrent} total={row.adminTotal} />
+              <MetricGapButton
+                gap={gaps.notAdmin}
+                title={t('groupMonitoring.accountCard.colNotAdminHint')}
+                onClick={() => openMetricModal('notAdmin')}
+              />
             )}
           </div>
         </td>
@@ -633,32 +697,74 @@ export function AccountTableRow({
                 operateLocked={operateLocked}
                 activeProcessIntent={activeProcessIntent}
                 onCancelScrape={onCancelScrape}
-                onOpenGroupLinks={() => setPickerOpen(true)}
               />
             </div>
           </td>
         ) : null}
       </tr>
 
-      <GroupLinksPickerModal
-        open={pickerOpen}
-        accountName={row.accountName}
-        onClose={() => setPickerOpen(false)}
-        onSelect={(mode) => {
-          setLinksViewMode(mode);
-          setPickerOpen(false);
-          setLinksOpen(true);
-        }}
-      />
+      {setupFeedback ? (
+        <tr className="brand-account-row brand-account-row--feedback">
+          <td colSpan={9} className="brand-col-cell">
+            <p className="brand-metric-feedback text-xs text-amber-300" role="status">
+              {setupFeedback}{' '}
+              <button
+                type="button"
+                className="brand-metric-feedback-dismiss"
+                onClick={() => setSetupFeedback(null)}
+              >
+                {t('groupMonitoring.accountCard.closeModal')}
+              </button>
+            </p>
+          </td>
+        </tr>
+      ) : null}
+
       <GroupLinksModal
         open={linksOpen}
         brandName={row.brandName}
         accountName={row.accountName}
         platform={row.platform}
         accountId={row.id}
-        viewMode={linksViewMode}
+        initialViewMode={linksMode}
         onClose={() => setLinksOpen(false)}
+        onExited={() => {
+          if (!pendingSetupTask) return;
+          const next = pendingSetupTask;
+          setPendingSetupTask(null);
+          setSetupTask(next);
+          setSetupOpen(true);
+        }}
+        onQuickAction={handleQuickAction}
+        quickActionDisabled={operateLocked}
       />
+
+      {setupTask ? (
+        <JobQueueSetupHost
+          open={setupOpen}
+          onClose={() => setSetupOpen(false)}
+          onExited={() => {
+            setSetupTask(null);
+            setSetupOpen(false);
+          }}
+          onSaved={(message) => {
+            setSetupFeedback(message);
+            setSetupOpen(false);
+          }}
+          onFeedback={setSetupFeedback}
+          taskType={setupTask}
+          platform={row.platform}
+          activeBrand={row.brandName}
+          selectedAccounts={setupTask === 'set_admin' ? [] : [row]}
+          superAdminAccount={undefined}
+          targetAccountCandidates={setupTask === 'set_admin' ? validPeers : []}
+          validAccounts={validPeers}
+          ownerAccountCandidates={setupTask === 'set_admin' ? setAdminOwnerCandidates : undefined}
+          preferredSetAdminTargetId={setupTask === 'set_admin' ? row.id : undefined}
+          preferredExitGroupTab={setupTask === 'exit_delete_group' ? 'junk' : undefined}
+          preferredMasterListExpanded={setupTask === 'join'}
+        />
+      ) : null}
     </>
   );
 }
@@ -690,11 +796,6 @@ export function AccountEmptySlotRow({
           <span className="brand-account-slot-muted truncate">{slot.brandName}</span>
         </div>
       </td>
-      <td className="brand-col-cell brand-col-cell--status">
-        <div className="brand-col-cell-inner">
-          <span className="brand-account-slot-pill">—</span>
-        </div>
-      </td>
       <td className="brand-col-cell brand-col-cell--session">
         <div className="brand-col-cell-inner">
           <span className="brand-account-slot-muted text-xs">—</span>
@@ -705,17 +806,19 @@ export function AccountEmptySlotRow({
           <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
         </div>
       </td>
+      <td className="brand-col-cell brand-col-cell--junk">
+        <div className="brand-col-cell-inner">
+          <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
+        </div>
+      </td>
       <td className="brand-col-cell brand-col-cell--in-brand">
         <div className="brand-col-cell-inner">
-          <span className="brand-account-slot-muted text-xs tabular-nums">—/—</span>
+          <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
         </div>
       </td>
       <td className="brand-col-cell brand-col-cell--admin">
         <div className="brand-col-cell-inner">
-          <div className="brand-admin-progress">
-            <div className="brand-admin-progress-bar brand-admin-progress-bar--empty" />
-            <span className="brand-admin-progress-label brand-account-slot-muted">—/—</span>
-          </div>
+          <span className="brand-account-slot-muted text-xs tabular-nums">—</span>
         </div>
       </td>
       <td className="brand-col-cell brand-col-cell--last-update">

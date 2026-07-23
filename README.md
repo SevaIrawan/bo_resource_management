@@ -34,7 +34,7 @@ Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary
 
 **Panduan Group Monitoring (tim R&M):** **[docs/PANDUAN-PENGGUNA-SIMPLE.md](./docs/PANDUAN-PENGGUNA-SIMPLE.md)**
 
-**Installer multi-platform:** Windows `.exe`, macOS `.dmg`/`.zip`, Linux `.AppImage` — lihat [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) dan [docs/RELEASE-CI.md](./docs/RELEASE-CI.md).
+**Installer multi-platform:** Windows `.exe`, macOS `.dmg`/`.zip`, Linux `.AppImage` — lihat [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) dan [docs/CLIENT-INSTALL.md](./docs/CLIENT-INSTALL.md).
 
 **Panduan user (PDF / Word, bukan Markdown):** [docs/guides/documents/](./docs/guides/documents/) · rebuild: `npm run build:handbook-docs`
 

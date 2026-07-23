@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import {
@@ -18,7 +18,6 @@ const STOCK_LABEL_KEY: Record<GroupStockBucket, string> = {
   ready: 'operations.stock.ready',
   recycle: 'operations.stock.recycle',
   review: 'operations.stock.review',
-  other: 'operations.stock.other',
 };
 
 interface OperationsStockDetailModalProps {
@@ -43,6 +42,8 @@ export function OperationsStockDetailModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const loadSeqRef = useRef(0);
+  const hasRowsRef = useRef(false);
 
   const platformLabel =
     platform === 'whatsapp'
@@ -51,28 +52,43 @@ export function OperationsStockDetailModal({
   const bucketLabel = t(STOCK_LABEL_KEY[bucket]);
 
   useEffect(() => {
+    hasRowsRef.current = rows.length > 0;
+  }, [rows]);
+
+  useEffect(() => {
     if (!open) return;
     setPage(1);
   }, [open, bucket]);
 
   const loadDetailRows = useCallback(async () => {
-    setLoading(true);
+    const seq = ++loadSeqRef.current;
+    const soft = hasRowsRef.current;
+    if (!soft) setLoading(true);
     setError(null);
     try {
       const data = await fetchOperationsStockBucketDetails(brandName, platform, bucket);
+      if (seq !== loadSeqRef.current) return;
       setRows(data);
     } catch (err) {
+      if (seq !== loadSeqRef.current) return;
       setError(
         err instanceof Error ? err.message : t('operations.stock.detail.loadFailed'),
       );
       setRows([]);
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, [brandName, bucket, platform, t]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      loadSeqRef.current += 1;
+      setRows([]);
+      setError(null);
+      setLoading(false);
+      hasRowsRef.current = false;
+      return;
+    }
     void loadDetailRows();
   }, [loadDetailRows, open]);
 
@@ -103,10 +119,8 @@ export function OperationsStockDetailModal({
     });
   };
 
-  if (!open) return null;
-
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot open={open} onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--group-links"
         role="dialog"

@@ -32,6 +32,7 @@ export function AccountBrandTableView({ groups }: AccountBrandTableViewProps) {
                   key={row.id}
                   row={row}
                   layout="flat"
+                  brandAccounts={groups.find((g) => g.brandName === row.brandName)?.accounts}
                   canOperatePlatform={canOperatePlatform}
                 />
               ))

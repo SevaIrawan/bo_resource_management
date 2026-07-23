@@ -112,10 +112,12 @@ export function getRunnerState(): AutomationJobRunnerState {
 function buildQueueStats() {
   const runningJobs = listRunningJobs();
   const slotStats = getExecuteSlotStats();
+  const maxWa = getMaxConcurrentAutomationJobs('whatsapp');
+  const maxTg = getMaxConcurrentAutomationJobs('telegram');
   return {
     runningJobIds: runningJobs.map((job) => job.id),
     runningJobId: runningJobs[0]?.id ?? null,
-    maxConcurrent: getMaxConcurrentAutomationJobs(),
+    maxConcurrent: maxWa + maxTg,
     runningCount: runningJobs.length,
     queuedCount: getQueuedJobCount(),
     blockingExecutes: isJobQueueBlockingExecutes(jobs),
@@ -316,40 +318,44 @@ export function removeAutomationJobs(jobIds: string[]): number {
   return removed;
 }
 
-/** Slot kosong di pool bersama Sync/Scrape/Job (max 4 akun default). */
-export function countFreeExecuteSlots(): number {
-  const stats = getExecuteSlotStats();
+/** Slot kosong di pool Sync/Scrape/Job — per platform (WA/TG terpisah). */
+export function countFreeExecuteSlots(platform: 'whatsapp' | 'telegram'): number {
+  const stats = getExecuteSlotStats().byPlatform[platform];
   return Math.max(0, stats.maxConcurrent - stats.activeCount - stats.queuedCount);
 }
 
-/** FIFO — hingga maxConcurrent job berbeda akun; selaras execute slot pool + scrape. */
-export function pickQueuedJobsForDispatch(limit: number): AutomationJobRecord[] {
+/** FIFO per platform — hingga maxConcurrent job berbeda akun per platform. */
+export function pickQueuedJobsForDispatch(): AutomationJobRecord[] {
   ensureLoaded();
-  const maxConcurrent = getMaxConcurrentAutomationJobs();
-  const running = listRunningJobs();
-  const freeSlots = countFreeExecuteSlots();
-  const dispatchBudget = Math.min(
-    limit,
-    maxConcurrent - running.length,
-    freeSlots,
-  );
-  if (dispatchBudget <= 0) return [];
-
-  const runningAccountIds = new Set(running.map((job) => job.accountId));
   const picked: AutomationJobRecord[] = [];
-  const queued = jobs
-    .filter((job) => job.status === 'queued' && !job.paused)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const platforms = ['whatsapp', 'telegram'] as const;
 
-  for (const job of queued) {
-    if (picked.length >= dispatchBudget) break;
-    if (runningAccountIds.has(job.accountId)) continue;
-    if (isScrapeActiveForSession(job.sessionId)) continue;
-    if (isAutoScrapeActiveForSession(job.sessionId)) continue;
-    if (picked.some((row) => row.accountId === job.accountId)) continue;
-    picked.push(job);
-    runningAccountIds.add(job.accountId);
-    if (running.length + picked.length >= maxConcurrent) break;
+  for (const platform of platforms) {
+    const maxConcurrent = getMaxConcurrentAutomationJobs(platform);
+    const running = listRunningJobs().filter((job) => job.platform === platform);
+    const freeSlots = countFreeExecuteSlots(platform);
+    const dispatchBudget = Math.min(maxConcurrent - running.length, freeSlots);
+    if (dispatchBudget <= 0) continue;
+
+    const runningAccountIds = new Set(running.map((job) => job.accountId));
+    const queued = jobs
+      .filter(
+        (job) =>
+          job.status === 'queued' && !job.paused && job.platform === platform,
+      )
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+    let platformPicked = 0;
+    for (const job of queued) {
+      if (platformPicked >= dispatchBudget) break;
+      if (runningAccountIds.has(job.accountId)) continue;
+      if (isScrapeActiveForSession(job.sessionId)) continue;
+      if (isAutoScrapeActiveForSession(job.sessionId)) continue;
+      if (picked.some((row) => row.accountId === job.accountId)) continue;
+      picked.push(job);
+      runningAccountIds.add(job.accountId);
+      platformPicked += 1;
+    }
   }
 
   return picked;

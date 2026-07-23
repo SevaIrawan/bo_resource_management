@@ -1,4 +1,5 @@
 import type { UserActionKind } from '@/lib/userActionGate';
+import type { Platform } from '@/types/database';
 
 function executeSlotApi() {
   return window.electronAPI?.executeSlots;
@@ -11,11 +12,12 @@ export type ExecuteSlotAcquireResult =
 export async function acquireExecuteSlot(
   accountId: string,
   kind: UserActionKind,
+  platform: Platform,
   onQueued?: () => void,
 ): Promise<ExecuteSlotAcquireResult> {
   const api = executeSlotApi()?.acquireOrWait;
   if (api) {
-    const result = await api(accountId, kind);
+    const result = await api(accountId, kind, platform);
     if (!result.ok) {
       return { ok: false, reason: result.reason ?? 'same_account' };
     }
@@ -23,13 +25,13 @@ export async function acquireExecuteSlot(
     return { ok: true, queued: result.queued };
   }
   const { tryLockUserAction, enqueueUserActionWhenSlotFree } = await import('@/lib/userActionGate');
-  const lock = tryLockUserAction(accountId, kind);
+  const lock = tryLockUserAction(accountId, kind, platform);
   if (lock.ok) return { ok: true, queued: false };
   if (lock.reason === 'same_account') {
     return { ok: false, reason: 'same_account' };
   }
   return new Promise<ExecuteSlotAcquireResult>((resolve) => {
-    enqueueUserActionWhenSlotFree(accountId, kind, () => {
+    enqueueUserActionWhenSlotFree(accountId, kind, platform, () => {
       if (onQueued) onQueued();
       resolve({ ok: true, queued: true });
     });

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wireframe Review &amp; Breakdown · EN</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --line: #2d3a47;
+      --text: #e8eef4;
+      --muted: #9aabbc;
+      --head: #1e2a38;
+      --c1: rgba(120, 130, 150, 0.14);
+      --c2: rgba(139, 90, 60, 0.18);
+      --c3: rgba(45, 106, 79, 0.18);
+      --c4: rgba(78, 168, 222, 0.14);
+      --accent: #4ea8de;
+      --warn: #e9c46a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 1.75rem 1rem 2.75rem;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    header {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .lang {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.45rem;
+    }
+    header h1 {
+      margin: 0 0 0.4rem;
+      font-size: 1.4rem;
+      font-weight: 650;
+    }
+    header .meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      max-width: 48rem;
+    }
+    h2 {
+      margin: 1.5rem 0 0.7rem;
+      font-size: 1.02rem;
+      color: var(--accent);
+      font-weight: 650;
+    }
+    .key-grid { display: grid; gap: 0.65rem; }
+    .key-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.95rem 1.05rem;
+    }
+    .key-card .num {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      margin-bottom: 0.3rem;
+    }
+    .key-card strong {
+      display: block;
+      font-size: 0.98rem;
+      margin-bottom: 0.45rem;
+    }
+    .key-card p {
+      margin: 0 0 0.4rem;
+      color: #d7e3ee;
+      font-size: 0.88rem;
+    }
+    .key-card p:last-child { margin-bottom: 0; color: var(--muted); }
+    .key-card b { color: #e8eef4; font-weight: 650; }
+    .key-card .label {
+      display: block;
+      margin: 0 0 0.35rem;
+      color: #d7e3ee;
+      font-size: 0.88rem;
+      font-weight: 650;
+    }
+    .key-card ol {
+      margin: 0 0 0.55rem;
+      padding-left: 1.25rem;
+      color: #d7e3ee;
+      font-size: 0.88rem;
+    }
+    .key-card ol:last-of-type { margin-bottom: 0.45rem; }
+    .key-card ol li { margin-bottom: 0.35rem; }
+    .key-card ol li:last-child { margin-bottom: 0; }
+    .key-card .reason {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .scroll {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 940px;
+      font-size: 0.86rem;
+    }
+    th, td {
+      padding: 0.7rem 0.8rem;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+    }
+    th:last-child, td:last-child { border-right: none; }
+    tr:last-child td { border-bottom: none; }
+    thead th {
+      background: var(--head);
+      color: #d5e0ea;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+    td:nth-child(1) { width: 22%; background: var(--c1); font-weight: 650; }
+    td:nth-child(2) { width: 24%; background: var(--c2); }
+    td:nth-child(3) { width: 24%; background: var(--c3); }
+    td:nth-child(4) { width: 30%; background: var(--c4); }
+    .hod-note {
+      background: rgba(233, 196, 106, 0.12);
+      border: 1px solid rgba(233, 196, 106, 0.45);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      margin: 1.5rem 0 0.25rem;
+    }
+    .hod-note .label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--warn);
+      margin-bottom: 0.4rem;
+    }
+    .hod-note p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #f0e6c8;
+      line-height: 1.55;
+    }
+    .hod-note strong { color: #ffe8a3; }
+    .args { margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+    .args li {
+      list-style: none;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      padding: 0.75rem 0.9rem;
+      font-size: 0.9rem;
+    }
+    footer {
+      margin-top: 1.75rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      header .meta, .key-card p:last-child, footer { color: #444; }
+      h2, .key-card .num, header h1, .key-card strong, .key-card p, .key-card b { color: #111; }
+      td:nth-child(1) { background: #f2f2f2; }
+      td:nth-child(2) { background: #fff4ec; }
+      td:nth-child(3) { background: #eaf7f0; }
+      td:nth-child(4) { background: #eef6fb; }
+      .key-card, .args li, .scroll, .hod-note { border-color: #ccc; background: #fff; }
+      .hod-note p, .hod-note strong, .hod-note .label { color: #333; }
+      table { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="lang">English</span>
+      <h1>Wireframe Review and Change Breakdown</h1>
+      <p class="meta">
+        Comparison of application structure: Version 1.0.30 and Proposed Version.
+        Implementation, testing, and publication require HOD approval.
+      </p>
+    </header>
+
+    <h2>1. Key change points</h2>
+    <div class="key-grid">
+      <article class="key-card">
+        <span class="num">Point 01</span>
+        <strong>Main tabs from three to two</strong>
+        <p class="label">Change</p>
+        <ol>
+          <li>Reporting tab removed.</li>
+          <li>Remaining tabs: Account and Operations.</li>
+        </ol>
+        <p class="reason"><b>Rationale:</b> Three tabs fragmented the daily workflow.</p>
+      </article>
+
+      <article class="key-card">
+        <span class="num">Point 02</span>
+        <strong>Account as the centre for monitoring and decisions</strong>
+        <p class="label">Change</p>
+        <ol>
+          <li>Stock status moved to the brand card in Account.</li>
+          <li>Group matrix opened from the brand card in Account.</li>
+        </ol>
+        <p class="reason"><b>Rationale:</b> Operational decisions must sit next to the brand-account context under review.</p>
+      </article>
+
+      <article class="key-card">
+        <span class="num">Point 03</span>
+        <strong>Sequential Job Queue task pairing</strong>
+        <p class="label">Change</p>
+        <ol>
+          <li><b>Create Group and Set Photo</b> — after create completes, Set Photo is queued automatically when a brand photo is available.</li>
+          <li><b>Leave and Delete</b> — after leave completes, Delete is queued automatically only for groups successfully left.</li>
+          <li><b>Photo in Create Group modal</b> — no photo: Upload Photo (required before Queue). Photo exists: Preview Photo; Queue allowed.</li>
+        </ol>
+        <p class="reason"><b>Rationale:</b> Sequential tasks are combined. Photo is requested at Create Group, not when adding a brand.</p>
+      </article>
+
+      <article class="key-card">
+        <span class="num">Point 04</span>
+        <strong>Operations focused on the Job Queue</strong>
+        <p class="label">Change</p>
+        <ol>
+          <li>Operations opens directly to the Job Queue.</li>
+          <li>Leave/Delete Queue without display disruption.</li>
+          <li>Leave failure reasons shown in Remark.</li>
+        </ol>
+        <p class="reason"><b>Rationale:</b> Execution UI must be stable; failures must be auditable.</p>
+      </article>
+
+      <article class="key-card">
+        <span class="num">Point 05</span>
+        <strong>Device execution resilience</strong>
+        <p class="label">Change</p>
+        <ol>
+          <li><b>Telegram scrape</b> — quality gate that stopped scrapes due to many zero member counts is removed; member count and invite links prioritise complete server data.</li>
+          <li><b>Telegram automation</b> — session lock fixed so create/automation jobs do not deadlock.</li>
+          <li><b>WhatsApp Leave</b> — retries, fallback paths, and failure reason in Remark.</li>
+        </ol>
+        <p class="reason"><b>Rationale:</b> Layout changes are insufficient if device execution still fails without a documented reason.</p>
+      </article>
+    </div>
+
+    <h2>2. Point 03 edge cases</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th>System behaviour</th>
+            <th>Operator follow-up</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Create Group with no brand photo</td>
+            <td>Modal shows Upload Photo. Queue blocked until upload succeeds.</td>
+            <td>Upload in Create Group modal. After create completes, Set Photo is queued automatically.</td>
+          </tr>
+          <tr>
+            <td>Create done; Set Photo needs retry</td>
+            <td>Set Photo can still be queued manually from create VIEW.</td>
+            <td>Open create VIEW → Queue Set Photo (when brand photo is available).</td>
+          </tr>
+          <tr>
+            <td>Leave succeeded (status left)</td>
+            <td>Delete queued automatically only for groups with status left.</td>
+            <td>Monitor Delete queue; intervene only if Delete fails.</td>
+          </tr>
+          <tr>
+            <td>Leave failed</td>
+            <td>Failed groups are not auto-deleted. Status and reason shown in Remark.</td>
+            <td>Fix cause → re-run Leave from queue/VIEW. No automatic Delete for groups not left.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>3. Comparison: Version 1.0.30 and Proposed Version</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>What changed</th>
+            <th>Version 1.0.30</th>
+            <th>Proposed Version</th>
+            <th>Operational benefit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Main tabs</td>
+            <td>Account · Operations · Reporting</td>
+            <td>Account · Operations</td>
+            <td>Shorter navigation; clearer tab roles.</td>
+          </tr>
+          <tr>
+            <td>Reporting tab</td>
+            <td>Separate tab</td>
+            <td>Removed</td>
+            <td>Less page duplication.</td>
+          </tr>
+          <tr>
+            <td>Operations content</td>
+            <td>Stock summary and work queue</td>
+            <td>Job Queue directly</td>
+            <td>Operations for execution; stock in Account.</td>
+          </tr>
+          <tr>
+            <td>Create Group and Set Photo</td>
+            <td>Separate; Set Photo manual from VIEW</td>
+            <td>Combined; Set Photo automatic after create when photo available</td>
+            <td>One create-to-photo sequence.</td>
+          </tr>
+          <tr>
+            <td>Photo in Create Group modal</td>
+            <td>No photo: empty text; Queue locked without clear action</td>
+            <td>No photo: Upload required. Photo exists: Preview; Queue allowed</td>
+            <td>Upload at create; cannot skip without photo.</td>
+          </tr>
+          <tr>
+            <td>Leave and Delete</td>
+            <td>Separate; Delete manual from VIEW</td>
+            <td>Combined; Delete automatic after leave only for left groups</td>
+            <td>One leave-to-delete sequence.</td>
+          </tr>
+          <tr>
+            <td>Group stock status</td>
+            <td>Operations summary</td>
+            <td>Account brand card</td>
+            <td>Stock decisions with brand-account review.</td>
+          </tr>
+          <tr>
+            <td>Group matrix access</td>
+            <td>Reporting tab</td>
+            <td>Account brand card (Group)</td>
+            <td>Matrix audit scoped to the brand in focus.</td>
+          </tr>
+          <tr>
+            <td>Leave and Delete Queue</td>
+            <td>Display disruption; sudden list reload</td>
+            <td>No disruption; modal closes first, then result message</td>
+            <td>Stable display; fewer mis-clicks.</td>
+          </tr>
+          <tr>
+            <td>Telegram scrape and automation</td>
+            <td>Quality gate stopped scrapes; data often incomplete; automation could hang</td>
+            <td>Strict quality gate removed; GetFull-first; session lock fixed</td>
+            <td>More reliable jobs and daily data.</td>
+          </tr>
+          <tr>
+            <td>WhatsApp Leave failure</td>
+            <td>Failed status without reason</td>
+            <td>Fallback paths; failure reason in Remark</td>
+            <td>Failures auditable and actionable.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>4. Success metrics (KPI)</h2>
+    <ol class="args">
+      <li><b>Navigation (Point 01).</b> Daily work through two tabs (Account · Operations). Reporting removed.</li>
+      <li><b>Account (Point 02).</b> Stock and matrix available from the Account brand card.</li>
+      <li><b>Job Queue (Point 03).</b> Create→Set Photo and Leave→Delete automatic under stated conditions (see section 2).</li>
+      <li><b>Operations (Point 04).</b> Focused on Job Queue; Queue without display disruption; failure reason in Remark.</li>
+      <li><b>Device (Point 05).</b> Telegram scrape/automation more reliable; WhatsApp Leave has fallback and Remark. Optional post-release: compare manual interventions before vs after.</li>
+    </ol>
+
+    <h2>5. Effort estimate</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Cluster</th>
+            <th>Scope</th>
+            <th>Relative effort</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>IA / Account–Operations UI</td>
+            <td>Tabs, stock on Account, matrix from brand card, Operations = Job Queue</td>
+            <td>Medium</td>
+          </tr>
+          <tr>
+            <td>Job Queue</td>
+            <td>Auto Set Photo, auto Delete, required Upload on Create, Queue anti-flash, Remark</td>
+            <td>Medium–high</td>
+          </tr>
+          <tr>
+            <td>Device resilience</td>
+            <td>Telegram scrape/automation, WhatsApp Leave</td>
+            <td>Medium</td>
+          </tr>
+          <tr>
+            <td>Testing and HOD document</td>
+            <td>WA+TG tests, acceptance checklist, approval document</td>
+            <td>Low–medium</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="meta" style="margin-top:0.75rem;">
+      Sequence: Job Queue → device tests → document → HOD approval → publication.
+    </p>
+
+    <h2>6. Business arguments</h2>
+    <ol class="args">
+      <li><b>Status quo — navigation.</b> Work split across Reporting, stock Overview, and Job Queue; adds time and brand-context errors.</li>
+      <li><b>Status quo — Create and Set Photo.</b> After create, Set Photo remains manual from VIEW; easy to miss.</li>
+      <li><b>Status quo — Leave and Delete.</b> After leave, Delete remains manual; easy to miss at high volume.</li>
+      <li><b>Status quo — failures without reason.</b> Leave failures without Remark slow remediation.</li>
+      <li><b>Proposed Version.</b> Monitor and decide in Account; execute in Operations; sequential flows automated under conditions; failures auditable.</li>
+    </ol>
+
+    <h2>7. Risks and rollback</h2>
+    <ol class="args">
+      <li><b>Risk:</b> Auto Set Photo / Auto Delete runs under the wrong condition.<br /><b>Mitigation:</b> Set Photo only when photo available; Delete only for left status; Remark for audit.</li>
+      <li><b>Risk:</b> Operators unfamiliar without the Reporting tab.<br /><b>Mitigation:</b> Matrix remains on Account brand card; short release briefing.</li>
+      <li><b>Operational rollback:</b> Auto follow-up can be disabled without reverting full structure. Create→Photo and Leave→Delete remain available manually from VIEW.</li>
+      <li><b>UI rollback (Reporting / Overview):</b> Only if approval requires it; higher cost. Evaluate KPI before rolling back tab structure.</li>
+    </ol>
+
+    <aside class="hod-note" role="note">
+      <span class="label">Implementation decision</span>
+      <p>
+        Implementation, testing, and publication proceed
+        <strong>after HOD approval</strong>.
+      </p>
+    </aside>
+
+    <footer>
+      Wireframe Review and Change Breakdown · Version 1.0.30 and Proposed Version ·
+      Implementation after HOD approval
+    </footer>
+  </div>
+</body>
+</html>

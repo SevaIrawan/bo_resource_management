@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { BrandImage } from '@/components/brand/BrandImage';
 import {
   countAccountsByPlatform,
   masterGroupCountsByPlatform,
@@ -9,11 +10,11 @@ import { resolveMessagingAccountSaveErrorCode } from '@/lib/messagingAccounts';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
 import { AddAccountHeaderMenu } from '@/components/group-monitoring/AddAccountHeaderMenu';
-import {
-  BrandMasterGroupsModal,
-  BrandPlatformGroupsBadgeButton,
-} from '@/components/group-monitoring/BrandMasterGroupsModal';
+import { BrandMasterGroupsModal } from '@/components/group-monitoring/BrandMasterGroupsModal';
 import { CardDismissButton } from '@/components/group-monitoring/CardDismissButton';
+import { AccountBrandStockChips } from '@/components/group-monitoring/AccountBrandStockChips';
+import { OperationsBrandHeaderMeta } from '@/components/group-monitoring/OperationsBrandHeaderMeta';
+import { OperationsStockDetailModal } from '@/components/group-monitoring/OperationsStockDetailModal';
 import {
   AddAccountModal,
   type AddAccountFormValues,
@@ -31,10 +32,21 @@ import type { AddAccountInput, AccountBrandGroup, AccountBrandRow } from '@/type
 import type { Platform } from '@/types/database';
 import type { RowProcessingSpinner } from '@/hooks/useAccountSyncFlow';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
+import {
+  EMPTY_GROUP_STOCK_COUNTS,
+  EMPTY_GROUP_STOCK_HEADER_META,
+  type GroupStockBucket,
+  type GroupStockCounts,
+  type GroupStockHeaderMeta,
+} from '@/types/groupStock';
 
 interface AccountBrandCardProps {
   group: AccountBrandGroup;
   activePlatformFilter?: AccountPlatformFilter;
+  /** Jumlah grup master live (groups_master) — sumber badge Group + To prep. */
+  masterGroupCount?: number;
+  stockCounts?: GroupStockCounts;
+  stockHeaderMeta?: GroupStockHeaderMeta;
   canManageStructure?: boolean;
   canOperatePlatform?: boolean;
   onAddAccount: (input: AddAccountInput) => Promise<void>;
@@ -50,9 +62,16 @@ interface AccountBrandCardProps {
   onDismiss?: () => void;
 }
 
+function resolveHeaderPlatform(filter: AccountPlatformFilter): Platform {
+  return filter === 'telegram' ? 'telegram' : 'whatsapp';
+}
+
 export function AccountBrandCard({
   group,
-  activePlatformFilter = 'all',
+  activePlatformFilter = 'whatsapp',
+  masterGroupCount,
+  stockCounts = EMPTY_GROUP_STOCK_COUNTS,
+  stockHeaderMeta = EMPTY_GROUP_STOCK_HEADER_META,
   canManageStructure = true,
   canOperatePlatform = true,
   onAddAccount,
@@ -78,9 +97,9 @@ export function AccountBrandCard({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [comparePlatform, setComparePlatform] = useState<Platform | null>(null);
+  const [stockDetailBucket, setStockDetailBucket] = useState<GroupStockBucket | null>(null);
 
-  const allAligned = group.misalignedCount === 0;
-
+  const headerPlatform = resolveHeaderPlatform(activePlatformFilter);
   const accountsByPlatform = useMemo(
     () => countAccountsByPlatform(group.accounts),
     [group.accounts],
@@ -89,24 +108,29 @@ export function AccountBrandCard({
     () => masterGroupCountsByPlatform(group.standardGroupCountByPlatform),
     [group.standardGroupCountByPlatform],
   );
-  const showAllPlatforms = activePlatformFilter === 'all';
-
-  function renderAccountsBadge() {
-    if (showAllPlatforms) {
-      return t('groupMonitoring.accountCard.platformAccountsBadge', {
-        wa: accountsByPlatform.whatsapp,
-        tg: accountsByPlatform.telegram,
-      });
-    }
-    if (activePlatformFilter === 'whatsapp') {
-      return t('groupMonitoring.accountCard.platformAccountsBadgeWa', {
-        count: accountsByPlatform.whatsapp,
-      });
-    }
-    return t('groupMonitoring.accountCard.platformAccountsBadgeTg', {
-      count: accountsByPlatform.telegram,
-    });
-  }
+  const accountCount =
+    headerPlatform === 'whatsapp' ? accountsByPlatform.whatsapp : accountsByPlatform.telegram;
+  const gridGroupCount =
+    headerPlatform === 'whatsapp' ? groupsByPlatform.whatsapp : groupsByPlatform.telegram;
+  /** Badge Group = master live (sama sumber chip + To prep); fallback grid sebelum load. */
+  const groupCount =
+    masterGroupCount != null && Number.isFinite(masterGroupCount)
+      ? Math.max(0, Math.floor(masterGroupCount))
+      : gridGroupCount;
+  const platformAccounts = useMemo(
+    () => group.accounts.filter((row) => row.platform === headerPlatform),
+    [group.accounts, headerPlatform],
+  );
+  const logoutCount = useMemo(
+    () => platformAccounts.filter((row) => row.sessionStatus === 'invalid').length,
+    [platformAccounts],
+  );
+  const notAlignedCount = useMemo(
+    () => platformAccounts.filter((row) => row.isMisaligned).length,
+    [platformAccounts],
+  );
+  const platformShort = headerPlatform === 'whatsapp' ? 'WA' : 'TG';
+  const platformAsset = headerPlatform === 'whatsapp' ? 'whatsapp' : 'telegram';
 
   function openAddFlow(platform: Platform, slotId?: string) {
     if (!canManageStructure) return;
@@ -212,38 +236,88 @@ export function AccountBrandCard({
             <span className="brand-card-title">
               Brand : {group.brandName}
             </span>
+            <OperationsBrandHeaderMeta meta={stockHeaderMeta} />
           </button>
 
           <div className="brand-card-header-actions">
-            <span className="brand-card-badge brand-card-badge--neutral brand-card-badge--split">
-              {renderAccountsBadge()}
-            </span>
-            <span className="brand-card-header-platform-badges">
-              {(showAllPlatforms || activePlatformFilter === 'whatsapp') && (
-                <BrandPlatformGroupsBadgeButton
-                  platform="whatsapp"
-                  count={groupsByPlatform.whatsapp}
-                  onClick={() => setComparePlatform('whatsapp')}
-                />
-              )}
-              {(showAllPlatforms || activePlatformFilter === 'telegram') && (
-                <BrandPlatformGroupsBadgeButton
-                  platform="telegram"
-                  count={groupsByPlatform.telegram}
-                  onClick={() => setComparePlatform('telegram')}
-                />
-              )}
-            </span>
             <span
-              className={cn(
-                'brand-card-badge',
-                allAligned ? 'brand-card-badge--success' : 'brand-card-badge--danger',
-              )}
+              className="brand-card-badge brand-card-badge--neutral brand-card-badge--split brand-card-badge--platform-summary"
+              aria-label={t('groupMonitoring.accountCard.platformSummaryAria', {
+                platform: platformShort,
+                accounts: accountCount,
+                groups: groupCount,
+                logout: logoutCount,
+                notAligned: notAlignedCount,
+              })}
             >
-              {allAligned
-                ? t('groupMonitoring.accountCard.allAligned')
-                : t('groupMonitoring.accountCard.misaligned', { count: group.misalignedCount })}
+              <BrandImage
+                asset={platformAsset}
+                alt=""
+                className="brand-card-badge-platform-icon inline h-3 w-3 shrink-0"
+                aria-hidden
+              />
+              <span className="brand-card-badge-caption">
+                <span className="brand-card-badge-caption-label">{platformShort}</span>
+                <button
+                  type="button"
+                  className="brand-card-badge-group-btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setComparePlatform(headerPlatform);
+                  }}
+                  aria-label={
+                    headerPlatform === 'whatsapp'
+                      ? t('groupMonitoring.accountCard.platformGroupsBadgeWa', {
+                          count: groupCount,
+                        })
+                      : t('groupMonitoring.accountCard.platformGroupsBadgeTg', {
+                          count: groupCount,
+                        })
+                  }
+                >
+                  <span className="brand-card-badge-count brand-card-badge-count--group">
+                    {groupCount}
+                  </span>
+                  <span className="brand-card-badge-caption-label">
+                    {t('groupMonitoring.accountCard.platformSummaryGroupSuffix')}
+                  </span>
+                </button>
+                <span className="brand-card-badge-divider" aria-hidden>
+                  |
+                </span>
+                <span className="brand-card-badge-count brand-card-badge-count--acc">
+                  {accountCount}
+                </span>
+                <span className="brand-card-badge-caption-label">
+                  {t('groupMonitoring.accountCard.platformSummaryAccSuffix')}
+                </span>
+                <span className="brand-card-badge-divider" aria-hidden>
+                  |
+                </span>
+                <span className="brand-card-badge-count brand-card-badge-count--alert">
+                  {logoutCount}
+                </span>
+                <span className="brand-card-badge-caption-label">
+                  {t('groupMonitoring.accountCard.platformSummaryLogoutSuffix')}
+                </span>
+                <span className="brand-card-badge-divider" aria-hidden>
+                  |
+                </span>
+                <span className="brand-card-badge-count brand-card-badge-count--alert">
+                  {notAlignedCount}
+                </span>
+                <span className="brand-card-badge-caption-label">
+                  {t('groupMonitoring.accountCard.platformSummaryNotAlignedSuffix')}
+                </span>
+              </span>
             </span>
+
+            <AccountBrandStockChips
+              className="brand-card-header-stock"
+              counts={stockCounts}
+              onBucketClick={setStockDetailBucket}
+            />
+
             <AddAccountHeaderMenu
               locked={!canManageStructure}
               onSelectPlatform={(platform) => openAddFlow(platform)}
@@ -267,6 +341,7 @@ export function AccountBrandCard({
                     <AccountTableRow
                       key={row.id}
                       row={row}
+                      brandAccounts={group.accounts}
                       canOperatePlatform={canOperatePlatform}
                       canManageStructure={canManageStructure}
                       syncLoading={processingByAccount[row.id] === 'sync'}
@@ -325,7 +400,18 @@ export function AccountBrandCard({
           open
           brandName={group.brandName}
           platform={comparePlatform}
+          accounts={group.accounts}
           onClose={() => setComparePlatform(null)}
+        />
+      ) : null}
+
+      {stockDetailBucket ? (
+        <OperationsStockDetailModal
+          open
+          brandName={group.brandName}
+          platform={headerPlatform}
+          bucket={stockDetailBucket}
+          onClose={() => setStockDetailBucket(null)}
         />
       ) : null}
     </>

@@ -89,12 +89,13 @@ check('accountActionColumn resolver', () => {
   if (!t.includes("row.actionProcess === 'sync'")) return fail('proc-sync condition missing');
   if (!t.includes("row.actionProcess === 'session_check'")) return fail('session_check proc condition missing');
   if (t.includes('accountNeedsRelogin')) return fail('Action must not gate on relogin');
-  if (t.includes('adminCurrent')) return fail('Action must not gate on admin — use Y>0 && X>0');
   if (!t.includes('accountHasGroupLinkData')) return fail('accountHasGroupLinkData helper missing');
-  if (!/y > 0 && x > 0/.test(t)) return fail('group-link gate Y>0 && X>0 missing');
-  if (!/return 'group-link'/.test(t)) return fail('group-link branch missing');
+  if (!/y > 0 && x > 0/.test(t)) return fail('metric gate Y>0 && X>0 missing');
+  if (!/return 'aligned'/.test(t)) return fail('aligned branch missing');
+  if (!/return 'not-aligned'/.test(t)) return fail('not-aligned branch missing');
   if (!/return 'none'/.test(t)) return fail('idle fallback to none missing');
-  if (!t.includes('Number.isFinite')) return fail('group-link gate must reject non-finite Y/X');
+  if (!t.includes('Number.isFinite')) return fail('metric gate must reject non-finite Y/X');
+  if (!t.includes('computeAccountGapMetrics')) return fail('Remark must use gap metrics');
   return ok('accountActionColumn.ts logic present');
 });
 
@@ -205,11 +206,11 @@ check('TG login QR endpoint (not /qr/{id})', () => {
     : fail('qr/start endpoint missing');
 });
 
-check('Monitoring tabs (account, operations, reporting)', () => {
+check('Monitoring tabs (account, operations)', () => {
   const t = read('src/types/monitoring.ts');
-  return t.includes("'account' | 'operations' | 'reporting'") && !t.includes("'ticket'")
-    ? ok('MonitoringTab tanpa ticket')
-    : fail('MonitoringTab masih punya ticket');
+  return t.includes("'account' | 'operations'") && !t.includes("'ticket'") && !t.includes("'reporting'")
+    ? ok('MonitoringTab = account | operations')
+    : fail('MonitoringTab masih salah');
 });
 
 check('accountNeedsRelogin', () => {

@@ -252,11 +252,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }>,
   },
   executeSlots: {
-    tryAcquire: (accountId: string, kind: 'sync' | 'scraper') =>
-      ipcRenderer.invoke('executeSlots:tryAcquire', accountId, kind),
+    tryAcquire: (
+      accountId: string,
+      kind: 'sync' | 'scraper',
+      platform: Platform,
+    ) => ipcRenderer.invoke('executeSlots:tryAcquire', accountId, kind, platform),
     release: (accountId: string) => ipcRenderer.invoke('executeSlots:release', accountId),
-    acquireOrWait: (accountId: string, kind: 'sync' | 'scraper') =>
-      ipcRenderer.invoke('executeSlots:acquireOrWait', accountId, kind),
+    acquireOrWait: (
+      accountId: string,
+      kind: 'sync' | 'scraper',
+      platform: Platform,
+    ) => ipcRenderer.invoke('executeSlots:acquireOrWait', accountId, kind, platform),
     getStats: () => ipcRenderer.invoke('executeSlots:getStats'),
     onChanged: (callback: () => void) => {
       const listener = () => callback();

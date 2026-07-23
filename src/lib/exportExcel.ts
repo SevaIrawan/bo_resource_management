@@ -35,8 +35,18 @@ function accountRowsForExport(rows: AccountBrandRow[]) {
     Phone: row.phoneNumber || '',
     Status: row.syncState === 'pending' ? 'Pending sync' : row.status,
     'On device': row.syncState === 'pending' ? '' : row.groupsCurrent,
-    'In brand': row.syncState === 'pending' ? '' : `${row.joinedInMaster}/${row.groupsTotal}`,
-    Admin: row.syncState === 'pending' ? '' : `${row.adminCurrent}/${row.adminTotal}`,
+    Junk: row.syncState === 'pending' ? '' : Math.max(0, row.groupsCurrent - row.joinedInMaster),
+    Missing: row.syncState === 'pending' ? '' : Math.max(0, row.groupsTotal - row.joinedInMaster),
+    'Not admin':
+      row.syncState === 'pending' ? '' : Math.max(0, row.joinedInMaster - row.adminCurrent),
+    Remark:
+      row.syncState === 'pending'
+        ? ''
+        : Math.max(0, row.groupsCurrent - row.joinedInMaster) === 0 &&
+            Math.max(0, row.groupsTotal - row.joinedInMaster) === 0 &&
+            Math.max(0, row.joinedInMaster - row.adminCurrent) === 0
+          ? 'Aligned'
+          : 'Not Aligned',
     'Group link': '',
   }));
 }
@@ -174,7 +184,7 @@ export function exportReportingDailyExcel(input: {
       'Admin Count': row.adminCount,
       'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
       'Group Link': row.inviteLink ?? '',
-      Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'other'],
+      Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'review'],
     })),
   );
   const workbook = XLSX.utils.book_new();
@@ -193,7 +203,7 @@ export function exportReportingAdminDailyExcel(input: {
       'Group Name': row.groupName,
       'Group ID': row.groupId,
       'Group Link': row.inviteLink ?? '',
-      Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'other'],
+      Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'review'],
       'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
     })),
   );
@@ -216,7 +226,7 @@ export function exportReportingMatrixExcel(input: {
         'Group Name': row.groupName,
         'Group ID': row.groupId,
         'Group Link': row.inviteLink ?? '',
-        Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'other'],
+        Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'review'],
       };
       for (const acc of input.accounts) {
         const active =

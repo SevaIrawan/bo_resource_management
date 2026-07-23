@@ -4,6 +4,17 @@
 
 ---
 
+## Installer multi-platform — status
+
+**Completed.** Windows (`.exe`), macOS (`.dmg` / `.zip`), Linux (`.AppImage`) dibuild lewat workflow **Release multi-platform** + skrip lokal `npm run build:installer:{win|mac|linux}`.
+
+Panduan install operator: [`CLIENT-INSTALL.md`](./CLIENT-INSTALL.md) · root [`INSTALL-WINDOWS.md`](../INSTALL-WINDOWS.md) / [`INSTALL-MACOS.md`](../INSTALL-MACOS.md) / [`INSTALL-LINUX.md`](../INSTALL-LINUX.md).  
+Detail artefak bundel: [`INSTALLER-BUNDLE.md`](./INSTALLER-BUNDLE.md).
+
+*(Rencana lama `PLAN-CROSS-PLATFORM-INSTALLERS.md` dihapus — digantikan dokumen di atas.)*
+
+---
+
 ## Setup sekali (GitHub repo)
 
 **Settings → Secrets and variables → Actions → New repository secret**

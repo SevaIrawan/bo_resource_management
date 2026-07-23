@@ -59,8 +59,6 @@ export function EditAccountModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, saving, onClose]);
 
-  if (!open || !account) return null;
-
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
@@ -88,7 +86,8 @@ export function EditAccountModal({
   const displayError = localError ?? error;
 
   return (
-    <BrandModalRoot onBackdropClick={saving ? undefined : onClose}>
+    <BrandModalRoot open={open && Boolean(account)} onBackdropClick={saving ? undefined : onClose}>
+      {!account ? null : (
       <div
         className="brand-modal-panel"
         role="dialog"
@@ -190,6 +189,7 @@ export function EditAccountModal({
           </div>
         </form>
       </div>
+      )}
     </BrandModalRoot>
   );
 }

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import time
 
+from telethon import utils
+from telethon.errors import FloodWaitError
+from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.messages import ExportChatInviteRequest, GetFullChatRequest
 from telethon.tl.types import (
     Channel,
@@ -13,9 +17,23 @@ from telethon.tl.types import (
     ChatParticipantCreator,
 )
 
+from telegram_human_delay import (
+    flood_wait_seconds,
+    jitter_seconds,
+    max_floodwait_auto_sleep,
+    merge_delay,
+)
 from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 
 DEVICE_GROUP_TARGET_MAX = 6000
+# Selaras learning Script Worker scrape_groups.py (between_groups ~2s) + ban safety.
+_SCRAPE_DELAY = merge_delay(
+    {
+        "scrape_between_groups_sec": 1.5,
+        "scrape_invite_gap_sec": 2.0,
+        "max_floodwait_auto_sleep_sec": 120,
+    }
+)
 
 _scrape_progress: dict[str, dict] = {}
 _scrape_cancel_requests: set[str] = set()
@@ -96,22 +114,86 @@ def _assert_telegram_account_match(me, expected_phone: str | None) -> str:
     return me_label
 
 
-def _assert_scrape_quality(groups: list[dict], elapsed_sec: float) -> None:
-    n = len(groups)
-    if n < 5:
-        return
-    min_elapsed = max(30.0, n * 0.28)
-    if elapsed_sec < min_elapsed:
-        raise ValueError(
-            f"SCRAPE_TOO_FAST: {n} groups in {elapsed_sec:.0f}s "
-            f"(min ~{min_elapsed:.0f}s for live Telegram API). Retry scrape."
-        )
-    bad_member = sum(1 for group in groups if int(group.get("member_count") or 0) <= 0)
-    if bad_member / n > 0.12:
-        raise ValueError(
-            f"SCRAPE_INCOMPLETE: {bad_member}/{n} groups have member_count=0 — "
-            "Telegram API did not return participant counts. Retry or re-login."
-        )
+def _link_from_exported_invite(exported) -> str | None:
+    if exported is None:
+        return None
+    link = getattr(exported, "link", None)
+    value = str(link).strip() if link else ""
+    if value.startswith("http://") or value.startswith("https://") or value.startswith("t.me/"):
+        return value
+    return None
+
+
+async def _fetch_full_meta(client, entity) -> tuple[int, str | None]:
+    """Satu GetFull* → (participants_count, exported_invite URL).
+
+    Pola learning scrape_groups.py + Lonami: GetFullChannel/GetFullChat dulu,
+    bukan get_participants (sering ChatAdminRequired / 0 untuk member biasa).
+    """
+    try:
+        if isinstance(entity, Channel):
+
+            async def _full_channel():
+                return await client(GetFullChannelRequest(channel=entity))
+
+            full = await _count_with_flood_retry(_full_channel, label="full_channel")
+            count = int(getattr(full.full_chat, "participants_count", 0) or 0)
+            invite = _link_from_exported_invite(getattr(full.full_chat, "exported_invite", None))
+            return count, invite
+
+        if isinstance(entity, Chat):
+
+            async def _full_chat():
+                return await client(GetFullChatRequest(chat_id=entity.id))
+
+            full = await _count_with_flood_retry(_full_chat, label="full_chat")
+            count = getattr(full.full_chat, "participants_count", None)
+            if isinstance(count, int) and count > 0:
+                member_count = count
+            else:
+                participants = getattr(full.full_chat, "participants", None)
+                rows = getattr(participants, "participants", None) or []
+                member_count = len(rows) if rows else 0
+            invite = _link_from_exported_invite(getattr(full.full_chat, "exported_invite", None))
+            return member_count, invite
+    except FloodWaitError:
+        raise
+    except Exception:  # noqa: BLE001
+        pass
+    return 0, None
+
+
+async def _resolve_member_count(client, entity) -> tuple[int, str | None]:
+    """Return (member_count, exported_invite_or_none). GetFull dulu; get_participants last resort."""
+    cached = getattr(entity, "participants_count", None)
+    cached_count = cached if isinstance(cached, int) and cached > 0 else 0
+
+    try:
+        full_count, full_invite = await _fetch_full_meta(client, entity)
+    except FloodWaitError:
+        full_count, full_invite = 0, None
+
+    if full_count > 0:
+        return full_count, full_invite
+    if cached_count > 0:
+        return cached_count, full_invite
+
+    # Last resort — sering gagal untuk non-admin; jangan andalkan sebagai primary.
+    try:
+
+        async def _participants_total():
+            participants = await client.get_participants(entity, limit=0)
+            return int(participants.total or 0)
+
+        total = await _count_with_flood_retry(_participants_total, label="members")
+        if total > 0:
+            return total, full_invite
+    except FloodWaitError:
+        pass
+    except Exception:  # noqa: BLE001
+        pass
+
+    return 0, full_invite
 
 
 def _is_group_dialog(dialog) -> bool:
@@ -164,15 +246,61 @@ async def _is_group_admin(client, entity, me) -> bool:
     return await _is_me_listed_as_admin(client, entity, me)
 
 
-async def _resolve_invite_link(client, entity, username: str | None) -> str | None:
+async def _resolve_invite_link(
+    client,
+    entity,
+    username: str | None,
+    *,
+    is_admin: bool,
+    existing_invite: str | None = None,
+) -> str | None:
+    """Username → t.me; admin: pakai exported_invite dari GetFull dulu, baru ExportChatInvite.
+
+    Pola learning scrape_groups._invite_link.
+    """
     if username:
         return f"https://t.me/{username}"
-    try:
-        exported = await client(ExportChatInviteRequest(peer=entity))
-        link = getattr(exported, "link", None)
-        return str(link) if link else None
-    except Exception:  # noqa: BLE001
+    if existing_invite:
+        return existing_invite
+    # Selaras WA / learning: export hanya jika admin (non-admin biasanya gagal / spam API).
+    if not is_admin:
         return None
+    delay_cfg = _SCRAPE_DELAY
+    retries = 2
+    for attempt in range(1, retries + 1):
+        try:
+            exported = await client(ExportChatInviteRequest(peer=entity))
+            value = _link_from_exported_invite(exported)
+            if value:
+                await asyncio.sleep(
+                    jitter_seconds(float(delay_cfg.get("scrape_invite_gap_sec", 2.0)), delay_cfg)
+                )
+                return value
+            return None
+        except FloodWaitError as exc:
+            cap = max_floodwait_auto_sleep(delay_cfg)
+            if int(exc.seconds) > cap:
+                print(f"[tg-scrape] invite FloodWait {exc.seconds}s exceeds cap — skip")
+                return None
+            await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
+            if attempt >= retries:
+                return None
+        except Exception:  # noqa: BLE001
+            return None
+    return None
+
+
+async def _count_with_flood_retry(coro_factory, *, label: str):
+    delay_cfg = _SCRAPE_DELAY
+    try:
+        return await coro_factory()
+    except FloodWaitError as exc:
+        cap = max_floodwait_auto_sleep(delay_cfg)
+        if int(exc.seconds) > cap:
+            print(f"[tg-scrape] {label} FloodWait {exc.seconds}s exceeds cap")
+            raise
+        await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
+        return await coro_factory()
 
 
 async def _count_admin_roles(client, entity) -> tuple[int, int]:
@@ -272,8 +400,16 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             if is_scrape_cancelled(session_id):
                 return _cancelled_payload(session_id)
 
+            if index > 0:
+                await asyncio.sleep(
+                    jitter_seconds(float(_SCRAPE_DELAY.get("scrape_between_groups_sec", 1.5)), _SCRAPE_DELAY)
+                )
+
             entity = dialog.entity
-            group_id = str(dialog.id)
+            try:
+                group_id = str(utils.get_peer_id(entity))
+            except Exception:  # noqa: BLE001
+                group_id = str(dialog.id)
             group_name = dialog.title or dialog.name or group_id
 
             set_scrape_progress(
@@ -285,15 +421,38 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             )
 
             try:
-                participants = await client.get_participants(entity, limit=0)
-                member_count = int(participants.total or 0)
+                member_count, existing_invite = await _resolve_member_count(client, entity)
             except Exception:  # noqa: BLE001
-                member_count = 0
+                member_count, existing_invite = 0, None
 
-            is_admin_flag = await _is_group_admin(client, entity, me)
-            owner_count, admin_count = await _count_admin_roles(client, entity)
+            try:
+                is_admin_flag = await _count_with_flood_retry(
+                    lambda: _is_group_admin(client, entity, me),
+                    label="is_admin",
+                )
+            except FloodWaitError:
+                is_admin_flag = False
+            except Exception:  # noqa: BLE001
+                is_admin_flag = False
+
+            try:
+                owner_count, admin_count = await _count_with_flood_retry(
+                    lambda: _count_admin_roles(client, entity),
+                    label="admin_roles",
+                )
+            except FloodWaitError:
+                owner_count, admin_count = 0, 0
+            except Exception:  # noqa: BLE001
+                owner_count, admin_count = 0, 0
+
             username = getattr(entity, "username", None)
-            invite_link = await _resolve_invite_link(client, entity, username)
+            invite_link = await _resolve_invite_link(
+                client,
+                entity,
+                username,
+                is_admin=bool(is_admin_flag),
+                existing_invite=existing_invite,
+            )
 
             current = index + 1
             set_scrape_progress(
@@ -317,10 +476,6 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             )
 
         elapsed_sec = time.monotonic() - started_at
-        try:
-            _assert_scrape_quality(groups, elapsed_sec)
-        except ValueError as exc:
-            return {"status": "error", "message": str(exc), "valid": False}
 
         admin_count = sum(1 for group in groups if group["is_admin"] == "yes")
         payload = {

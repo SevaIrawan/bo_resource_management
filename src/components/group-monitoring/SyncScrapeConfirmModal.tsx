@@ -40,8 +40,6 @@ export function SyncScrapeConfirmModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   const message = postLogin
     ? postLoginCountsReady
       ? t('groupMonitoring.sync.postLoginScrapeMessage')
@@ -51,7 +49,7 @@ export function SyncScrapeConfirmModal({
       : t('groupMonitoring.sync.postSyncScrapeMessage');
 
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot open={open} onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--sync"
         role="dialog"

@@ -68,6 +68,54 @@ export function canQueueDeleteFromExitJob(
   return !exitJobHasDeleteQueuedOrDone(exitJob.id, jobs);
 }
 
+function findDeleteJobForExitJob(
+  exitJobId: string,
+  jobs: AutomationJobRecord[],
+): AutomationJobRecord | undefined {
+  const matches = jobs.filter(
+    (job) => job.action === 'delete_group' && job.payload.sourceExitJobId === exitJobId,
+  );
+  if (matches.length === 0) return undefined;
+  const priority = (job: AutomationJobRecord): number => {
+    if (job.status === 'running') return 4;
+    if (job.status === 'queued') return 3;
+    if (job.status === 'completed') return 2;
+    if (job.status === 'failed' && (job.progress?.current ?? 0) > 0) return 1;
+    return 0;
+  };
+  return matches.slice().sort((a, b) => priority(b) - priority(a))[0];
+}
+
+/** Remark kolom Leave — follow-up delete chat auto setelah left. */
+export function resolveExitJobDeleteFollowUpRemarkKey(
+  exitJob: AutomationJobRecord,
+  allJobs: AutomationJobRecord[],
+): string | null {
+  if (!isExitDeleteExitJob(exitJob)) return null;
+  if (exitJob.status !== 'completed' && exitJob.status !== 'failed') return null;
+  if (resolveLeftGroupsFromExitJob(exitJob).length === 0) return null;
+
+  const deleteJob = findDeleteJobForExitJob(exitJob.id, allJobs);
+  if (!deleteJob) {
+    return 'operations.jobQueue.exitRemarkDeleteAutoPending';
+  }
+  switch (deleteJob.status) {
+    case 'completed':
+      return 'operations.jobQueue.statusCompleted';
+    case 'running':
+      return 'operations.jobQueue.exitRemarkDeleteRunning';
+    case 'queued':
+      return 'operations.jobQueue.exitRemarkDeleteQueued';
+    case 'failed':
+      if ((deleteJob.progress?.current ?? 0) > 0) {
+        return 'operations.jobQueue.exitRemarkDeletePartial';
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
 function isExitDeleteFlowJobForAccount(job: AutomationJobRecord, accountId: string): boolean {
   if (job.accountId !== accountId) return false;
   return (

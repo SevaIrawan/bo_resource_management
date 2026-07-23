@@ -58,9 +58,9 @@
 <li><a href="#5-tombol-sync">5. Tombol Sync (↻)</a></li>
 <li><a href="#6-scrape-lengkap-kolom-last-update">6. Scrape lengkap & kolom Last update</a></li>
 <li><a href="#7-group-link-full-group-full-admin-junk">7. Group link — full group, full admin, junk</a></li>
-<li><a href="#8-tab-operations-overview-stock">8. Tab Operations — Overview (stock)</a></li>
+<li><a href="#8-stock-grup-di-header-account">8. Stock grup di header Account</a></li>
 <li><a href="#9-tab-operations-job-queue">9. Tab Operations — Job Queue</a></li>
-<li><a href="#10-tab-reporting">10. Tab Reporting</a></li>
+<li><a href="#10-group-matrix-header-account">10. Group matrix (header Account)</a></li>
 <li><a href="#11-settings-apa-yang-perlu-di-set">11. Settings — apa yang perlu di-set</a></li>
 <li><a href="#12-di-mana-melihat-apa">12. Di mana melihat apa</a></li>
 <li><a href="#13-alur-harian-faq">13. Alur harian & FAQ</a></li></ol>
@@ -109,7 +109,7 @@
 <h3 id="layar-utama">Layar utama</h3>
 <pre><code>Sidebar                    Area kerja
 ─────────                  ─────────────────────────────────────
-Group Monitoring    →      Tab: Account | Operations | Reporting
+Group Monitoring    →      Tab: Account | Operations
 Settings            →      KPI + isi tab
 Logout
 </code></pre>
@@ -122,21 +122,20 @@ Logout
 </thead>
 <tbody><tr>
 <td><strong>Account</strong></td>
-<td>Daftar akun per brand, Sync, scrape via Sync, Group link</td>
+<td>Daftar akun per brand, Sync, scrape, Group link, <strong>stock chips</strong> + <strong>Group matrix</strong> (header kartu)</td>
 </tr>
 <tr>
 <td><strong>Operations</strong></td>
-<td><strong>Overview</strong> = stock grup · <strong>Job Queue</strong> = otomasi join/create/set admin/exit/set photo</td>
-</tr>
-<tr>
-<td><strong>Reporting</strong></td>
-<td>Laporan join &amp; admin (baca saja)</td>
+<td><strong>Job Queue</strong> saja — otomasi join/create/set admin/exit/set photo</td>
 </tr>
 <tr>
 <td><strong>Settings</strong></td>
 <td>Bahasa, jadwal auto-scrape, kebijakan stock &amp; worker</td>
 </tr>
 </tbody></table>
+<blockquote>
+<p>Stock overview <strong>tidak</strong> di tab Operations. Chip stock + Avg ND / To prep hidup di <strong>header brand card</strong> (tab Account).<br>Tidak ada tab <strong>Reporting</strong> terpisah. Matrix join/admin dibuka dari <strong>badge jumlah grup</strong> di header brand card.</p>
+</blockquote>
 <p>Menu <strong>Refresh</strong> di header tab = muat ulang data tab aktif dari server.</p>
 <hr />
 <h2 id="3-ringkasan-semua-fitur">3. Ringkasan semua fitur</h2>
@@ -175,7 +174,7 @@ Logout
 </tr>
 <tr>
 <td>Stock grup (Active, Ready, …)</td>
-<td>Operations → Overview</td>
+<td>Account → header brand card (chips)</td>
 <td>Monitoring klasifikasi master brand</td>
 </tr>
 <tr>
@@ -205,13 +204,13 @@ Logout
 </tr>
 <tr>
 <td>Matrix join/admin</td>
-<td>Reporting</td>
+<td>Account → badge grup (header kartu)</td>
 <td>Tabel Yes/No semua akun × grup master</td>
 </tr>
 <tr>
 <td>Full Group / Full Admin</td>
-<td>Reporting</td>
-<td>Detail per akun</td>
+<td>Modal Group matrix</td>
+<td>Bookmark di modal</td>
 </tr>
 <tr>
 <td>Auto-scrape harian</td>
@@ -224,7 +223,7 @@ Logout
 <td>Target Ready %, penamaan SOP, delay otomasi</td>
 </tr>
 </tbody></table>
-<p>Cek selisih grup/admin lewat kolom <strong>In brand</strong>, <strong>Admin</strong>, badge <strong>not aligned</strong>, <strong>Group link</strong> (junk), dan tab <strong>Reporting</strong>.</p>
+<p>Cek selisih grup/admin lewat kolom <strong>In brand</strong>, <strong>Admin</strong>, badge <strong>not aligned</strong>, <strong>Group link</strong> (junk), dan <strong>Group matrix</strong> (badge grup di header kartu).</p>
 <hr />
 <h2 id="4-tab-account-monitoring-akun">4. Tab Account — monitoring akun</h2>
 <h3 id="kpi-4-angka-di-atas">KPI (4 angka di atas)</h3>
@@ -412,7 +411,7 @@ Logout
 </tbody></table>
 <hr />
 <h2 id="6-scrape-lengkap-kolom-last-update">6. Scrape lengkap & kolom Last update</h2>
-<p><strong>Fungsi scrape penuh:</strong> baca <strong>semua</strong> grup dari HP → simpan ke database → perbarui <strong>On device, In brand, Admin, Reporting, stock Overview</strong>.</p>
+<p><strong>Fungsi scrape penuh:</strong> baca <strong>semua</strong> grup dari HP → simpan ke database → perbarui <strong>On device, In brand, Admin, Group matrix, stock chips Account</strong>.</p>
 <p><strong>Cara menjalankan scrape penuh:</strong></p>
 <ul>
 <li><strong>Sync (↻)</strong> → pilih <strong>Scrape now</strong> di modal</li>
@@ -488,8 +487,8 @@ Logout
 </tbody></table>
 <p>Export Excel: <code>RM-[nama akun]-tanggal.xlsx</code>.<br>Kosong → <strong>Sync</strong> → <strong>Scrape now</strong> dulu.</p>
 <hr />
-<h2 id="8-tab-operations-overview-stock">8. Tab Operations — Overview (stock)</h2>
-<p>Bookmark <strong>Overview</strong> · filter <strong>Platform</strong> + <strong>Brand</strong>.</p>
+<h2 id="8-stock-grup-di-header-account">8. Stock grup di header Account</h2>
+<p>Stock <strong>tidak</strong> punya tab/bookmark terpisah. Lihat di <strong>Account</strong> → header tiap brand card (Avg ND, To prep, chip Active/Ready/…).</p>
 <h3 id="header-kartu-brand">Header kartu brand</h3>
 <pre><code>Brand | Avg ND | To prep  ···  [ WA n Group ] [ Active | Ready | Recycle | Review | Other ]
 </code></pre>
@@ -530,10 +529,11 @@ Logout
 </tr>
 </tbody></table>
 <p><strong>Double-click</strong> chip → modal daftar grup di bucket itu.</p>
-<p>Overview <strong>hanya monitoring</strong> — untuk buat grup NEW pakai Job Queue.</p>
+<p>Stock chips <strong>hanya monitoring</strong> — untuk buat grup NEW pakai Job Queue (tab Operations).</p>
+<p>Detail kontrak klasifikasi: <code>docs/OPERATIONS-STOCK-ENGINE.md</code>.</p>
 <hr />
 <h2 id="9-tab-operations-job-queue">9. Tab Operations — Job Queue</h2>
-<p>Bookmark <strong>Job Queue</strong> · pilih <strong>Platform</strong>, <strong>Brand</strong>, <strong>Task type</strong>, <strong>Account</strong> → <strong>SETUP</strong> → <strong>Queue</strong>.</p>
+<p>Tab <strong>Operations</strong> = <strong>Job Queue</strong> saja (filter <strong>Platform</strong> di slicer). Brand dan akun dipilih di form SETUP task.</p>
 <h3 id="task-type-sesuai-ui">Task type (sesuai UI)</h3>
 <table>
 <thead>
@@ -561,7 +561,7 @@ Logout
 </tbody></table>
 <h3 id="status-antrian">Status antrian</h3>
 <p><strong>Queued</strong> → <strong>Running</strong> → <strong>Completed</strong> / <strong>Failed</strong> · bisa <strong>PAUSE</strong> / <strong>CANCEL</strong> / <strong>RUN</strong> / <strong>VIEW</strong>.</p>
-<p>Satu akun tidak bisa <strong>Sync</strong> bersamaan dengan job di akun yang sama. Maks ~4 akun <strong>berbeda</strong> bisa jalan paralel (masing-masing 1 slot Chrome).</p>
+<p>Satu akun tidak bisa <strong>Sync</strong> bersamaan dengan job di akun yang sama. Maks <strong>10 akun berbeda per platform</strong> (WA dan TG terpisah) bisa jalan paralel (masing-masing 1 slot).</p>
 <p><strong>Batch besar (v1.0.30):</strong> jika Anda Queue banyak grup (mis. 100), sistem <strong>otomatis memecah</strong> menjadi beberapa baris job (<strong>maks 30 grup per job</strong>, dari Settings → Invite by link). Job untuk <strong>akun yang sama antri berurutan</strong> — bukan paralel — sehingga Chrome stabil. Anda akan melihat beberapa baris job di tabel; tunggu semua selesai sebelum anggap task 100% done.</p>
 <p>Setelah <strong>Queue</strong> sukses, job masuk tabel dan runner mencoba jalan otomatis jika slot kosong.</p>
 <hr />
@@ -625,21 +625,28 @@ Logout
 <li><strong>VIEW</strong> hasil → antrikan delete jika diizinkan policy Settings</li>
 </ol>
 <hr />
-<h2 id="10-tab-reporting">10. Tab Reporting</h2>
+<h2 id="10-group-matrix-header-account">10. Group matrix (header Account)</h2>
 <p><strong>Hanya baca</strong> — tidak mengubah session, scrape, atau antrian job.</p>
-<h3 id="filter">Filter</h3>
-<p>Platform · Brand · <strong>Acc Name</strong> (All = matrix) · <strong>Status</strong> (Active/Ready/Recycle/Review/Other/all) · Search nama grup · bookmark <strong>Full Group</strong> / <strong>Full Admin</strong></p>
-<h3 id="full-group-per-akun-atau-matrix">Full Group (per akun atau matrix)</h3>
-<ul>
-<li><strong>Acc Name = All:</strong> matrix — baris = grup master, kolom = akun, isi <strong>Yes/No</strong> join</li>
-<li><strong>Acc Name = satu akun:</strong> tabel semua grup daily akun (7 kolom)</li>
-</ul>
-<h3 id="full-admin">Full Admin</h3>
-<ul>
-<li>Daftar grup master + status admin akun terpilih</li>
-</ul>
-<p>Klik header kolom akun di matrix → filter Yes/No. Export Excel tersedia di panel Reporting.</p>
-<p>Data ikut update setelah scrape selesai (realtime ~500 ms).</p>
+<p><strong>Cara buka:</strong> Tab <strong>Account</strong> → header brand card → klik <strong>jumlah grup</strong> pada badge platform (WA/TG). Modal = matrix semua akun brand+platform.</p>
+<h3 id="isi-modal">Isi modal</h3>
+<table>
+<thead>
+<tr>
+<th>Bookmark</th>
+<th>Isi</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Full Group</strong></td>
+<td>Baris = grup master; kolom = akun; isi <strong>Yes/No</strong> join</td>
+</tr>
+<tr>
+<td><strong>Full Admin</strong></td>
+<td>Sama, fokus status admin</td>
+</tr>
+</tbody></table>
+<p>Filter Status (Active/Ready/Recycle/Review), search nama grup, dan filter kolom Yes/No tersedia di modal. Export Excel dari modal.</p>
+<p>Data ikut update setelah scrape selesai (event realtime <code>rm-reporting-reload</code>, debounce ~500 ms).</p>
 <hr />
 <h2 id="11-settings-apa-yang-perlu-di-set">11. Settings — apa yang perlu di-set</h2>
 <p>Buka <strong>Settings</strong> di sidebar.</p>
@@ -731,31 +738,27 @@ Logout
 </tr>
 <tr>
 <td>Stock Active/Ready/Recycle/…</td>
-<td>Operations → Overview</td>
+<td>Account → header brand card (chips)</td>
 </tr>
 <tr>
 <td>Detail grup per bucket stock</td>
-<td>Overview → double-click chip</td>
+<td>Account → double-click chip</td>
 </tr>
 <tr>
-<td>Antrian join/create/admin/exit</td>
+<td>Antrian join/create/admin/exit/set photo</td>
 <td>Operations → Job Queue</td>
 </tr>
 <tr>
-<td>Matrix join semua akun</td>
-<td>Reporting → Full Group, Acc=All</td>
+<td>Matrix join semua akun brand</td>
+<td>Account → badge grup di header kartu → Full Group</td>
 </tr>
 <tr>
-<td>Matrix admin semua akun</td>
-<td>Reporting → Full Admin, Acc=All</td>
-</tr>
-<tr>
-<td>Detail satu akun</td>
-<td>Reporting → pilih Acc Name</td>
+<td>Matrix admin semua akun brand</td>
+<td>Account → badge grup → Full Admin</td>
 </tr>
 <tr>
 <td>Filter grup by status stock</td>
-<td>Reporting → Status</td>
+<td>Modal Group matrix → Status</td>
 </tr>
 </tbody></table>
 <hr />
@@ -775,8 +778,8 @@ Logout
 </ul>
 <p><strong>Sore</strong></p>
 <ul>
-<li><input disabled="" type="checkbox"> Reporting matrix brand Anda</li>
-<li><input disabled="" type="checkbox"> Operations Overview — To prep &amp; Ready</li>
+<li><input disabled="" type="checkbox"> Group matrix brand Anda (badge grup di header kartu)</li>
+<li><input disabled="" type="checkbox"> Account — stock chips To prep &amp; Ready</li>
 </ul>
 <h3 id="faq">FAQ</h3>
 <p><strong>Sync atau scrape penuh dulu?</strong><br>Session Invalid → Sync dulu. Sudah Valid tapi angka salah → Sync → <strong>Scrape now</strong>.</p>

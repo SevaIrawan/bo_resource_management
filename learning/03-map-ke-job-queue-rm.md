@@ -7,80 +7,44 @@
 | `create_groups.py` + `run_create_until_done` | `create_group` | TG sidecar + `waAutomation` batch `perRun` / `pause_between_runs` |
 | `set_admin.py` | `set_admin` | `payload.groups[]` + `targets` + delay |
 | `join_groups.py` (folder join member) | `join_by_invite_link` | throttle invite + batch rest |
+| `set_group_photo.py` / `set-group-photo.js` | `set_group_photo` | follow-up dari VIEW create + brand photo IPC |
+| `leave-groups.js` + TG LeaveChannel | `leave_group` / `exit_delete_group` | leave SETUP → optional auto-enqueue delete |
+| delete chat / DeleteChannel | `delete_group` | policy Settings `deleteEnabled` (default OFF) |
 
-Pola yang **harus** diikuti untuk task baru:
+Pola yang **harus** diikuti untuk task:
 
-1. Satu job = satu akun (`sessionId`) + list grup (`payload.groups[]`)
+1. Satu job = satu akun (`sessionId`) + list grup (`payload.groups[]`) — batch besar **auto-split ≤30** (v1.0.30)
 2. Delay dari `readWhatsAppWorkerSettings()` / `readTelegramWorkerSettings()` saat enqueue
 3. Progress `onProgress(i, total, groupName)`
 4. Partial fail: `success/total` → job failed jika tidak full (runner join/set_admin)
 5. Idempotent skip — lihat learning (status kolom / sudah ada photo)
 
-## Belum di-port — dari learning Script Worker
+## Payload & settings (ringkas)
 
 ### set_group_photo
 
-| Platform | Sumber learning | Port ke |
-|----------|-----------------|---------|
-| TG | `set_group_photo.py` | `telegram_automation.run_set_group_photo` + route sidecar |
-| WA | `set-group-photo.js` | `waAutomation.runSetGroupPhoto` |
+- `photoPath` / brand JPG via IPC `brandGroupPhoto`
+- Skip jika sudah ada foto (idempotent)
+- Settings: `standard.setPhotoMaxRetry`, `betweenGroupsSec`
 
-Payload tambahan:
-- `photoPath` atau `photoUrl` (TG: `config.group.photo_path`; WA: `photos/groups/photo.*`)
-- Skip jika sudah ada foto (TG: `has_group_photo`; WA: kolom status — di RM bisa cek scrape atau flag job row)
+### leave_group / exit_delete_group
 
-Settings: `standard.setPhotoMaxRetry`, `betweenGroupsSec`
+- Status per grup: left | not_found | error | skipped_creator (TG)
+- Settings: `leaveDelete.leaveEnabled`, `betweenGroupsSec`
+- WA leave dan delete = fase terpisah (atau exit → auto delete jika policy ON)
 
-### leave_group
+### delete_group
 
-| Platform | Sumber learning | Port ke |
-|----------|-----------------|---------|
-| WA | `leave-groups.js` | `chat.leave()` + status Left/NotFound/Error |
-| TG | *belum ada script* | `LeaveChannelRequest` / `delete_dialog` — tiru pola delay TG Master |
-
-Settings: `leaveDelete.leaveEnabled`, `betweenGroupsSec`
-
-Status idempotent learning WA:
-- Skip `Left`, `Not Found`
-- Retry `Error` atau kosong
-
-### clear / delete chat
-
-| Platform | Sumber learning | Port ke |
-|----------|-----------------|---------|
-| WA | `delete-group-chats.js` | Hanya jika sudah leave: `clearMessages` → `delete` |
-| TG | *belum ada script* | `DeleteHistory` + optional `DeleteChannel` jika owner |
-
-Settings:
-- `deleteEnabled` (default false)
-- `clearChatHistoryOnDelete` (WA)
-- `requireOwnerForDelete` (TG delete channel)
-
-**Penting dari learning:** WA leave dan delete adalah **2 action terpisah** (atau 1 job dengan step 2 phase + state per grup).
-
-## Rekomendasi action Job Queue (selaras learning)
-
-```
-set_group_photo     — 1 phase, skip if has photo
-leave_group         — mirror leave-groups.js status machine
-clear_group_chat    — hanya baris yang status leave=ok (WA) atau equivalent TG
-delete_group        — TG owner only; WA tidak ada (leave saja)
-```
-
-Atau gabung `leave_group` + optional flag `clearChatAfterLeave` (WA `clearChatHistoryOnDelete`).
+- TG owner: `DeleteChannel` (guard size / owner)
+- WA: tidak ada hapus grup untuk semua — leave + optional clear chat
+- Settings: `deleteEnabled` (default false), `requireOwnerForDelete` (TG)
 
 ## Post-job wajib (RM production — di luar learning scripts)
 
 Learning pakai Excel/CSV state lokal. RM pakai Supabase:
 
-Setelah leave/delete sukses → **scrape akun** → grid & Issue refresh via realtime + `patchAccountGridAfterDailyWrite`.
+Setelah leave/delete/create/join sukses → **scrape akun** (atau patch realtime) → grid & Issue refresh via `patchAccountGridAfterDailyWrite` + `scheduleMonitoringReload`.
 
-## Feasibility
+## Human delay vs kode
 
-**Ya** — asalkan implementasi **clone pola learning**, bukan API generik dari internet:
-
-- TG set photo: copy logic `set_group_photo.py` (sudah hampir sama dengan yang perlu di sidecar)
-- WA leave/delete: copy `leave-groups.js` + `delete-group-chats.js` verbatim ke `waAutomation.ts`
-- TG leave/delete: tulis baru mengikuti `human_delay` + `resolve_channel_entity` Master (belum ada referensi .py)
-
-Estimasi tetap ~1 sprint kecil jika mengikuti file learning yang sudah ada.
+Port RM: `python-sidecar/telegram_human_delay.py` + worker settings — **subset** pola Master (jitter + FloodWait). Long-pause penuh learning boleh dilengkapi jika FloodWait sering di lapangan — jangan potong delay default tanpa bukti.

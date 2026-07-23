@@ -206,7 +206,7 @@ export function PlatformLoginModal({
                         : t('groupMonitoring.sync.loadingQr');
 
   return (
-    <BrandModalRoot onBackdropClick={handleDismiss}>
+    <BrandModalRoot open={open} onBackdropClick={handleDismiss}>
       <div
         className={cn(
           'brand-modal-panel platform-login-panel',

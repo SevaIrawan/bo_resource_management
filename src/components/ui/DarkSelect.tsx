@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useDarkSelectMenu } from '@/components/ui/useDarkSelectMenu';
 
@@ -7,6 +7,8 @@ export interface DarkSelectOption {
   value: string;
   label: string;
 }
+
+export type DarkSelectMenuPlacement = 'down' | 'up' | 'auto';
 
 export interface DarkSelectProps {
   value: string;
@@ -18,9 +20,55 @@ export interface DarkSelectProps {
   ariaLabel?: string;
   className?: string;
   triggerClassName?: string;
+  menuClassName?: string;
   menuAlign?: 'left' | 'right';
-  menuPlacement?: 'down' | 'up';
+  /** `auto` = flip ke atas bila ruang di bawah (viewport / clip container) tidak cukup. */
+  menuPlacement?: DarkSelectMenuPlacement;
+  /** Batasi tinggi menu (row terlihat); sisanya scroll. Default: tanpa batas row (CSS max-height tetap berlaku). */
+  menuMaxRows?: number;
   disabled?: boolean;
+}
+
+const MENU_ITEM_EST_PX = 26;
+const MENU_PAD_EST_PX = 8;
+const MENU_GAP_EST_PX = 8;
+const DEFAULT_MENU_MAX_ROWS = 6;
+
+function estimateMenuHeight(optionCount: number, maxRows = DEFAULT_MENU_MAX_ROWS): number {
+  const rows = Math.min(Math.max(optionCount, 1), maxRows);
+  return rows * MENU_ITEM_EST_PX + MENU_PAD_EST_PX + MENU_GAP_EST_PX;
+}
+
+function resolveClipRect(trigger: HTMLElement): DOMRect {
+  const clip = trigger.closest(
+    '.brand-card-body, .brand-card, .content-area-body, [data-dark-select-clip]',
+  ) as HTMLElement | null;
+  if (clip) return clip.getBoundingClientRect();
+  return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+}
+
+function resolveAutoPlacement(
+  trigger: HTMLElement,
+  optionCount: number,
+  maxRows = DEFAULT_MENU_MAX_ROWS,
+): 'up' | 'down' {
+  const rect = trigger.getBoundingClientRect();
+  const clip = resolveClipRect(trigger);
+  const needed = estimateMenuHeight(optionCount, maxRows);
+  const spaceBelow = Math.min(clip.bottom, window.innerHeight) - rect.bottom;
+  const spaceAbove = rect.top - Math.max(clip.top, 0);
+  if (spaceBelow >= needed) return 'down';
+  if (spaceAbove > spaceBelow) return 'up';
+  return 'down';
+}
+
+/** Dipakai DarkSelect + DarkMultiSelect (hybrid flip up/down). */
+export function resolveDarkSelectAutoPlacement(
+  trigger: HTMLElement,
+  optionCount: number,
+  maxRows = DEFAULT_MENU_MAX_ROWS,
+): 'up' | 'down' {
+  return resolveAutoPlacement(trigger, optionCount, maxRows);
 }
 
 export function DarkSelect({
@@ -33,16 +81,35 @@ export function DarkSelect({
   ariaLabel,
   className,
   triggerClassName,
+  menuClassName,
   menuAlign = 'left',
   menuPlacement = 'down',
+  menuMaxRows = DEFAULT_MENU_MAX_ROWS,
   disabled = false,
 }: DarkSelectProps) {
   const { phase, isOpen, isVisible, close, toggle } = useDarkSelectMenu();
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [resolvedPlacement, setResolvedPlacement] = useState<'up' | 'down'>(
+    menuPlacement === 'up' ? 'up' : 'down',
+  );
   const disabledSet = new Set(disabledValues);
   const selected = options.find((opt) => opt.value === value);
   const showPlaceholder = !selected && !value;
   const triggerLabel = selected?.label ?? placeholder ?? value;
+  const dropUp = resolvedPlacement === 'up';
+  const maxRows = Math.max(1, menuMaxRows);
+
+  useEffect(() => {
+    if (menuPlacement === 'auto') return;
+    setResolvedPlacement(menuPlacement);
+  }, [menuPlacement]);
+
+  useEffect(() => {
+    if (!isOpen || menuPlacement !== 'auto') return;
+    const trigger = wrapRef.current?.querySelector<HTMLElement>('.dark-select-trigger');
+    if (!trigger) return;
+    setResolvedPlacement(resolveAutoPlacement(trigger, options.length, maxRows));
+  }, [isOpen, menuPlacement, maxRows, options.length]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,6 +135,17 @@ export function DarkSelect({
     if (next !== value) onChange(next);
   }
 
+  function handleToggle() {
+    if (disabled) return;
+    if (!isOpen && menuPlacement === 'auto') {
+      const trigger = wrapRef.current?.querySelector<HTMLElement>('.dark-select-trigger');
+      if (trigger) {
+        setResolvedPlacement(resolveAutoPlacement(trigger, options.length, maxRows));
+      }
+    }
+    toggle();
+  }
+
   return (
     <div className={cn('dark-select-wrap', className)} ref={wrapRef}>
       <button
@@ -79,10 +157,7 @@ export function DarkSelect({
         aria-expanded={isOpen}
         aria-disabled={disabled || undefined}
         disabled={disabled}
-        onClick={() => {
-          if (disabled) return;
-          toggle();
-        }}
+        onClick={handleToggle}
       >
         <span
           className={cn(
@@ -102,10 +177,12 @@ export function DarkSelect({
           className={cn(
             'dark-select-menu',
             menuAlign === 'right' && 'dark-select-menu--align-right',
-            menuPlacement === 'up' && 'dark-select-menu--drop-up',
+            dropUp && 'dark-select-menu--drop-up',
             (phase === 'open' || phase === 'opening') && 'dark-select-menu--open',
             phase === 'closing' && 'dark-select-menu--closing',
+            menuClassName,
           )}
+          style={{ ['--dark-select-menu-rows' as string]: String(maxRows) }}
           role="listbox"
           aria-label={ariaLabel}
           onMouseDown={(event) => event.stopPropagation()}

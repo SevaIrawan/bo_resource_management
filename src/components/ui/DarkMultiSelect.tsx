@@ -1,7 +1,11 @@
 import { Check, ChevronDown } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import type { DarkSelectOption } from '@/components/ui/DarkSelect';
+import {
+  type DarkSelectMenuPlacement,
+  type DarkSelectOption,
+  resolveDarkSelectAutoPlacement,
+} from '@/components/ui/DarkSelect';
 import { useDarkSelectMenu } from '@/components/ui/useDarkSelectMenu';
 
 export interface DarkMultiSelectProps {
@@ -13,6 +17,8 @@ export interface DarkMultiSelectProps {
   className?: string;
   triggerClassName?: string;
   menuAlign?: 'left' | 'right';
+  /** `auto` = flip ke atas bila ruang di bawah tidak cukup. */
+  menuPlacement?: DarkSelectMenuPlacement;
   disabled?: boolean;
   showSelectAll?: boolean;
   selectAllLabel?: string;
@@ -31,6 +37,7 @@ export function DarkMultiSelect({
   className,
   triggerClassName,
   menuAlign = 'left',
+  menuPlacement = 'down',
   disabled = false,
   showSelectAll = true,
   selectAllLabel = 'Select all',
@@ -40,6 +47,9 @@ export function DarkMultiSelect({
 }: DarkMultiSelectProps) {
   const { phase, isOpen, isVisible, close, toggle } = useDarkSelectMenu();
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [resolvedPlacement, setResolvedPlacement] = useState<'up' | 'down'>(
+    menuPlacement === 'up' ? 'up' : 'down',
+  );
   const disabledSet = useMemo(() => new Set(disabledValues), [disabledValues]);
 
   const selectableOptions = useMemo(
@@ -52,6 +62,9 @@ export function DarkMultiSelect({
     selectableOptions.length > 0 &&
     selectableOptions.every((opt) => selectedSet.has(opt.value));
   const someSelected = selectableOptions.some((opt) => selectedSet.has(opt.value));
+  const menuOptionCount =
+    options.length + (showSelectAll && selectableOptions.length > 1 ? 1 : 0);
+  const dropUp = resolvedPlacement === 'up';
 
   const triggerLabel = useMemo(() => {
     if (values.length === 0) return placeholder;
@@ -60,6 +73,18 @@ export function DarkMultiSelect({
     }
     return summaryLabel ? summaryLabel(values.length) : `${values.length} selected`;
   }, [options, placeholder, summaryLabel, values]);
+
+  useEffect(() => {
+    if (menuPlacement === 'auto') return;
+    setResolvedPlacement(menuPlacement);
+  }, [menuPlacement]);
+
+  useEffect(() => {
+    if (!isOpen || menuPlacement !== 'auto') return;
+    const trigger = wrapRef.current?.querySelector<HTMLElement>('.dark-select-trigger');
+    if (!trigger) return;
+    setResolvedPlacement(resolveDarkSelectAutoPlacement(trigger, menuOptionCount));
+  }, [isOpen, menuOptionCount, menuPlacement]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -99,19 +124,31 @@ export function DarkMultiSelect({
     close();
   }
 
+  function handleToggle() {
+    if (disabled) return;
+    if (!isOpen && menuPlacement === 'auto') {
+      const trigger = wrapRef.current?.querySelector<HTMLElement>('.dark-select-trigger');
+      if (trigger) {
+        setResolvedPlacement(resolveDarkSelectAutoPlacement(trigger, menuOptionCount));
+      }
+    }
+    toggle();
+  }
+
   return (
     <div className={cn('dark-select-wrap dark-multi-select-wrap', className)} ref={wrapRef}>
       <button
         type="button"
-        className={cn('dark-select-trigger', triggerClassName, disabled && 'dark-select-trigger--disabled')}
+        className={cn(
+          'dark-select-trigger',
+          triggerClassName,
+          disabled && 'dark-select-trigger--disabled',
+        )}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         disabled={disabled}
-        onClick={() => {
-          if (disabled) return;
-          toggle();
-        }}
+        onClick={handleToggle}
       >
         <span className="dark-select-trigger-label">{triggerLabel}</span>
         <ChevronDown
@@ -124,6 +161,7 @@ export function DarkMultiSelect({
           className={cn(
             'dark-select-menu dark-multi-select-menu',
             menuAlign === 'right' && 'dark-select-menu--align-right',
+            dropUp && 'dark-select-menu--drop-up',
             (phase === 'open' || phase === 'opening') && 'dark-select-menu--open',
             phase === 'closing' && 'dark-select-menu--closing',
           )}
@@ -148,7 +186,7 @@ export function DarkMultiSelect({
                 }}
               >
                 <span className="dark-multi-select-check" aria-hidden>
-                  {allSelected ? <Check className="h-3.5 w-3.5" /> : someSelected ? '–' : null}
+                  {allSelected ? <Check className="h-3 w-3" /> : someSelected ? '–' : null}
                 </span>
                 {selectAllLabel}
               </button>
@@ -176,7 +214,7 @@ export function DarkMultiSelect({
                   }}
                 >
                   <span className="dark-multi-select-check" aria-hidden>
-                    {active ? <Check className="h-3.5 w-3.5" /> : null}
+                    {active ? <Check className="h-3 w-3" /> : null}
                   </span>
                   {opt.label}
                 </button>

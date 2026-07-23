@@ -1,25 +1,43 @@
 import { isAccountJobQueueBusy } from '../automation/jobQueueBatchHelpers';
-import {
-  isExecuteSlotActiveForAccount,
-} from '../automation/executeSlotPool';
+import { isExecuteSlotActiveForAccount } from '../automation/executeSlotPool';
 import { getJobQueueSnapshot } from '../automation/jobQueueStore';
 import { isSessionSettling } from '../automation/jobQueueSettle';
 import { isScrapeActiveForSession } from './scrapeCancel';
+import {
+  DEFAULT_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM,
+  HARD_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM,
+} from '../../../src/config/deviceConcurrencyPolicy';
 
-let autoScrapeLaneSessionId: string | null = null;
+type AutoScrapePlatform = 'whatsapp' | 'telegram';
 
-export function tryAcquireAutoScrapeLane(sessionId: string): boolean {
-  if (autoScrapeLaneSessionId && autoScrapeLaneSessionId !== sessionId) {
-    return false;
+const maxSessionsPerPlatform = Math.min(
+  DEFAULT_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM,
+  HARD_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM,
+);
+
+/** sessionId → platform (hingga max brand slots per platform). */
+const activeSessions = new Map<string, AutoScrapePlatform>();
+
+function activeCount(platform: AutoScrapePlatform): number {
+  let n = 0;
+  for (const p of activeSessions.values()) {
+    if (p === platform) n += 1;
   }
-  autoScrapeLaneSessionId = sessionId;
+  return n;
+}
+
+export function tryAcquireAutoScrapeLane(
+  sessionId: string,
+  platform: AutoScrapePlatform = 'whatsapp',
+): boolean {
+  if (activeSessions.has(sessionId)) return true;
+  if (activeCount(platform) >= maxSessionsPerPlatform) return false;
+  activeSessions.set(sessionId, platform);
   return true;
 }
 
 export function releaseAutoScrapeLane(sessionId: string): void {
-  if (autoScrapeLaneSessionId === sessionId) {
-    autoScrapeLaneSessionId = null;
-  }
+  activeSessions.delete(sessionId);
 }
 
 /** User lane sibuk untuk akun ini — auto scrape skip, jangan antre slot user. */

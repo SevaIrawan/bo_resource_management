@@ -23,6 +23,50 @@ export function clampAutoScrapeScheduledHour(value: number): number {
   );
 }
 
+/** UI: 0–23 → "12:00 AM" … "11:00 PM" (local). */
+export function formatScheduledHourAmPm(hour24: number): string {
+  const parts = splitScheduledHourAmPm(hour24);
+  return `${parts.hour12}:00 ${parts.period}`;
+}
+
+export type ScheduledHourPeriod = 'AM' | 'PM';
+
+export function splitScheduledHourAmPm(hour24: number): {
+  hour12: number;
+  period: ScheduledHourPeriod;
+} {
+  const h = clampAutoScrapeScheduledHour(hour24);
+  return {
+    hour12: h % 12 === 0 ? 12 : h % 12,
+    period: h < 12 ? 'AM' : 'PM',
+  };
+}
+
+/** hour12 = 1–12 + AM/PM → 0–23. */
+export function combineScheduledHourAmPm(
+  hour12: number,
+  period: ScheduledHourPeriod,
+): number {
+  const raw = Number.isFinite(hour12) ? Math.round(hour12) : 12;
+  const h12 = Math.min(12, Math.max(1, raw));
+  const hour24 = period === 'AM' ? (h12 === 12 ? 0 : h12) : h12 === 12 ? 12 : h12 + 12;
+  return clampAutoScrapeScheduledHour(hour24);
+}
+
+export function scheduledHour12Options(): Array<{ value: string; label: string }> {
+  return Array.from({ length: 12 }, (_, i) => {
+    const hour12 = i + 1;
+    return { value: String(hour12), label: `${hour12}:00` };
+  });
+}
+
+export function scheduledHourPeriodOptions(): Array<{ value: string; label: string }> {
+  return [
+    { value: 'AM', label: 'AM' },
+    { value: 'PM', label: 'PM' },
+  ];
+}
+
 export function readAutoScrapeScheduledHour(): number {
   try {
     const raw = localStorage.getItem(AUTO_SCRAPE_SCHEDULED_HOUR_KEY);

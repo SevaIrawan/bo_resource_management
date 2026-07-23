@@ -5,6 +5,7 @@ import { withScrapeWatchdog } from './scrapeWatchdog';
 import { abortActiveScrape } from './scrapeCancel';
 import { abortActiveAutoScrape } from './autoScrapeCancel';
 import { withTelegramScrapeSessionLock } from './telegramScrapeSessionLock';
+import { emitScrapeProgress, type ScrapeProgressPhase } from './scrapeProgress';
 import type { ScrapedGroupRow } from './index';
 
 const PROGRESS_POLL_MS = 400;

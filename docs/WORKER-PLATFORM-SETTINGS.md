@@ -1,9 +1,9 @@
 # Worker platform settings (Admin)
 
-Policy storage for future Operations job worker — **WhatsApp** and **Telegram** separately.
+Policy storage untuk **Operations Job Queue** — **WhatsApp** dan **Telegram** terpisah. Dibaca saat **enqueue** job (bukan hanya scaffolding).
 
 - Storage: `localStorage` — `rm_worker_settings_whatsapp`, `rm_worker_settings_telegram`
-- UI: Admin grid — **WhatsApp worker** | **Telegram worker** (separate expand cards)
+- UI: Admin / Settings — **WhatsApp worker** | **Telegram worker** (separate expand cards)
 - Event: `rm-worker-settings-changed` after Save
 
 Validate: `npm run validate:worker-platform-settings`

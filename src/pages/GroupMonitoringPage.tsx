@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AccountMonitoringBody } from '@/components/group-monitoring/AccountMonitoringBody';
 import { OperationsMonitoringPanel } from '@/components/group-monitoring/OperationsMonitoringPanel';
-import { ReportingMonitoringPanel } from '@/components/group-monitoring/ReportingMonitoringPanel';
 import { ContentAreaCard } from '@/components/group-monitoring/ContentAreaCard';
 import { KpiGrid } from '@/components/group-monitoring/KpiGrid';
 import { useMonitoringTab } from '@/hooks/useMonitoringTab';
@@ -24,14 +23,6 @@ function GroupMonitoringContent() {
 
   if (loadError && !loading) {
     return <p className="account-sync-loading">{loadError}</p>;
-  }
-
-  if (tab === 'reporting') {
-    return (
-      <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">
-        <ReportingMonitoringPanel />
-      </div>
-    );
   }
 
   if (tab === 'operations') {

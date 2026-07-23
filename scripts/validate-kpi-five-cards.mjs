@@ -1,5 +1,5 @@
 /**
- * KPI dashboard: Account 4 kartu (brands, accounts, active, aligned).
+ * KPI dashboard: Account 4 kartu (brands, accounts, logout, notAligned).
  */
 import fs from 'fs';
 import path from 'path';
@@ -9,6 +9,12 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const kpis = fs.readFileSync(path.join(root, 'src/lib/monitoringKpis.ts'), 'utf8');
 const defaults = fs.readFileSync(path.join(root, 'src/config/groupMonitoringKpis.ts'), 'utf8');
 const grid = fs.readFileSync(path.join(root, 'src/components/group-monitoring/KpiGrid.tsx'), 'utf8');
+const en = fs.readFileSync(path.join(root, 'src/i18n/locales/en.ts'), 'utf8');
+const filterTs = fs.readFileSync(path.join(root, 'src/lib/filterAccountGroups.ts'), 'utf8');
+const slicer = fs.readFileSync(
+  path.join(root, 'src/components/group-monitoring/AccountSlicerHeader.tsx'),
+  'utf8',
+);
 
 const accountReturn = kpis.slice(kpis.indexOf('export function computeAccountKpis'));
 
@@ -18,8 +24,28 @@ function countLabelKeys(block) {
 
 const checks = [
   {
-    name: 'Account KPI: 4 kartu, tanpa kpi.account.issue',
-    ok: countLabelKeys(accountReturn) === 4 && !accountReturn.includes('kpi.account.issue'),
+    name: 'Account KPI: 4 kartu logout + notAligned (exception insight)',
+    ok:
+      countLabelKeys(accountReturn) === 4 &&
+      accountReturn.includes('kpi.account.logout') &&
+      accountReturn.includes('kpi.account.notAligned') &&
+      !accountReturn.includes('kpi.account.issue') &&
+      !accountReturn.includes('kpi.account.active') &&
+      !accountReturn.includes('kpi.account.aligned'),
+  },
+  {
+    name: 'i18n KPI Logout / Not Aligned',
+    ok: en.includes("logout: 'Logout'") && en.includes("notAligned: 'Not Aligned'"),
+  },
+  {
+    name: 'Slicer Status setelah Session (Aligned / Not Aligned)',
+    ok:
+      filterTs.includes("status: 'all'") &&
+      filterTs.includes("filters.status === 'aligned'") &&
+      filterTs.includes("filters.status === 'not_aligned'") &&
+      slicer.includes('ACCOUNT_STATUS_OPTIONS') &&
+      /sessionOptions[\s\S]*statusOptions/.test(slicer) &&
+      /accountFilters\.session[\s\S]*accountFilters\.status/.test(slicer),
   },
   {
     name: 'Tidak ada computeTicketKpis',

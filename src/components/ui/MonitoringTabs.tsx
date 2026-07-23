@@ -9,13 +9,12 @@ interface MonitoringTabsProps {
   onChange: (value: MonitoringTab) => void;
 }
 
-/** Urutan tab: Account → Operations → Reporting */
-const TAB_IDS: MonitoringTab[] = ['account', 'operations', 'reporting'];
+/** Urutan tab: Account → Operations */
+const TAB_IDS: MonitoringTab[] = ['account', 'operations'];
 
 const TAB_LABEL_KEYS: Record<MonitoringTab, string> = {
   account: 'tabs.account',
   operations: 'tabs.operations',
-  reporting: 'tabs.reporting',
 };
 
 export function MonitoringTabs({ value, onChange }: MonitoringTabsProps) {
@@ -36,7 +35,6 @@ export function MonitoringTabs({ value, onChange }: MonitoringTabsProps) {
               'monitoring-tab-btn inline-flex items-center gap-0.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
               id === 'account' && 'monitoring-tab-btn--account',
               id === 'operations' && 'monitoring-tab-btn--operations',
-              id === 'reporting' && 'monitoring-tab-btn--reporting',
               isActive
                 ? 'bg-bg-shell text-text-primary shadow-sm'
                 : 'text-text-muted hover:text-text-secondary',

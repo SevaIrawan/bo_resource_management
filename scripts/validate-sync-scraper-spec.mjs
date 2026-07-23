@@ -131,15 +131,18 @@ const implChecks = [
     })(),
   },
   {
-    name: 'Kontrak: execute slot pool max 4 + IPC (cursor-prompt-gm-master)',
+    name: 'Kontrak: execute slot pool per platform (max 10 WA + 10 TG) + IPC',
     ok: (() => {
       const pool = read('electron/main/automation/executeSlotPool.ts');
       const policy = read('src/config/executeSlotPolicy.ts');
+      const concurrency = read('src/config/deviceConcurrencyPolicy.ts');
       const gate = read('src/lib/userActionGate.ts');
       const client = read('src/lib/executeSlotClient.ts');
       return (
         pool.includes('getMaxWaBrowserSlots') &&
-        policy.includes('DEFAULT_MAX_EXECUTE_SLOTS = 4') &&
+        pool.includes('getMaxTgExecuteSlots') &&
+        concurrency.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM = 10') &&
+        policy.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM') &&
         gate.includes('DEFAULT_MAX_EXECUTE_SLOTS') &&
         client.includes('acquireOrWait')
       );
@@ -160,37 +163,115 @@ const implChecks = [
     ok: read('src/lib/automationJobQueueClient.ts').includes('isAccountJobActive'),
   },
   {
-    name: 'Auto Sync Settings = runAutoAccountScraper lane terpisah (bukan sync check / quick count)',
+    name: 'Auto Sync: lane terpisah + brand slots (max 6/platform) paralel',
     ok: (() => {
       const autoHook = read('src/hooks/useAutoAccountSync.ts');
       const autoScrape = read('src/lib/runAutoAccountScrape.ts');
       const autoScraper = read('src/lib/runAutoAccountScraper.ts');
+      const brandSettings = read('src/config/autoScrapeBrandSettings.ts');
+      const concurrency = read('src/config/deviceConcurrencyPolicy.ts');
+      const autoPool = read('electron/main/platformLogin/waAutoScrapeBrowserPool.ts');
+      const waLogin = read('electron/main/platformLogin/whatsapp.ts');
+      const lane = read('electron/main/scraper/autoScrapeLane.ts');
       const schedule = read('src/config/autoScrapeSchedule.ts');
       const policy = read('src/config/autoScrapePolicy.ts');
       const teardown = read('src/lib/autoScrapeDeviceTeardown.ts');
       const scraperMain = read('electron/main/scraper/index.ts');
+      const provider = read('src/providers/GroupMonitoringProvider.tsx');
       return (
+        autoHook.includes('collectAutoScrapeTargets') &&
+        autoHook.includes('readAutoSyncEnabled') &&
+        autoHook.includes('isBrandAccountStillSelected') &&
         autoHook.includes('runAutoAccountScrape') &&
-        autoHook.includes('cycleAbortRef') &&
-        autoHook.includes('teardownAutoScrapeDevice') &&
-        autoHook.includes('AUTO_SCRAPE_POLICY') &&
-        !autoHook.includes('setInterval') &&
+        autoHook.includes('getMaxAutoScrapeBrandSlotsPerPlatform') &&
+        autoHook.includes('selectedByPlatform') &&
+        autoHook.includes('runBrandPlatformSequential') &&
+        autoHook.includes('teardownAllActive') &&
+        autoHook.includes('activeAutoScrapeAccountIds') &&
+        autoHook.includes('Map<string, ActiveAutoScrapeEntry>') &&
+        provider.includes('activeAutoScrapeAccountIds') &&
+        brandSettings.includes('getMaxAutoScrapeBrandSlotsPerPlatform') &&
+        brandSettings.includes('session_invalid') &&
+        concurrency.includes('DEFAULT_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM = 6') &&
+        autoPool.includes('DEFAULT_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM') &&
+        waLogin.includes("browserPool === 'auto'") &&
+        waLogin.includes('withWaAutoScrapeBrowserSlot(run)') &&
+        waLogin.includes('skipBrowserPool: browserPool === \'auto\'') &&
+        lane.includes('maxSessionsPerPlatform') &&
         autoScrape.includes('runAutoAccountScraper') &&
-        autoScrape.includes('isAutoScrapeLaneReadyForAccount') &&
-        autoScrape.includes("sessionStatus !== 'valid'") &&
-        autoScrape.includes('teardownAutoScrapeDevice') &&
-        autoScrape.includes('AUTO_SCRAPE_POLICY') &&
-        autoScrape.includes('waitUntilAutoScrapeAccountReady') &&
+        autoScrape.includes("kind: 'start'") &&
+        autoScrape.includes('AUTO_SCRAPE_LANE_BUSY') &&
+        autoScrape.includes("account.status !== 'active'") &&
         !autoScrape.includes('acquireExecuteSlotWithinMs') &&
         autoScraper.includes('runAuto') &&
         policy.includes('gapAfterAccountMs') &&
-        !policy.includes('slotMaxWaitMs') &&
         teardown.includes('cancelAuto') &&
         !teardown.includes('releaseExecuteSlot') &&
         scraperMain.includes('scraper:run-auto') &&
         scraperMain.includes('scraper:cancel-auto') &&
+        scraperMain.includes('isAutoScrapeActiveForSession') &&
+        scraperMain.includes('stopWhatsAppLogin') &&
         schedule.includes('shouldTriggerAutoScrapeCycle') &&
-        !autoHook.includes('runAccountSyncCheck')
+        !autoHook.includes('runAccountSyncCheck') &&
+        !autoHook.includes('activeAutoScrapeAccountId:')
+      );
+    })(),
+  },
+  {
+    name: 'Auto scrape isolasi penuh vs manual scrape + job queue',
+    ok: (() => {
+      const autoScrape = read('src/lib/runAutoAccountScrape.ts');
+      const autoScraper = read('src/lib/runAutoAccountScraper.ts');
+      const autoHook = read('src/hooks/useAutoAccountSync.ts');
+      const teardown = read('src/lib/autoScrapeDeviceTeardown.ts');
+      const scraperMain = read('electron/main/scraper/index.ts');
+      const lane = read('electron/main/scraper/autoScrapeLane.ts');
+      const cancelAuto = read('electron/main/scraper/autoScrapeCancel.ts');
+      const cancelUser = read('electron/main/scraper/scrapeCancel.ts');
+      const userPool = read('electron/main/platformLogin/waBrowserPool.ts');
+      const autoPool = read('electron/main/platformLogin/waAutoScrapeBrowserPool.ts');
+      const jqStore = read('electron/main/automation/jobQueueStore.ts');
+      const jqRunner = read('electron/main/automation/jobQueueRunner.ts');
+      const jqGuard = read('electron/main/automation/jobQueueGuard.ts');
+      const syncFlow = read('src/hooks/useAccountSyncFlow.ts');
+      return (
+        // Auto path: tidak ambil execute slot user / tidak enqueue job queue
+        !autoScrape.includes('acquireExecuteSlot') &&
+        !autoScraper.includes('acquireExecuteSlot') &&
+        !autoHook.includes('acquireExecuteSlot') &&
+        !autoHook.includes('runAutomationJob') &&
+        !autoHook.includes("lane: 'user'") &&
+        !teardown.includes('releaseExecuteSlot') &&
+        !teardown.includes('acquireExecuteSlot') &&
+        autoScraper.includes("lane: 'auto'") &&
+        // IPC + cancel registry terpisah
+        scraperMain.includes("ipcMain.handle('scraper:run-auto'") &&
+        scraperMain.includes("ipcMain.handle('scraper:run'") &&
+        scraperMain.includes('registerActiveAutoScrape') &&
+        scraperMain.includes('registerActiveScrape') &&
+        scraperMain.includes('executeAutoScrapeRun') &&
+        !scraperMain
+          .slice(
+            scraperMain.indexOf('async function executeAutoScrapeRun'),
+            scraperMain.indexOf("ipcMain.handle('scraper:run'"),
+          )
+          .includes('guardAccountExecute') &&
+        cancelAuto.includes('registerActiveAutoScrape') &&
+        cancelUser.includes('registerActiveScrape') &&
+        // Chrome pool terpisah
+        userPool.includes('withWaBrowserSlot') &&
+        autoPool.includes('withWaAutoScrapeBrowserSlot') &&
+        !autoPool.includes('withWaBrowserSlot') &&
+        // Saling hormati per akun (bukan saling makan kuota global)
+        lane.includes('resolveUserLaneBlockForAutoScrape') &&
+        lane.includes('isExecuteSlotActiveForAccount') &&
+        lane.includes('isAccountJobQueueBusy') &&
+        lane.includes('isScrapeActiveForSession') &&
+        jqStore.includes('isAutoScrapeActiveForSession') &&
+        jqRunner.includes('isAutoScrapeActiveForSession') &&
+        jqGuard.includes('isAutoScrapeActiveForSession') &&
+        // Manual sync tetap pakai execute slot user
+        syncFlow.includes('acquireExecuteSlot')
       );
     })(),
   },

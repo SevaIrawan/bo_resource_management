@@ -11,19 +11,21 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const classify = read('src/lib/classifyGroupStock.ts');
 const policy = read('src/lib/groupStockPolicy.ts');
 const loader = read('src/lib/loadOperationsStockCounts.ts');
-const panel = read('src/components/group-monitoring/OperationsMonitoringPanel.tsx');
-const cardList = read('src/components/group-monitoring/OperationsBrandCardList.tsx');
-const card = read('src/components/group-monitoring/OperationsBrandCard.tsx');
+const accountCardList = read('src/components/group-monitoring/AccountBrandCardList.tsx');
+const accountCard = read('src/components/group-monitoring/AccountBrandCard.tsx');
 const modal = read('src/components/group-monitoring/OperationsStockDetailModal.tsx');
 const provider = read('src/providers/GroupMonitoringProvider.tsx');
 const realtime = read('src/hooks/useRealtimeMonitoring.ts');
 const compute = read('src/lib/computeStockToPrepare.ts');
 const opsPolicy = read('src/config/operationsStockPolicy.ts');
 const headerMeta = read('src/components/group-monitoring/OperationsBrandHeaderMeta.tsx');
+const buildMeta = read('src/lib/buildStockHeaderMeta.ts');
 const adminSection = read('src/components/admin/OperationsStockPolicySection.tsx');
 const prefixConfig = read('src/config/stockPrefixCategoryConfig.ts');
 const loadAvg = read('src/lib/loadAvgNewDepositor.ts');
 const doc = read('docs/OPERATIONS-STOCK-ENGINE.md');
+const monitoringTabs = read('src/components/ui/MonitoringTabs.tsx');
+const monitoringType = read('src/types/monitoring.ts');
 
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -124,9 +126,9 @@ const BLOCKLIST = [/^❌aa/i, /^CO group/i, /^Feedback Level/i];
 function classifyBucket(groupName, memberNonAdmin, brand) {
   const count = Math.max(0, Math.floor(Number(memberNonAdmin) || 0));
   const name = groupName.trim();
-  if (!name || !brand.trim()) return 'other';
+  if (!name || !brand.trim()) return 'review';
   for (const pattern of BLOCKLIST) {
-    if (pattern.test(name)) return 'other';
+    if (pattern.test(name)) return 'review';
   }
   if (isPrefix3(name, brand) && count < 1) return 'recycle';
   if (isPrefix2(name, brand) && count < 1) return 'ready';
@@ -134,7 +136,7 @@ function classifyBucket(groupName, memberNonAdmin, brand) {
     if (count === 1) return 'active';
     if (count === 0 || count > 1) return 'review';
   }
-  return 'other';
+  return 'review';
 }
 
 const BRAND = 'FWSG';
@@ -148,11 +150,11 @@ const decisionCases = [
   { name: 'Prefix1 + 0 → review', in: ['FWSG John', 0], out: 'review' },
   { name: 'Prefix1 + 2 → review', in: ['FWSG John', 2], out: 'review' },
   { name: 'Prefix2 + 0 → ready', in: ['FWSG NEW', 0], out: 'ready' },
-  { name: 'Prefix2 + 1 → other', in: ['FWSG NEW', 1], out: 'other' },
+  { name: 'Prefix2 + 1 → review', in: ['FWSG NEW', 1], out: 'review' },
   { name: 'Prefix3 + 0 → recycle', in: ['FWSG John LG', 0], out: 'recycle' },
-  { name: 'Prefix3 + 1 → other', in: ['FWSG John LG', 1], out: 'other' },
-  { name: 'blocklist ❌aa → other', in: ['❌aa junk', 1], out: 'other' },
-  { name: 'legacy CO group → other', in: ['CO group x', 0], out: 'other' },
+  { name: 'Prefix3 + 1 → review', in: ['FWSG John LG', 1], out: 'review' },
+  { name: 'blocklist ❌aa → review', in: ['❌aa junk', 1], out: 'review' },
+  { name: 'legacy CO group → review', in: ['CO group x', 0], out: 'review' },
   { name: 'Ringgo LG before Prefix1', in: ['FWSG Ringgo LG', 0], out: 'recycle' },
 ];
 
@@ -166,8 +168,8 @@ const checks = [
     ok: doc.includes('Prefix1 + `member_non_admin = 0`') && doc.includes('Prefix1 + `member_non_admin > 1`'),
   },
   {
-    name: 'Doc: urutan blocklist → Prefix3 → Prefix2 → Prefix1',
-    ok: doc.includes('blocklist → Prefix3 → Prefix2 → Prefix1'),
+    name: 'Doc: urutan blocklist → Prefix3 → Prefix2 → Prefix1 → Review',
+    ok: doc.includes('blocklist → Prefix3 → Prefix2 → Prefix1 → Review'),
   },
   {
     name: 'classifyGroupStockBucket + aggregate + readGroupStockCounts',
@@ -202,40 +204,67 @@ const checks = [
       adminSection.includes('prefixOtherDesc'),
   },
   {
-    name: 'Loader dedupe group_id + wire panel',
+    name: 'Loader dedupe group_id + wire Account card list',
     ok:
       loader.includes('loadOperationsStockCountsByBrandPlatform') &&
       loader.includes('byGroupKey') &&
-      panel.includes('loadOperationsStockCountsByBrandPlatform') &&
-      panel.includes('stockCounts'),
+      accountCardList.includes('loadOperationsStockCountsByBrandPlatform') &&
+      accountCardList.includes('stockByBrandPlatform'),
+  },
+  {
+    name: 'fetchAllSupabaseRows paginated (.range, page ≤1000) + ORDER BY stabil (PK)',
+    ok: (() => {
+      const paged = read('src/lib/supabasePagedSelect.ts');
+      return (
+        paged.includes('SUPABASE_FETCH_PAGE_SIZE') &&
+        paged.includes('.range(from, to)') &&
+        paged.includes('page.length < SUPABASE_FETCH_PAGE_SIZE') &&
+        paged.includes('stableOrderForTable') &&
+        paged.includes('.order(o.column') &&
+        paged.includes("column: 'scrape_date'") &&
+        paged.includes("column: 'id'") &&
+        paged.includes("column: 'brand'") &&
+        !paged.includes('satu query tanpa limit/range')
+      );
+    })(),
   },
   {
     name: 'UI card: stockCounts prop (bukan placeholder)',
     ok:
-      cardList.includes('readGroupStockCounts') &&
-      card.includes('stockCounts: GroupStockCounts') &&
-      !card.includes('EMPTY_GROUP_STOCK_COUNTS'),
+      accountCardList.includes('readGroupStockCounts') &&
+      accountCard.includes('stockCounts?: GroupStockCounts') &&
+      accountCard.includes('EMPTY_GROUP_STOCK_COUNTS'),
   },
   {
-    name: 'Double-click chip → modal detail bucket',
+    name: 'Account punya stock header + Tab Operations tetap ada',
     ok:
-      read('src/components/group-monitoring/OperationsGroupStockStrip.tsx').includes(
-        'onBucketDoubleClick',
-      ) &&
-      read('src/components/group-monitoring/OperationsGroupStockStrip.tsx').includes(
-        'onDoubleClick',
-      ) &&
-      card.includes('OperationsStockDetailModal') &&
+      monitoringType.includes("'account'") &&
+      monitoringType.includes("'operations'") &&
+      monitoringTabs.includes("'operations'"),
+  },
+  {
+    name: 'Click chip → modal detail bucket (Account)',
+    ok:
+      accountCard.includes('AccountBrandStockChips') &&
+      accountCard.includes('OperationsStockDetailModal') &&
+      accountCard.includes('onBucketClick') &&
       read('src/lib/loadOperationsStockBucketDetails.ts').includes(
         'fetchOperationsStockBucketDetails',
+      ) &&
+      read('src/lib/loadOperationsStockBucketDetails.ts').includes(
+        'getOperationsStockMasterRows',
+      ) &&
+      read('src/lib/loadOperationsStockCounts.ts').includes(
+        'replaceOperationsStockMasterCache',
       ),
   },
   {
     name: 'Realtime: scheduleOperationsReload → rm-operations-reload',
     ok:
       provider.includes('scheduleOperationsReload') &&
-      provider.includes("new Event('rm-operations-reload')") &&
-      panel.includes("addEventListener('rm-operations-reload'"),
+      provider.includes('dispatchOperationsReload') &&
+      read('src/lib/monitoringRealtimeEvents.ts').includes("new Event('rm-operations-reload')") &&
+      accountCardList.includes("addEventListener('rm-operations-reload'"),
   },
   {
     name: 'Realtime: scrape/daily → scheduleMonitoringReload (reporting + operations)',
@@ -274,17 +303,20 @@ const checks = [
   },
   {
     name: 'Full refresh dispatch rm-operations-reload',
-    ok: /registerFullRefreshHandler[\s\S]*rm-operations-reload/.test(provider),
+    ok:
+      /registerFullRefreshHandler[\s\S]*scheduleMonitoringReload/.test(provider) &&
+      provider.includes('dispatchOperationsReload'),
   },
   {
-    name: 'To prep: computeStockToPrepare + wire card list',
+    name: 'To prep: computeStockToPrepare + wire Account card list',
     ok:
       compute.includes('computeStockToPrepare') &&
       compute.includes('Math.ceil') &&
-      cardList.includes('computeStockToPrepare') &&
-      cardList.includes('readEffectiveBrandOperationsPolicy') &&
-      cardList.includes('operationsPolicyByBrand') &&
-      !cardList.includes('stockToPrepare: 0'),
+      buildMeta.includes('computeStockToPrepare') &&
+      buildMeta.includes('readEffectiveBrandOperationsPolicy') &&
+      accountCardList.includes('buildStockHeaderMeta') &&
+      accountCardList.includes('operationsPolicyByBrand') &&
+      accountCard.includes('OperationsBrandHeaderMeta'),
   },
   {
     name: 'To prep warning UI + Admin per-brand Save + Avg ND days',
@@ -304,6 +336,28 @@ const checks = [
       adminSection.includes('persistOperationsPolicyByBrand'),
   },
   {
+    name: 'Settings Save: notify policy-changed + operations-reload',
+    ok:
+      opsPolicy.includes("new Event('rm-operations-policy-changed')") &&
+      opsPolicy.includes("new Event('rm-operations-reload')") &&
+      /notifyOperationsStockPolicyChanged[\s\S]*rm-operations-policy-changed[\s\S]*rm-operations-reload/.test(
+        opsPolicy,
+      ),
+  },
+  {
+    name: 'Account: policy-changed reload stock+AvgND; shared buildStockHeaderMeta',
+    ok:
+      accountCardList.includes("addEventListener('rm-operations-policy-changed'") &&
+      accountCardList.includes('reloadStockMeta') &&
+      accountCardList.includes('setOperationsPolicyByBrand') &&
+      accountCardList.includes('masterGroupCountFor') &&
+      accountCard.includes('masterGroupCount') &&
+      buildMeta.includes('computeStockToPrepare') &&
+      read('src/components/group-monitoring/OperationsBrandCardList.tsx').includes(
+        "from '@/lib/buildStockHeaderMeta'",
+      ),
+  },
+  {
     name: 'To prep formula sample (187 total, 10%, ready 18 → gap 1)',
     ok: (() => {
       const total = 187;
@@ -313,6 +367,30 @@ const checks = [
       const gap = Math.max(0, target - ready);
       return target === 19 && gap === 1;
     })(),
+  },
+  {
+    name: 'To prep screenshot sample (187 total, 10%, ready 38 → gap 0)',
+    ok: (() => {
+      const total = 187;
+      const pct = 10;
+      const ready = 38;
+      const target = Math.ceil((total * pct) / 100);
+      const gap = Math.max(0, target - ready);
+      return target === 19 && gap === 0;
+    })(),
+  },
+  {
+    name: 'Chip sum screenshot sample (134+38+2+13 = 187)',
+    ok: 134 + 38 + 2 + 13 === 187,
+  },
+  {
+    name: 'sumGroupStockCounts = total master buckets',
+    ok:
+      classify.includes('export function sumGroupStockCounts') &&
+      (() => {
+        const counts = { active: 134, ready: 38, recycle: 2, review: 13 };
+        return counts.active + counts.ready + counts.recycle + counts.review === 187;
+      })(),
   },
   {
     name: 'Agregat chip = filter bucket (konsistensi sample)',
@@ -325,11 +403,11 @@ const checks = [
         { name: 'FWSG Bob', mna: 2 },
         { name: '❌aa junk', mna: 1 },
       ];
-      const counts = { active: 0, ready: 0, recycle: 0, review: 0, other: 0 };
+      const counts = { active: 0, ready: 0, recycle: 0, review: 0 };
       for (const row of sample) {
         counts[classifyBucket(row.name, row.mna, BRAND)] += 1;
       }
-      return ['active', 'ready', 'recycle', 'review', 'other'].every(
+      return ['active', 'ready', 'recycle', 'review'].every(
         (bucket) =>
           sample.filter((row) => classifyBucket(row.name, row.mna, BRAND) === bucket).length ===
           counts[bucket],

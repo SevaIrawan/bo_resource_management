@@ -21,7 +21,7 @@ This document is the **official guide to every feature** in the current applicat
 3. [Navigation and layout](#3-navigation-and-layout)
 4. [Account tab — account monitoring](#4-account-tab--account-monitoring)
 5. [Ticket tab — issues and remediation](#5-ticket-tab--issues-and-remediation)
-6. [Reporting tab — join/admin matrix](#6-reporting-tab--joinadmin-matrix)
+6. [Group matrix — join/admin (Account header)](#6-group-matrix--joinadmin-account-header)
 7. [Admin page](#7-admin-page)
 8. [Data synchronization (realtime)](#8-data-synchronization-realtime)
 9. [Recommended daily workflows](#9-recommended-daily-workflows)
@@ -131,8 +131,10 @@ You land on **Group Monitoring** (main workspace) with the **Account** tab selec
 
 | Tab | Function |
 |-----|----------|
-| **Account** | Brand cards & WA/TG account rows |
-| **Ticket** | Open issues to remediate (badge = open issue count) |
+| **Account** | Brand cards, WA/TG rows, KPI issues, **stock chips** + **Group matrix** (card header) |
+| **Operations** | **Job Queue** only (join / create / set admin / exit-delete / set photo) |
+
+> There is **no** separate Reporting tab. Open the join/admin matrix from the **group count badge** on the Account brand card header. Stock chips live on the same header (not an Operations Overview bookmark).
 
 Switching tabs updates KPI cards and the filter toolbar below.
 
@@ -416,21 +418,18 @@ If tickets remain after phone fix: **Run** scraper to push latest device data. A
 
 ---
 
-## 6. Reporting tab — join/admin matrix
+## 6. Group matrix — join/admin (Account header)
 
-Read-only — does not change sessions, scraper, or tickets.
+The Reporting tab shell was **removed**. Join/admin matrix opens from the Account brand card **group count badge** (`BrandMasterGroupsModal`) — read-only.
 
-| Filter | Purpose |
-|--------|---------|
-| **Platform** | WhatsApp or Telegram |
-| **Brand** | Brand with accounts |
-| **Acc Name** | **All** = matrix for all accounts; one account = single-account report |
-| **Full Group / Full Admin** | Join status or admin status vs master |
-| **Search group name** | Filter by group name |
+| Control | Purpose |
+|---------|---------|
+| Entry | Account → brand card header → group count |
+| **Full Group / Full Admin** | Join or admin Yes/No vs master (all accounts on that brand+platform) |
+| Search / Status | Filter by name / stock status |
+| Column filter | Yes / No / All on account headers |
 
-**Matrix (Acc Name = All):** master rows × account columns (Yes/No). Column header dropdown: Yes / No / All. If filter returns no rows, table headers stay visible — click **Back to all groups** or choose **All**.
-
-Updates automatically after scrape or Supabase changes (realtime).
+Updates automatically after scrape or Supabase changes (`rm-reporting-reload`).
 
 ---
 

@@ -1,12 +1,11 @@
-/** Bucket stock grup (Operations) — bukan session akun. */
-export type GroupStockBucket = 'active' | 'ready' | 'recycle' | 'review' | 'other';
+/** Bucket stock grup (Operations / Account / Reporting) — bukan session akun. */
+export type GroupStockBucket = 'active' | 'ready' | 'recycle' | 'review';
 
 export interface GroupStockCounts {
   active: number;
   ready: number;
   recycle: number;
   review: number;
-  other: number;
 }
 
 /** Fallback kosong sebelum load stock dari groups_master. */
@@ -15,7 +14,6 @@ export const EMPTY_GROUP_STOCK_COUNTS: GroupStockCounts = {
   ready: 0,
   recycle: 0,
   review: 0,
-  other: 0,
 };
 
 export const GROUP_STOCK_BUCKETS: GroupStockBucket[] = [
@@ -23,7 +21,13 @@ export const GROUP_STOCK_BUCKETS: GroupStockBucket[] = [
   'ready',
   'recycle',
   'review',
-  'other',
+];
+
+/** Header Account: Active disembunyikan; hanya insight aksi. */
+export const ACCOUNT_HEADER_STOCK_BUCKETS: GroupStockBucket[] = [
+  'ready',
+  'recycle',
+  'review',
 ];
 
 /** Ringkasan brand di header Operations (bukan session). */

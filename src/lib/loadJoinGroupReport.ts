@@ -102,10 +102,13 @@ export async function loadAccountDailyReport(
   brandName: string,
   platform: Platform,
 ): Promise<AccountGroupLinkRow[]> {
-  const rows = await fetchAccountDailyGroupLinks(accountId);
+  const brand = brandName.trim();
+  const rows = await fetchAccountDailyGroupLinks(accountId, {
+    brand,
+    platform,
+  });
   if (rows.length === 0) return rows;
 
-  const brand = brandName.trim();
   const masterRows = dedupeMasterRowsByGroupId(
     await fetchAllSupabaseRows<{
       group_id: string;

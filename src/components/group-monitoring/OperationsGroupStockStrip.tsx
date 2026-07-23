@@ -11,7 +11,6 @@ const STOCK_LABEL_KEY: Record<GroupStockBucket, string> = {
   ready: 'operations.stock.ready',
   recycle: 'operations.stock.recycle',
   review: 'operations.stock.review',
-  other: 'operations.stock.other',
 };
 
 const STOCK_TOOLTIP_KEY: Record<GroupStockBucket, string> = {
@@ -19,7 +18,6 @@ const STOCK_TOOLTIP_KEY: Record<GroupStockBucket, string> = {
   ready: 'operations.stock.readyTooltip',
   recycle: 'operations.stock.recycleTooltip',
   review: 'operations.stock.reviewTooltip',
-  other: 'operations.stock.otherTooltip',
 };
 
 interface OperationsGroupStockStripProps {

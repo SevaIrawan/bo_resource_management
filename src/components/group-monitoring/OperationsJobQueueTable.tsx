@@ -14,6 +14,7 @@ import {
   jobQueueCanRun,
   jobQueueRowActionMode,
   jobQueueCreateGroupRemarkKey,
+  jobQueueExitDeleteRemarkKey,
   jobQueueEmptyKey,
   jobQueueGroupName,
   jobQueueBatchTotalText,
@@ -425,6 +426,15 @@ function buildQueueColumns(
     },
   };
 
+  const exitRemarkCol: QueueColumnDef = {
+    key: 'remark',
+    labelKey: 'operations.jobQueue.colRemark',
+    render: (job, t) => {
+      const key = jobQueueExitDeleteRemarkKey(job, allJobs);
+      return key ? t(key) : '—';
+    },
+  };
+
   const createCols: QueueColumnDef[] = [
     statusCol,
     ...(showBrand ? [brandCol] : []),
@@ -464,6 +474,7 @@ function buildQueueColumns(
       render: (job) => jobQueueBatchTotalText(job),
     },
     progressCol,
+    exitRemarkCol,
     createdCol,
     actionsCol,
   ];

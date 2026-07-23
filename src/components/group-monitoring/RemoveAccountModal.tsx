@@ -44,12 +44,10 @@ export function RemoveAccountModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, saving, onClose]);
 
-  if (!open) return null;
-
   const accountLine = `${accountPlatformSubtitle(accountName, platform)} · ${brandName}`;
 
   return (
-    <BrandModalRoot onBackdropClick={saving ? undefined : onClose}>
+    <BrandModalRoot open={open} onBackdropClick={saving ? undefined : onClose}>
       <div
         className="brand-modal-panel"
         role="alertdialog"

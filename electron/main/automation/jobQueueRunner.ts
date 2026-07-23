@@ -16,8 +16,6 @@ import {
   broadcastJobQueueChanged,
   consumeJobStopRequest,
   failStaleRunningJobs,
-  countFreeExecuteSlots,
-  getRunningJobCount,
   getRunnerState,
   markJobFinished,
   markJobRunning,
@@ -25,6 +23,8 @@ import {
   updateJobProgress,
 } from './jobQueueStore';
 import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
+import { maybeAutoEnqueueSetPhotoFromCreate } from './autoEnqueueSetPhotoFromCreate';
+import { maybeAutoEnqueueDeleteFromExit } from './autoEnqueueDeleteFromExit';
 
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let tickInProgress = false;
@@ -188,7 +188,7 @@ async function runAccountAutomationJob(job: AutomationJobRecord): Promise<Automa
 
 async function runSingleJob(job: AutomationJobRecord): Promise<void> {
   try {
-    await waitForExecuteSlot(job.accountId, 'job');
+    await waitForExecuteSlot(job.accountId, 'job', job.platform);
   } catch {
     scheduleRunnerRetry(1000);
     return;
@@ -255,6 +255,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
           error: message,
           ...outcomeExtras,
         });
+        tryAutoEnqueueSetPhotoAfterCreate(job);
         return;
       }
       markJobFinished(job.id, 'completed', {
@@ -277,6 +278,8 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
         batchSuccess: success,
         ...outcomeExtras,
       });
+      tryAutoEnqueueSetPhotoAfterCreate(job);
+      tryAutoEnqueueDeleteAfterExit(job);
       return;
     }
 
@@ -286,6 +289,8 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       error: result.errorCode ?? message ?? 'AUTOMATION_ERROR',
       ...outcomeExtras,
     });
+    tryAutoEnqueueSetPhotoAfterCreate(job);
+    tryAutoEnqueueDeleteAfterExit(job);
   } catch (error) {
     markJobFinished(job.id, 'failed', {
       error: error instanceof Error ? error.message : 'AUTOMATION_EXCEPTION',
@@ -294,6 +299,32 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
     markSessionSettleAfterJob(job.sessionId);
     releaseExecuteSlot(job.accountId);
     scheduleRunnerTick(0);
+  }
+}
+
+function tryAutoEnqueueSetPhotoAfterCreate(job: AutomationJobRecord): void {
+  if (job.action !== 'create_group') return;
+  try {
+    maybeAutoEnqueueSetPhotoFromCreate(job);
+  } catch (error) {
+    console.error(
+      '[jobQueue] auto enqueue set_group_photo failed',
+      job.id,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+function tryAutoEnqueueDeleteAfterExit(job: AutomationJobRecord): void {
+  if (job.action !== 'leave_group' || job.payload.exitDeletePhase !== 'exit') return;
+  try {
+    maybeAutoEnqueueDeleteFromExit(job);
+  } catch (error) {
+    console.error(
+      '[jobQueue] auto enqueue delete_group after leave failed',
+      job.id,
+      error instanceof Error ? error.message : error,
+    );
   }
 }
 
@@ -311,13 +342,7 @@ async function runnerTick(): Promise<void> {
       scheduleRunnerTick(0);
     }
 
-    const maxConcurrent = getMaxConcurrentAutomationJobs();
-    const running = getRunningJobCount();
-    const freeSlots = countFreeExecuteSlots();
-    const available = Math.min(maxConcurrent - running, freeSlots);
-    if (available <= 0) return;
-
-    const candidates = pickQueuedJobsForDispatch(available);
+    const candidates = pickQueuedJobsForDispatch();
     if (candidates.length === 0) return;
 
     for (const job of candidates) {

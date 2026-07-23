@@ -1,6 +1,6 @@
 # Operations — Stock Engine (SOP)
 
-Dokumen kontrak klasifikasi stock grup di tab **Operations**. Status **tidak** disimpan di `groups_master`; dihitung dari fakta scrape + policy penamaan (nanti editable Admin).
+Dokumen kontrak klasifikasi stock grup di tab **Operations**. Stock juga tampil di header brand card **Tab Account** (chips + Avg ND / To prep). Status **tidak** disimpan di `groups_master`; dihitung dari fakta scrape + policy penamaan (editable Admin).
 
 ## Sumber data
 
@@ -10,7 +10,7 @@ Dokumen kontrak klasifikasi stock grup di tab **Operations**. Status **tidak** d
 | `public.new_register` | `line`, `new_depositor` | **Avg ND** (terpisah — lihat `loadAvgNewDepositor.ts`) |
 | Admin policy | prefix / blocklist / **Ready min %** / **Avg ND days** per brand |
 
-Implementasi: `src/lib/classifyGroupStock.ts`, `src/lib/groupStockPolicy.ts`, `src/lib/loadOperationsStockCounts.ts`.
+Stock/master counts di UI memakai `fetchAllSupabaseRows` (loop `.range`, page 1000) — bukan satu select tanpa pagination.
 
 ---
 
@@ -21,13 +21,12 @@ Implementasi: `src/lib/classifyGroupStock.ts`, `src/lib/groupStockPolicy.ts`, `s
 | **Prefix1** | `{emoji} FWSG {user}` · `{emoji} FWSG {user} {tail≠NEW/LG}` · `FWSG {user}` · `FWSG {user} {tail≠NEW/LG}` | Grup **customer** (Active/Review) |
 | **Prefix2** | `{emoji} FWSG NEW` · `{emoji} FWSG {user} NEW` · `{emoji} FWSG {user} NEW {tail}` | Stock **NEW** resmi (Ready) |
 | **Prefix3** | `{emoji} FWSG {user} LG` · `FWSG {user} LG` | Customer **sudah left** (Recycle) |
-| **Other** | Tidak match blocklist / prefix di atas | Junk / legacy |
 
 `{user}` = slot setelah brand (default `*`): **huruf, angka/numeric, atau kombinasi** — contoh `WBSG 84736008`, `FWSG John`. `{tail}` = teks/angka/emoji tambahan (P1: bukan NEW/LG; P2: setelah NEW).
 
-**Blocklist → Other:** `❌aa…`, `CO group…`, `Feedback Level…` (default; Admin bisa tambah).
+**Blocklist → Review:** `❌aa…`, `CO group…`, `Feedback Level…` (default; Admin bisa tambah).
 
-**Urutan evaluasi:** blocklist → Prefix3 → Prefix2 → Prefix1 → Other.
+**Urutan evaluasi:** blocklist → Prefix3 → Prefix2 → Prefix1 → Review.
 
 Match brand **case-insensitive** di `group_name`.
 
@@ -37,13 +36,13 @@ Match brand **case-insensitive** di `group_name`.
 
 | Kondisi | Status | Makna operasi |
 |---------|--------|----------------|
-| Blocklist / tidak match prefix SOP | **Other** | Junk / legacy — admin normalize naming |
+| Blocklist / tidak match prefix SOP | **Review** | Junk / legacy — admin normalize naming |
 | Prefix3 + `member_non_admin < 1` | **Recycle** | LG resmi, slot kosong — siap leave/clear/daur ulang |
 | Prefix2 + `member_non_admin < 1` | **Ready** | NEW resmi, stock kosong — siap assign |
 | Prefix1 + `member_non_admin = 1` | **Active** | Tepat satu customer non-admin |
 | Prefix1 + `member_non_admin = 0` | **Review** | Customer sudah keluar tapi nama belum LG/NEW (marketing belum sync) |
 | Prefix1 + `member_non_admin > 1` | **Review** | Orang asing di grup customer |
-| Selain rule di atas | **Other** | Mismatch SOP |
+| Selain rule di atas | **Review** | Mismatch SOP / catch-all |
 
 ### Catatan Review (Prefix1 + count ≠ 1)
 
@@ -109,12 +108,12 @@ Sumber: `new_register.line` = brand. Implementasi: `loadAvgNewDepositor.ts` + `o
 Header brand card:
 
 ```text
-Brand | Avg ND | To prep  ···  [ WA n Group ] [ Active | Ready | Recycle | Review | Other ]
+Brand | Avg ND | To prep  ···  [ WA n Group ] [ Active | Ready | Recycle | Review ]
 ```
 
 - Badge total = jumlah baris unik `groups_master` (brand + platform).
-- Chip stock = agregat bucket (jumlah per status); **jumlah chip tidak wajib = total** selama masih ada Other / overlap policy.
-- **Double-click** chip Active / Ready / Recycle / Review / Other → modal daftar grup master bucket tersebut (`OperationsStockDetailModal`).
+- Chip stock = agregat bucket (jumlah per status); jumlah chip Active+Ready+Recycle+Review = total master (catch-all masuk Review).
+- **Double-click** chip Active / Ready / Recycle / Review → modal daftar grup master bucket tersebut (`OperationsStockDetailModal`).
 
 ---
 

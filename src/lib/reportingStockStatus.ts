@@ -7,7 +7,6 @@ export const REPORTING_STOCK_EXPORT_LABEL: Record<GroupStockBucket, string> = {
   ready: 'Ready',
   recycle: 'Recycle',
   review: 'Review',
-  other: 'Other',
 };
 
 export function computeReportingStockStatus(

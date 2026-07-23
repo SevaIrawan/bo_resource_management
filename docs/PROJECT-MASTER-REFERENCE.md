@@ -54,8 +54,8 @@ Dokumen ini melengkapi (bukan mengganti):
 9. [Alur Scraper / Run](#9-alur-scraper--run)
 10. [Cancel Scrape](#10-cancel-scrape)
 11. [Modal login platform](#11-modal-login-platform)
-12. [Tab Ticket & reconcile](#12-tab-ticket--reconcile)
-13. [Tab Reporting](#13-tab-reporting)
+12. [Issue KPI (engine in-memory)](#12-issue-kpi-engine-in-memory)
+13. [Group matrix (Account header)](#13-group-matrix-account-header)
 14. [Realtime & auto-sync](#14-realtime--auto-sync)
 15. [Database Supabase](#15-database-supabase)
 16. [Electron & sidecar](#16-electron--sidecar)
@@ -91,7 +91,7 @@ Aplikasi **desktop Electron** multi-platform untuk memantau dan mengoperasikan b
 - Data bisnis (brand, akun, grup, ticket, session flag) → **Supabase** (`src/config/tables.ts`).
 - Auth WA on-disk → `{userData}/wa-sessions/` — `electron/main/platformLogin/whatsapp.ts` (`app.getPath('userData')`).
   - Windows contoh: `%APPDATA%\Resource Management\wa-sessions\` — lihat `INSTALL-WINDOWS.md`.
-  - Linux/macOS: path `userData` OS masing-masing — lihat `INSTALL-LINUX.md` / `PLAN-CROSS-PLATFORM-INSTALLERS.md` § path.
+  - Linux/macOS: path `userData` OS masing-masing — lihat `INSTALL-LINUX.md` / `INSTALL-MACOS.md`.
 
 ---
 
@@ -102,7 +102,7 @@ Routing: `src/App.tsx` (HashRouter)
 | Path | Halaman | Akses | Sumber |
 |------|---------|-------|--------|
 | `/login` | Login app (`loginWithCredentials` → tabel `users`) | Guest | `src/lib/auth.ts`, `src/App.tsx` |
-| `/` | Group Monitoring — tab **Account** + **Operations** + **Reporting** | Login required | `GroupMonitoringPage.tsx` |
+| `/` | Group Monitoring — tab **Account** + **Operations** | Login required | `GroupMonitoringPage.tsx` |
 | `/admin` | Admin settings | `AdminRoute` — username `admin` | `AdminRoute.tsx` |
 | `/settings` | Redirect → `/admin` jika admin, else `/` | Login required | `SettingsRedirect.tsx` |
 
@@ -110,9 +110,8 @@ Routing: `src/App.tsx` (HashRouter)
 
 **Group Monitoring** — `GroupMonitoringPage.tsx` + `useMonitoringTab()`:
 
-- **Account** — brand card, grid akun, sync/scrape, KPI issue (engine `accountMasterDailyCompare`)
-- **Operations** — bookmark **Overview** (stock opname) + **Job Queue** (join, create group, set admin, exit/delete, set photo) — `OperationsMonitoringPanel.tsx`
-- **Reporting** — matrix join/admin read-only per brand+platform (`ReportingMonitoringPanel.tsx`)
+- **Account** — brand card, grid akun, sync/scrape, KPI issue (engine `accountMasterDailyCompare`), **stock chips** + **Group matrix** di header kartu (`AccountBrandStockChips`, `BrandMasterGroupsModal`)
+- **Operations** — **Job Queue** saja (stock overview sudah di header Account) — `OperationsMonitoringPanel.tsx`
 
 View mode Account: **Card** (satu kartu per brand) atau **Table** (semua baris flat). State di slicer header.
 
@@ -537,9 +536,11 @@ Main TG: `electron/main/platformLogin/telegramSidecar.ts` → Python `telegram_l
 
 ---
 
-## 12. Tab Ticket & reconcile
+## 12. Issue KPI (engine in-memory)
 
-### 11.1 Tipe issue
+Tab Ticket DB **dihapus** (rilis 1.0.24 / migrasi 033). Issue hanya KPI di tab Account.
+
+### 12.1 Tipe issue
 
 | Type | Arti |
 |------|------|
@@ -551,20 +552,20 @@ Main TG: `electron/main/platformLogin/telegramSidecar.ts` → Python `telegram_l
 
 Session login/logout **bukan** ticket.
 
-### 11.2 Engine (satu sumber kebenaran dengan grid)
+### 12.2 Engine (satu sumber kebenaran dengan grid)
 
 ```
 accountMasterDailyCompare.ts  →  computeAccountTicketBreakdown (in-memory)
 buildTicketSummariesFromEngine.ts  →  kartu KPI Issue
 ```
 
-### 11.3 Kapan grid & reporting refresh
+### 12.3 Kapan grid & matrix refresh
 
 - Setelah sync/scrape sukses → `applyResult` + realtime `group_scrape_daily` → `refreshAccountAfterDailyWrite` → `scheduleMonitoringReload`
 - Realtime Supabase pada `group_scrape_daily`, `groups_master`, registry akun
 - Hook: `useRealtimeMonitoring.ts`
 
-### 11.4 Data fresh (anti cache lama)
+### 12.4 Data fresh (anti cache lama)
 
 | Langkah | File |
 |---------|------|
@@ -575,18 +576,18 @@ buildTicketSummariesFromEngine.ts  →  kartu KPI Issue
 
 ---
 
-## 13. Tab Reporting
+## 13. Group matrix (Account header)
 
-**Read-only** — tidak ubah session, scraper, sync, atau ticket DB dari tab ini.
+**Read-only** — tidak ubah session, scraper, sync dari modal ini.  
+**Entry UI:** badge jumlah grup di header brand card → `BrandMasterGroupsModal` (bukan tab Reporting).
 
 | Komponen | File |
 |----------|------|
-| Panel + slicer | `ReportingMonitoringPanel.tsx`, `ReportingSlicerHeader.tsx` |
+| Modal + load | `BrandMasterGroupsModal.tsx` → `loadJoinGroupMatrix` |
 | Matrix Acc=All | `ReportingJoinMatrixTable.tsx`, `loadJoinGroupReport.ts` |
-| Full Group/Admin per akun | `ReportingDailyTable.tsx`, `ReportingAdminDailyTable.tsx` |
 | Reload realtime | `GroupMonitoringProvider.scheduleReportingReload` → event `rm-reporting-reload` |
 
-**Sumber data:** `fetchAllSupabaseRows` + `dedupeDailyRowsByGroupIdKeepLatest` — bukan cache `masterDailyLoadCache`.
+**Sumber data:** query Supabase + `dedupeDailyRowsByGroupIdKeepLatest` — bukan cache `masterDailyLoadCache`.
 
 **Filter kolom akun (Yes/No):** jika tidak ada baris, header tabel + dropdown filter tetap tampil; tombol **Back to all groups** reset filter.
 
@@ -715,9 +716,10 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | `PlatformLoginModal.tsx` | Modal QR/phone login |
 | `GroupLinksModal.tsx` | Modal group link |
 | `ScrapeCancelConfirmModal.tsx` | Konfirmasi cancel scrape |
-| `ReportingMonitoringPanel.tsx` | Tab Reporting — slicer + reload |
+| `BrandMasterGroupsModal.tsx` | Group matrix dari header Account — Full Group / Full Admin |
 | `ReportingJoinMatrixTable.tsx` | Matrix join/admin + filter kolom |
-| `OperationsMonitoringPanel.tsx` | Tab Operations — Overview stock + Job Queue |
+| `OperationsMonitoringPanel.tsx` | Tab Operations — Job Queue saja |
+| `AccountBrandStockChips.tsx` | Chip stock di header Account brand card |
 | `OperationsJobQueueAddBar.tsx` | Enqueue task + SETUP modal trigger |
 | `OperationsJobQueueSetupModal.tsx` | SETUP create/join/set_admin/exit |
 | `OperationsJobQueueCreateGroupViewModal.tsx` | VIEW create result + Set Photo tab |
@@ -799,11 +801,11 @@ Jalankan sebelum release: `npm run validate:pre-release`
 | `validate:wa-qr-login` | Timeout QR WA, modal close |
 | `validate:telegram-login` | Alur login TG |
 | `validate:multi-account-wa` | Multi-akun WA |
-| `validate:ticket-reconcile` | Reconcile ticket + forceFresh + reporting reload |
-| `validate:ticket-logic` | Engine ticket |
-| `validate-reporting-matrix.mjs` | Tab Reporting matrix + filter back |
-| `validate:operations-stock` | Decision table stock + wire Operations UI |
-| `validate:device-group-scale` | Skala 3000 grup |
+| `validate:reporting-matrix` | Group matrix + filter back (`validate-reporting-matrix.mjs`) |
+| `validate:operations-stock` | Decision table stock + wire Account stock chips |
+| `validate:operations-job-queue` | Job Queue actions + concurrency |
+| `validate:real-operations-data` | Data device nyata (bukan mock) |
+| `validate:device-group-scale` | Skala hingga 6000 grup |
 | `validate:post-login-sync` | Sync setelah login |
 | `validate:desktop` | Gabungan validator desktop |
 

@@ -7,7 +7,6 @@ const STOCK_LABEL_KEY: Record<GroupStockBucket, string> = {
   ready: 'operations.stock.ready',
   recycle: 'operations.stock.recycle',
   review: 'operations.stock.review',
-  other: 'operations.stock.other',
 };
 
 interface ReportingStockStatusCellProps {

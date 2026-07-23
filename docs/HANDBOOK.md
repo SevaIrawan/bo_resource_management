@@ -23,7 +23,7 @@ Untuk arsitektur & rilis IT, lihat [PROJECT.md](../PROJECT.md).
 3. [Navigasi & tata letak](#3-navigasi--tata-letak)
 4. [Tab Account — monitoring akun](#4-tab-account--monitoring-akun)
 5. [Issue grup & admin (Ticket dihapus)](#5-issue-grup--admin-tab-ticket-dihapus-v1024)
-6. [Tab Reporting — matrix join/admin](#6-tab-reporting--matrix-joinadmin)
+6. [Group matrix — join/admin (Account header)](#6-group-matrix--joinadmin-account-header)
 7. [Halaman Admin](#7-halaman-admin)
 8. [Sinkronisasi data (realtime)](#8-sinkronisasi-data-realtime)
 9. [Alur kerja harian (disarankan)](#9-alur-kerja-harian-disarankan)
@@ -105,9 +105,10 @@ Anda langsung masuk ke **Group Monitoring** (halaman utama).
 
 | Tab | Fungsi |
 |-----|--------|
-| **Account** | Brand card, grid akun WA/TG, KPI issue, sync/scrape |
-| **Operations** | **Overview** — stock opname; **Job Queue** — antrian join / create group / set admin / exit & delete / set photo |
-| **Reporting** | Laporan read-only join/admin grup per brand (matrix atau per akun) |
+| **Account** | Brand card, grid akun WA/TG, KPI issue, sync/scrape, **stock chips** + **Group matrix** (header kartu) |
+| **Operations** | **Job Queue** saja — antrian join / create group / set admin / exit & delete / set photo |
+
+> Stock overview dan Reporting tab shell **tidak** ada. Stock = chips di header Account. Matrix join/admin = modal dari badge grup.
 
 ### 3.4 KPI (kartu angka di atas)
 
@@ -316,32 +317,22 @@ Login/logout session **tidak** membuat ticket.
 
 ---
 
-## 6. Tab Reporting — matrix join/admin
+## 6. Group matrix — join/admin (Account header)
 
-Tab **Reporting** hanya **baca data** — tidak mengubah session, scraper, atau ticket.
+Tab **Reporting** shell **dihapus**. Matrix join/admin = **modal** dari badge jumlah grup di header brand card (tab Account) — hanya **baca data**.
 
-### 6.1 Filter atas
+### 6.1 Cara buka & isi
 
-| Filter | Fungsi |
+| Elemen | Fungsi |
 |--------|--------|
-| **Platform** | WhatsApp atau Telegram |
-| **Brand** | Brand yang punya akun |
-| **Acc Name** | **All** = matrix semua akun; pilih satu = laporan akun itu saja |
-| **Full Group / Full Admin** | Join status atau admin status vs master |
-| **Search group name** | Filter nama grup |
+| Entry | Account → header brand card → klik jumlah grup (badge platform) |
+| **Full Group / Full Admin** | Join status atau admin status vs master (semua akun brand+platform) |
+| **Search / Status** | Filter nama grup / stock status |
+| Filter kolom akun | Yes / No / All di header kolom |
 
-### 6.2 Matrix (Acc Name = All)
+Data diperbarui otomatis setelah scrape atau perubahan di Supabase (event `rm-reporting-reload`).
 
-- Baris = grup master brand; kolom = akun (Yes/No join atau admin)
-- Klik panah di header kolom akun → filter **Yes** / **No** / **All**
-- Jika filter tidak punya baris: header tabel tetap ada → klik **Back to all groups** atau pilih **All** di dropdown
-
-### 6.3 Per akun (Acc Name = satu akun)
-
-- **Full Group:** semua grup daily akun (7 kolom)
-- **Full Admin:** daftar master brand + status admin akun
-
-Data diperbarui otomatis setelah scrape atau perubahan di Supabase (realtime).
+Komponen: `BrandMasterGroupsModal` → `ReportingJoinMatrixTable`.
 
 ---
 
@@ -503,7 +494,7 @@ Login
         ├─ [Tab Operations]
         │     ├─ Overview — stock buckets
         │     └─ Job Queue — join, create, set admin, exit/delete, set photo
-        └─ [Tab Reporting]
+        └─ [Group matrix modal]
               └─ Matrix / Full Group / Full Admin
   └─ Admin
         ├─ System status + Worker settings (defaults)

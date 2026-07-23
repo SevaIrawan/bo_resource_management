@@ -284,11 +284,13 @@ declare global {
         tryAcquire: (
           accountId: string,
           kind: 'sync' | 'scraper',
+          platform: Platform,
         ) => Promise<{ ok: true } | { ok: false; reason: 'same_account' | 'slots_full' }>;
         release: (accountId: string) => Promise<{ ok: boolean }>;
         acquireOrWait: (
           accountId: string,
           kind: 'sync' | 'scraper',
+          platform: Platform,
         ) => Promise<
           | { ok: true; queued: boolean }
           | { ok: false; reason: 'same_account' }
@@ -298,6 +300,15 @@ declare global {
           activeCount: number;
           queuedCount: number;
           activeAccountIds: string[];
+          byPlatform?: Record<
+            Platform,
+            {
+              maxConcurrent: number;
+              activeCount: number;
+              queuedCount: number;
+              activeAccountIds: string[];
+            }
+          >;
         }>;
         onChanged: (callback: () => void) => () => void;
       };

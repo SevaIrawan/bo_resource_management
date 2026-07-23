@@ -422,7 +422,7 @@ export function useAccountSyncFlow({
         'sync',
       );
 
-      const slot = await acquireExecuteSlot(account.id, 'sync', () => {
+      const slot = await acquireExecuteSlot(account.id, 'sync', account.platform, () => {
         reportBlockingError(t('groupMonitoring.sync.executeSlotsQueued'));
       });
       if (!slot.ok) {
@@ -565,7 +565,7 @@ export function useAccountSyncFlow({
 
       if (processingByAccount[account.id]) return;
 
-      const slot = await acquireExecuteSlot(account.id, 'sync');
+      const slot = await acquireExecuteSlot(account.id, 'sync', account.platform);
       if (!slot.ok) return;
 
       setClearingSessionAccountId(account.id);
@@ -650,7 +650,7 @@ export function useAccountSyncFlow({
 
       setRowProcessing(groupId, account.id, 'scraper', 'scraper');
 
-      const slot = await acquireExecuteSlot(account.id, 'scraper', () => {
+      const slot = await acquireExecuteSlot(account.id, 'scraper', account.platform, () => {
         reportBlockingError(t('groupMonitoring.sync.executeSlotsQueued'));
       });
       if (!slot.ok) {

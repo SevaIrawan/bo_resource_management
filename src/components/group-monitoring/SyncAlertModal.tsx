@@ -34,15 +34,13 @@ export function SyncAlertModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
-  if (!open || !message.trim()) return null;
-
   const headerLine =
     accountName && platform
       ? accountPlatformSubtitle(accountName, platform)
       : accountName ?? t('groupMonitoring.sync.errorTitle');
 
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot open={open && Boolean(message.trim())} onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--sync"
         role="alertdialog"

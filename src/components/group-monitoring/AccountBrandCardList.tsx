@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { AccountBrandCard } from '@/components/group-monitoring/AccountBrandCard';
 import type { EditAccountFormValues } from '@/components/group-monitoring/EditAccountModal';
 import { AddBrandCard } from '@/components/group-monitoring/AddBrandCard';
@@ -12,8 +12,20 @@ import { removeBrandCompletely } from '@/lib/brands';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { createMessagingAccount } from '@/lib/messagingAccounts';
 import { useLanguage } from '@/hooks/useLanguage';
+import { readGroupStockCounts } from '@/lib/classifyGroupStock';
+import { buildStockHeaderMeta } from '@/lib/buildStockHeaderMeta';
+import { loadAvgNewDepositorByLine } from '@/lib/loadAvgNewDepositor';
+import { loadMasterGroupCountsByBrandPlatform, readMasterGroupCount } from '@/lib/loadOperationsMasterCounts';
+import { loadOperationsStockCountsByBrandPlatform } from '@/lib/loadOperationsStockCounts';
+import {
+  readOperationsPolicyByBrand,
+  type OperationsPolicyByBrand,
+} from '@/config/operationsStockPolicy';
 import type { AccountBrandGroup, AccountBrandRow, AddAccountInput } from '@/types/accountMonitoringUi';
 import type { AccountPlatformFilter } from '@/lib/brandCardHeaderBadges';
+import type { GroupStockCounts, GroupStockHeaderMeta } from '@/types/groupStock';
+import { EMPTY_GROUP_STOCK_HEADER_META } from '@/types/groupStock';
+import type { Platform } from '@/types/database';
 
 type SyncFlow = ReturnType<typeof useAccountSyncFlow>;
 
@@ -26,9 +38,13 @@ interface AccountBrandCardListProps {
   onRemoveFromSlot: (groupId: string, account: AccountBrandRow) => void;
 }
 
+function resolveListPlatform(filter: AccountPlatformFilter): Platform {
+  return filter === 'telegram' ? 'telegram' : 'whatsapp';
+}
+
 export function AccountBrandCardList({
   groups,
-  activePlatformFilter = 'all',
+  activePlatformFilter = 'whatsapp',
   onOpenAddBrand,
   onGroupsChange,
   sync,
@@ -40,6 +56,85 @@ export function AccountBrandCardList({
   const [removeTarget, setRemoveTarget] = useState<AccountBrandGroup | null>(null);
   const [removeSaving, setRemoveSaving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [stockByBrandPlatform, setStockByBrandPlatform] = useState<Map<string, GroupStockCounts>>(
+    () => new Map(),
+  );
+  const [masterCounts, setMasterCounts] = useState<Map<string, number>>(() => new Map());
+  const [avgNdByLine, setAvgNdByLine] = useState<Map<string, number>>(() => new Map());
+  const [operationsPolicyByBrand, setOperationsPolicyByBrand] = useState<OperationsPolicyByBrand>(
+    () => readOperationsPolicyByBrand(),
+  );
+  const [stockMetaReady, setStockMetaReady] = useState(false);
+  const reloadSeqRef = useRef(0);
+  const headerPlatform = resolveListPlatform(activePlatformFilter);
+
+  const reloadStockMeta = useCallback(async () => {
+    const brandNames = [...new Set(groups.map((g) => g.brandName.trim()).filter(Boolean))];
+    const seq = ++reloadSeqRef.current;
+    try {
+      const [stock, master, avgNd] = await Promise.all([
+        loadOperationsStockCountsByBrandPlatform(),
+        loadMasterGroupCountsByBrandPlatform(),
+        loadAvgNewDepositorByLine(brandNames),
+      ]);
+      if (seq !== reloadSeqRef.current) return;
+      setStockByBrandPlatform(stock);
+      setMasterCounts(master);
+      setAvgNdByLine(avgNd);
+      setOperationsPolicyByBrand(readOperationsPolicyByBrand());
+      setStockMetaReady(true);
+    } catch {
+      if (seq !== reloadSeqRef.current) return;
+      setStockByBrandPlatform(new Map());
+      setMasterCounts(new Map());
+      setAvgNdByLine(new Map());
+      setStockMetaReady(false);
+    }
+  }, [groups]);
+
+  useEffect(() => {
+    void reloadStockMeta();
+  }, [reloadStockMeta]);
+
+  useEffect(() => {
+    const onReload = () => void reloadStockMeta();
+    window.addEventListener('rm-operations-reload', onReload);
+    return () => window.removeEventListener('rm-operations-reload', onReload);
+  }, [reloadStockMeta]);
+
+  useEffect(() => {
+    const onPolicyChanged = () => {
+      setOperationsPolicyByBrand(readOperationsPolicyByBrand());
+      // Avg ND window + prefix SOP butuh reload angka/chip (bukan hanya state policy).
+      void reloadStockMeta();
+    };
+    window.addEventListener('rm-operations-policy-changed', onPolicyChanged);
+    return () => window.removeEventListener('rm-operations-policy-changed', onPolicyChanged);
+  }, [reloadStockMeta]);
+
+  function stockHeaderMetaFor(brandName: string): GroupStockHeaderMeta {
+    if (!stockMetaReady) {
+      return EMPTY_GROUP_STOCK_HEADER_META;
+    }
+    return buildStockHeaderMeta(
+      brandName,
+      headerPlatform,
+      masterCounts,
+      stockByBrandPlatform,
+      avgNdByLine,
+      operationsPolicyByBrand,
+    );
+  }
+
+  function masterGroupCountFor(brandName: string): number {
+    if (!stockMetaReady) {
+      const fromGrid = groups.find((g) => g.brandName === brandName)?.standardGroupCountByPlatform?.[
+        headerPlatform
+      ];
+      return Math.max(0, Number(fromGrid) || 0);
+    }
+    return readMasterGroupCount(masterCounts, brandName, headerPlatform);
+  }
 
   const {
     processingByAccount,
@@ -143,6 +238,13 @@ export function AccountBrandCardList({
             key={group.id}
             group={group}
             activePlatformFilter={activePlatformFilter}
+            masterGroupCount={masterGroupCountFor(group.brandName)}
+            stockCounts={readGroupStockCounts(
+              stockByBrandPlatform,
+              group.brandName,
+              headerPlatform,
+            )}
+            stockHeaderMeta={stockHeaderMetaFor(group.brandName)}
             onAddAccount={(input) => handleAddAccount(group, input)}
             onEditAccount={(account, values) => handleEditAccount(group, account, values)}
             canManageStructure={canManageStructure}

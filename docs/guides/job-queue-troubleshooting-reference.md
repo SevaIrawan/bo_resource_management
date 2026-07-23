@@ -11,7 +11,7 @@
 
 | Symptom | Check first | Likely cause |
 |---------|-------------|--------------|
-| Nothing runs; all actions queue | `executeSlotsActive` vs max (4) | Ghost slot after crash **or** 4 real jobs running |
+| Nothing runs; all actions queue | `executeSlotsActive` vs max (**10** per platform WA/TG) | Ghost slot after crash **or** 10 real jobs running on that platform |
 | One account stuck; others OK | Row busy indicator / job table | Scrape + job conflict, settling, or active job on that account |
 | Job `failed` immediately | Job error / `errorCode` | Invalid session, payload, or platform error |
 | Job `running` forever | Duration vs action timeout | Chrome hang; wait 90m stale sweep or restart app |
@@ -25,7 +25,7 @@
 
 ## 2. Architecture (do not misdiagnose)
 
-- **Max 4 parallel accounts** — shared pool for Sync, Scrape, and Job Queue (`executeSlotPool`).
+- **Max 10 parallel accounts per platform** — WA dan TG **terpisah** (masing-masing hingga 10). Pool bersama untuk Sync, Scrape, dan Job Queue user (`executeSlotPool` + `deviceConcurrencyPolicy.ts`). Auto-scrape brand: lane terpisah max **6** per platform.
 - **Per-account isolation** — account A failure or block does not stop account B; **one account uses at most 1 slot**.
 - **Batch auto-split (v1.0.30)** — large group lists split at enqueue into jobs of ≤ `maxPerRun` (default 30); chunks for the **same account run sequentially** (FIFO), not in parallel.
 - **Single slot source of truth** — main process `executeSlotPool` only; `jobQueueGuard` does **not** check global slot fill.
@@ -102,7 +102,7 @@
 
 | Behavior | Why | What to do |
 |----------|-----|------------|
-| 5th action queues | Max 4 slots (different accounts) | Wait; notification is correct |
+| 5th+ action queues when 10 already active on that platform | Max **10** user slots per platform (WA/TG terpisah) | Wait; notification is correct |
 | Multiple queued rows, same account | Auto-split batch (v1.0.30) | Normal — chunks run one after another |
 | `SESSION_SETTLING` | 15s Chrome cleanup after job | Retry after ~15s |
 | Scrape blocks job on same account | Per-account isolation | Finish scrape first |

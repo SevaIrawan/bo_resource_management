@@ -32,8 +32,6 @@ export function AddBrandModal({ open, onClose, onSubmit }: AddBrandModalProps) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
@@ -48,7 +46,7 @@ export function AddBrandModal({ open, onClose, onSubmit }: AddBrandModalProps) {
   }
 
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot open={open} onBackdropClick={onClose}>
       <div
         className="brand-modal-panel"
         role="dialog"

@@ -21,7 +21,7 @@ BAGIAN 3: MODAL LOGIN & QR
 Panel lebar (min ~36rem), kotak QR besar (~14rem), skeleton saat generate, overlay expired/gagal + tombol Refresh QR.
 WA: auto-regenerate QR. TG: error dulu, refresh manual.
 
-BAGIAN 4: PERFORMA (3000 grup)
+BAGIAN 4: PERFORMA (hingga 6000 grup)
 - quickDeviceCount: hanya total dari device; tidak merge ribuan group_id ke daily di renderer.
 - Agregasi master↔daily: accountMasterDailyCompare.ts (in-memory) + RPC rm_commit_account_scrape saat tulis scrape.
 - Issue/kartu: buildTicketSummariesFromEngine.ts dari engine yang sama dengan grid; patch grid setelah scrape via patchAccountGridAfterDailyWrite.
@@ -47,12 +47,13 @@ BAGIAN 7: SESSION PROBE & RESOLVE AKUN (1.0.17)
 BAGIAN 8: DATA FRESH & REALTIME (1.0.17+)
 - Scrape: RPC rm_commit_account_scrape atomik (DELETE daily → INSERT → rebuild master).
 - Patch grid: patchAccountGridAfterDailyWrite; realtime group_scrape_daily → onAccountDailyChanged (tanpa double-patch master).
-- Reload Reporting + Operations: scheduleMonitoringReload di GroupMonitoringProvider (debounce 500ms) — bukan dispatch ganda dari caller scrape.
-- Reporting: fetch langsung DB + dedupe scraped_at; reload via rm-reporting-reload.
+- Reload Group matrix + Operations: scheduleMonitoringReload di GroupMonitoringProvider (debounce 500ms) — bukan dispatch ganda dari caller scrape.
+- Group matrix (modal header Account): fetch langsung DB + dedupe scraped_at; reload via rm-reporting-reload → BrandMasterGroupsModal.
 - Matrix filter kolom Yes/No kosong: header tabel tetap + Back to all groups.
 
 Implementasi: useAccountSyncFlow.ts, clearAccountSession.ts, accountMasterDailyCompare.ts,
-buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx, ReportingMonitoringPanel.tsx,
+buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx, BrandMasterGroupsModal.tsx,
 ReportingJoinMatrixTable.tsx, loadJoinGroupReport.ts, masterDailyLoadCache.ts, accountSessionResolve.ts,
 PlatformLoginModal.tsx, GroupMonitoringProvider.tsx, useRealtimeMonitoring.ts,
 electron/main/scraper/countWhatsApp.ts
+deviceConcurrencyPolicy.ts (user execute max 10/platform; auto scrape max 6/platform)

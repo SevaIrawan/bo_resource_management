@@ -21,6 +21,7 @@ import {
   abortActiveAutoScrape,
   AutoScrapeCancelledError,
   clearActiveAutoScrape,
+  isAutoScrapeActiveForSession,
   isAutoScrapeCancelled,
   registerActiveAutoScrape,
 } from './autoScrapeCancel';
@@ -84,7 +85,7 @@ async function executeAutoScrapeRun(payload: ScrapeRunPayload) {
   if (userBlock) {
     throw new Error(`AUTO_SCRAPE_USER_LANE_BUSY:${userBlock}`);
   }
-  if (!tryAcquireAutoScrapeLane(payload.sessionId)) {
+  if (!tryAcquireAutoScrapeLane(payload.sessionId, payload.platform)) {
     throw new Error('AUTO_SCRAPE_LANE_BUSY');
   }
 
@@ -156,7 +157,15 @@ export function registerScraperIpc() {
   ipcMain.handle(
     'scraper:cancel-auto',
     async (_event, payload: { sessionId: string; platform: Platform }) => {
-      await abortActiveAutoScrape(payload.sessionId, payload.platform);
+      const wasActive = isAutoScrapeActiveForSession(payload.sessionId);
+      if (wasActive) {
+        // Mid-scrape cancel — lepas Chrome segera.
+        await abortActiveAutoScrape(payload.sessionId, payload.platform);
+      } else if (payload.platform === 'whatsapp') {
+        // Post-success teardown — soft close (hindari TargetCloseError / frame detached ke Acc berikutnya).
+        const { stopWhatsAppLogin } = await import('../platformLogin/whatsapp');
+        await stopWhatsAppLogin(payload.sessionId).catch(() => undefined);
+      }
       if (payload.platform === 'telegram') {
         await cancelTelegramScrape(payload.sessionId).catch(() => undefined);
       }

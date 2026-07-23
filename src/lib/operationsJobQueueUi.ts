@@ -8,6 +8,7 @@ import {
   isExitDeleteDeleteJob,
   isExitDeleteExitJob,
   jobMatchesExitDeleteTaskType,
+  resolveExitJobDeleteFollowUpRemarkKey,
 } from '@/lib/exitDeleteFlow';
 import { createGroupBatchUsesNumbering } from '@/lib/createGroupBatchNaming';
 import {
@@ -583,7 +584,7 @@ export function jobQueueViewTableRows(
           : row.exitStatus === 'failed'
             ? t('operations.jobQueue.exitStatusFailed')
             : jobQueueViewRowStatusLabel(job, index, t),
-      remark: '',
+      remark: (row as { exitError?: string }).exitError ?? '',
     }));
   }
 
@@ -719,6 +720,14 @@ export function jobQueueCreateGroupRemarkKey(
     return resolveSetPhotoJobRemarkKey(job);
   }
   return resolveCreateJobSetPhotoFollowUpRemarkKey(job, allJobs);
+}
+
+/** Kolom Remark — Leave tab; follow-up delete chat setelah left. */
+export function jobQueueExitDeleteRemarkKey(
+  job: AutomationJobRecord,
+  allJobs: AutomationJobRecord[],
+): string | null {
+  return resolveExitJobDeleteFollowUpRemarkKey(job, allJobs);
 }
 
 export function jobQueueActionKey(action: AutomationJobAction): string {

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GM Apps Implementation Checklist</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --line: #2d3a47;
+      --text: #e8eef4;
+      --muted: #9aabbc;
+      --head: #1e2a38;
+      --accent: #4ea8de;
+      --ok: #5fb98b;
+      --warn: #e9c46a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      padding: 1.75rem 1rem 2.75rem;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    header { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+    header h1 { margin: 0 0 0.5rem; font-size: 1.5rem; font-weight: 650; }
+    .meta-grid { display: grid; grid-template-columns: 140px 1fr; row-gap: 0.35rem; font-size: 0.9rem; color: var(--muted); }
+    .meta-grid strong { color: var(--text); font-weight: 600; }
+    .tag {
+      display: inline-block; background: rgba(78,168,222,0.14); color: var(--accent);
+      border: 1px solid rgba(78,168,222,0.4); border-radius: 4px; padding: 2px 8px; font-size: 0.78rem;
+    }
+    h2 {
+      margin: 1.75rem 0 0.8rem; font-size: 1.08rem; color: var(--accent); font-weight: 650;
+      padding-bottom: 0.4rem; border-bottom: 1px solid var(--line);
+    }
+    .phase-block {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+      padding: 1rem 1.15rem; margin-bottom: 0.9rem;
+    }
+    .phase-block h3 { margin: 0 0 0.7rem; font-size: 0.98rem; color: var(--text); }
+    .phase-block .dep { font-size: 0.82rem; color: var(--muted); margin: 0 0 0.7rem; }
+    .checklist { list-style: none; margin: 0; padding: 0; }
+    .checklist li {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      font-size: 0.9rem; padding: 0.4rem 0; border-bottom: 1px solid var(--line);
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist input[type="checkbox"] { margin-top: 0.2rem; width: 15px; height: 15px; flex-shrink: 0; }
+    .checklist .item-text { flex: 1; }
+    .checklist .item-note { display: block; color: var(--muted); font-size: 0.82rem; margin-top: 0.15rem; }
+    footer { margin-top: 2rem; padding-top: 0.85rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>GM Apps Implementation Checklist</h1>
+    <div class="meta-grid">
+      <div>Task</div><div>Implementation checklist for GM Apps restructure</div>
+      <div>Category</div><div><span class="tag">Do</span></div>
+      <div>Status</div><div>Approved scope, ready for execution</div>
+      <div>Reference</div><div>GM Apps Restructure Plan — Consolidated (agreed with HOD)</div>
+    </div>
+  </header>
+
+  <h2>Phase 1 — Tab Restructure</h2>
+  <div class="phase-block">
+    <ul class="checklist">
+      <li><input type="checkbox" /><span class="item-text">Remove Reporting as a separate tab<span class="item-note">Main navigation becomes Account and Operations only</span></span></li>
+      <li><input type="checkbox" /><span class="item-text">Move stock status into the Account brand card</span></li>
+      <li><input type="checkbox" /><span class="item-text">Move group matrix access into the Account brand card</span></li>
+      <li><input type="checkbox" /><span class="item-text">Confirm Operations opens directly to the Job Queue</span></li>
+    </ul>
+  </div>
+
+  <h2>Phase 2 — Account &amp; Decision Center Redesign</h2>
+  <div class="phase-block">
+    <ul class="checklist">
+      <li><input type="checkbox" /><span class="item-text">Change top-level card metric from accounts Online to accounts Offline</span></li>
+      <li><input type="checkbox" /><span class="item-text">Add top-level card metric for Group/Admin not Aligned</span></li>
+      <li><input type="checkbox" /><span class="item-text">Show total group count once per brand card, remove repeated total on each account row</span></li>
+      <li><input type="checkbox" /><span class="item-text">Show per-account group count on each account row only</span></li>
+      <li><input type="checkbox" /><span class="item-text">Trim brand card status breakdown from Active/Recycle/Ready/Review to to-create count and Review count only</span></li>
+      <li><input type="checkbox" /><span class="item-text">Validate against the 3-second detection standard with the R&amp;M team during pilot</span></li>
+    </ul>
+  </div>
+
+  <h2>Phase 3 — Job Queue Dependency and Account Rules</h2>
+  <div class="phase-block">
+    <ul class="checklist">
+      <li><input type="checkbox" /><span class="item-text">Add brand-photo gate before Create Group execute can run</span></li>
+      <li><input type="checkbox" /><span class="item-text">Add Upload Photo requirement inside the Create Group modal when no brand photo exists</span></li>
+      <li><input type="checkbox" /><span class="item-text">Auto-queue Set Photo after Create Group completes, when brand photo is available</span></li>
+      <li><input type="checkbox" /><span class="item-text">Auto-queue Delete only for groups with confirmed Left status</span></li>
+      <li><input type="checkbox" /><span class="item-text">Skip and mark failed for groups where Leave did not succeed, no auto-Delete for those</span></li>
+      <li><input type="checkbox" /><span class="item-text">Add failure reason in Remark for Leave and WhatsApp Leave</span></li>
+      <li><input type="checkbox" /><span class="item-text">Re-activate Run button for failed tasks so they can be retried from the table</span></li>
+      <li><input type="checkbox" /><span class="item-text">Fix Job Queue display so the dialog closes first, then shows the result message, no abrupt reload</span></li>
+      <li><input type="checkbox" /><span class="item-text">Lock an account from Create Group selection once it has executed a Create Group task that day</span></li>
+      <li><input type="checkbox" /><span class="item-text">Filter Join Missing, Set Admin, and Leave &amp; Delete Chat lists to show only accounts not Aligned</span></li>
+    </ul>
+  </div>
+
+  <h2>Phase 4 — Telegram Mechanism</h2>
+  <div class="phase-block">
+    <p class="dep">Depends on Phase 4 group-type detection being completed before the Upgrade job is used against live data.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" /><span class="item-text">Add group-type detection field (Supergroup / Basic Group) to Scrape logic</span></li>
+      <li><input type="checkbox" /><span class="item-text">Build new Job Queue type: Upgrade to Supergroup</span></li>
+      <li><input type="checkbox" /><span class="item-text">Restrict Upgrade to Supergroup execution to accounts holding Creator rights on the target group</span></li>
+      <li><input type="checkbox" /><span class="item-text">Test Upgrade to Supergroup on a small sample of groups before wider use</span></li>
+      <li><input type="checkbox" /><span class="item-text">Run one-time check per brand: cross-check current Creator/Owner status against GM Apps records</span></li>
+      <li><input type="checkbox" /><span class="item-text">Produce output from the check: number of groups no longer usable, number of customers to migrate</span></li>
+    </ul>
+  </div>
+
+  <h2>Phase 5 — Device-Side Resilience</h2>
+  <div class="phase-block">
+    <ul class="checklist">
+      <li><input type="checkbox" /><span class="item-text">Remove the Telegram scrape quality gate that stops scrapes on many zero member counts</span></li>
+      <li><input type="checkbox" /><span class="item-text">Prioritize complete server data for member count and invite links (GetFull-first)</span></li>
+      <li><input type="checkbox" /><span class="item-text">Fix Telegram session lock so create/automation jobs do not deadlock</span></li>
+      <li><input type="checkbox" /><span class="item-text">Add WhatsApp Leave retries and fallback paths</span></li>
+      <li><input type="checkbox" /><span class="item-text">Record WhatsApp Leave failure reason in Remark instead of a bare failed status</span></li>
+    </ul>
+  </div>
+
+  <h2>Phase 6 — Pilot and Rollout</h2>
+  <div class="phase-block">
+    <ul class="checklist">
+      <li><input type="checkbox" /><span class="item-text">Select a limited set of brands for pilot</span></li>
+      <li><input type="checkbox" /><span class="item-text">Apply full restructure (Phases 1-5) to the pilot brands</span></li>
+      <li><input type="checkbox" /><span class="item-text">Monitor Create Group account lockout and Leave-to-Delete dependency closely during pilot for unexpected blocking</span></li>
+      <li><input type="checkbox" /><span class="item-text">Collect R&amp;M team feedback and metric baselines during pilot period</span></li>
+      <li><input type="checkbox" /><span class="item-text">Review pilot results against agreed metrics before extending to full account base</span></li>
+      <li><input type="checkbox" /><span class="item-text">Roll out to full account base after successful pilot review</span></li>
+    </ul>
+  </div>
+
+  <footer>
+    GM Apps Implementation Checklist · Derived from GM Apps Restructure Plan — Consolidated
+  </footer>
+
+</div>
+</body>
+</html>

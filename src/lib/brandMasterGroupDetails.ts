@@ -1,6 +1,6 @@
-import { MASTER_GROUP_SELECT } from '@/config/masterGroupColumns';
 import { TABLES } from '@/config/tables';
-import { getSupabase } from '@/lib/supabase';
+import { setOperationsStockMasterRowsForBrandPlatform } from '@/lib/operationsStockMasterCache';
+import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import type { Platform } from '@/types/database';
 
 export interface BrandMasterGroupDetailRow {
@@ -14,35 +14,31 @@ export interface BrandMasterGroupDetailRow {
   memberNonAdmin: number;
 }
 
-/** Hanya `resource_management_groups_master`. */
+/** Select modal detail — tanpa kolom `id` label yang tidak dipakai UI. */
+const DETAIL_SELECT =
+  'group_id, group_name, invite_link, last_sync, owner_count, admin_count, member_count, member_non_admin';
+
+/** Hanya `resource_management_groups_master` — paged + ORDER BY stabil. */
 export async function fetchBrandMasterGroupDetails(
   brand: string,
   platform: Platform,
 ): Promise<BrandMasterGroupDetailRow[]> {
-  const supabase = getSupabase();
-  if (!supabase) return [];
+  const rows = await fetchAllSupabaseRows<{
+    group_id: string;
+    group_name: string;
+    invite_link: string;
+    last_sync: string;
+    owner_count: number;
+    admin_count: number;
+    member_count: number;
+    member_non_admin: number;
+  }>(TABLES.groupsMaster, DETAIL_SELECT, [
+    { column: 'brand', value: brand.trim() },
+    { column: 'platform', value: platform },
+  ]);
 
-  const { data, error } = await supabase
-    .from(TABLES.groupsMaster)
-    .select(MASTER_GROUP_SELECT)
-    .eq('brand', brand.trim())
-    .eq('platform', platform)
-    .order('group_name', { ascending: true });
-
-  if (error) throw error;
-
-  return (data ?? []).map((row) => {
-    const r = row as unknown as {
-      group_id: string;
-      group_name: string;
-      invite_link: string;
-      last_sync: string;
-      owner_count: number;
-      admin_count: number;
-      member_count: number;
-      member_non_admin: number;
-    };
-    return {
+  const mapped = rows
+    .map((r) => ({
       groupId: String(r.group_id ?? '').trim(),
       groupName: (r.group_name ?? '').trim() || 'Group',
       inviteLink: (r.invite_link ?? '').trim() || null,
@@ -51,6 +47,9 @@ export async function fetchBrandMasterGroupDetails(
       adminCount: Math.max(0, Number(r.admin_count) || 0),
       memberCount: Math.max(0, Number(r.member_count) || 0),
       memberNonAdmin: Math.max(0, Number(r.member_non_admin) || 0),
-    };
-  });
+    }))
+    .sort((a, b) => a.groupName.localeCompare(b.groupName));
+
+  setOperationsStockMasterRowsForBrandPlatform(brand.trim(), platform, mapped);
+  return mapped;
 }

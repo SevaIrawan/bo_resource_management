@@ -9,7 +9,7 @@ import {
 export interface GroupStockNamingPolicy {
   /** Token brand (match case-insensitive di group_name). */
   brand: string;
-  /** Nama match → Other (junk / legacy). */
+  /** Nama match → Review (junk / legacy / blocklist). */
   blocklistPatterns: RegExp[];
   /** Prefix1 user slot (default * = any user). */
   prefix1UserToken: string;

@@ -1,5 +1,5 @@
 import { Download, Plus } from 'lucide-react';
-import { useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePermissions } from '@/hooks/usePermissions';
 import { exportAllAccountsExcel } from '@/lib/exportExcel';
@@ -7,19 +7,32 @@ import {
   type AccountSlicerFilters,
   uniqueAccountBrands,
   uniqueAccountPlatforms,
-  uniqueAccountStatuses,
 } from '@/lib/filterAccountGroups';
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import { PermissionLockedButton } from '@/components/ui/PermissionLockedButton';
 import { cn } from '@/lib/utils';
 import type {
   AccountBrandGroup,
-  AccountConnectionStatus,
   AccountViewMode,
 } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
 export type { AccountViewMode };
+
+/** Account tab — platform wajib WA atau TG (tanpa "All platforms"). */
+const ACCOUNT_PLATFORM_OPTIONS: Platform[] = ['whatsapp', 'telegram'];
+
+/** Filter Session akun — value = sessionStatus DB, label = Active/Logout. */
+const ACCOUNT_SESSION_OPTIONS: { value: string; labelKey: string }[] = [
+  { value: 'valid', labelKey: 'groupMonitoring.accountCard.sessionValid' },
+  { value: 'invalid', labelKey: 'groupMonitoring.accountCard.sessionInvalid' },
+];
+
+/** Filter Status alignment — Aligned / Not Aligned. */
+const ACCOUNT_STATUS_OPTIONS: { value: string; labelKey: string }[] = [
+  { value: 'aligned', labelKey: 'groupMonitoring.accountCard.remarkAligned' },
+  { value: 'not_aligned', labelKey: 'groupMonitoring.accountCard.remarkNotAligned' },
+];
 
 interface AccountSlicerHeaderProps {
   viewMode: AccountViewMode;
@@ -48,15 +61,6 @@ function SlicerSelect({ value, onChange, options, className }: FilterSelectProps
       triggerClassName="account-slicer-select"
     />
   );
-}
-
-function statusLabel(
-  t: (key: string) => string,
-  status: AccountConnectionStatus,
-): string {
-  return status === 'active'
-    ? t('groupMonitoring.accountCard.statusActive')
-    : t('groupMonitoring.accountCard.statusLogout');
 }
 
 function platformLabel(t: (key: string) => string, platform: Platform): string {
@@ -91,6 +95,30 @@ export function AccountSlicerHeader({
     setAccountFilters((prev) => ({ ...prev, ...partial }));
   };
 
+  const availablePlatforms = useMemo(() => uniqueAccountPlatforms(groups), [groups]);
+  const platformInitDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (platformInitDoneRef.current) return;
+    if (availablePlatforms.length === 0) return;
+
+    platformInitDoneRef.current = true;
+    const hasWhatsApp = availablePlatforms.includes('whatsapp');
+    const hasTelegram = availablePlatforms.includes('telegram');
+
+    setAccountFilters((prev) => {
+      if (prev.platform === 'whatsapp' || prev.platform === 'telegram') {
+        if (prev.platform === 'whatsapp' && !hasWhatsApp && hasTelegram) {
+          return { ...prev, platform: 'telegram' };
+        }
+        return prev;
+      }
+      if (hasWhatsApp) return { ...prev, platform: 'whatsapp' };
+      if (hasTelegram) return { ...prev, platform: 'telegram' };
+      return { ...prev, platform: 'whatsapp' };
+    });
+  }, [availablePlatforms, setAccountFilters]);
+
   const brandOptions = useMemo(() => {
     const brands = uniqueAccountBrands(groups);
     return [
@@ -99,27 +127,36 @@ export function AccountSlicerHeader({
     ];
   }, [groups, t]);
 
-  const platformOptions = useMemo(() => {
-    const platforms = uniqueAccountPlatforms(groups);
-    return [
-      { value: 'all', label: t('groupMonitoring.filters.allPlatforms') },
-      ...platforms.map((value) => ({
+  const platformOptions = useMemo(
+    () =>
+      ACCOUNT_PLATFORM_OPTIONS.map((value) => ({
         value,
         label: platformLabel(t, value),
       })),
-    ];
-  }, [groups, t]);
+    [t],
+  );
 
-  const statusOptions = useMemo(() => {
-    const statuses = uniqueAccountStatuses(groups);
-    return [
-      { value: 'all', label: t('groupMonitoring.filters.allStatus') },
-      ...statuses.map((value) => ({
+  const sessionOptions = useMemo(
+    () => [
+      { value: 'all', label: t('groupMonitoring.filters.allSession') },
+      ...ACCOUNT_SESSION_OPTIONS.map(({ value, labelKey }) => ({
         value,
-        label: statusLabel(t, value),
+        label: t(labelKey),
       })),
-    ];
-  }, [groups, t]);
+    ],
+    [t],
+  );
+
+  const statusOptions = useMemo(
+    () => [
+      { value: 'all', label: t('groupMonitoring.filters.allStatus') },
+      ...ACCOUNT_STATUS_OPTIONS.map(({ value, labelKey }) => ({
+        value,
+        label: t(labelKey),
+      })),
+    ],
+    [t],
+  );
 
   return (
     <div className="account-slicer-row">
@@ -157,6 +194,11 @@ export function AccountSlicerHeader({
             value={accountFilters.platform}
             onChange={(platform) => patchFilters({ platform })}
             options={platformOptions}
+          />
+          <SlicerSelect
+            value={accountFilters.session}
+            onChange={(session) => patchFilters({ session })}
+            options={sessionOptions}
           />
           <SlicerSelect
             value={accountFilters.status}

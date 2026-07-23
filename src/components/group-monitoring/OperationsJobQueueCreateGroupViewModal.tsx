@@ -24,6 +24,7 @@ import type { AutomationJobRecord } from '@/types/automationJob';
 interface OperationsJobQueueCreateGroupViewModalProps {
   job: AutomationJobRecord;
   allJobs?: AutomationJobRecord[];
+  open?: boolean;
   onClose: () => void;
   onQueueSetPhotoFromCreate?: (
     createJobId: string,
@@ -72,6 +73,7 @@ function renderCell(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumn
 export function OperationsJobQueueCreateGroupViewModal({
   job,
   allJobs = [],
+  open = true,
   onClose,
   onQueueSetPhotoFromCreate,
 }: OperationsJobQueueCreateGroupViewModalProps) {
@@ -126,7 +128,7 @@ export function OperationsJobQueueCreateGroupViewModal({
     : t('operations.jobQueue.createViewQueueSetPhoto');
 
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot open={open} onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--job-queue-detail brand-modal-panel--job-queue-create-view"
         role="dialog"

@@ -4,19 +4,23 @@ import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
 export function computeAccountKpis(groups: AccountBrandGroup[]): KpiItem[] {
   const brands = groups.length;
   const accounts = groups.reduce((n, g) => n + g.accounts.length, 0);
-  const active = groups.reduce(
-    (n, g) => n + g.accounts.filter((a) => a.sessionStatus === 'valid').length,
+  const logout = groups.reduce(
+    (n, g) => n + g.accounts.filter((a) => a.sessionStatus === 'invalid').length,
     0,
   );
-  const aligned = groups.reduce(
-    (n, g) => n + g.accounts.filter((a) => !a.isMisaligned && a.syncState === 'synced').length,
+  const notAligned = groups.reduce(
+    (n, g) => n + g.accounts.filter((a) => a.isMisaligned).length,
     0,
   );
 
   return [
     { value: brands, labelKey: 'kpi.account.brands' },
     { value: accounts, labelKey: 'kpi.account.accounts' },
-    { value: active, labelKey: 'kpi.account.active', tone: 'success' },
-    { value: aligned, labelKey: 'kpi.account.aligned', tone: 'success' },
+    { value: logout, labelKey: 'kpi.account.logout', tone: logout > 0 ? 'danger' : 'default' },
+    {
+      value: notAligned,
+      labelKey: 'kpi.account.notAligned',
+      tone: notAligned > 0 ? 'danger' : 'default',
+    },
   ];
 }

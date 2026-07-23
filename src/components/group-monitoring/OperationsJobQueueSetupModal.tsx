@@ -9,6 +9,8 @@ import {
 import { collectCreateGroupSetupValidationCodes } from '@/lib/createGroupSetupValidation';
 import {
   brandGroupPhotoPreviewUrl,
+  ensureLocalBrandGroupPhoto,
+  pickAndSaveBrandGroupPhoto,
   resolveBrandGroupPhotoPath,
 } from '@/lib/brandGroupPhotoClient';
 import { parseJoinImportFile } from '@/lib/parseCsvJoinImport';
@@ -56,12 +58,21 @@ export interface JobQueueSetAdminDraft {
 interface OperationsJobQueueSetupModalProps {
   open: boolean;
   onClose: () => void;
+  onExited?: () => void;
+  onSaved?: (message: string) => void;
   taskType: JobQueueTaskType;
   platform: Platform;
   activeBrand: string;
   selectedAccounts: AccountBrandRow[];
   superAdminAccount: AccountBrandRow | undefined;
   targetAccountCandidates: AccountBrandRow[];
+  /** Bila diisi — tampilkan pilih OWNER/ADMIN di modal (Account CTA Set admin). */
+  ownerAccountCandidates?: AccountBrandRow[];
+  selectedOwnerAccountId?: string;
+  onOwnerAccountChange?: (accountId: string) => void;
+  preferredSetAdminTargetId?: string;
+  preferredExitGroupTab?: 'daily' | 'junk';
+  preferredMasterListExpanded?: boolean;
   joinableGroups: MissingMasterGroupForJoin[];
   joinGroupAccountIds: Record<string, string[]>;
   loadingJoinGroups: boolean;
@@ -127,12 +138,20 @@ function CreateSetupSwitchRow({
 export function OperationsJobQueueSetupModal({
   open,
   onClose,
+  onExited,
+  onSaved,
   taskType,
   platform,
   activeBrand,
   selectedAccounts,
   superAdminAccount,
   targetAccountCandidates,
+  ownerAccountCandidates,
+  selectedOwnerAccountId,
+  onOwnerAccountChange,
+  preferredSetAdminTargetId,
+  preferredExitGroupTab,
+  preferredMasterListExpanded,
   joinableGroups,
   joinGroupAccountIds,
   loadingJoinGroups,
@@ -157,6 +176,8 @@ export function OperationsJobQueueSetupModal({
   const [dragOver, setDragOver] = useState(false);
   const [joinActiveSource, setJoinActiveSource] = useState<'none' | 'csv' | 'master'>('none');
   const [joinSwitchConfirmPending, setJoinSwitchConfirmPending] = useState(false);
+  const [joinGroupQuery, setJoinGroupQuery] = useState('');
+  const [exitGroupQuery, setExitGroupQuery] = useState('');
   const csvFileRef = useRef<HTMLInputElement>(null);
   const [createGroupName, setCreateGroupName] = useState('');
   const [createTotalToCreate, setCreateTotalToCreate] = useState('10');
@@ -183,8 +204,23 @@ export function OperationsJobQueueSetupModal({
   const [createPhotoPath, setCreatePhotoPath] = useState<string | null>(null);
   const [createPhotoPreviewUrl, setCreatePhotoPreviewUrl] = useState<string | null>(null);
   const [createPhotoLoading, setCreatePhotoLoading] = useState(false);
+  const [createPhotoUploading, setCreatePhotoUploading] = useState(false);
+  const [createPhotoError, setCreatePhotoError] = useState<string | null>(null);
 
   const createTotalParsed = Math.max(1, Math.min(500, Math.floor(Number(createTotalToCreate)) || 1));
+
+  const setAdminOwnerOptions = useMemo(
+    () => (ownerAccountCandidates ?? []).map((row) => ({ value: row.id, label: row.accountName })),
+    [ownerAccountCandidates],
+  );
+
+  const setAdminOwnerDisabledIds = useMemo(
+    () =>
+      (ownerAccountCandidates ?? [])
+        .filter((row) => row.sessionStatus !== 'valid' || !row.phoneNumber?.trim())
+        .map((row) => row.id),
+    [ownerAccountCandidates],
+  );
 
   const setAdminTargetOptions = useMemo(
     () => targetAccountCandidates.map((row) => ({ value: row.id, label: row.accountName })),
@@ -199,7 +235,7 @@ export function OperationsJobQueueSetupModal({
     [targetAccountCandidates],
   );
 
-  const visibleJoinGroups = useMemo(() => {
+  const eligibleJoinGroups = useMemo(() => {
     const accountIds = new Set(selectedAccounts.map((row) => row.id));
     if (accountIds.size === 0) return [];
     return joinableGroups.filter((group) => {
@@ -207,6 +243,16 @@ export function OperationsJobQueueSetupModal({
       return eligible.some((id) => accountIds.has(id));
     });
   }, [joinGroupAccountIds, joinableGroups, selectedAccounts]);
+
+  const visibleJoinGroups = useMemo(() => {
+    const q = joinGroupQuery.trim().toLowerCase();
+    if (!q) return eligibleJoinGroups;
+    return eligibleJoinGroups.filter((group) => {
+      const name = group.groupName.toLowerCase();
+      const id = group.groupId.toLowerCase();
+      return name.includes(q) || id.includes(q);
+    });
+  }, [eligibleJoinGroups, joinGroupQuery]);
 
   const allJoinGroupsSelected =
     visibleJoinGroups.length > 0 &&
@@ -216,9 +262,19 @@ export function OperationsJobQueueSetupModal({
     eligibleSetAdminGroups.length > 0 &&
     eligibleSetAdminGroups.every((group) => selectedSetAdminGroupIds.has(group.groupId));
 
-  const visibleExitGroups = useMemo((): AccountDailyGroupForLeaveDelete[] => {
+  const exitGroupsForTab = useMemo((): AccountDailyGroupForLeaveDelete[] => {
     return exitGroupTab === 'daily' ? accountExitGroups.daily : accountExitGroups.junk;
   }, [accountExitGroups.daily, accountExitGroups.junk, exitGroupTab]);
+
+  const visibleExitGroups = useMemo((): AccountDailyGroupForLeaveDelete[] => {
+    const q = exitGroupQuery.trim().toLowerCase();
+    if (!q) return exitGroupsForTab;
+    return exitGroupsForTab.filter((group) => {
+      const name = group.groupName.toLowerCase();
+      const id = group.groupId.toLowerCase();
+      return name.includes(q) || id.includes(q);
+    });
+  }, [exitGroupQuery, exitGroupsForTab]);
 
   const exitGroupPageCount = Math.max(
     1,
@@ -306,20 +362,36 @@ export function OperationsJobQueueSetupModal({
     loadCreateGroupPermissionDefaultsFromSettings();
     setSelectedSetAdminGroupIds(new Set());
     setSelectedLeaveDeleteGroupIds(new Set());
-    setExitGroupTab('daily');
+    setExitGroupTab(preferredExitGroupTab === 'junk' ? 'junk' : 'daily');
     setExitGroupPage(1);
     setExitGroupProcessedAlertOpen(false);
-    setSelectedSetAdminTargetAccountId('');
+    const preferredOk =
+      preferredSetAdminTargetId &&
+      targetAccountCandidates.some((row) => row.id === preferredSetAdminTargetId);
+    setSelectedSetAdminTargetAccountId(preferredOk ? preferredSetAdminTargetId : '');
     setEligibleSetAdminGroups([]);
     setCreatePhotoPath(null);
     setCreatePhotoPreviewUrl(null);
+    setCreatePhotoError(null);
     setCsvValidatedRows([]);
     setCsvLoading(false);
-    setMasterListExpanded(false);
+    setMasterListExpanded(Boolean(preferredMasterListExpanded));
     setDragOver(false);
+    /** CTA Join Missing: expand master, tapi CSV tetap aktif (jangan lock ke master). */
     setJoinActiveSource('none');
     setJoinSwitchConfirmPending(false);
-  }, [open, taskType, activeBrand, platform]);
+    setJoinGroupQuery('');
+    setExitGroupQuery('');
+  }, [
+    open,
+    taskType,
+    activeBrand,
+    platform,
+    preferredExitGroupTab,
+    preferredSetAdminTargetId,
+    preferredMasterListExpanded,
+    targetAccountCandidates,
+  ]);
 
   const processJoinImportFile = useCallback(async (file: File) => {
     setCsvLoading(true);
@@ -373,25 +445,62 @@ export function OperationsJobQueueSetupModal({
     if (!open || taskType !== 'create_group' || !activeBrand) return;
     let cancelled = false;
     setCreatePhotoLoading(true);
-    void resolveBrandGroupPhotoPath(activeBrand).then(async (result) => {
-      if (cancelled) return;
-      if (result.ok) {
-        setCreatePhotoPath(result.path);
-        const url = await brandGroupPhotoPreviewUrl(result.path);
+    setCreatePhotoError(null);
+    void (async () => {
+      try {
+        const result = await resolveBrandGroupPhotoPath(activeBrand);
+        if (cancelled) return;
+        if (!result.ok) {
+          setCreatePhotoPath(null);
+          setCreatePhotoPreviewUrl(null);
+          return;
+        }
+
+        const localPath = result.path.startsWith('http')
+          ? await ensureLocalBrandGroupPhoto(activeBrand)
+          : result.path;
+        if (cancelled) return;
+
+        const pathForJob = localPath ?? result.path;
+        setCreatePhotoPath(pathForJob);
+        const url = await brandGroupPhotoPreviewUrl(pathForJob);
         if (!cancelled) setCreatePhotoPreviewUrl(url);
-      } else {
-        setCreatePhotoPath(null);
-        setCreatePhotoPreviewUrl(null);
+      } finally {
+        if (!cancelled) setCreatePhotoLoading(false);
       }
-    }).finally(() => {
-      if (!cancelled) setCreatePhotoLoading(false);
-    });
-    return () => { cancelled = true; };
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open, taskType, activeBrand]);
+
+  async function handleCreateBrandPhotoUpload(): Promise<void> {
+    if (!activeBrand.trim() || createPhotoUploading || saving) return;
+    setCreatePhotoUploading(true);
+    setCreatePhotoError(null);
+    try {
+      const result = await pickAndSaveBrandGroupPhoto(activeBrand);
+      if (!result.ok) {
+        if (result.error === 'CANCELLED') return;
+        setCreatePhotoError(
+          result.error === 'DESKTOP_REQUIRED'
+            ? t('admin.brandPhoto.uploadDesktopRequired')
+            : t('admin.brandPhoto.uploadFailed'),
+        );
+        return;
+      }
+      setCreatePhotoPath(result.path);
+      const url =
+        result.dataUrl ?? (await brandGroupPhotoPreviewUrl(result.path));
+      setCreatePhotoPreviewUrl(url);
+    } finally {
+      setCreatePhotoUploading(false);
+    }
+  }
 
   useEffect(() => {
     setExitGroupPage(1);
-  }, [exitGroupTab]);
+  }, [exitGroupTab, exitGroupQuery]);
 
   useEffect(() => {
     if (exitGroupPage > exitGroupPageCount) {
@@ -450,8 +559,6 @@ export function OperationsJobQueueSetupModal({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose, open, saving]);
-
-  if (!open) return null;
 
   function switchToMasterSource() {
     setJoinActiveSource('master');
@@ -628,6 +735,9 @@ export function OperationsJobQueueSetupModal({
       return;
     }
     onClose();
+    if (onSaved) {
+      requestAnimationFrame(() => onSaved(message));
+    }
   }
 
   const modalTitle =
@@ -696,7 +806,7 @@ export function OperationsJobQueueSetupModal({
 
   return (
     <>
-    <BrandModalRoot onBackdropClick={saving ? undefined : onClose}>
+    <BrandModalRoot open={open} onBackdropClick={saving ? undefined : onClose} onExited={onExited}>
       <div
         className={`brand-modal-panel brand-modal-panel--job-queue-setup ${setupModeClass}`}
         role="dialog"
@@ -763,12 +873,11 @@ export function OperationsJobQueueSetupModal({
         <div className="brand-modal-form operations-job-queue-setup-modal-body">
           {taskType === 'join' ? (
             <div className="operations-job-queue-setup-form operations-job-queue-setup-form--join">
-              {/* Drop zone — primary import action */}
+              {/* Drop zone — Import CSV hanya untuk Join Missing */}
               <div
                 className={cn(
                   'operations-job-queue-dropzone',
                   dragOver && 'operations-job-queue-dropzone--dragover',
-                  joinActiveSource === 'master' && 'operations-job-queue-dropzone--inactive',
                 )}
                 onClick={() => csvFileRef.current?.click()}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -862,12 +971,24 @@ export function OperationsJobQueueSetupModal({
                   <ChevronRight className="operations-job-queue-master-accordion__chevron" size={14} />
                   <span>
                     {t('operations.jobQueue.csvMasterAccordion', {
-                      count: String(visibleJoinGroups.length),
+                      count: String(eligibleJoinGroups.length),
                     })}
                   </span>
                 </button>
 
                 {masterListExpanded ? (
+                  <>
+                    <div className="operations-job-queue-group-search">
+                      <input
+                        type="search"
+                        value={joinGroupQuery}
+                        onChange={(event) => setJoinGroupQuery(event.target.value)}
+                        placeholder={t('operations.jobQueue.groupListSearchPlaceholder')}
+                        className="operations-job-queue-group-search-input"
+                        disabled={saving || loadingJoinGroups}
+                        aria-label={t('operations.jobQueue.groupListSearchPlaceholder')}
+                      />
+                    </div>
                   <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
                     <table className="operations-job-queue-table operations-job-queue-table--missing">
                       <thead>
@@ -897,7 +1018,9 @@ export function OperationsJobQueueSetupModal({
                         ) : visibleJoinGroups.length === 0 ? (
                           <tr>
                             <td colSpan={2} className="operations-job-queue-empty">
-                              {t('operations.jobQueue.noMissingGroups')}
+                              {joinGroupQuery.trim()
+                                ? t('operations.jobQueue.noGroupSearchMatch')
+                                : t('operations.jobQueue.noMissingGroups')}
                             </td>
                           </tr>
                         ) : (
@@ -919,6 +1042,7 @@ export function OperationsJobQueueSetupModal({
                       </tbody>
                     </table>
                   </div>
+                  </>
                 ) : null}
               </div>
 
@@ -1054,15 +1178,17 @@ export function OperationsJobQueueSetupModal({
 
                 <div className="operations-job-queue-create-column">
                   <h4 className="operations-job-queue-create-card__title">
-                    {t('admin.brandPhoto.previewCard')}
+                    {createPhotoPreviewUrl && createPhotoPath
+                      ? t('admin.brandPhoto.previewCard')
+                      : t('admin.brandPhoto.uploadCard')}
                     <span className="operations-job-queue-required-mark" aria-hidden="true"> *</span>
                   </h4>
                   <section className="operations-job-queue-create-card operations-job-queue-create-card--photo">
-                    {createPhotoLoading ? (
+                    {createPhotoLoading || createPhotoUploading ? (
                       <div className="operations-job-queue-photo-loading">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                       </div>
-                    ) : createPhotoPreviewUrl ? (
+                    ) : createPhotoPreviewUrl && createPhotoPath ? (
                       <div className="operations-job-queue-photo-preview">
                         <img
                           src={createPhotoPreviewUrl}
@@ -1074,11 +1200,36 @@ export function OperationsJobQueueSetupModal({
                       <div className="operations-job-queue-photo-empty">
                         <ImagePlus className="operations-job-queue-photo-empty__icon" size={24} />
                         <p className="operations-job-queue-photo-empty__caption">
-                          {t('admin.brandPhoto.brandNotAvailable')}
+                          {t('admin.brandPhoto.createUploadRequired')}
                         </p>
+                        <button
+                          type="button"
+                          className="operations-job-queue-photo-upload-btn operations-job-queue-photo-upload-btn--primary"
+                          disabled={saving || !activeBrand.trim()}
+                          onClick={() => void handleCreateBrandPhotoUpload()}
+                        >
+                          {t('admin.brandPhoto.upload')}
+                        </button>
                       </div>
                     )}
                   </section>
+                  {createPhotoPreviewUrl && createPhotoPath ? (
+                    <div className="operations-job-queue-photo-below">
+                      <button
+                        type="button"
+                        className="operations-job-queue-photo-upload-btn"
+                        disabled={saving || createPhotoUploading || !activeBrand.trim()}
+                        onClick={() => void handleCreateBrandPhotoUpload()}
+                      >
+                        {t('admin.brandPhoto.change')}
+                      </button>
+                    </div>
+                  ) : null}
+                  {createPhotoError ? (
+                    <p className="operations-job-queue-error" role="alert">
+                      {createPhotoError}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1089,6 +1240,30 @@ export function OperationsJobQueueSetupModal({
               <p className="operations-job-queue-form-note">
                 {t('operations.jobQueue.setAdminHint')}
               </p>
+              {ownerAccountCandidates && onOwnerAccountChange ? (
+                <div className="operations-job-queue-field">
+                  <span>{t('operations.jobQueue.setAdminSuperAccount')}</span>
+                  {setAdminOwnerOptions.length === 0 ? (
+                    <span className="operations-schedule-join-empty">
+                      {t('operations.jobQueue.noAccounts')}
+                    </span>
+                  ) : (
+                    <DarkSelect
+                      value={selectedOwnerAccountId ?? ''}
+                      onChange={(value) => {
+                        onOwnerAccountChange(value);
+                        setSelectedSetAdminGroupIds(new Set());
+                      }}
+                      options={setAdminOwnerOptions}
+                      disabledValues={setAdminOwnerDisabledIds}
+                      ariaLabel={t('operations.jobQueue.setAdminSuperAccount')}
+                      triggerClassName="account-slicer-select operations-job-queue-select"
+                      disabled={saving}
+                      placeholder={t('operations.jobQueue.selectAccount')}
+                    />
+                  )}
+                </div>
+              ) : null}
               <div className="operations-job-queue-field">
                 <span>{t('operations.jobQueue.setAdminTargetAccounts')}</span>
                 {setAdminTargetOptions.length === 0 ? (
@@ -1104,7 +1279,7 @@ export function OperationsJobQueueSetupModal({
                     disabledValues={setAdminTargetDisabledIds}
                     ariaLabel={t('operations.jobQueue.setAdminTargetAccounts')}
                     triggerClassName="account-slicer-select operations-job-queue-select"
-                    disabled={saving}
+                    disabled={saving || (Boolean(ownerAccountCandidates) && !superAdminAccount)}
                     placeholder={t('operations.jobQueue.selectAccount')}
                   />
                 )}
@@ -1138,6 +1313,12 @@ export function OperationsJobQueueSetupModal({
                         <td colSpan={2} className="operations-job-queue-empty">
                           <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
                           {t('operations.jobQueue.loadingMissing')}
+                        </td>
+                      </tr>
+                    ) : ownerAccountCandidates && !superAdminAccount ? (
+                      <tr>
+                        <td colSpan={2} className="operations-job-queue-empty">
+                          {t('operations.jobQueue.setAdminSelectOwnerFirst')}
                         </td>
                       </tr>
                     ) : !selectedSetAdminTargetAccountId ? (
@@ -1181,6 +1362,17 @@ export function OperationsJobQueueSetupModal({
                   ? t('operations.jobQueue.exitTabDailyCaption')
                   : t('operations.jobQueue.exitTabJunkCaption')}
               </p>
+              <div className="operations-job-queue-group-search">
+                <input
+                  type="search"
+                  value={exitGroupQuery}
+                  onChange={(event) => setExitGroupQuery(event.target.value)}
+                  placeholder={t('operations.jobQueue.groupListSearchPlaceholder')}
+                  className="operations-job-queue-group-search-input"
+                  disabled={saving || loadingAccountDailyGroups}
+                  aria-label={t('operations.jobQueue.groupListSearchPlaceholder')}
+                />
+              </div>
               <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--paged">
                 <table className="operations-job-queue-table operations-job-queue-table--missing operations-job-queue-table--exit-groups">
                   <colgroup>
@@ -1222,9 +1414,11 @@ export function OperationsJobQueueSetupModal({
                     ) : visibleExitGroups.length === 0 ? (
                       <tr>
                         <td colSpan={3} className="operations-job-queue-empty">
-                          {exitGroupTab === 'daily'
-                            ? t('operations.jobQueue.noExitDailyGroups')
-                            : t('operations.jobQueue.noExitJunkGroups')}
+                          {exitGroupQuery.trim()
+                            ? t('operations.jobQueue.noGroupSearchMatch')
+                            : exitGroupTab === 'daily'
+                              ? t('operations.jobQueue.noExitDailyGroups')
+                              : t('operations.jobQueue.noExitJunkGroups')}
                         </td>
                       </tr>
                     ) : (
@@ -1357,8 +1551,10 @@ export function OperationsJobQueueSetupModal({
       </div>
     </BrandModalRoot>
 
-    {exitGroupProcessedAlertOpen ? (
-      <BrandModalRoot onBackdropClick={() => setExitGroupProcessedAlertOpen(false)}>
+    <BrandModalRoot
+      open={exitGroupProcessedAlertOpen}
+      onBackdropClick={() => setExitGroupProcessedAlertOpen(false)}
+    >
         <div
           className="brand-modal-panel brand-modal-panel--sync"
           role="alertdialog"
@@ -1393,7 +1589,6 @@ export function OperationsJobQueueSetupModal({
           </div>
         </div>
       </BrandModalRoot>
-    ) : null}
     </>
   );
 }

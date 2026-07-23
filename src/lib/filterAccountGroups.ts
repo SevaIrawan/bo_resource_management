@@ -8,13 +8,17 @@ import type { Platform } from '@/types/database';
 export interface AccountSlicerFilters {
   brand: string;
   platform: string;
+  /** Filter Session akun: 'all' | 'valid' (Active) | 'invalid' (Logout). */
+  session: string;
+  /** Filter alignment: 'all' | 'aligned' | 'not_aligned'. */
   status: string;
   search: string;
 }
 
 export const ACCOUNT_FILTER_DEFAULT: AccountSlicerFilters = {
   brand: 'all',
-  platform: 'all',
+  platform: 'whatsapp',
+  session: 'all',
   status: 'all',
   search: '',
 };
@@ -76,7 +80,9 @@ export function filterAccountGroups(
     .map((group) => {
       const accounts = group.accounts.filter((row) => {
         if (filters.platform !== 'all' && row.platform !== filters.platform) return false;
-        if (filters.status !== 'all' && row.status !== filters.status) return false;
+        if (filters.session !== 'all' && row.sessionStatus !== filters.session) return false;
+        if (filters.status === 'aligned' && row.isMisaligned) return false;
+        if (filters.status === 'not_aligned' && !row.isMisaligned) return false;
         if (q && !rowMatchesSearch(row, group, q)) return false;
         return true;
       });

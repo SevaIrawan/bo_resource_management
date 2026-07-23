@@ -18,10 +18,8 @@ export function GroupLinksPickerModal({
 }: GroupLinksPickerModalProps) {
   const { t } = useLanguage();
 
-  if (!open) return null;
-
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot open={open} onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--group-links-picker"
         role="dialog"

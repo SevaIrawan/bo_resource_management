@@ -1,7 +1,7 @@
 import { dedupeDailyRowsByGroupIdKeepLatest } from '@/lib/dedupeScrapeDaily';
 import type { CompareDailyRow, CompareMasterRow } from '@/lib/accountMasterDailyCompare';
 import { TABLES } from '@/config/tables';
-import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
+import { fetchAllSupabaseRows, SUPABASE_FETCH_PAGE_SIZE } from '@/lib/supabasePagedSelect';
 import { getSupabase } from '@/lib/supabase';
 import type { Platform } from '@/types/database';
 
@@ -102,7 +102,6 @@ export async function warmMasterDailyLoadCache(
 }
 
 const DAILY_IN_CHUNK = 40;
-const DAILY_PAGE_SIZE = 5000;
 
 async function fetchDailyRowsForAccounts(accountIds: string[]): Promise<DailyRowRaw[]> {
   const supabase = getSupabase();
@@ -113,17 +112,21 @@ async function fetchDailyRowsForAccounts(accountIds: string[]): Promise<DailyRow
     const chunk = accountIds.slice(i, i + DAILY_IN_CHUNK);
     let from = 0;
     for (;;) {
-      const to = from + DAILY_PAGE_SIZE - 1;
+      const to = from + SUPABASE_FETCH_PAGE_SIZE - 1;
       const { data, error } = await supabase
         .from(TABLES.groupScrapeDaily)
         .select('account_id, group_id, group_name, invite_link, is_admin, scraped_at')
         .in('account_id', chunk)
+        .order('account_id', { ascending: true })
+        .order('group_id', { ascending: true })
+        .order('scrape_date', { ascending: true })
+        .order('id', { ascending: true })
         .range(from, to);
       if (error) throw error;
       const page = (data ?? []) as DailyRowRaw[];
       rows.push(...page);
-      if (page.length < DAILY_PAGE_SIZE) break;
-      from += DAILY_PAGE_SIZE;
+      if (page.length < SUPABASE_FETCH_PAGE_SIZE) break;
+      from += SUPABASE_FETCH_PAGE_SIZE;
     }
   }
   return rows;

@@ -809,7 +809,145 @@ table td {
   margin-inline: auto;
 }
 
+/* Exact single-file replica of src/components/ui/DarkSelect.tsx */
+.wf-native-select{display:none!important}
+.dark-select-wrap{position:relative;display:inline-flex;flex-shrink:0;align-items:center}
+.dark-select-trigger{display:inline-flex;align-items:center;justify-content:space-between;gap:.375rem;height:2rem;min-width:6.75rem;border:1px solid rgba(255,255,255,.08);border-radius:.375rem;background:rgba(0,0,0,.22);padding:0 .5rem 0 .625rem;font-size:.75rem;font-weight:500;line-height:1.25;color:var(--color-text-primary);cursor:pointer;outline:none;transition:border-color 160ms ease,background-color 160ms ease}
+.dark-select-trigger:hover,.dark-select-trigger:focus-visible{border-color:rgba(255,255,255,.14);background:rgba(0,0,0,.32)}
+.dark-select-trigger:disabled{cursor:not-allowed;opacity:.5}
+.dark-select-trigger-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dark-select-trigger-label--placeholder{color:var(--color-text-muted)}
+.dark-select-trigger-icon{width:.875rem;height:.875rem;flex-shrink:0;color:var(--color-text-muted);transition:transform 160ms ease}
+.dark-select-trigger-icon--open{transform:rotate(180deg)}
+.dark-select-menu{position:absolute;top:calc(100% + .25rem);left:0;z-index:100;min-width:100%;width:max-content;max-width:min(20rem,100vw);margin:0;padding:.25rem;list-style:none;border-radius:.375rem;border:1px solid rgba(255,255,255,.12);background:#1a1b26;box-shadow:0 10px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top center;pointer-events:none;transition:opacity 160ms ease,transform 160ms ease}
+.dark-select-menu--open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.dark-select-menu--drop-up{top:auto;bottom:calc(100% + .25rem);transform:translateY(6px) scale(.98);transform-origin:bottom center}
+.dark-select-menu--drop-up.dark-select-menu--open{transform:translateY(0) scale(1)}
+.dark-select-menu-item{display:block;width:100%;border:0;border-radius:.25rem;background:transparent;padding:.4375rem .625rem;font-size:.75rem;font-weight:500;line-height:1.25;color:var(--color-text-secondary);text-align:left;white-space:nowrap;cursor:pointer;transition:background-color 160ms ease,color 160ms ease}
+.dark-select-menu-item:hover{background:rgba(255,255,255,.08);color:var(--color-text-primary)}
+.dark-select-menu-item--active{background:rgba(59,130,246,.22);color:var(--color-text-primary)}
+.dark-select-menu-item--disabled{opacity:.45;cursor:not-allowed}
+.dark-select-menu-item--disabled:hover{background:transparent;color:var(--color-text-secondary)}
+.operations-job-queue-field .dark-select-wrap{width:auto;max-width:100%}
+.operations-job-queue-field .dark-select-trigger.operations-job-queue-select{width:100%;min-width:0;max-width:100%;height:2.25rem;font-size:.8125rem}
+.operations-job-queue-add-filters .dark-select-menu{min-width:100%}
+.matrix-filter .dark-select-trigger{height:1.5rem;min-width:3.5rem;padding:0 .375rem;font-size:.625rem}
+.matrix-filter .dark-select-menu-item{font-size:.6875rem}
+
 .app-root{padding-top:0}
+
+/* Current-project parity overrides — Account + Operations only */
+.monitoring-tabs{display:flex;align-items:center;gap:4px}
+.content-area-body{padding:12px;overflow:auto}
+.brand-card-header{min-height:48px;padding:8px 12px}
+.brand-card-header-toggle{min-width:0}
+.brand-card-title{font-size:12px}
+.brand-card-header-actions{gap:6px}
+.brand-add-account-menu{position:relative}.brand-add-account-popover{display:none;position:absolute;top:calc(100% + .25rem);right:0;z-index:80;min-width:9rem;border:1px solid rgba(255,255,255,.12);border-radius:.375rem;background:#1a1b26;padding:.25rem;box-shadow:0 10px 28px rgba(0,0,0,.45)}.brand-add-account-menu.is-open .brand-add-account-popover{display:flex;flex-direction:column}.brand-add-account-popover>span{padding:.35rem .5rem;font-size:.625rem;color:var(--color-text-muted)}.brand-add-account-popover button{display:flex;align-items:center;gap:.5rem;border-radius:.25rem;padding:.4375rem .5rem;font-size:.75rem;color:var(--color-text-secondary);text-align:left}.brand-add-account-popover button:hover{background:rgba(255,255,255,.08);color:#fff}.brand-add-account-popover img{width:.875rem;height:.875rem}
+.brand-card-badge--platform-summary{gap:4px}
+.brand-card-badge-group-btn{display:inline-flex;gap:3px;color:inherit;text-decoration:underline;text-underline-offset:2px}
+.brand-card-header-meta{display:inline-flex;align-items:center;gap:10px;margin-left:12px;font-size:10px;color:var(--color-text-muted)}
+.brand-card-header-meta strong{color:var(--color-text-secondary);font-weight:500}
+.account-brand-stock-chips{display:flex;align-items:center;gap:4px}
+.account-brand-stock-chip{display:inline-flex;height:24px;align-items:center;gap:4px;border:1px solid var(--color-border-subtle);border-radius:999px;padding:0 8px;font-size:10px;background:rgba(255,255,255,.025)}
+.account-brand-stock-chip:hover{filter:brightness(1.16)}
+.account-brand-stock-chip--active{color:#37dc80;border-color:rgba(37,211,102,.35);background:rgba(37,211,102,.08)}
+.account-brand-stock-chip--ready{color:#6aa7ff;border-color:rgba(59,130,246,.35);background:rgba(59,130,246,.08)}
+.account-brand-stock-chip--recycle{color:#fbbf24;border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
+.account-brand-stock-chip--review{color:#fb923c;border-color:rgba(249,115,22,.35);background:rgba(249,115,22,.08)}
+.account-brand-stock-chip-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.brand-card-table{table-layout:fixed}
+.brand-card-table th,.brand-card-table td{padding:7px 8px;font-size:10px}
+.brand-card-table th:first-child,.brand-card-table td:first-child{text-align:left!important}
+.brand-card-table th:not(:first-child),.brand-card-table td:not(:first-child){text-align:center!important}
+.details-group-btn{white-space:nowrap}
+.session-pill{display:inline-flex;border-radius:999px;padding:2px 7px;font-size:9px;font-weight:700;text-transform:uppercase}
+.session-pill.session-valid{background:rgba(37,211,102,.13)}
+.session-pill.session-invalid{background:rgba(239,68,68,.13)}
+.brand-col--account{width:25%}.brand-col--location{width:9%}.brand-col--session{width:9%}.brand-col--on-device{width:9%}.brand-col--in-brand{width:9%}.brand-col--admin{width:18%}.brand-col--last-update{width:12%}.brand-col--action{width:9%}
+.operations-job-queue-only{display:flex;flex:1;min-height:0;height:100%;width:100%;flex-direction:column;gap:12px;overflow:hidden}
+.operations-job-queue-zone--add{flex:0 0 auto}
+.operations-job-queue-zone--table{display:flex;flex:1 1 0;min-height:0;width:100%;flex-direction:column;overflow:hidden}
+.operations-job-queue-zone--table .operations-job-queue-table-wrap{flex:1;min-height:0;overflow:auto}
+.operations-job-queue-zone--table .operations-job-queue-table thead th{position:sticky;top:0;z-index:2}
+.operations-job-queue-empty{display:flex;flex:1;align-items:flex-start;padding:14px;color:var(--color-text-muted)}
+.operations-job-queue-zone{padding:12px 14px}
+.brand-modal-panel--job-queue-setup{display:flex!important;width:min(54rem,calc(100vw - 2.5rem))!important;max-width:calc(100vw - 2.5rem)!important;max-height:min(85vh,720px)!important;flex-direction:column;overflow:hidden!important}
+.brand-modal-panel--job-queue-setup>.modal-body{min-height:0;overflow:auto}
+.job-setup-subtitle{margin:0 0 .75rem;font-size:.75rem;color:var(--color-text-muted)}
+.job-setup-hint{margin:.5rem 0;font-size:.75rem;line-height:1.45;color:var(--color-text-muted)}
+.job-setup-dropzone{display:flex;min-height:5rem;align-items:center;justify-content:center;flex-direction:column;gap:.25rem;border:1px dashed rgba(148,163,184,.38);border-radius:.5rem;background:rgba(255,255,255,.02);font-size:.75rem;color:var(--color-text-secondary);cursor:pointer}.job-setup-dropzone span{font-size:.6875rem;color:var(--color-text-muted)}
+.job-setup-accordion{margin-top:.75rem;border:1px solid var(--color-border-subtle);border-radius:.5rem;overflow:hidden}.job-setup-accordion summary{padding:.625rem .75rem;font-size:.75rem;font-weight:600;cursor:pointer}
+.job-setup-table-wrap{max-height:15rem;overflow:auto;border:1px solid var(--color-border-subtle);border-radius:.5rem}
+.job-create-grid{display:grid;grid-template-columns:1.15fr 1fr .8fr;gap:.75rem}
+.job-setup-card{display:flex;min-width:0;flex-direction:column;gap:.625rem;border:1px solid var(--color-border-subtle);border-radius:.625rem;background:rgba(255,255,255,.02);padding:.75rem}.job-setup-card h4{margin:0 0 .125rem;font-size:.8125rem}.job-setup-card>label{font-size:.6875rem;color:var(--color-text-muted)}.job-setup-card .field{width:100%}
+.job-inline{display:flex;align-items:flex-end;gap:.5rem}.job-inline>label{display:flex;flex:1;flex-direction:column;gap:.25rem;font-size:.6875rem;color:var(--color-text-muted)}
+.job-photo-preview{display:grid;min-height:9rem;place-items:center;border:1px dashed var(--color-border);border-radius:.5rem;padding:.5rem;text-align:center;font-size:.75rem;color:var(--color-text-muted)}
+.operations-job-queue-exit-group-tabs{display:flex;gap:.375rem}.operations-job-queue-exit-group-tab{height:2rem;padding:0 .875rem;border:1px solid var(--color-border-subtle);border-radius:.5rem;background:rgba(255,255,255,.04);font-size:.75rem;color:var(--color-text-secondary)}.operations-job-queue-exit-group-tab--active{border-color:rgba(59,130,246,.45);background:rgba(59,130,246,.14);color:var(--color-text-primary)}
+.modal--matrix{display:flex!important;width:min(96vw,90rem)!important;height:min(92vh,52rem);overflow:hidden!important;flex-direction:column}
+.brand-modal-header-actions{display:flex;align-items:center;gap:.5rem;flex-shrink:0;margin-left:auto}
+.brand-master-reporting-modal-body{display:flex;min-height:0;flex:1 1 auto;flex-direction:column;overflow:hidden}
+.brand-master-reporting-modal-body .reporting-table-shell{padding-top:.75rem}
+.modal--details{display:flex!important;width:min(92vw,72rem)!important;height:auto;max-height:92vh;overflow:hidden!important;flex-direction:column}
+.group-links-header-tools{display:flex;flex-shrink:0;align-items:center;gap:.5rem}
+.group-links-modal-title-block{flex:1 1 auto;min-width:0}
+.group-links-modal-body{display:flex;flex:0 0 auto;min-width:0;flex-direction:column;padding:0 .625rem}
+.group-links-table-wrap{--group-links-head-h:1.75rem;--group-links-row-h:1.625rem;width:100%;min-width:0;height:fit-content;overflow-x:auto;border:1px solid rgba(255,255,255,.08);border-radius:.375rem}
+.group-links-table-wrap--scroll{max-height:calc(var(--group-links-head-h) + var(--group-links-row-h) * 15);overflow-y:auto}
+.group-links-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:.75rem;table-layout:auto}
+.group-links-table th,.group-links-table td{width:auto;max-width:none;overflow:visible;text-overflow:clip;white-space:nowrap}
+.group-links-table th{position:sticky;top:0;z-index:1;padding:.375rem .5rem;text-align:left;font-weight:600;font-size:.6875rem;color:var(--color-text-muted);background:#12101f;border-bottom:1px solid rgba(255,255,255,.12)}
+.group-links-table td{padding:.3125rem .5rem;vertical-align:middle;border-bottom:1px solid rgba(255,255,255,.05);color:var(--color-text-secondary);line-height:1.35}
+.group-links-table__name{color:var(--color-text-primary);font-weight:500}
+.group-links-table__id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.6875rem}
+.group-links-table__link a{color:var(--color-tg);text-decoration:none;white-space:nowrap}
+.group-links-table__link a:hover{text-decoration:underline}
+.group-links-table__admin,.group-links-table--account-daily .group-links-table__num,.group-links-table--account-daily .group-links-table__count{text-align:center;white-space:nowrap}
+.group-links-table--account-daily th:nth-child(1),.group-links-table--account-daily th:nth-child(4),.group-links-table--account-daily th:nth-child(5),.group-links-table--account-daily th:nth-child(6){text-align:center}
+.group-links-admin-badge{display:inline-block;padding:.125rem .5rem;border-radius:.25rem;font-size:.625rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;line-height:1.2}
+.group-links-admin-badge--yes{background:rgba(34,197,94,.18);color:#86efac}.group-links-admin-badge--no{background:rgba(255,255,255,.06);color:var(--color-text-muted)}
+.group-links-pagination{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;width:100%;padding-top:.375rem;font-size:.6875rem;color:var(--color-text-muted)}
+.group-links-pagination-label{font-weight:600;color:var(--color-text-secondary)}.group-links-pagination-actions{display:flex;gap:.375rem;margin-left:auto}
+.group-links-modal-footer{display:flex;flex-shrink:0;align-items:center;justify-content:flex-end;padding:.375rem .625rem .5rem;border-top:1px solid rgba(255,255,255,.06)}
+.group-links-empty{display:flex;height:calc(1.75rem + 1.625rem * 15);flex-direction:column;align-items:center;justify-content:center;gap:.75rem;border:1px solid rgba(255,255,255,.08);border-radius:.375rem;padding:1rem}
+.group-links-empty-text{margin:0;font-size:.8125rem;color:var(--color-text-muted)}
+.modal--stock{display:flex!important;width:min(92vw,72rem)!important;max-height:88vh;overflow:hidden!important;flex-direction:column}
+.modal--matrix>.modal-body,.modal--details>.modal-body,.modal--stock>.modal-body{display:flex;min-height:0;flex:1;flex-direction:column;padding:10px 12px}
+.modal--matrix .modal-tabs,.modal--details .modal-tabs{align-self:flex-start;margin-bottom:8px}
+.modal-table-body{display:flex;min-height:0;flex:1;flex-direction:column;overflow:hidden;padding:10px 12px}
+.modal-table-scroll{flex:1;min-height:0;overflow:auto;border:1px solid var(--color-border-subtle);border-radius:6px}
+.modal-table-scroll table thead th{position:sticky;top:0;z-index:2;background:#12101f}
+.modal-tabs{display:inline-flex;gap:2px;border-radius:7px;background:#090812;padding:2px}
+.modal-tab{border-radius:5px;padding:5px 12px;font-size:10px;color:var(--color-text-muted)}
+.modal-tab.is-active{background:#282344;color:#fff}
+.matrix-filter{display:inline-flex;align-items:center;gap:3px}
+.matrix-filter select{width:auto;min-width:54px;border:0;background:transparent;color:inherit;font-size:10px}
+.matrix-filtered{background:rgba(99,102,241,.06)}
+.empty-modal-state{display:flex;min-height:360px;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--color-text-muted);font-size:12px}
+.details-fixed-body{height:calc(28px + 26px * 15)}
+.modal-one-line-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:var(--color-text-muted)}
+.modal-one-line-actions{display:flex;align-items:center;gap:5px}
+.stock-status-pill{display:inline-flex;border-radius:5px;padding:3px 7px;font-size:9px;font-weight:600;text-transform:capitalize}
+.stock-status-pill.active{color:#37dc80;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.25)}
+.stock-status-pill.ready{color:#6aa7ff;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25)}
+.stock-status-pill.recycle{color:#fbbf24;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25)}
+.stock-status-pill.review{color:#fb923c;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.25)}
+.qr-demo{display:grid;grid-template-columns:1fr 264px;gap:20px;align-items:center}
+.qr-box{height:260px;border:1px solid var(--color-border);border-radius:12px;background:#1a1825;display:grid;place-items:center}
+.qr-code{width:180px;height:180px;background:repeating-conic-gradient(#111 0 25%,#fff 0 50%) 50%/18px 18px;border:12px solid #fff}
+.qr-steps{display:flex;flex-direction:column;gap:10px;color:var(--color-text-secondary);font-size:12px}
+.qr-step{display:flex;gap:8px;align-items:center}.qr-step i{display:grid;width:18px;height:18px;place-items:center;border-radius:50%;background:#282536;font-style:normal;font-size:10px}
+.flat-table-frame{height:100%;overflow:auto;border:1px solid var(--color-border-subtle);border-radius:10px;background:var(--color-bg-card)}
+.brand-add-card{display:flex;min-height:5.5rem;flex-shrink:0;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;border:1.5px dashed rgba(255,255,255,.18);background:rgba(255,255,255,.02);padding:1.25rem;color:var(--color-text-muted);cursor:pointer;transition:border-color 160ms ease,background-color 160ms ease,color 160ms ease}
+.brand-add-card:hover{border-color:rgba(37,211,102,.45);background:rgba(37,211,102,.06);color:var(--color-wa)}
+.brand-add-card-icon{display:inline-flex;height:2.25rem;width:2.25rem;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.06);font-size:1.25rem;line-height:1}
+.brand-add-card-caption{font-size:.8125rem;font-weight:500}
+.job-status{display:inline-flex;align-items:center;height:1.375rem;padding:0 .5rem;border-radius:999px;font-size:.6875rem;font-weight:700;text-transform:capitalize}
+.job-status.job-completed,.job-completed{background:rgba(37,211,102,.15);color:#37dc80}
+.job-status.job-queued,.job-queued{background:rgba(148,163,184,.15);color:#cbd5e1}
+.job-status.job-running,.job-running{background:rgba(59,130,246,.15);color:#6aa7ff}
+.job-status.job-failed,.job-failed{background:rgba(239,68,68,.15);color:#fca5a5}
+.job-status.job-cancelled,.job-cancelled,.job-status.job-paused,.job-paused{background:rgba(245,158,11,.15);color:#fbbf24}
   </style>
 </head>
 <body data-page="app">
@@ -867,7 +1005,6 @@ table td {
             <div class="monitoring-tabs">
               <button type="button" class="monitoring-tab-btn monitoring-tab-btn--account is-active" data-tab="account">Account</button>
               <button type="button" class="monitoring-tab-btn monitoring-tab-btn--operations" data-tab="operations">Operations</button>
-              <button type="button" class="monitoring-tab-btn monitoring-tab-btn--reporting" data-tab="reporting">Reporting</button>
             </div>
             <button type="button" class="monitoring-refresh-btn" id="btn-refresh" title="Refresh" aria-label="Refresh">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -1143,24 +1280,184 @@ window.WF_DATA = {
       { brand: 'SBMY', readyMinPercent: 10, avgNdDays: 7 },
     ],
     sopNaming: { prefix1: '{brand} {user}', prefix2: '{brand} NEW', prefix3: '{brand} {user} LG' },
-    brandPhotoSet: { FWSG: true, SBMY: false },
+    brandPhotoSet: { M24SG: true },
     leaveDelete: { leaveEnabled: true, deleteEnabled: true, requireOwner: true },
   },
 };
 
+/* Screenshot-driven dummy dataset — only M24SG demo brand, all features still interactive. */
+(() => {
+  const accountNames = ['M24SG Maxie', 'M24SG JUN', 'M24SG Jamie', 'M24SG Master', 'M24SG Dyy'];
+  const phones = ['60161717016', '60161731540', '601139855820', '601128425327', '601168681736'];
+  const seedNames = [
+    'M24SG ameskyer', 'M24SG Ash16 LG', 'M24SG Dot73 LG', 'M24SG Naddy21 LG',
+    'M24SG Ramesh41', 'M24SG Saravanakumar', 'M24SG Zekco NB', 'M24SG Alammd',
+    'M24SG Aravind24', 'M24SG Dinesh91', 'M24SG FAKHRUDDIN20 LG', 'M24SG Ijat33 LG',
+    'M24SG Karim63', 'M24SG mikhaanz', 'M24SG Myomintlhaike12AZ',
+  ];
+  const master = Array.from({ length: 195 }, (_, i) => {
+    const status = i < 156 ? 'active' : i < 183 ? 'ready' : i < 191 ? 'recycle' : 'review';
+    const name = seedNames[i] || (status === 'ready'
+      ? 'M24SG NEW'
+      : status === 'recycle'
+        ? `M24SG User${i + 1} LG`
+        : status === 'review'
+          ? `M24 IN/OUT ${i + 1}`
+          : `M24SG User${String(i + 1).padStart(3, '0')}`);
+    return {
+      groupId: `601${String(46236838 + i * 9137).padStart(11, '0')}@g.us`,
+      groupName: name,
+      inviteLink: `https://chat.whatsapp.com/${btoa(`M24SG-${i + 1}`).replaceAll('=', '')}`,
+      status,
+      members: status === 'ready' || status === 'recycle' ? 0 : 9,
+      admins: status === 'ready' || status === 'recycle' ? 0 : 8,
+      isAdmin: i % 17 !== 0,
+      nonAdmin: status === 'active' || status === 'review' ? 1 : 0,
+      lastSync: 'Jul 06, 04:20 PM',
+      joined: accountNames.map((_, ai) => ((i + ai) % 19 !== 0)),
+      adminsByAccount: accountNames.map((_, ai) => ((i + ai) % 23 !== 0)),
+    };
+  });
+
+  const m24Accounts = accountNames.map((accountName, i) => ({
+    id: `a-m24sg-${i + 1}`,
+    platform: 'whatsapp',
+    accountName,
+    phoneNumber: phones[i],
+    brandName: 'M24SG',
+    status: i === 1 ? 'logout' : 'active',
+    locationDevice: 'MY',
+    groupsCurrent: 195,
+    groupsTotal: 195,
+    joinedInMaster: 195,
+    adminCurrent: 195,
+    adminTotal: 195,
+    sessionStatus: i === 1 ? 'invalid' : 'valid',
+    syncState: 'synced',
+    actionProcess: null,
+    isMisaligned: false,
+    lastSyncAt: i === 1 ? null : `2026-07-${String(8 + i).padStart(2, '0')}T${String(4 + i).padStart(2, '0')}:15:00.000Z`,
+    scrapeProgress: null,
+  }));
+
+  WF_DATA.brands = [
+    {
+      id: 'b-m24sg',
+      brandName: 'M24SG',
+      brandLabel: 'M24SG',
+      standardGroupCountByPlatform: { whatsapp: 195, telegram: 0 },
+      stock: { active: 156, ready: 27, recycle: 8, review: 4 },
+      avgNd: 1.0,
+      toPrep: 0,
+      accounts: m24Accounts,
+    },
+  ];
+  WF_DATA.masterGroups = { M24SG: master };
+  WF_DATA.junkGroups = [
+    { groupId: '60170557499-1573618971@g.us', groupName: 'Squared B Exchange WS Version', inviteLink: '', status: 'review', members: 2, admins: 1, isAdmin: false },
+  ];
+  WF_DATA.reportingAccounts = accountNames;
+  WF_DATA.settings.stockPolicy = [{ brand: 'M24SG', readyMinPercent: 10, avgNdDays: 7 }];
+  WF_DATA.jobs = [
+    {
+      id: 'job-create-1',
+      action: 'create_group',
+      taskType: 'create_group',
+      brandName: 'M24SG',
+      accountId: 'a-m24sg-1',
+      accountName: 'M24SG Maxie',
+      platform: 'whatsapp',
+      status: 'completed',
+      progress: { current: 3, total: 3 },
+      batchLabel: 'M24SG NEW (× 3)',
+      createdAt: '2026-07-08T07:44:00.000Z',
+      remark: 'Press VIEW to set group photo',
+      outcomes: [
+        { groupId: 'g-new-1', groupName: 'M24SG NEW 01', status: 'created', inviteLink: 'https://chat.whatsapp.com/new1' },
+        { groupId: 'g-new-2', groupName: 'M24SG NEW 02', status: 'created', inviteLink: 'https://chat.whatsapp.com/new2' },
+        { groupId: 'g-new-3', groupName: 'M24SG NEW 03', status: 'created', inviteLink: 'https://chat.whatsapp.com/new3' },
+      ],
+    },
+    {
+      id: 'job-create-2',
+      action: 'set_group_photo',
+      taskType: 'create_group',
+      brandName: 'M24SG',
+      accountId: 'a-m24sg-1',
+      accountName: 'M24SG Maxie',
+      platform: 'whatsapp',
+      status: 'completed',
+      progress: { current: 3, total: 3 },
+      batchLabel: '3',
+      createdAt: '2026-07-08T09:31:00.000Z',
+      remark: 'Set photo 3/3 group(s)',
+      outcomes: [
+        { groupId: 'g-new-1', groupName: 'M24SG NEW 01', status: 'photo_set', inviteLink: 'https://chat.whatsapp.com/new1' },
+        { groupId: 'g-new-2', groupName: 'M24SG NEW 02', status: 'photo_set', inviteLink: 'https://chat.whatsapp.com/new2' },
+        { groupId: 'g-new-3', groupName: 'M24SG NEW 03', status: 'photo_set', inviteLink: 'https://chat.whatsapp.com/new3' },
+      ],
+    },
+    {
+      id: 'job-join-1',
+      action: 'join_by_invite_link',
+      taskType: 'join',
+      brandName: 'M24SG',
+      accountId: 'a-m24sg-3',
+      accountName: 'M24SG Jamie',
+      platform: 'whatsapp',
+      status: 'queued',
+      progress: { current: 0, total: 4 },
+      createdAt: '2026-07-17T08:00:00.000Z',
+      remark: 'Waiting in queue',
+      outcomes: [],
+    },
+    {
+      id: 'job-admin-1',
+      action: 'set_admin',
+      taskType: 'set_admin',
+      brandName: 'M24SG',
+      accountId: 'a-m24sg-1',
+      accountName: 'M24SG Maxie',
+      platform: 'whatsapp',
+      status: 'failed',
+      progress: { current: 1, total: 2 },
+      createdAt: '2026-07-16T11:20:00.000Z',
+      remark: '1 group failed — target not in group',
+      outcomes: [
+        { groupId: '60146236838@g.us', groupName: 'M24SG ameskyer', status: 'ok', remark: 'Promoted' },
+        { groupId: '60146245975@g.us', groupName: 'M24SG NEW', status: 'failed', remark: 'Target not in group' },
+      ],
+    },
+    {
+      id: 'job-leave-1',
+      action: 'exit_delete_group',
+      taskType: 'exit_delete_group',
+      brandName: 'M24SG',
+      accountId: 'a-m24sg-5',
+      accountName: 'M24SG Dyy',
+      platform: 'whatsapp',
+      status: 'running',
+      progress: { current: 1, total: 3 },
+      createdAt: '2026-07-17T09:10:00.000Z',
+      remark: 'Leaving groups…',
+      outcomes: [],
+    },
+  ];
+})();
+
 window.WF_STATE = {
-  role: localStorage.getItem('wf_role') || 'admin', // admin | operator
+  role: 'admin',
   userName: 'admin',
-  page: 'account', // account | operations | reporting | settings
-  opsBookmark: 'overview', // overview | job_queue
+  page: 'account', // account | operations | settings
   accountView: 'card',
   filters: {
-    account: { search: '', brand: 'all', platform: 'all', status: 'all' },
-    ops: { platform: 'whatsapp', brand: 'FWSG' },
-    reporting: { search: '', platform: 'whatsapp', brand: 'FWSG', accName: 'all', status: 'all', bookmark: 'full_group' },
+    account: { search: '', brand: 'all', platform: 'whatsapp', status: 'all' },
+    ops: { platform: 'whatsapp' },
   },
-  jq: { taskType: '', brand: 'FWSG', accountId: '' },
-  sidebarCollapsed: false,
+  jq: { taskType: 'create_group', brand: 'M24SG', accountId: 'a-m24sg-1' },
+  matrix: { bookmark: 'full_group', accountId: '', value: 'all', page: 1 },
+  details: { mode: 'account', page: 1 },
+  sidebarCollapsed: true,
   refreshing: false,
   settingsOpen: '',
   modal: null, // { type, payload }
@@ -1190,7 +1487,6 @@ window.WF = {
   logout() {
     WF_STATE.userName = 'admin';
     WF_STATE.page = 'account';
-    WF_STATE.opsBookmark = 'overview';
     location.hash = '#/account';
     if (window.WF_UI) WF_UI.renderShell();
     this.toast('Demo reset');
@@ -1231,6 +1527,95 @@ window.WF = {
     try { return new Date(iso).toLocaleString(); } catch { return iso; }
   };
   const platIcon = (p) => WF_ASSETS[p === 'telegram' ? 'telegram' : 'whatsapp'];
+  const selectChevron = `<svg class="dark-select-trigger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
+
+  function closeDarkSelects(except) {
+    $$('.dark-select-wrap.is-open').forEach((wrap) => {
+      if (wrap === except) return;
+      wrap.classList.remove('is-open');
+      wrap.querySelector('.dark-select-menu')?.classList.remove('dark-select-menu--open');
+      wrap.querySelector('.dark-select-trigger-icon')?.classList.remove('dark-select-trigger-icon--open');
+      wrap.querySelector('.dark-select-trigger')?.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function enhanceDarkSelects(root = document) {
+    $$('select:not([multiple]):not([data-wf-enhanced])', root).forEach((select) => {
+      select.dataset.wfEnhanced = 'true';
+      const wrap = document.createElement('div');
+      wrap.className = 'dark-select-wrap';
+      select.parentNode.insertBefore(wrap, select);
+      wrap.appendChild(select);
+      select.classList.add('wf-native-select');
+
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = `dark-select-trigger ${[...select.classList].filter((name) => !['dark-select','wf-native-select'].includes(name)).join(' ')}`;
+      trigger.disabled = select.disabled;
+      trigger.setAttribute('aria-haspopup', 'listbox');
+      trigger.setAttribute('aria-expanded', 'false');
+      if (select.getAttribute('aria-label')) trigger.setAttribute('aria-label', select.getAttribute('aria-label'));
+
+      const label = document.createElement('span');
+      label.className = 'dark-select-trigger-label';
+      const current = select.options[select.selectedIndex];
+      label.textContent = current?.textContent || select.getAttribute('placeholder') || '';
+      if (!select.value) label.classList.add('dark-select-trigger-label--placeholder');
+      trigger.append(label);
+      trigger.insertAdjacentHTML('beforeend', selectChevron);
+
+      const menu = document.createElement('ul');
+      menu.className = 'dark-select-menu';
+      menu.setAttribute('role', 'listbox');
+      [...select.options].filter((option) => option.value !== '').forEach((option) => {
+        const li = document.createElement('li');
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = `dark-select-menu-item${option.value === select.value ? ' dark-select-menu-item--active' : ''}${option.disabled ? ' dark-select-menu-item--disabled' : ''}`;
+        item.textContent = option.textContent;
+        item.disabled = option.disabled;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(option.value === select.value));
+        item.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          if (option.disabled) return;
+          select.value = option.value;
+          label.textContent = option.textContent;
+          label.classList.toggle('dark-select-trigger-label--placeholder', !option.value);
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          closeDarkSelects();
+        });
+        li.append(item);
+        menu.append(li);
+      });
+
+      trigger.addEventListener('click', () => {
+        if (trigger.disabled) return;
+        const opening = !wrap.classList.contains('is-open');
+        closeDarkSelects(wrap);
+        wrap.classList.toggle('is-open', opening);
+        menu.classList.toggle('dark-select-menu--open', opening);
+        trigger.querySelector('.dark-select-trigger-icon')?.classList.toggle('dark-select-trigger-icon--open', opening);
+        trigger.setAttribute('aria-expanded', String(opening));
+        if (opening) {
+          const rect = trigger.getBoundingClientRect();
+          const needed = Math.min(280, menu.children.length * 32 + 8);
+          menu.classList.toggle('dark-select-menu--drop-up', window.innerHeight - rect.bottom < needed && rect.top > window.innerHeight - rect.bottom);
+        }
+      });
+      wrap.append(trigger, menu);
+    });
+
+    if (!window.__wfDarkSelectBound) {
+      window.__wfDarkSelectBound = true;
+      document.addEventListener('mousedown', (event) => {
+        if (!event.target.closest('.dark-select-wrap')) closeDarkSelects();
+      });
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeDarkSelects();
+      });
+    }
+  }
 
   function yx(cur, tot, aligned) {
     const cls = aligned || cur >= tot ? 'ok' : 'bad';
@@ -1245,14 +1630,11 @@ window.WF = {
 
   function kpiAccount() {
     const accounts = WF.allAccounts();
-    const brands = WF_STATE.brands.length;
-    const online = accounts.filter((a) => a.sessionStatus === 'valid').length;
-    const aligned = accounts.filter((a) => !a.isMisaligned && a.sessionStatus === 'valid').length;
     return [
-      { label: 'Brands', value: brands },
+      { label: 'Brands', value: WF_STATE.brands.length },
       { label: 'Accounts', value: accounts.length },
-      { label: 'Online', value: online },
-      { label: 'Aligned', value: aligned },
+      { label: 'Online', value: accounts.filter((a) => a.sessionStatus === 'valid').length },
+      { label: 'Aligned', value: accounts.filter((a) => a.sessionStatus === 'valid' && !a.isMisaligned && a.syncState === 'synced').length },
     ];
   }
 
@@ -1262,9 +1644,8 @@ window.WF = {
       let accounts = [...b.accounts];
       if (f.brand !== 'all' && b.brandName !== f.brand) accounts = [];
       if (f.platform !== 'all') accounts = accounts.filter((a) => a.platform === f.platform);
-      if (f.status === 'online') accounts = accounts.filter((a) => a.sessionStatus === 'valid');
-      if (f.status === 'offline') accounts = accounts.filter((a) => a.sessionStatus !== 'valid');
-      if (f.status === 'misaligned') accounts = accounts.filter((a) => a.isMisaligned);
+      if (f.status === 'valid') accounts = accounts.filter((a) => a.sessionStatus === 'valid');
+      if (f.status === 'invalid') accounts = accounts.filter((a) => a.sessionStatus !== 'valid');
       if (f.search) {
         const q = f.search.toLowerCase();
         accounts = accounts.filter((a) => a.accountName.toLowerCase().includes(q) || a.phoneNumber.includes(q));
@@ -1276,7 +1657,7 @@ window.WF = {
   function renderShell() {
     const collapsed = WF_STATE.sidebarCollapsed;
     const page = WF_STATE.page;
-    const titles = { account: 'Group Monitoring', operations: 'Group Monitoring', reporting: 'Group Monitoring', settings: 'Settings' };
+    const titles = { account: 'Group Monitoring', operations: 'Group Monitoring', settings: 'Settings' };
     $('#sidebar').classList.toggle('is-collapsed', collapsed);
     $('#nav-settings').style.display = WF.isAdmin ? '' : 'none';
     $$('.nav-item[data-nav]').forEach((el) => {
@@ -1296,9 +1677,9 @@ window.WF = {
     const root = $('#page-root');
     if (WF_STATE.page === 'account') root.innerHTML = renderAccount();
     else if (WF_STATE.page === 'operations') root.innerHTML = renderOperations();
-    else if (WF_STATE.page === 'reporting') root.innerHTML = renderReporting();
     else root.innerHTML = renderSettings();
     bindPageEvents();
+    enhanceDarkSelects(root);
   }
 
   function renderAccount() {
@@ -1325,14 +1706,13 @@ window.WF = {
                       ${WF_STATE.brands.map((b) => `<option value="${esc(b.brandName)}" ${f.brand===b.brandName?'selected':''}>${esc(b.brandName)}</option>`).join('')}
                     </select>
                     <select class="account-slicer-select dark-select" id="acc-platform">
-                      <option value="all">All platforms</option>
                       <option value="whatsapp" ${f.platform==='whatsapp'?'selected':''}>WhatsApp</option>
                       <option value="telegram" ${f.platform==='telegram'?'selected':''}>Telegram</option>
                     </select>
                     <select class="account-slicer-select dark-select" id="acc-status">
-                      <option value="all">All status</option>
-                      <option value="online" ${f.status==='online'?'selected':''}>Active</option>
-                      <option value="offline" ${f.status==='offline'?'selected':''}>Logout</option>
+                      <option value="all">All session</option>
+                      <option value="valid" ${f.status==='valid'?'selected':''}>Active</option>
+                      <option value="invalid" ${f.status==='invalid'?'selected':''}>Logout</option>
                     </select>
                   </div>
                   <div class="account-slicer-view-toggle">
@@ -1367,14 +1747,14 @@ window.WF = {
       : a.actionProcess === 'sync' || a.actionProcess === 'session_check'
         ? `<span class="marquee">${a.actionProcess === 'sync' ? 'Syncing…' : 'Checking session…'}</span>`
         : a.sessionStatus === 'invalid' && !a.lastSyncAt
-          ? `<span class="muted">Use Sync to log in first</span>`
+          ? `<span class="muted">Use Sync (↻) to log in first</span>`
           : `<span class="muted">${esc(fmtTime(a.lastSyncAt))}</span>`;
     const action = a.actionProcess === 'scraper'
       ? `<button class="brand-card-action-btn brand-card-action-btn--cancel-scrape" data-cancel-scrape="${a.id}">Cancel scrape</button>`
       : a.actionProcess
         ? `<span class="brand-card-action-btn">PROC SYNC</span>`
         : (a.joinedInMaster > 0 && a.groupsTotal > 0
-          ? `<button class="brand-card-action-btn" data-group-link="${a.id}">Group link</button>`
+          ? `<button class="brand-card-action-btn details-group-btn" data-group-link="${a.id}">Details Group</button>`
           : `<span class="muted">—</span>`);
     const adminPct = a.adminTotal ? Math.round(a.adminCurrent / a.adminTotal * 100) : 0;
     return `
@@ -1387,8 +1767,7 @@ window.WF = {
       </td>
       ${showBrand ? `<td>${esc(a.brandName)}</td>` : ''}
       <td>${esc(a.locationDevice || '—')}</td>
-      <td><span class="status-pill ${a.status==='active'?'status-active':'status-logout'}">${a.status==='active'?'Active':'Logout'}</span></td>
-      <td><span class="session-pill ${a.sessionStatus==='valid'?'session-valid':'session-invalid'}">${a.sessionStatus === 'valid' ? 'Valid' : 'Invalid'}</span></td>
+      <td><span class="session-pill ${a.sessionStatus==='valid'?'session-valid':'session-invalid'}">${a.sessionStatus === 'valid' ? 'Active' : 'Logout'}</span></td>
       <td>${a.groupsCurrent}</td>
       <td><span class="metric-ratio ${alignedG?'aligned':'short'}"><span class="current">${a.joinedInMaster}</span>/${a.groupsTotal}</span></td>
       <td><div class="admin-progress"><span class="metric-ratio ${alignedA?'aligned':'short'}"><span class="current">${a.adminCurrent}</span>/${a.adminTotal}</span><div class="admin-progress-track"><i class="${alignedA?'good':''}" style="width:${adminPct}%"></i></div></div></td>
@@ -1407,44 +1786,61 @@ window.WF = {
         <div class="brand-card-header">
           <button type="button" class="brand-card-header-toggle" data-collapse-brand="${esc(b.brandName)}">
             ${iconChevron()}<span class="brand-card-title">Brand : ${esc(b.brandLabel)}</span>
+            <span class="brand-card-header-meta"><span>Avg ND <strong>${b.avgNd}</strong></span><span>To Prep <strong>${b.toPrep}</strong></span></span>
           </button>
           <div class="brand-card-header-actions">
-            <span class="brand-card-badge brand-card-badge--neutral">WA ${b.accounts.filter(a=>a.platform==='whatsapp').length} Acc | TG ${b.accounts.filter(a=>a.platform==='telegram').length} ACC</span>
-            <button class="brand-card-badge brand-card-badge--neutral brand-card-badge--platform-groups" type="button" data-master="${esc(b.brandName)}"><span>WA ${b.standardGroupCountByPlatform.whatsapp}</span><span>Group</span></button>
-            <button class="brand-card-badge brand-card-badge--neutral brand-card-badge--platform-groups" type="button" data-master="${esc(b.brandName)}"><span>TG ${b.standardGroupCountByPlatform.telegram}</span><span>Group</span></button>
-            <span class="brand-card-badge ${b.accounts.some(a=>a.isMisaligned)?'brand-card-badge--danger':'brand-card-badge--success'}">${b.accounts.some(a=>a.isMisaligned)?`${b.accounts.filter(a=>a.isMisaligned).length} accounts not aligned`:'All aligned'}</span>
-            <button class="brand-add-account-btn" data-add-account="${esc(b.brandName)}">${WF.isAdmin ? '+ Add account' : '🔒'}</button>
+            <span class="brand-card-badge brand-card-badge--neutral brand-card-badge--platform-summary">
+              <img class="plat-icon" src="${platIcon(WF_STATE.filters.account.platform)}" alt="" />
+              <strong>${WF_STATE.filters.account.platform==='telegram'?'TG':'WA'}</strong>
+              <span>${b.accounts.length} Acc</span><span>|</span>
+              <button class="brand-card-badge-group-btn" type="button" data-master="${esc(b.brandName)}" data-platform="${WF_STATE.filters.account.platform}">${b.standardGroupCountByPlatform[WF_STATE.filters.account.platform] || 0} Group</button>
+            </span>
+            <div class="account-brand-stock-chips">
+              ${['active','ready','recycle','review'].map((k) => `<button type="button" class="account-brand-stock-chip account-brand-stock-chip--${k}" data-stock="${k}" data-stock-brand="${esc(b.brandName)}"><span class="account-brand-stock-chip-dot"></span><span>${k[0].toUpperCase()+k.slice(1)}</span><strong>${b.stock[k]}</strong></button>`).join('')}
+            </div>
+            <div class="brand-add-account-menu">
+              <button class="brand-add-account-btn" data-add-menu="${esc(b.brandName)}">${WF.isAdmin ? '+ Add' : '🔒'}</button>
+              <div class="brand-add-account-popover">
+                <span>Select platform</span>
+                <button data-add-account="${esc(b.brandName)}" data-add-platform="whatsapp"><img src="${platIcon('whatsapp')}" alt="">WhatsApp</button>
+                <button data-add-account="${esc(b.brandName)}" data-add-platform="telegram"><img src="${platIcon('telegram')}" alt="">Telegram</button>
+              </div>
+            </div>
           </div>
           <button class="card-header-dismiss-btn" title="Remove brand card">×</button>
         </div>
         <div class="brand-card-body">
         <table class="brand-card-table">
-          <colgroup><col class="brand-col--account"/><col class="brand-col--location"/><col class="brand-col--status"/><col class="brand-col--session"/><col class="brand-col--on-device"/><col class="brand-col--in-brand"/><col class="brand-col--admin"/><col class="brand-col--last-update"/><col class="brand-col--action"/></colgroup>
+          <colgroup><col class="brand-col--account"/><col class="brand-col--location"/><col class="brand-col--session"/><col class="brand-col--on-device"/><col class="brand-col--in-brand"/><col class="brand-col--admin"/><col class="brand-col--last-update"/><col class="brand-col--action"/></colgroup>
           <thead><tr>
-            <th>Account</th><th>Location</th><th>Status</th><th>Session</th><th>On device</th><th>In brand</th><th>Admin</th><th>Last update</th><th>Action</th>
+            <th>Account</th><th>Location</th><th>Session</th><th>On device</th><th>In brand</th><th>Admin</th><th>Last update</th><th>Remark</th>
           </tr></thead>
           <tbody>
-            ${b.accounts.map((a) => `<tr>${accountRowCells(a, false)}</tr>`).join('') || `<tr><td colspan="9" class="muted">No accounts</td></tr>`}
+            ${b.accounts.map((a) => `<tr>${accountRowCells(a, false)}</tr>`).join('') || `<tr><td colspan="8" class="muted">No accounts</td></tr>`}
           </tbody>
         </table>
         </div>
-      </div>`).join('')}</div>`;
+      </div>`).join('')}
+      <button type="button" class="brand-add-card" id="btn-add-card" title="Add brand card">
+        <span class="brand-add-card-icon" aria-hidden>+</span>
+        <span class="brand-add-card-caption">Add Card View</span>
+      </button>
+    </div>`;
   }
 
   function renderAccountFlatTable(brands) {
     const rows = brands.flatMap((b) => b.accounts);
     if (!rows.length) return `<div class="empty-state">No accounts match filters.</div>`;
-    return `<div class="brand-card" style="overflow:auto"><div class="brand-card-body"><table class="brand-card-table">
+    return `<div class="flat-table-frame"><table class="brand-card-table">
       <thead><tr>
-        <th>Account</th><th>Brand</th><th>Location</th><th>Status</th><th>Session</th><th>On device</th><th>In brand</th><th>Admin</th><th>Action</th>
+        <th>Account</th><th>Brand</th><th>Location</th><th>Session</th><th>On device</th><th>In brand</th><th>Admin</th><th>Remark</th>
       </tr></thead>
       <tbody>${rows.map((a) => `<tr>${accountRowCells(a, true)}</tr>`).join('')}</tbody>
-    </table></div></div>`;
+    </table></div>`;
   }
 
   function renderOperations() {
     const f = WF_STATE.filters.ops;
-    const brand = WF_STATE.brands.find((b) => b.brandName === f.brand) || WF_STATE.brands[0];
     return `
       <div class="page-stack">
         <section class="content-area-shell">
@@ -1456,22 +1852,13 @@ window.WF = {
                 <option value="whatsapp" ${f.platform==='whatsapp'?'selected':''}>WhatsApp</option>
                 <option value="telegram" ${f.platform==='telegram'?'selected':''}>Telegram</option>
               </select>
-              ${WF_STATE.opsBookmark==='overview'?`<select class="account-slicer-select dark-select" id="ops-brand">
-                <option value="all">All brands</option>
-                ${WF_STATE.brands.map((b) => `<option value="${esc(b.brandName)}" ${f.brand===b.brandName?'selected':''}>${esc(b.brandName)}</option>`).join('')}
-              </select>`:''}
                 </div></div>
-                <div class="account-slicer-right">
-                  <div class="account-slicer-view-toggle">
-                    <button type="button" data-ops-bm="overview" class="account-slicer-view-btn ${WF_STATE.opsBookmark==='overview'?'account-slicer-view-btn--active':''}">Overview</button>
-                    <button type="button" data-ops-bm="job_queue" class="account-slicer-view-btn ${WF_STATE.opsBookmark==='job_queue'?'account-slicer-view-btn--active':''}">Job Queue</button>
-                  </div>
-                </div>
+                <div class="account-slicer-right"></div>
               </div>
             </div>
           </header>
           <div class="content-area-body">
-            ${WF_STATE.opsBookmark === 'overview' ? renderOpsOverview(brand, f.platform) : renderJobQueue()}
+            ${renderJobQueue()}
           </div>
         </section>
       </div>`;
@@ -1512,54 +1899,74 @@ window.WF = {
 
   function renderJobQueue() {
     const jq = WF_STATE.jq;
-    const accounts = WF.allAccounts().filter((a) => a.brandName === jq.brand && a.platform === (WF_STATE.filters.ops.platform || 'whatsapp'));
+    const accounts = WF.allAccounts().filter((a) => (!jq.brand || a.brandName === jq.brand) && a.platform === (WF_STATE.filters.ops.platform || 'whatsapp'));
     const jobs = WF_STATE.jobs.filter((j) => !jq.taskType || j.taskType === jq.taskType);
     return `<div class="operations-job-queue-only">
       <section class="operations-job-queue-zone operations-job-queue-zone--add">
         <div class="operations-job-queue-add">
         <div class="operations-job-queue-add-filters">
-        <label class="operations-job-queue-field operations-job-queue-field--inline"><span>Task</span><select class="operations-job-queue-select dark-select" id="jq-task">
-          <option value="">Select task type</option>
+        <div class="operations-job-queue-field operations-job-queue-field--inline"><select class="operations-job-queue-select dark-select" id="jq-task" aria-label="Task type">
+          <option value="">Select Task Type</option>
           <option value="join" ${jq.taskType==='join'?'selected':''}>Join missing</option>
-          <option value="create_group" ${jq.taskType==='create_group'?'selected':''}>Create & set photo</option>
+          <option value="create_group" ${jq.taskType==='create_group'?'selected':''}>Create group</option>
           <option value="set_admin" ${jq.taskType==='set_admin'?'selected':''}>Set admin</option>
-          <option value="exit_delete_group" ${jq.taskType==='exit_delete_group'?'selected':''}>Exit & delete group</option>
-        </select></label>
-        <label class="operations-job-queue-field operations-job-queue-field--inline"><span>Brand</span><select class="operations-job-queue-select dark-select" id="jq-brand">
+          <option value="exit_delete_group" ${jq.taskType==='exit_delete_group'?'selected':''}>Leave group</option>
+        </select></div>
+        <div class="operations-job-queue-field operations-job-queue-field--inline"><select class="operations-job-queue-select dark-select" id="jq-brand" aria-label="Brand">
+          <option value="">Select Brand</option>
           ${WF_STATE.brands.map((b) => `<option value="${esc(b.brandName)}" ${jq.brand===b.brandName?'selected':''}>${esc(b.brandName)}</option>`).join('')}
-        </select></label>
-        <label class="operations-job-queue-field operations-job-queue-field--inline"><span>Account</span><select class="operations-job-queue-select dark-select" id="jq-account">
-          <option value="">Select account</option>
-          ${accounts.map((a) => `<option value="${a.id}" ${jq.accountId===a.id?'selected':''}>${esc(a.accountName)} (${a.sessionStatus})</option>`).join('')}
-        </select></label>
-        <div class="operations-job-queue-add-filters__actions"><button class="operations-job-queue-setup-btn" id="jq-setup" title="Setup" ${!jq.taskType || !jq.accountId ? 'disabled' : ''}>⚙</button></div>
+        </select></div>
+        <div class="operations-job-queue-field operations-job-queue-field--inline"><select class="operations-job-queue-select dark-select" id="jq-account" aria-label="${jq.taskType==='set_admin'?'OWNER/ADMIN':'Account'}" ${!jq.brand?'disabled':''}>
+          <option value="">Select Account</option>
+          ${accounts.map((a) => `<option value="${a.id}" ${jq.accountId===a.id?'selected':''} ${a.sessionStatus!=='valid'?'disabled':''}>${esc(a.accountName)}${a.sessionStatus!=='valid'?' (Logout)':''}</option>`).join('')}
+        </select></div>
+        <div class="operations-job-queue-add-filters__actions"><button class="operations-job-queue-setup-btn" id="jq-setup" title="Setup" ${!jq.taskType || !jq.brand || !jq.accountId ? 'disabled' : ''}>⚙</button></div>
         </div></div>
       </section>
       <section class="operations-job-queue-zone operations-job-queue-zone--table">
-        <div class="operations-job-queue-zone-head"><h3 class="operations-job-queue-zone-title">${jq.taskType ? `${esc(jq.taskType.replaceAll('_',' '))} queue` : 'Queue — select a task type'}</h3></div>
+        <div class="operations-job-queue-zone-head"><h3 class="operations-job-queue-zone-title">${({
+          '': 'Queued tasks',
+          join: 'Queued join tasks',
+          create_group: 'Queued create tasks',
+          set_admin: 'Queued set admin tasks',
+          exit_delete_group: 'Queued exit & delete tasks',
+        })[jq.taskType] || 'Queued tasks'}</h3></div>
       ${!jq.taskType ? `<div class="operations-job-queue-empty">Select a task type to view the queue.</div>` : `
       <div class="operations-job-queue-table-wrap"><table class="operations-job-queue-table">
         <thead><tr>
-          <th class="operations-job-queue-select-col"></th><th>Status</th><th>Brand</th><th>Account</th><th>Progress</th><th>Created</th><th>Remark</th><th>Actions</th>
+          <th class="operations-job-queue-select-col"></th><th>Status</th><th>Brand</th><th>Account</th>
+          <th>${({ join:'Joined (total)', create_group:'Batch', set_admin:'Set admin (total)', exit_delete_group:'Groups (exit)' })[jq.taskType] || 'Total'}</th>
+          <th>Progress</th><th>Created</th><th>Actions</th>${jq.taskType==='create_group'?'<th>Remark</th>':''}
         </tr></thead>
         <tbody>
-          ${jobs.length ? jobs.map((j) => `
+          ${jobs.length ? jobs.map((j) => {
+            const batchCell = jq.taskType === 'create_group'
+              ? (j.batchLabel || `${j.progress.total}`)
+              : String(j.progress.total);
+            const progressCell = j.action === 'set_group_photo'
+              ? `Set photo ${j.progress.current}/${j.progress.total} group(s)`
+              : jq.taskType === 'create_group' && j.status === 'completed'
+                ? `${j.progress.current}/${j.progress.total} created`
+                : `${j.progress.current}/${j.progress.total}`;
+            return `
             <tr>
               <td class="operations-job-queue-select-col"><input class="operations-job-queue-row-checkbox" type="checkbox" data-job-sel="${j.id}" /></td>
-              <td><span class="job-status job-${j.status}">${j.status}</span></td>
+              <td><span class="job-status job-${j.status}">${({ queued:'Queued', paused:'Paused', running:'Process '+j.progress.current+'/'+j.progress.total, completed:'Completed', failed:'Failed', cancelled:'Cancelled' })[j.status] || j.status}</span></td>
               <td>${esc(j.brandName)}</td>
               <td><img class="plat-icon" src="${platIcon(j.platform)}" alt="" />${esc(j.accountName)}</td>
-              <td>${j.progress.current}/${j.progress.total}</td>
+              <td>${esc(batchCell)}</td>
+              <td>${esc(progressCell)}</td>
               <td class="muted">${esc(fmtTime(j.createdAt))}</td>
-              <td>${esc(j.remark || '—')}</td>
               <td><div class="operations-job-queue-row-actions">
-                ${j.status==='queued' || j.status==='paused' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-run="${j.id}">RUN</button>` : ''}
+                ${j.status==='queued' || j.status==='paused' || j.status==='cancelled' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-run="${j.id}">RUN</button>` : ''}
                 ${j.status==='running' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-pause="${j.id}">PAUSE</button><button class="operations-job-queue-btn operations-job-queue-btn--row operations-job-queue-btn--danger" data-job-cancel="${j.id}">CANCEL</button>` : ''}
                 ${j.status==='completed' || j.status==='failed' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-view="${j.id}">VIEW</button>` : ''}
                 ${j.status==='failed' ? `<button class="operations-job-queue-btn operations-job-queue-btn--row" data-job-run="${j.id}">RUN</button>` : ''}
               </div>
               </td>
-            </tr>`).join('') : `<tr><td colspan="8" class="muted">No ${esc(jq.taskType)} tasks in queue.</td></tr>`}
+              ${jq.taskType==='create_group'?`<td class="operations-job-queue-remark-cell">${esc(j.remark || '—')}</td>`:''}
+            </tr>`;
+          }).join('') : `<tr><td colspan="${jq.taskType==='create_group'?9:8}" class="muted">No ${esc(({join:'join',create_group:'create',set_admin:'set admin',exit_delete_group:'exit & delete'})[jq.taskType]||jq.taskType)} tasks in queue.</td></tr>`}
         </tbody>
       </table></div>
       <div style="margin-top:8px"><button class="operations-job-queue-btn operations-job-queue-btn--danger" id="jq-delete-sel">Delete selected</button></div>`}
@@ -1691,7 +2098,7 @@ window.WF = {
           <div class="form-row"><label>Allow leave group job</label><input class="field" value="${s.leaveDelete.leaveEnabled?'On':'Off'}" readonly /></div>
           <div class="form-row"><label>Allow delete group job</label><input class="field" value="${s.leaveDelete.deleteEnabled?'On':'Off'}" readonly /></div>
         </div>
-        <p class="muted" style="font-size:12px;margin-top:10px">Brand group photo: FWSG ${s.brandPhotoSet.FWSG?'set':'not set'} · SBMY ${s.brandPhotoSet.SBMY?'set':'not set'}</p>` },
+        <p class="muted" style="font-size:12px;margin-top:10px">Brand group photo: M24SG ${s.brandPhotoSet.M24SG?'set':'not set'}</p>` },
       { id: 'worker-tg', title: 'Telegram worker', summary: 'Configured', body: `
         <div class="form-grid">
           <div class="form-row"><label>Max per run</label><input class="field" value="30" readonly /></div>
@@ -1757,10 +2164,11 @@ window.WF = {
     const fn = map[m.type] || modalAlert;
     root.innerHTML = fn(m.payload || {});
     bindModalEvents();
+    enhanceDarkSelects(root);
   }
 
-  function modalShell(title, body, foot, lg) {
-    return `<div class="modal brand-modal-panel ${lg?'modal--lg brand-modal-panel--group-links':''}" role="dialog">
+  function modalShell(title, body, foot, lg, kind = '') {
+    return `<div class="modal brand-modal-panel ${lg?'modal--lg brand-modal-panel--group-links':''} ${kind}" role="dialog">
       <div class="modal-head brand-modal-header"><h3 class="modal-title brand-modal-title">${title}</h3>
         <button type="button" class="icon-btn brand-modal-close" data-close-modal aria-label="Close">✕</button></div>
       <div class="modal-body">${body}</div>
@@ -1778,9 +2186,16 @@ window.WF = {
   function modalPlatformLogin(p) {
     const loading = p.phase === 'loading';
     return modalShell(`${p.platform === 'telegram' ? 'Telegram' : 'WhatsApp'} login`,
-      `<p class="muted" style="font-size:13px;margin-top:0">Scan QR on the marketing phone for <strong>${esc(p.accountName)}</strong>.</p>
-       <div class="qr-box ${loading?'loading':''}"></div>
-       <p style="text-align:center;font-size:12px;color:var(--color-text-secondary)">${loading ? 'Generating QR…' : 'QR ready — scan to continue (demo: click Simulate scan)'}</p>`,
+      `<div class="qr-demo">
+         <div class="qr-box">${loading ? '<span class="marquee">Generating QR…</span>' : '<div class="qr-code" aria-label="Demo QR"></div>'}</div>
+         <div class="qr-steps">
+           <strong>${esc(p.accountName)}</strong>
+           <span class="muted">Scan this QR from the messaging app on your marketing phone.</span>
+           <div class="qr-step"><i>1</i><span>Open ${p.platform === 'telegram' ? 'Telegram' : 'WhatsApp'} on your phone</span></div>
+           <div class="qr-step"><i>2</i><span>Open Linked Devices / Devices</span></div>
+           <div class="qr-step"><i>3</i><span>Scan the code and wait until session is ready</span></div>
+         </div>
+       </div>`,
       `<button class="btn" data-close-modal>Cancel</button>
        ${loading ? '' : `<button class="btn btn-primary" data-simulate-scan="${p.accountId}">Simulate scan success</button>`}`);
   }
@@ -1816,84 +2231,159 @@ window.WF = {
 
   function modalGroupLinks(p) {
     const found = WF.findAccount(p.accountId);
-    const brand = found?.account.brandName || 'FWSG';
-    let rows = p.mode === 'junk' ? WF_DATA.junkGroups : (WF_DATA.masterGroups[brand] || []);
-    return modalShell(`Group links — ${esc(p.mode)}`,
-      `<div style="margin-bottom:10px"><select class="field" id="gl-admin-filter"><option value="all">Admin: All</option><option value="yes">Yes</option><option value="no">No</option></select></div>
-       <table class="acct-table"><thead><tr><th>Name</th><th>Id</th><th>Members</th><th>Admins</th><th>IsAdmin</th><th>Link</th></tr></thead>
-       <tbody>${rows.map((g) => `<tr data-isadmin="${g.isAdmin}">
-         <td>${esc(g.groupName)}</td><td class="muted">${esc(g.groupId)}</td><td>${g.members??'—'}</td><td>${g.admins??'—'}</td>
-         <td class="${g.isAdmin?'yes':'no'}">${g.isAdmin?'Yes':'No'}</td><td class="muted">${g.inviteLink?'link':'—'}</td>
-       </tr>`).join('') || '<tr><td colspan="6" class="muted">Empty</td></tr>'}</tbody></table>`,
-      `<button class="btn" data-close-modal>Close</button><button class="btn" id="gl-export">Export Excel</button>`, true);
+    const brand = found?.account.brandName || 'M24SG';
+    const mode = WF_STATE.details.mode || 'account';
+    const allRows = mode === 'junk' ? WF_DATA.junkGroups : (WF_DATA.masterGroups[brand] || []);
+    const pageSize = 15;
+    const pages = Math.max(1, Math.ceil(allRows.length / pageSize));
+    WF_STATE.details.page = Math.min(WF_STATE.details.page || 1, pages);
+    const start = (WF_STATE.details.page - 1) * pageSize;
+    const rows = allRows.slice(start, start + pageSize);
+    const content = rows.length ? `
+      <div class="group-links-table-wrap ${mode==='account'?'group-links-table-wrap--account-daily':''} group-links-table-wrap--scroll details-fixed-body"><table class="group-links-table ${mode==='account'?'group-links-table--account-daily':''}">
+        <thead><tr>${mode === 'account'
+          ? '<th>No</th><th>Group name</th><th>Group ID</th><th>Member count</th><th>Admin count</th><th>Is admin</th><th>Invite link</th>'
+          : '<th>Group name</th><th>Group ID</th><th>Invite link</th><th>Admin</th>'}</tr></thead>
+        <tbody>${rows.map((g, i) => mode === 'account' ? `<tr>
+          <td class="group-links-table__num">${start + i + 1}</td><td class="group-links-table__name">${esc(g.groupName)}</td><td class="group-links-table__id">${esc(g.groupId)}</td>
+          <td class="group-links-table__count">${g.members ?? '—'}</td><td class="group-links-table__count">${g.admins ?? '—'}</td><td class="group-links-table__admin"><span class="group-links-admin-badge group-links-admin-badge--${g.isAdmin?'yes':'no'}">${g.isAdmin?'Yes':'No'}</span></td>
+          <td class="group-links-table__link">${g.inviteLink ? `<a href="${esc(g.inviteLink)}" target="_blank">${esc(g.inviteLink)}</a>` : '—'}</td>
+        </tr>` : `<tr><td class="group-links-table__name">${esc(g.groupName)}</td><td class="group-links-table__id">${esc(g.groupId)}</td><td class="group-links-table__link">${g.inviteLink?`<a href="${esc(g.inviteLink)}" target="_blank">${esc(g.inviteLink)}</a>`:'—'}</td><td class="group-links-table__admin"><span class="group-links-admin-badge group-links-admin-badge--${g.isAdmin?'yes':'no'}">${g.isAdmin?'Yes':'No'}</span></td></tr>`).join('')}</tbody>
+      </table></div>` : `<div class="group-links-empty"><p class="group-links-empty-text">No data</p><button class="join-report-table__filter-empty-btn" data-details-back>‹ Back</button></div>`;
+    return `<section class="modal brand-modal-panel brand-modal-panel--group-links brand-modal-panel--details-group modal--details" role="dialog">
+      <header class="modal-head brand-modal-header group-links-modal-header">
+        <div class="group-links-modal-title-block"><h3 class="modal-title brand-modal-title group-links-modal-title">${esc(brand)} ${esc(found?.account.accountName || '')}</h3></div>
+        <div class="group-links-header-tools">
+          <div class="account-slicer-view-toggle" role="group" aria-label="Details group tabs">
+            <button class="account-slicer-view-btn ${mode==='account'?'account-slicer-view-btn--active':''}" data-details-mode="account">On Device</button>
+            <button class="account-slicer-view-btn ${mode==='junk'?'account-slicer-view-btn--active':''}" data-details-mode="junk">Junk</button>
+          </div>
+          <button type="button" class="brand-modal-close" data-close-modal aria-label="Close">✕</button>
+        </div>
+      </header>
+      <div class="group-links-modal-body group-links-modal-body--details">${content}
+        ${pages > 1 ? `<nav class="group-links-pagination"><span class="group-links-pagination-range">${start+1}–${Math.min(start+pageSize,allRows.length)} of ${allRows.length}</span><span class="group-links-pagination-label">Page ${WF_STATE.details.page} of ${pages}</span><div class="group-links-pagination-actions"><button class="group-links-page-btn" data-details-page="${WF_STATE.details.page-1}" ${WF_STATE.details.page<=1?'disabled':''}>‹ Previous</button><button class="group-links-page-btn" data-details-page="${WF_STATE.details.page+1}" ${WF_STATE.details.page>=pages?'disabled':''}>Next ›</button><button class="group-links-export-btn" id="gl-export">⇩ Export</button></div></nav>` : ''}
+      </div>
+      ${pages <= 1 ? `<footer class="group-links-modal-footer"><button class="group-links-export-btn" id="gl-export" ${!rows.length?'disabled':''}>⇩ Export</button></footer>` : ''}
+    </section>`;
   }
 
   function modalMasterGroups(p) {
-    const rows = WF_DATA.masterGroups[p.brand] || [];
-    return modalShell(`Master groups — ${esc(p.brand)}`,
-      `<table class="acct-table"><thead><tr><th>Name</th><th>Id</th><th>Link</th><th>Status</th></tr></thead>
-       <tbody>${rows.map((g) => `<tr><td>${esc(g.groupName)}</td><td class="muted">${esc(g.groupId)}</td><td class="muted">${g.inviteLink?'link':'—'}</td><td>${esc(g.status)}</td></tr>`).join('')}</tbody></table>`,
-      `<button class="btn" data-close-modal>Close</button>`, true);
+    const allRows = WF_DATA.masterGroups[p.brand] || [];
+    const brand = WF_STATE.brands.find((b) => b.brandName === p.brand);
+    const accounts = (brand?.accounts || []).filter((a) => a.platform === (p.platform || 'whatsapp'));
+    WF_STATE.matrix.filters ||= {};
+    const bookmark = WF_STATE.matrix.bookmark || 'full_group';
+    const filtered = allRows.filter((g) => accounts.every((_, ai) => {
+      const wanted = WF_STATE.matrix.filters[ai] || 'all';
+      const yes = bookmark === 'full_admin' ? g.adminsByAccount?.[ai] !== false : g.joined?.[ai] !== false;
+      return wanted === 'all' || (wanted === 'yes') === yes;
+    }));
+    const pageSize = 15;
+    const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    WF_STATE.matrix.page = Math.min(WF_STATE.matrix.page || 1, pages);
+    const start = (WF_STATE.matrix.page - 1) * pageSize;
+    const rows = filtered.slice(start, start + pageSize);
+    return `<section class="modal brand-modal-panel brand-modal-panel--group-links brand-modal-panel--reporting-matrix modal--matrix" role="dialog">
+      <header class="modal-head brand-modal-header group-links-modal-header">
+        <h3 class="modal-title brand-modal-title group-links-modal-title">${esc(p.brand)} ${p.platform === 'telegram' ? 'Telegram' : 'WhatsApp'}</h3>
+        <div class="brand-modal-header-actions">
+          <div class="account-slicer-view-toggle" role="group" aria-label="Report view">
+            <button class="account-slicer-view-btn ${bookmark==='full_group'?'account-slicer-view-btn--active':''}" data-matrix-bookmark="full_group">Full Group</button>
+            <button class="account-slicer-view-btn ${bookmark==='full_admin'?'account-slicer-view-btn--active':''}" data-matrix-bookmark="full_admin">Full Admin</button>
+          </div>
+          <button type="button" class="brand-modal-close" data-close-modal aria-label="Close">✕</button>
+        </div>
+      </header>
+      <div class="brand-master-reporting-modal-body">
+       <div class="reporting-table-shell"><div class="reporting-table-scroll"><table class="join-report-table"><thead><tr>
+         <th>No</th><th>Group Name</th><th>Group ID</th><th>Group Link</th><th>Status</th>
+         ${accounts.map((a, ai) => `<th class="matrix-filtered"><span class="matrix-filter"><span>${esc(a.accountName)}</span><select class="dark-select" data-matrix-filter="${ai}" aria-label="${esc(a.accountName)} filter"><option value="all" ${(WF_STATE.matrix.filters[ai]||'all')==='all'?'selected':''}>All</option><option value="yes" ${WF_STATE.matrix.filters[ai]==='yes'?'selected':''}>Yes</option><option value="no" ${WF_STATE.matrix.filters[ai]==='no'?'selected':''}>No</option></select></span></th>`).join('')}
+       </tr></thead><tbody>${rows.map((g, i) => `<tr>
+         <td>${start+i+1}</td><td>${esc(g.groupName)}</td><td class="join-report-table__mono">${esc(g.groupId)}</td>
+         <td>${g.inviteLink?`<a class="join-report-table__link" href="${esc(g.inviteLink)}" target="_blank">link</a>`:'—'}</td>
+         <td><span class="stock-status-pill ${g.status}">${esc(g.status)}</span></td>
+         ${accounts.map((_, ai) => { const yes = bookmark === 'full_admin' ? g.adminsByAccount?.[ai] !== false : g.joined?.[ai] !== false; return `<td class="${yes?'join-report-table__yes':'join-report-table__no'}">${yes?'Yes':'No'}</td>`; }).join('')}
+       </tr>`).join('')}</tbody></table></div></div>
+      </div>
+      <div class="reporting-card-footer">
+        <div class="reporting-card-footer-meta"><span>${filtered.length} row(s)</span><span>Page ${WF_STATE.matrix.page} of ${pages}</span></div>
+        <div class="reporting-card-footer-actions"><button class="group-links-page-btn" data-matrix-page="${WF_STATE.matrix.page-1}" ${WF_STATE.matrix.page<=1?'disabled':''}>Previous</button><button class="group-links-page-btn" data-matrix-page="${WF_STATE.matrix.page+1}" ${WF_STATE.matrix.page>=pages?'disabled':''}>Next</button><button class="group-links-export-btn" data-toast="Matrix exported (demo)">Export</button></div>
+      </div>
+    </section>`;
   }
 
   function modalStockDetail(p) {
+    const plat = WF_STATE.filters.account.platform === 'telegram' ? 'Telegram' : 'WhatsApp';
     const rows = (WF_DATA.masterGroups[p.brand] || []).filter((g) => g.status === p.bucket);
-    return modalShell(`Stock — ${esc(p.brand)} / ${esc(p.bucket)}`,
+    return modalShell(`${esc(p.brand)} — ${esc(p.bucket[0].toUpperCase()+p.bucket.slice(1))} (${plat})`,
       rows.length
-        ? `<table class="acct-table"><thead><tr><th>Name</th><th>Id</th><th>Members</th><th>Status</th></tr></thead>
-           <tbody>${rows.map((g) => `<tr><td>${esc(g.groupName)}</td><td class="muted">${esc(g.groupId)}</td><td>${g.members}</td><td>${esc(g.status)}</td></tr>`).join('')}</tbody></table>`
-        : `<div class="empty-state">No groups in this bucket.</div>`,
-      `<button class="btn" data-close-modal>Close</button><button class="btn" data-toast="Export started (demo)">Export Excel</button>`, true);
+        ? `<div class="modal-table-body"><div class="modal-table-scroll"><table class="join-report-table"><thead><tr><th>Group name</th><th>Group ID</th><th>Non-admin</th><th>Invite link</th><th>Last sync</th></tr></thead>
+           <tbody>${rows.slice(0,30).map((g) => `<tr><td>${esc(g.groupName)}</td><td class="join-report-table__mono">${esc(g.groupId)}</td><td>${g.nonAdmin ?? Math.max(0,(g.members||0)-(g.admins||0))}</td><td>${g.inviteLink?`<a class="join-report-table__link" href="${esc(g.inviteLink)}" target="_blank">link</a>`:'—'}</td><td>${esc(g.lastSync||'—')}</td></tr>`).join('')}</tbody></table></div></div>`
+        : `<div class="empty-state">No groups in this stock bucket.</div>`,
+      `<button class="btn" data-close-modal>Close</button><button class="btn" data-toast="Export started (demo)">Export Excel</button>`, true, 'modal--stock');
   }
 
   function modalJqSetup(p) {
     const type = p.taskType;
+    const account = WF.findAccount(p.accountId)?.account;
+    const groups = (WF_DATA.masterGroups[p.brand] || []).slice(0, 10);
     let body = '';
     if (type === 'join') {
-      const groups = (WF_DATA.masterGroups[p.brand] || []).slice(0, 5);
-      body = `<p class="muted" style="font-size:12px;margin-top:0">Select missing master groups or import CSV (demo checklist).</p>
-        <div class="check-list">${groups.map((g,i)=>`<label class="check-item"><input type="checkbox" ${i<2?'checked':''}/> ${esc(g.groupName)}</label>`).join('')}</div>`;
+      body = `<p class="job-setup-subtitle">${esc(p.brand)} · Join missing</p>
+        <label class="job-setup-dropzone"><input type="file" accept=".csv,.xlsx" hidden><strong>Drop .csv or .xlsx here, or click to browse</strong><span>Validating against master before queueing</span></label>
+        <details class="job-setup-accordion" open><summary>Select from master list (${groups.length} groups)</summary>
+          <div class="job-setup-table-wrap"><table class="operations-job-queue-table"><thead><tr><th><input type="checkbox" checked> Select all</th><th>Group</th></tr></thead><tbody>${groups.map((g)=>`<tr><td><input type="checkbox" checked></td><td>${esc(g.groupName)}</td></tr>`).join('')}</tbody></table></div>
+        </details>`;
     } else if (type === 'create_group') {
       const hasPhoto = WF_DATA.settings.brandPhotoSet[p.brand];
-      body = `<div class="form-grid">
-        <div class="form-row"><label>Base name</label><input class="field" value="${esc(p.brand)} NEW" style="width:100%" /></div>
-        <div class="form-row"><label>Count</label><input class="field" type="number" value="5" style="width:100%" /></div>
-      </div>
-      <p style="font-size:12px;margin:12px 0 0;color:var(--color-text-secondary)">Brand photo: ${hasPhoto ? '<strong style="color:var(--color-wa)">Preview available</strong> (already set in Settings)' : '<strong style="color:#fbbf24">Not set</strong> — configure in Settings before create in production app.'}</p>`;
+      body = `<p class="job-setup-subtitle">${WF_STATE.filters.ops.platform==='telegram'?'Telegram':'WhatsApp'} | ${esc(p.brand)} | ${esc(account?.accountName || '')}</p>
+        <div class="job-create-grid">
+          <section class="job-setup-card"><h4>Group batch</h4><label>Group name *</label><input class="field" value="${esc(p.brand)} Customer A" placeholder="e.g. FWSG Customer A"><label>Total groups to create *</label><input class="field" type="number" min="1" max="500" value="10"><div class="job-inline"><label>Start Number *<input class="field" type="number" value="1"></label><label class="toggle"><span class="switch on"></span> Number each group name</label></div></section>
+          <section class="job-setup-card"><h4>Group permissions</h4>${WF_STATE.filters.ops.platform==='telegram'
+            ? '<label class="toggle"><span class="switch on"></span> Hide chat history for new members</label>'
+            : '<label class="toggle"><span class="switch on"></span> Only admins send messages</label><label class="toggle"><span class="switch on"></span> Only admins add members</label><label class="toggle"><span class="switch on"></span> Only admins edit group info</label>'}</section>
+          <section class="job-setup-card"><h4>Preview Photo *</h4><div class="job-photo-preview">${hasPhoto?'<span class="status-active">Brand photo available</span>':'Photo for this brand is not available yet.'}</div></section>
+        </div>`;
     } else if (type === 'set_admin') {
-      body = `<div class="form-row"><label>Target account</label>
-        <select class="field" style="width:100%">${WF.allAccounts().filter(a=>a.brandName===p.brand).map(a=>`<option>${esc(a.accountName)}</option>`).join('')}</select></div>
-        <div class="check-list" style="margin-top:10px">${(WF_DATA.masterGroups[p.brand]||[]).slice(0,4).map(g=>`<label class="check-item"><input type="checkbox" checked/> ${esc(g.groupName)}</label>`).join('')}</div>`;
+      body = `<p class="job-setup-subtitle">${esc(p.brand)} · Set admin</p><p class="job-setup-hint">Owner promotes selected account as admin — only groups where owner is admin and target has joined but is not yet admin are shown.</p>
+        <div class="form-row"><label>Account to promote</label><select class="dark-select" style="width:100%"><option value="">Select Account</option>${WF.allAccounts().filter(a=>a.brandName===p.brand&&a.id!==p.accountId&&a.sessionStatus==='valid').map(a=>`<option value="${a.id}">${esc(a.accountName)}</option>`).join('')}</select></div>
+        <div class="job-setup-table-wrap"><table class="operations-job-queue-table"><thead><tr><th><input type="checkbox"> Select all</th><th>Group</th></tr></thead><tbody>${groups.slice(0,5).map(g=>`<tr><td><input type="checkbox"></td><td>${esc(g.groupName)}</td></tr>`).join('')}</tbody></table></div>`;
     } else {
-      body = `<p class="muted" style="font-size:12px;margin-top:0">Select groups to exit (leave). Delete is queued later from VIEW if Settings allow.</p>
-        <div class="check-list">${WF_DATA.junkGroups.map(g=>`<label class="check-item"><input type="checkbox" checked/> ${esc(g.groupName)}</label>`).join('')}</div>`;
+      body = `<p class="job-setup-subtitle">${esc(p.brand)} · Leave group</p>
+        <div class="operations-job-queue-exit-group-tabs"><button class="operations-job-queue-exit-group-tab operations-job-queue-exit-group-tab--active">On device</button><button class="operations-job-queue-exit-group-tab">Not in master</button></div>
+        <p class="job-setup-hint">All groups on this account from latest daily scrape (real device data).</p>
+        <div class="job-setup-table-wrap"><table class="operations-job-queue-table"><thead><tr><th><input type="checkbox"> Select all</th><th>Group</th><th>Group ID</th></tr></thead><tbody>${groups.map(g=>`<tr><td><input type="checkbox"></td><td>${esc(g.groupName)}</td><td class="join-report-table__mono">${esc(g.groupId)}</td></tr>`).join('')}</tbody></table></div>
+        <div class="group-links-pagination"><span>1–10 of ${WF_DATA.masterGroups[p.brand]?.length||0}</span><div class="group-links-pagination-actions"><button class="group-links-page-btn" disabled>Previous</button><button class="group-links-page-btn">Next</button></div></div>`;
     }
-    return modalShell(`SETUP — ${esc(type)}`, body,
-      `<button class="btn" data-close-modal>Cancel</button><button class="btn btn-primary" data-setup-save>Queue</button>`, true);
+    const title = ({join:'Setup join tasks',create_group:'Setup create group',set_admin:'Setup set admin tasks',exit_delete_group:'Setup exit & delete groups'})[type] || 'Setup';
+    const saveDisabled = type === 'create_group' && !WF_DATA.settings.brandPhotoSet[p.brand];
+    return modalShell(title, body,
+      `<button class="btn" data-close-modal>Cancel</button><button class="btn btn-primary" data-setup-save ${saveDisabled?'disabled':''}>Queue</button>`, true, 'brand-modal-panel--job-queue-setup');
   }
 
   function modalJqView(p) {
     const job = WF_STATE.jobs.find((j) => j.id === p.jobId);
     if (!job) return modalAlert({ title: 'Not found', message: 'Job not found.' });
     if (job.taskType === 'create_group') {
-      return modalShell(`VIEW Create — ${esc(job.accountName)}`,
-        `<div class="seg" style="margin-bottom:12px">
-          <button type="button" class="is-active" data-create-tab="result">Result</button>
-          <button type="button" data-create-tab="photo">Set Photo</button>
-        </div>
-        <div id="create-tab-body">
-          <table class="acct-table"><thead><tr><th>Name</th><th>Id</th><th>Invite</th><th>Status</th></tr></thead>
-          <tbody>${(job.outcomes||[]).map(o=>`<tr><td>${esc(o.groupName)}</td><td class="muted">${esc(o.groupId)}</td><td class="muted">${o.inviteLink?'link':'—'}</td><td>${esc(o.status)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No results yet</td></tr>'}</tbody></table>
-        </div>`,
-        `<button class="btn" data-close-modal>Close</button><button class="btn btn-primary" data-queue-set-photo="${job.id}">Queue Set Photo</button>`, true);
+      const isPhoto = job.action === 'set_group_photo';
+      return modalShell(`${esc(job.accountName)}`,
+        `<p class="job-setup-subtitle">Create group · ${esc(job.brandName)} · ${esc(job.status)}</p>
+         <p class="muted" style="font-size:12px;margin:0 0 10px">Created: ${esc(fmtTime(job.createdAt))}</p>
+         <table class="acct-table"><thead><tr><th>Group name</th><th>Group ID</th><th>Invite link</th>${isPhoto?'<th>Status</th>':''}</tr></thead>
+         <tbody>${(job.outcomes||[]).map(o=>`<tr><td>${esc(o.groupName)}</td><td class="muted">${esc(o.groupId)}</td><td class="muted">${o.inviteLink?'link':'—'}</td>${isPhoto?`<td>${esc(o.status||'—')}</td>`:''}</tr>`).join('')||'<tr><td colspan="3" class="muted">No results yet</td></tr>'}</tbody></table>`,
+        `<button class="btn" data-close-modal>Close</button>
+         ${!isPhoto && job.status==='completed' ? `<button class="btn btn-primary" data-queue-set-photo="${job.id}">Queue Set Photo</button>` : ''}
+         <button class="btn" data-toast="Export started (demo)">Export</button>`, true);
     }
-    return modalShell(`VIEW — ${esc(job.taskType)}`,
-      `<p class="muted" style="font-size:12px;margin-top:0">${esc(job.remark || '')}</p>
-       <table class="acct-table"><thead><tr><th>Group</th><th>Id</th><th>Status</th><th>Remark</th></tr></thead>
+    return modalShell(`${esc(job.accountName)}`,
+      `<p class="job-setup-subtitle">${esc(({join:'Join missing',set_admin:'Set admin',exit_delete_group:'Leave group'})[job.taskType]||job.taskType)} · ${esc(job.brandName)} · ${esc(job.status)}</p>
+       <p class="muted" style="font-size:12px;margin:0 0 10px">${esc(job.remark || '')}</p>
+       <table class="acct-table"><thead><tr><th>Group name</th><th>Group ID</th><th>Status</th><th>Remark</th></tr></thead>
        <tbody>${(job.outcomes||[]).map(o=>`<tr><td>${esc(o.groupName)}</td><td class="muted">${esc(o.groupId)}</td><td>${esc(o.status)}</td><td>${esc(o.remark||'—')}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No per-group outcomes</td></tr>'}</tbody></table>`,
-      `${job.taskType==='exit_delete_group'?'<button class="btn btn-danger" data-toast="Delete queued for Left groups (demo)">Queue delete</button>':''}
-       ${job.status==='failed'?'<button class="btn btn-wa" data-job-run="'+job.id+'" data-close-modal>Run failed only</button>':''}
-       <button class="btn" data-close-modal>Close</button>`, true);
+      `${job.taskType==='exit_delete_group' && job.status==='completed'?'<button class="btn btn-danger" data-toast="Delete queued for Left groups (demo)">Queue delete (left groups)</button>':''}
+       ${job.status==='failed'?'<button class="btn btn-wa" data-job-run="'+job.id+'" data-close-modal>Run</button>':''}
+       <button class="btn" data-close-modal>Close</button><button class="btn" data-toast="Export started (demo)">Export</button>`, true);
   }
 
   function modalAddBrand() {
@@ -1905,7 +2395,7 @@ window.WF = {
   function modalAddAccount(p) {
     return modalShell(`Add Account — ${esc(p.brand)}`,
       `<div class="form-grid">
-        <div class="form-row"><label>Platform</label><select class="field" id="new-acc-plat" style="width:100%"><option value="whatsapp">WhatsApp</option><option value="telegram">Telegram</option></select></div>
+        <div class="form-row"><label>Platform</label><select class="field dark-select" id="new-acc-plat" style="width:100%"><option value="whatsapp" ${p.platform==='whatsapp'?'selected':''}>WhatsApp</option><option value="telegram" ${p.platform==='telegram'?'selected':''}>Telegram</option></select></div>
         <div class="form-row"><label>Account name</label><input class="field" id="new-acc-name" style="width:100%" /></div>
         <div class="form-row"><label>Phone</label><input class="field" id="new-acc-phone" style="width:100%" /></div>
         <div class="form-row"><label>Location</label><select class="field" id="new-acc-loc" style="width:100%"><option>MY</option><option>KH</option></select></div>
@@ -1986,9 +2476,19 @@ window.WF = {
     $$('[data-view]').forEach((b) => b.addEventListener('click', () => { WF_STATE.accountView = b.dataset.view; renderPage(); }));
     $('#btn-export-acc')?.addEventListener('click', () => WF.toast('Export Excel (demo)'));
     $('#btn-add-brand')?.addEventListener('click', () => WF.isAdmin ? WF.openModal('add-brand') : WF.toast('Admin permission required'));
-    $$('[data-add-account]').forEach((b) => b.addEventListener('click', () => WF.isAdmin ? WF.openModal('add-account', { brand: b.dataset.addAccount }) : WF.toast('Admin permission required')));
+    $('#btn-add-card')?.addEventListener('click', () => WF.isAdmin ? WF.openModal('add-brand') : WF.toast('Admin permission required'));
+    $$('[data-add-menu]').forEach((b) => b.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const menu = b.closest('.brand-add-account-menu');
+      $$('.brand-add-account-menu.is-open').forEach((item) => { if (item !== menu) item.classList.remove('is-open'); });
+      menu?.classList.toggle('is-open');
+    }));
+    $$('[data-add-account]').forEach((b) => b.addEventListener('click', () => WF.isAdmin ? WF.openModal('add-account', { brand: b.dataset.addAccount, platform: b.dataset.addPlatform }) : WF.toast('Admin permission required')));
     $$('[data-collapse-brand]').forEach((b) => b.addEventListener('click', () => b.closest('.brand-card')?.classList.toggle('collapsed')));
-    $$('[data-master]').forEach((b) => b.addEventListener('click', () => WF.openModal('master-groups', { brand: b.dataset.master })));
+    $$('[data-master]').forEach((b) => b.addEventListener('click', () => {
+      WF_STATE.matrix = { bookmark: 'full_group', filters: {}, page: 1 };
+      WF.openModal('master-groups', { brand: b.dataset.master, platform: b.dataset.platform || WF_STATE.filters.account.platform });
+    }));
     $$('[data-sync]').forEach((b) => b.addEventListener('click', () => startSync(b.dataset.sync)));
     $$('[data-clear]').forEach((b) => b.addEventListener('click', () => {
       const f = WF.findAccount(b.dataset.clear); if (!f) return;
@@ -1996,7 +2496,8 @@ window.WF = {
     }));
     $$('[data-group-link]').forEach((b) => b.addEventListener('click', () => {
       const found = WF.findAccount(b.dataset.groupLink);
-      WF.openModal('group-link-picker', { accountId: b.dataset.groupLink, accountName: found?.account.accountName });
+      WF_STATE.details = { mode: 'account', page: 1 };
+      WF.openModal('group-links', { accountId: b.dataset.groupLink, accountName: found?.account.accountName });
     }));
     $$('[data-cancel-scrape]').forEach((b) => b.addEventListener('click', () => {
       const f = WF.findAccount(b.dataset.cancelScrape);
@@ -2005,12 +2506,7 @@ window.WF = {
 
     $('#ops-platform')?.addEventListener('change', (e) => { WF_STATE.filters.ops.platform = e.target.value; WF_STATE.jq.accountId = ''; renderPage(); });
     $('#ops-brand')?.addEventListener('change', (e) => { WF_STATE.filters.ops.brand = e.target.value; WF_STATE.jq.brand = e.target.value; renderPage(); });
-    $$('[data-ops-bm]').forEach((b) => b.addEventListener('click', () => {
-      WF_STATE.opsBookmark = b.dataset.opsBm;
-      setHashFromState();
-      renderPage();
-    }));
-    $$('[data-stock]').forEach((b) => b.addEventListener('dblclick', () => WF.openModal('stock-detail', { brand: b.dataset.stockBrand, bucket: b.dataset.stock })));
+    $$('[data-stock]').forEach((b) => b.addEventListener('click', () => WF.openModal('stock-detail', { brand: b.dataset.stockBrand, bucket: b.dataset.stock })));
 
     $('#jq-task')?.addEventListener('change', (e) => { WF_STATE.jq.taskType = e.target.value; renderPage(); });
     $('#jq-brand')?.addEventListener('change', (e) => { WF_STATE.jq.brand = e.target.value; WF_STATE.filters.ops.brand = e.target.value; WF_STATE.jq.accountId = ''; renderPage(); });
@@ -2089,14 +2585,38 @@ window.WF = {
       WF.openModal('sync-error', { title: 'Scrape cancelled', message: 'Scrape was cancelled.' });
       renderPage();
     }));
-    $$('[data-open-links]').forEach((b) => b.addEventListener('click', () => WF.openModal('group-links', { accountId: b.dataset.openLinks, mode: b.dataset.mode })));
-    $('#gl-admin-filter')?.addEventListener('change', (e) => {
-      $$('#modal-root tbody tr').forEach((tr) => {
-        const v = e.target.value;
-        if (v === 'all') tr.style.display = '';
-        else tr.style.display = (String(tr.dataset.isadmin) === 'true') === (v === 'yes') ? '' : 'none';
-      });
-    });
+    $$('[data-details-mode]').forEach((b) => b.addEventListener('click', () => {
+      WF_STATE.details.mode = b.dataset.detailsMode;
+      WF_STATE.details.page = 1;
+      renderModal();
+    }));
+    $$('[data-details-page]').forEach((b) => b.addEventListener('click', () => {
+      WF_STATE.details.page = Number(b.dataset.detailsPage);
+      renderModal();
+    }));
+    $$('[data-details-back]').forEach((b) => b.addEventListener('click', () => {
+      if (WF_STATE.details.mode === 'junk') {
+        WF_STATE.details.mode = 'account';
+        WF_STATE.details.page = 1;
+        renderModal();
+      } else {
+        WF.closeModal();
+      }
+    }));
+    $$('[data-matrix-bookmark]').forEach((b) => b.addEventListener('click', () => {
+      WF_STATE.matrix.bookmark = b.dataset.matrixBookmark;
+      WF_STATE.matrix.page = 1;
+      renderModal();
+    }));
+    $$('[data-matrix-filter]').forEach((s) => s.addEventListener('change', () => {
+      WF_STATE.matrix.filters[Number(s.dataset.matrixFilter)] = s.value;
+      WF_STATE.matrix.page = 1;
+      renderModal();
+    }));
+    $$('[data-matrix-page]').forEach((b) => b.addEventListener('click', () => {
+      WF_STATE.matrix.page = Number(b.dataset.matrixPage);
+      renderModal();
+    }));
     $('#gl-export')?.addEventListener('click', () => WF.toast('Export Excel (demo)'));
     $$('[data-toast]').forEach((b) => b.addEventListener('click', () => WF.toast(b.dataset.toast)));
     $$('[data-setup-save]').forEach((b) => b.addEventListener('click', () => {
@@ -2126,6 +2646,16 @@ window.WF = {
       WF.toast('Language: ' + (b.dataset.lang === 'zh' ? '中文' : 'English') + ' (demo)');
     }));
     $$('[data-queue-set-photo]').forEach((b) => b.addEventListener('click', () => { WF.toast('Set Photo job queued (demo)'); WF.closeModal(); }));
+    $$('.operations-job-queue-exit-group-tab').forEach((b) => b.addEventListener('click', () => {
+      $$('.operations-job-queue-exit-group-tab').forEach((x) => x.classList.remove('operations-job-queue-exit-group-tab--active'));
+      b.classList.add('operations-job-queue-exit-group-tab--active');
+      const hint = b.closest('.modal')?.querySelector('.job-setup-hint');
+      if (hint) {
+        hint.textContent = b.textContent.trim() === 'Not in master'
+          ? 'Daily groups not in brand master — difference daily minus master.'
+          : 'All groups on this account from latest daily scrape (real device data).';
+      }
+    }));
     $$('[data-create-tab]').forEach((b) => b.addEventListener('click', () => {
       $$('[data-create-tab]').forEach((x) => x.classList.remove('is-active'));
       b.classList.add('is-active');
@@ -2179,22 +2709,18 @@ window.WF = {
 
   function applyHash() {
     const raw = (location.hash || '#/account').replace(/^#\/?/, '');
-    const [page, sub] = raw.split('/');
-    const allowed = ['account', 'operations', 'reporting', 'settings'];
+    const [page] = raw.split('/');
+    const allowed = ['account', 'operations', 'settings'];
     if (page === 'settings' && !WF.isAdmin) {
       WF_STATE.page = 'account';
       location.hash = '#/account';
       return;
     }
     if (allowed.includes(page)) WF_STATE.page = page;
-    if (page === 'operations' && (sub === 'overview' || sub === 'job_queue')) {
-      WF_STATE.opsBookmark = sub;
-    }
   }
 
   function setHashFromState() {
     let h = '#/' + WF_STATE.page;
-    if (WF_STATE.page === 'operations') h += '/' + WF_STATE.opsBookmark;
     if (location.hash !== h) history.replaceState(null, '', h);
   }
 

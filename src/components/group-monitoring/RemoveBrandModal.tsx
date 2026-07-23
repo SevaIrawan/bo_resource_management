@@ -36,10 +36,8 @@ export function RemoveBrandModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, saving, onClose]);
 
-  if (!open) return null;
-
   return (
-    <BrandModalRoot onBackdropClick={saving ? undefined : onClose}>
+    <BrandModalRoot open={open} onBackdropClick={saving ? undefined : onClose}>
       <div
         className="brand-modal-panel"
         role="alertdialog"

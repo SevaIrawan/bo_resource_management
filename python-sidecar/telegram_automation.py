@@ -17,11 +17,12 @@ from telethon.errors import (
 from telethon.tl.functions.channels import (
     CreateChannelRequest,
     EditAdminRequest,
+    GetFullChannelRequest,
     GetParticipantRequest,
     JoinChannelRequest,
+    TogglePreHistoryHiddenRequest,
 )
 from telethon.tl.functions.messages import ExportChatInviteRequest, ImportChatInviteRequest
-from telethon.tl.functions.channels import TogglePreHistoryHiddenRequest
 from telethon.tl.types import Channel, ChatAdminRights, User
 
 from telegram_human_delay import (
@@ -31,7 +32,7 @@ from telegram_human_delay import (
     merge_delay,
     sleep_key,
 )
-from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
+from telegram_login import SESSIONS, _restore_telegram_session_locked, tg_session_lock
 
 
 def _ok(action: str, result: dict) -> dict:
@@ -40,6 +41,23 @@ def _ok(action: str, result: dict) -> dict:
 
 def _err(action: str, message: str, *, error_code: str = "AUTOMATION_FAILED") -> dict:
     return {"status": "error", "action": action, "message": message, "errorCode": error_code}
+
+
+def _peer_group_id(entity) -> str:
+    """Selaras scrape dialog.id — peer id channel biasanya -100…"""
+    try:
+        return str(utils.get_peer_id(entity))
+    except Exception:  # noqa: BLE001
+        return str(getattr(entity, "id", "") or "")
+
+
+def _is_http_invite_link(link: str) -> bool:
+    value = (link or "").strip().lower()
+    return (
+        value.startswith("http://")
+        or value.startswith("https://")
+        or value.startswith("t.me/")
+    )
 
 
 def _normalize_phone_digits(raw: str) -> str:
@@ -59,10 +77,16 @@ async def _prepare_session(
     session_string: str | None,
     expected_phone: str | None,
 ) -> tuple[Any | None, dict | None]:
-    if session_string and session_string.strip():
-        restored = await restore_telegram_session(session_id, session_string.strip())
+    """Caller MUST hold tg_session_lock(session_id) — jangan panggil restore_telegram_session (deadlock)."""
+    session = SESSIONS.get(session_id)
+    if session_string and session_string.strip() and (not session or session.status != "ready"):
+        restored = await _restore_telegram_session_locked(session_id, session_string.strip())
         if restored.get("status") == "error":
-            return None, _err("prepare", restored.get("message", "Session restore failed"), error_code="SESSION_RESTORE_FAILED")
+            return None, _err(
+                "prepare",
+                restored.get("message", "Session restore failed"),
+                error_code="SESSION_RESTORE_FAILED",
+            )
 
     session = SESSIONS.get(session_id)
     if not session:
@@ -143,6 +167,22 @@ def extract_invite_hash(link: str) -> str | None:
 
 
 async def _export_invite_link(client, channel, delay_cfg: dict) -> str:
+    """Return real invite URL only — never peer id as fake link.
+
+    Pola learning scrape/create: baca exported_invite dari GetFull dulu,
+    baru ExportChatInviteRequest (hemat API + kurang FloodWait).
+    """
+    try:
+        full = await client(GetFullChannelRequest(channel))
+        exported = getattr(full.full_chat, "exported_invite", None)
+        link = (getattr(exported, "link", None) or "").strip() if exported is not None else ""
+        if link and _is_http_invite_link(link):
+            return link
+    except FloodWaitError:
+        raise
+    except Exception:  # noqa: BLE001
+        pass
+
     retries = max(1, int(delay_cfg.get("invite_export_retries", 3)))
     gap = float(delay_cfg.get("invite_export_retry_sec", 3))
     last_err: Exception | None = None
@@ -151,20 +191,24 @@ async def _export_invite_link(client, channel, delay_cfg: dict) -> str:
         try:
             invite = await client(ExportChatInviteRequest(peer=channel))
             link = (invite.link or "").strip()
-            if link:
+            if link and _is_http_invite_link(link):
                 return link
-            last_err = RuntimeError("empty invite link")
-        except FloodWaitError:
-            raise
+            last_err = RuntimeError("empty or invalid invite link")
+        except FloodWaitError as exc:
+            cap = max_floodwait_auto_sleep(delay_cfg)
+            if int(exc.seconds) > cap:
+                raise
+            await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
+            last_err = exc
+            continue
         except Exception as exc:  # noqa: BLE001
             last_err = exc
         if attempt < retries:
             await sleep_key(delay_cfg, "invite_export_retry_sec", default=gap)
 
-    peer = str(utils.get_peer_id(channel))
     if last_err:
-        return peer
-    return peer
+        print(f"[tg-automation] invite export failed: {last_err}")
+    return ""
 
 
 async def _resolve_group_entity(
@@ -237,6 +281,8 @@ async def run_create_group(
             prep_err["action"] = action
             return prep_err
 
+        channel = None
+        group_id = ""
         try:
             if batch_idx > 1:
                 await sleep_key(delay_cfg, "between_groups_sec", default=90.0)
@@ -245,12 +291,20 @@ async def run_create_group(
                 CreateChannelRequest(title=name, about=about, megagroup=True)
             )
             channel = created.chats[0]
-            group_id = str(int(channel.id))
+            group_id = _peer_group_id(channel)
 
             await sleep_key(delay_cfg, "after_create_sec", default=2.0)
 
             if hide_chat_history:
-                await client(TogglePreHistoryHiddenRequest(channel=channel, enabled=True))
+                try:
+                    await client(TogglePreHistoryHiddenRequest(channel=channel, enabled=True))
+                except FloodWaitError as exc:
+                    cap = max_floodwait_auto_sleep(delay_cfg)
+                    if int(exc.seconds) <= cap:
+                        await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
+                        await client(TogglePreHistoryHiddenRequest(channel=channel, enabled=True))
+                    else:
+                        print(f"[tg-automation] hide history FloodWait {exc.seconds}s skipped")
 
             me = await client.get_me()
             owner = f"@{me.username}" if me.username else (f"+{me.phone}" if me.phone else str(me.id))
@@ -266,13 +320,60 @@ async def run_create_group(
                 },
             )
         except FloodWaitError as exc:
+            # Channel sudah dibuat — jangan orphan: kembalikan sukses + id, invite mungkin kosong.
+            if channel is not None and group_id:
+                cap = max_floodwait_auto_sleep(delay_cfg)
+                if int(exc.seconds) <= cap:
+                    await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
+                    invite_link = await _export_invite_link(client, channel, delay_cfg)
+                else:
+                    invite_link = ""
+                me = await client.get_me()
+                owner = (
+                    f"@{me.username}"
+                    if me.username
+                    else (f"+{me.phone}" if me.phone else str(me.id))
+                )
+                return _ok(
+                    action,
+                    {
+                        "group_id": group_id,
+                        "group_name": name,
+                        "invite_link": invite_link,
+                        "owner": owner,
+                        "flood_wait_partial": True,
+                    },
+                )
             cap = max_floodwait_auto_sleep(delay_cfg)
             if int(exc.seconds) > cap:
                 return _err(action, f"FloodWait {exc.seconds}s exceeds cap {cap}s", error_code="FLOOD_WAIT")
             await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
             return _err(action, f"FloodWait {exc.seconds}s — retry job", error_code="FLOOD_WAIT_RETRY")
         except Exception as exc:  # noqa: BLE001
+            if channel is not None and group_id:
+                return _ok(
+                    action,
+                    {
+                        "group_id": group_id,
+                        "group_name": name,
+                        "invite_link": "",
+                        "owner": "",
+                        "post_create_error": str(exc) or "post_create_failed",
+                    },
+                )
             return _err(action, str(exc) or "create_group failed")
+
+
+def _normalize_set_admin_target(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return value
+    if value.startswith("@") or value.startswith("+"):
+        return value
+    digits = _normalize_phone_digits(value)
+    if digits and value.replace(" ", "").replace("-", "").isdigit():
+        return f"+{digits}"
+    return value
 
 
 async def run_set_admin(
@@ -287,7 +388,8 @@ async def run_set_admin(
     delay: dict | None = None,
 ) -> dict:
     action = "set_admin"
-    normalized = [t.strip() for t in (targets or []) if t and t.strip()]
+    normalized = [_normalize_set_admin_target(t) for t in (targets or []) if t and t.strip()]
+    normalized = [t for t in normalized if t]
     if not normalized:
         return _err(action, "targets required", error_code="INVALID_PAYLOAD")
 
@@ -346,7 +448,24 @@ async def run_set_admin(
                     errors.append({"target": target, "error": f"FloodWait {exc.seconds}s"})
                 else:
                     await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
-                    errors.append({"target": target, "error": f"FloodWait {exc.seconds}s — retry"})
+                    try:
+                        user = await client.get_entity(target)
+                        await client(
+                            EditAdminRequest(
+                                channel=entity,
+                                user_id=user,
+                                admin_rights=rights,
+                                rank="Admin",
+                            )
+                        )
+                        promoted.append(target)
+                    except Exception as retry_exc:  # noqa: BLE001
+                        errors.append(
+                            {
+                                "target": target,
+                                "error": f"FloodWait retry failed: {retry_exc}",
+                            }
+                        )
             except UserNotParticipantError:
                 skipped.append({"target": target, "reason": "not_member"})
             except UserPrivacyRestrictedError:
@@ -367,7 +486,7 @@ async def run_set_admin(
                 "promoted": promoted,
                 "skipped": skipped,
                 "errors": errors,
-                "group_id": str(getattr(entity, "id", "") or group_id or ""),
+                "group_id": _peer_group_id(entity) if entity else str(group_id or ""),
             },
         }
         if status == "error" and not promoted:
@@ -407,7 +526,7 @@ async def run_join_by_invite_link(
                     updates = await client(ImportChatInviteRequest(invite_hash))
                     chats = getattr(updates, "chats", None) or []
                     chat = chats[0] if chats else None
-                    gid = str(int(chat.id)) if chat else ""
+                    gid = _peer_group_id(chat) if chat else ""
                     title = getattr(chat, "title", "") or gid
                     return _ok(
                         action,
@@ -419,16 +538,28 @@ async def run_join_by_invite_link(
                         },
                     )
                 except UserAlreadyParticipantError:
-                    entity = await client.get_entity(link)
-                    return _ok(
-                        action,
-                        {
-                            "group_id": str(int(entity.id)),
-                            "group_name": getattr(entity, "title", "") or str(entity.id),
-                            "invite_link": link,
-                            "already_member": True,
-                        },
-                    )
+                    try:
+                        entity = await client.get_entity(link)
+                        return _ok(
+                            action,
+                            {
+                                "group_id": _peer_group_id(entity),
+                                "group_name": getattr(entity, "title", "") or _peer_group_id(entity),
+                                "invite_link": link,
+                                "already_member": True,
+                            },
+                        )
+                    except Exception:  # noqa: BLE001
+                        # Private invite: get_entity(link) sering gagal jika sudah member.
+                        return _ok(
+                            action,
+                            {
+                                "group_id": "",
+                                "group_name": "",
+                                "invite_link": link,
+                                "already_member": True,
+                            },
+                        )
                 except (InviteHashExpiredError, InviteHashInvalidError) as exc:
                     return _err(action, str(exc), error_code="INVITE_INVALID")
 
@@ -438,8 +569,8 @@ async def run_join_by_invite_link(
                 return _ok(
                     action,
                     {
-                        "group_id": str(int(entity.id)),
-                        "group_name": getattr(entity, "title", "") or str(entity.id),
+                        "group_id": _peer_group_id(entity),
+                        "group_name": getattr(entity, "title", "") or _peer_group_id(entity),
                         "invite_link": link,
                         "already_member": False,
                     },
@@ -452,6 +583,14 @@ async def run_join_by_invite_link(
             await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
             return _err(action, f"FloodWait {exc.seconds}s — retry job", error_code="FLOOD_WAIT_RETRY")
         except UserAlreadyParticipantError:
-            return _ok(action, {"invite_link": link, "already_member": True})
+            return _ok(
+                action,
+                {
+                    "group_id": "",
+                    "group_name": "",
+                    "invite_link": link,
+                    "already_member": True,
+                },
+            )
         except Exception as exc:  # noqa: BLE001
             return _err(action, str(exc) or "join failed")

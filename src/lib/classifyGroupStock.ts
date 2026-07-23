@@ -22,7 +22,7 @@ export interface GroupStockMasterRow extends GroupStockClassifyInput {
 }
 
 export function emptyGroupStockCounts(): GroupStockCounts {
-  return { active: 0, ready: 0, recycle: 0, review: 0, other: 0 };
+  return { active: 0, ready: 0, recycle: 0, review: 0 };
 }
 
 /**
@@ -35,14 +35,14 @@ export function classifyGroupStockBucket(
 ): GroupStockBucket {
   const memberNonAdmin = Math.max(0, Math.floor(Number(input.memberNonAdmin) || 0));
   const groupName = input.groupName.trim();
-  if (!groupName) return 'other';
+  if (!groupName) return 'review';
 
   for (const pattern of policy.blocklistPatterns) {
-    if (pattern.test(groupName)) return 'other';
+    if (pattern.test(groupName)) return 'review';
   }
 
   const brand = policy.brand.trim();
-  if (!brand) return 'other';
+  if (!brand) return 'review';
 
   if (isPrefix3GroupName(groupName, brand) && memberNonAdmin < 1) {
     return 'recycle';
@@ -55,7 +55,7 @@ export function classifyGroupStockBucket(
     if (memberNonAdmin === 0 || memberNonAdmin > 1) return 'review';
   }
 
-  return 'other';
+  return 'review';
 }
 
 export function aggregateGroupStockCountsForBrand(
@@ -107,4 +107,9 @@ export function readGroupStockCounts(
 /** Sanity: semua bucket key terdefinisi. */
 export function isCompleteGroupStockCounts(counts: GroupStockCounts): boolean {
   return GROUP_STOCK_BUCKETS.every((bucket) => Number.isFinite(counts[bucket]));
+}
+
+/** Active+Ready+Recycle+Review — harus = total master (catch-all masuk Review). */
+export function sumGroupStockCounts(counts: GroupStockCounts): number {
+  return GROUP_STOCK_BUCKETS.reduce((sum, bucket) => sum + Math.max(0, counts[bucket] || 0), 0);
 }

@@ -34,8 +34,6 @@ export function MissingPhoneModal({
     }
   }, [open, initialPhone]);
 
-  if (!open) return null;
-
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const value = phone.trim();
@@ -50,7 +48,7 @@ export function MissingPhoneModal({
   const displayError = localError ?? error;
 
   return (
-    <BrandModalRoot onBackdropClick={saving ? undefined : onClose}>
+    <BrandModalRoot open={open} onBackdropClick={saving ? undefined : onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--sync"
         role="dialog"

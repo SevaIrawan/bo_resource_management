@@ -166,13 +166,11 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
 
   useEffect(() => {
     registerRefreshHandler(async (activeTab) => {
-      if (activeTab === 'reporting') {
-        scheduleReportingReload();
-      } else {
-        await reloadAll();
-        if (activeTab === 'operations') {
-          scheduleOperationsReload();
-        }
+      await reloadAll();
+      // Matrix Group modal (Account header) ikut realtime via rm-reporting-reload.
+      scheduleReportingReload();
+      if (activeTab === 'operations') {
+        scheduleOperationsReload();
       }
     });
     return () => registerRefreshHandler(null);
@@ -218,9 +216,9 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   });
 
   const realtimeSuspendAccountIds = useMemo(() => {
-    if (!autoSync.activeAutoScrapeAccountId) return probeSuspendAccountIds;
-    return [...new Set([...probeSuspendAccountIds, autoSync.activeAutoScrapeAccountId])];
-  }, [autoSync.activeAutoScrapeAccountId, probeSuspendAccountIds]);
+    if (autoSync.activeAutoScrapeAccountIds.length === 0) return probeSuspendAccountIds;
+    return [...new Set([...probeSuspendAccountIds, ...autoSync.activeAutoScrapeAccountIds])];
+  }, [autoSync.activeAutoScrapeAccountIds, probeSuspendAccountIds]);
 
   useRealtimeAccountSessions({
     groups,

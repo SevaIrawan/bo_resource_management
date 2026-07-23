@@ -49,6 +49,6 @@ Validator: `npm run validate:real-operations-data`
 # Realtime setelah scrape
 
 1. Tulis daily + master (satu RPC)
-2. Supabase realtime → grid + `scheduleReportingReload`
+2. Supabase realtime → grid + `scheduleReportingReload` (`rm-reporting-reload` → Group matrix modal)
 
-Reporting tab = read-only Supabase, `dedupeDailyRowsByGroupIdKeepLatest`, reload `rm-reporting-reload`.
+Group matrix (Account header) = read-only Supabase, `dedupeDailyRowsByGroupIdKeepLatest`, reload `rm-reporting-reload`. Stock chips di header Account — bukan tab Operations Overview.

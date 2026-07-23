@@ -40,6 +40,7 @@ export function shouldSkipAutoScrapeAccount(
   suspendedIds: ReadonlySet<string>,
 ): boolean {
   if (suspendedIds.has(account.id)) return true;
+  if (account.status !== 'active') return true;
   if (account.sessionStatus !== 'valid') return true;
   if (account.syncState === 'pending') return true;
   if (account.actionProcess) return true;
@@ -84,6 +85,10 @@ export async function waitUntilAutoScrapeAccountReady(
 /**
  * Satu akun auto scrape — lane terpisah, update grid per sukses; gagal skip + tutup Chrome.
  */
+export type AutoScrapeActiveEvent =
+  | { kind: 'start'; account: AccountBrandRow; dbAccountId?: string }
+  | { kind: 'end'; accountId: string };
+
 export async function runAutoAccountScrape(input: {
   userId: string;
   group: AccountBrandGroup;
@@ -91,7 +96,7 @@ export async function runAutoAccountScrape(input: {
   onGroupsChange: Dispatch<SetStateAction<AccountBrandGroup[]>>;
   cycleControl?: AutoScrapeCycleControl;
   suspendedIds?: ReadonlySet<string>;
-  onActiveChange?: (active: { account: AccountBrandRow; dbAccountId?: string } | null) => void;
+  onActiveChange?: (event: AutoScrapeActiveEvent) => void;
 }): Promise<AutoScrapeAccountResult> {
   const { userId, group, account, onGroupsChange, cycleControl, onActiveChange } = input;
   const suspendedIds = input.suspendedIds ?? new Set<string>();
@@ -100,12 +105,12 @@ export async function runAutoAccountScrape(input: {
 
   let dbAccountId = '';
 
-  const setActive = (dbId?: string) => {
-    onActiveChange?.({ account, dbAccountId: dbId });
+  const markStart = (dbId?: string) => {
+    onActiveChange?.({ kind: 'start', account, dbAccountId: dbId });
   };
 
-  const clearActive = () => {
-    onActiveChange?.(null);
+  const markEnd = () => {
+    onActiveChange?.({ kind: 'end', accountId: account.id });
   };
 
   try {
@@ -119,7 +124,7 @@ export async function runAutoAccountScrape(input: {
     );
     if (!ready) return isAborted(cycleControl) ? 'aborted' : 'skipped';
 
-    setActive(dbAccountId);
+    markStart(dbAccountId);
 
     if (isAborted(cycleControl)) return 'aborted';
 
@@ -197,13 +202,21 @@ export async function runAutoAccountScrape(input: {
       return isAborted(cycleControl) ? 'aborted' : 'failed';
     }
 
+    // Lane sibuk / penuh — scrape tidak dijalankan → sama skip (session/syarat), bukan failed scrape.
+    if (
+      message.includes('AUTO_SCRAPE_USER_LANE_BUSY') ||
+      message.includes('AUTO_SCRAPE_LANE_BUSY')
+    ) {
+      return 'skipped';
+    }
+
     if (scrapeFailureNeedsLoginModal(message)) {
       onGroupsChange((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
     }
 
     return 'failed';
   } finally {
-    clearActive();
+    markEnd();
     await teardownAutoScrapeDevice({ account, dbAccountId: dbAccountId || undefined });
   }
 }

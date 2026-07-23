@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.28)
+## 4. Konfigurasi & installer (kondisi 1.0.30)
 
 ### 4.1 Variabel lingkungan
 
@@ -101,7 +101,7 @@ Output Linux: `release/*.AppImage`
 
 CI: workflow **Release multi-platform** — job `build-win`, `build-mac`, `build-linux` → publish gabung ketiga artefak.
 
-Rencana lengkap: [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md)
+Runbook rilis multi-platform: [docs/RELEASE-CI.md](./docs/RELEASE-CI.md)
 
 **Yang terbundel dalam satu paket:**
 
@@ -168,14 +168,13 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 - **daily_junk_group** (Group mismatch): gap daily > master — `group_id` di daily tidak ada di master.
 - **missing_group**: gap master > daily — belum join grup master.
 - **not_admin**, **duplicate_group_id**, **duplicate_group_name** — lihat `.cursorrules` §11.
-- Realtime post-scrape: `patchAccountGridAfterDailyWrite` → patch grid + `scheduleReportingReload`.
+- Realtime post-scrape: `patchAccountGridAfterDailyWrite` → patch grid + `scheduleMonitoringReload` (Group matrix + Operations).
 - Modal **Admin vs master** / **Groups on account**: read-only dari Supabase (`fetchAccountGroupLinks`, `fetchAccountDailyGroupLinks`).
+- **Group matrix:** `BrandMasterGroupsModal` dari badge grup header kartu (bukan tab Reporting).
 
-### 6.3 Tab Operations (Overview + Job Queue)
+### 6.3 Tab Operations (Job Queue)
 
-Bookmark **Overview** — stock opname per brand+platform (`OperationsMonitoringPanel`, `OPERATIONS-STOCK-ENGINE.md`).
-
-Bookmark **Job Queue** — antrian otomasi device nyata (WA Puppeteer / TG sidecar):
+Tab Operations langsung menampilkan **Job Queue** tanpa bookmark. Slicer shell hanya **Platform**; brand dan akun dipilih di form setup task. Antrian menjalankan otomasi device nyata (WA Puppeteer / TG sidecar):
 
 | Action | Alur singkat |
 |--------|----------------|
@@ -183,7 +182,7 @@ Bookmark **Job Queue** — antrian otomasi device nyata (WA Puppeteer / TG sidec
 | `create_group` | SETUP modal (batch + **permission per job**) → runner baca `payload.createGroupSettings` |
 | `set_group_photo` | Dari **VIEW** create job selesai → upload/select foto brand → queue follow-up |
 | `set_admin` | SETUP super-admin targets |
-| `exit_delete_group` | Exit SETUP → delete dari VIEW result |
+| `exit_delete_group` | Leave SETUP → setelah leave selesai auto-enqueue delete (grup left); VIEW untuk retry |
 
 **Create group permission (1.0.28):**
 
@@ -207,13 +206,18 @@ Bookmark **Job Queue** — antrian otomasi device nyata (WA Puppeteer / TG sidec
 
 Validasi: `npm run validate:operations-job-queue`, `npm run validate:real-operations-data`.
 
-### 6.4 Tab Reporting (read-only)
+### 6.4 Group matrix (dari Account card)
 
-- Slicer: Platform, Brand, Acc Name (**All** = matrix), bookmark **Full Group** / **Full Admin**
-- Matrix (Acc=All): baris `groups_master` × join/admin per akun dari `group_scrape_daily` terbaru (`dedupeDailyRowsByGroupIdKeepLatest`)
-- Full Group / Full Admin per akun: daily akun atau admin vs master — fetch langsung Supabase (tanpa cache)
-- Realtime: event `rm-reporting-reload` setelah scrape, reconcile, atau perubahan master/daily (debounce 500 ms)
-- Filter kolom akun (Yes/No): jika kosong, header tabel + dropdown tetap tampil + tombol **Back to all groups**
+Tab **Reporting** UI shell sudah dihapus. Entry: klik **xxx Group** di header brand card Account.
+
+- Scope: brand + platform card itu (bukan slicer global)
+- Matrix **semua Acc** platform tersebut — tanpa filter Acc Name (per-akun sudah di baris card)
+- Bookmark **Full Group** / **Full Admin** (join vs admin Yes/No)
+- Filter kolom akun (Yes/No/All) di header kolom Acc
+- Data: `loadJoinGroupMatrix` — `groups_master` × daily terbaru (`dedupeDailyRowsByGroupIdKeepLatest`)
+- Realtime: event `rm-reporting-reload` setelah scrape / master / daily (debounce 500 ms)
+
+Komponen: `BrandMasterGroupsModal` → `ReportingJoinMatrixTable`.
 
 ### 6.5 Admin & Settings
 
@@ -226,7 +230,7 @@ Validasi: `npm run validate:operations-job-queue`, `npm run validate:real-operat
 
 | Platform | Kunci device | Batasan |
 |----------|--------------|---------|
-| WhatsApp | `resolveDeviceSessionId()` → LocalAuth `clientId` / folder `wa-sessions/session-{id}` | Lock per session; pool max ~4 Chrome (`waBrowserPool.ts`); **device key = UUID baris grid** |
+| WhatsApp | `resolveDeviceSessionId()` → LocalAuth `clientId` / folder `wa-sessions/session-{id}` | Lock per session; user pool max **10** Chrome; auto scrape brand slots max **6** (terpisah); TG user/auto kuota sendiri; **device key = UUID baris grid** |
 | Telegram | UUID `messaging_accounts.id` → sidecar `SESSIONS[session_id]` | Poll QR v3; tidak cancel `wait_task` saat finalize |
 
 Validasi sebelum rilis: `npm run validate:desktop`
@@ -265,7 +269,7 @@ Detail: `supabase/migrations/README.md`
 
 | Perubahan di DB | Dampak di app |
 |-----------------|---------------|
-| Scrape run, snapshot, daily, master | Patch grid metrik + **Reporting reload** (debounce ~500 ms) |
+| Scrape run, snapshot, daily, master | Patch grid metrik + **Group matrix** + Operations reload (debounce ~500 ms) |
 | Brand / messaging account | Reload monitoring penuh |
 | Session `is_active` false | Badge session invalid |
 
@@ -326,7 +330,7 @@ release/                Output installer (gitignore)
 | `npm run build:installer` | Installer Windows lengkap |
 | `npm run publish:github` | Build + upload Release (auto-update) |
 | `npm run validate:pre-release` | Gate lengkap sebelum publish (desktop + typecheck) |
-| `node scripts/validate-reporting-matrix.mjs` | Reporting matrix + filter empty back |
+| `node scripts/validate-reporting-matrix.mjs` | Group matrix Acc=All (Account header) + filter kolom |
 | `npm run typecheck` | TypeScript check |
 
 ---
@@ -347,7 +351,7 @@ release/                Output installer (gitignore)
 
 | File | Isi |
 |------|-----|
-| **[docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md)** | **Perencanaan installer Windows + macOS + Linux** (Fase 0–7) |
+| **[docs/RELEASE-CI.md](./docs/RELEASE-CI.md)** | **Rilis multi-platform** (Win / Mac / Linux) + status installer Completed |
 | **[docs/guides/documents/](./docs/guides/documents/)** | **Panduan user — PDF & Word (EN + 中文)** — bukan Markdown |
 | [docs/guides/README.md](./docs/guides/README.md) | Cara bagikan ke tim |
 | [docs/HANDBOOK.md](./docs/HANDBOOK.md) | Referensi internal (ID) |

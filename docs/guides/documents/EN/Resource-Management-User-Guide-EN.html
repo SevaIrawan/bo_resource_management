@@ -22,7 +22,7 @@
 <li><a href="#3-navigation-and-layout">3. Navigation and layout</a></li>
 <li><a href="#4-account-tab-account-monitoring">4. Account tab — account monitoring</a></li>
 <li><a href="#5-ticket-tab-issues-and-remediation">5. Ticket tab — issues and remediation</a></li>
-<li><a href="#6-reporting-tab-join-admin-matrix">6. Reporting tab — join/admin matrix</a></li>
+<li><a href="#6-group-matrix-join-admin-account-header">6. Group matrix — join/admin (Account header)</a></li>
 <li><a href="#7-admin-page">7. Admin page</a></li>
 <li><a href="#8-data-synchronization-realtime">8. Data synchronization (realtime)</a></li>
 <li><a href="#9-recommended-daily-workflows">9. Recommended daily workflows</a></li>
@@ -43,7 +43,7 @@
 <li><a href="#3-navigation-and-layout">Navigation and layout</a></li>
 <li><a href="#4-account-tab--account-monitoring">Account tab — account monitoring</a></li>
 <li><a href="#5-ticket-tab--issues-and-remediation">Ticket tab — issues and remediation</a></li>
-<li><a href="#6-reporting-tab--joinadmin-matrix">Reporting tab — join/admin matrix</a></li>
+<li><a href="#6-group-matrix--joinadmin-account-header">Group matrix — join/admin (Account header)</a></li>
 <li><a href="#7-admin-page">Admin page</a></li>
 <li><a href="#8-data-synchronization-realtime">Data synchronization (realtime)</a></li>
 <li><a href="#9-recommended-daily-workflows">Recommended daily workflows</a></li>
@@ -250,13 +250,16 @@
 </thead>
 <tbody><tr>
 <td><strong>Account</strong></td>
-<td>Brand cards &amp; WA/TG account rows</td>
+<td>Brand cards, WA/TG rows, KPI issues, <strong>stock chips</strong> + <strong>Group matrix</strong> (card header)</td>
 </tr>
 <tr>
-<td><strong>Ticket</strong></td>
-<td>Open issues to remediate (badge = open issue count)</td>
+<td><strong>Operations</strong></td>
+<td><strong>Job Queue</strong> only (join / create / set admin / exit-delete / set photo)</td>
 </tr>
 </tbody></table>
+<blockquote>
+<p>There is <strong>no</strong> separate Reporting tab. Open the join/admin matrix from the <strong>group count badge</strong> on the Account brand card header. Stock chips live on the same header (not an Operations Overview bookmark).</p>
+</blockquote>
 <p>Switching tabs updates KPI cards and the filter toolbar below.</p>
 <h3 id="3-4-kpi-cards-summary-numbers">3.4 KPI cards (summary numbers)</h3>
 <p>Numbers refresh when you change tab or when data updates from the database.</p>
@@ -930,38 +933,33 @@
 </tbody></table>
 <p>If tickets remain after phone fix: <strong>Run</strong> scraper to push latest device data. After scrape, ticket counts and Groups columns refresh from the latest database (not stale cache).</p>
 <hr>
-<h2 id="6-reporting-tab-join-admin-matrix">6. Reporting tab — join/admin matrix</h2>
-<p>Read-only — does not change sessions, scraper, or tickets.</p>
+<h2 id="6-group-matrix-join-admin-account-header">6. Group matrix — join/admin (Account header)</h2>
+<p>The Reporting tab shell was <strong>removed</strong>. Join/admin matrix opens from the Account brand card <strong>group count badge</strong> (<code>BrandMasterGroupsModal</code>) — read-only.</p>
 <table>
 <thead>
 <tr>
-<th>Filter</th>
+<th>Control</th>
 <th>Purpose</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Platform</strong></td>
-<td>WhatsApp or Telegram</td>
-</tr>
-<tr>
-<td><strong>Brand</strong></td>
-<td>Brand with accounts</td>
-</tr>
-<tr>
-<td><strong>Acc Name</strong></td>
-<td><strong>All</strong> = matrix for all accounts; one account = single-account report</td>
+<td>Entry</td>
+<td>Account → brand card header → group count</td>
 </tr>
 <tr>
 <td><strong>Full Group / Full Admin</strong></td>
-<td>Join status or admin status vs master</td>
+<td>Join or admin Yes/No vs master (all accounts on that brand+platform)</td>
 </tr>
 <tr>
-<td><strong>Search group name</strong></td>
-<td>Filter by group name</td>
+<td>Search / Status</td>
+<td>Filter by name / stock status</td>
+</tr>
+<tr>
+<td>Column filter</td>
+<td>Yes / No / All on account headers</td>
 </tr>
 </tbody></table>
-<p><strong>Matrix (Acc Name = All):</strong> master rows × account columns (Yes/No). Column header dropdown: Yes / No / All. If filter returns no rows, table headers stay visible — click <strong>Back to all groups</strong> or choose <strong>All</strong>.</p>
-<p>Updates automatically after scrape or Supabase changes (realtime).</p>
+<p>Updates automatically after scrape or Supabase changes (<code>rm-reporting-reload</code>).</p>
 <hr>
 <h2 id="7-admin-page">7. Admin page</h2>
 <p>Open from sidebar: <strong>Admin</strong>.</p>

@@ -1,15 +1,20 @@
 /**
  * Batasi jumlah instance Chrome/Puppeteer WA yang hidup bersamaan.
- * 100+ akun = profil terpisah per sessionId, tapi tidak boleh 100 Chrome sekaligus.
+ * Kuota WA terpisah dari Telegram sidecar. Default 10; slot on-demand (hanya Chrome aktif).
  */
-const DEFAULT_MAX_CONCURRENT_WA_BROWSERS = 4;
+import {
+  DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM,
+  HARD_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM,
+} from '../../../src/config/deviceConcurrencyPolicy';
+
+const DEFAULT_MAX_CONCURRENT_WA_BROWSERS = DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM;
 
 function readMaxSlots(): number {
   const raw = process.env.RM_WA_MAX_CONCURRENT_BROWSERS;
   if (!raw) return DEFAULT_MAX_CONCURRENT_WA_BROWSERS;
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n < 1) return DEFAULT_MAX_CONCURRENT_WA_BROWSERS;
-  return Math.min(n, 12);
+  return Math.min(n, HARD_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM);
 }
 
 let slotsInUse = 0;
@@ -21,7 +26,7 @@ function releaseSlot(): void {
   if (next) next();
 }
 
-/** Satu slot global per operasi `client.initialize()` (login / scrape / probe). */
+/** Satu slot WA per operasi `client.initialize()` (login / scrape / probe). */
 export async function withWaBrowserSlot<T>(fn: () => Promise<T>): Promise<T> {
   const maxSlots = readMaxSlots();
   if (slotsInUse >= maxSlots) {

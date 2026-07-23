@@ -65,9 +65,10 @@ const checks = [
       scrapeFlow.includes('updateSessionOnSuccess?: boolean'),
   },
   {
-    name: '§ Multi-akun: executeSlotPool max 4 + IPC',
+    name: '§ Multi-akun: executeSlotPool per platform (WA/TG) + IPC',
     ok:
       slotPool.includes('getMaxWaBrowserSlots') &&
+      slotPool.includes('getMaxTgExecuteSlots') &&
       read('electron/preload/index.ts').includes('executeSlots:'),
   },
   {

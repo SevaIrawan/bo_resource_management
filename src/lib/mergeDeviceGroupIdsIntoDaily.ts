@@ -7,6 +7,7 @@ import { hasValidAccountPhone } from '@/lib/accountPhone';
 import { buildGroupRowId } from '@/lib/groupRowId';
 import { TABLES } from '@/config/tables';
 import { getSupabase } from '@/lib/supabase';
+import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import type { Platform } from '@/types/database';
 
 const INSERT_CHUNK = 150;
@@ -27,15 +28,14 @@ export async function mergeDeviceGroupIdsIntoDaily(input: {
   ];
   if (!uniqueIds.length) return 0;
 
-  const { data: existing, error: existingError } = await supabase
-    .from(TABLES.groupScrapeDaily)
-    .select('group_id')
-    .eq('account_id', input.accountId);
-
-  if (existingError) throw existingError;
+  const existingRows = await fetchAllSupabaseRows<{ group_id: string }>(
+    TABLES.groupScrapeDaily,
+    'group_id',
+    [{ column: 'account_id', value: input.accountId }],
+  );
 
   const existingGids = new Set(
-    (existing ?? []).map((row) => String(row.group_id ?? '').trim()).filter(Boolean),
+    existingRows.map((row) => String(row.group_id ?? '').trim()).filter(Boolean),
   );
 
   const newGids = uniqueIds.filter((gid) => !existingGids.has(gid));
@@ -47,16 +47,17 @@ export async function mergeDeviceGroupIdsIntoDaily(input: {
     ? input.phoneNumber.trim()
     : '0';
 
-  const { data: masterRows, error: masterError } = await supabase
-    .from(TABLES.groupsMaster)
-    .select('group_id, group_name, invite_link')
-    .eq('brand', brand)
-    .eq('platform', input.platform);
-
-  if (masterError) throw masterError;
+  const masterRows = await fetchAllSupabaseRows<{
+    group_id: string;
+    group_name: string;
+    invite_link: string;
+  }>(TABLES.groupsMaster, 'group_id, group_name, invite_link', [
+    { column: 'brand', value: brand },
+    { column: 'platform', value: input.platform },
+  ]);
 
   const masterByGid = new Map(
-    (masterRows ?? []).map((row) => [String(row.group_id ?? '').trim(), row]),
+    masterRows.map((row) => [String(row.group_id ?? '').trim(), row]),
   );
 
   const scrapeDate = todayScrapeDate();

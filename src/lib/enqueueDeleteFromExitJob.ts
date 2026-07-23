@@ -40,6 +40,12 @@ export async function enqueueDeleteFromExitJob(
     error: 'NO_CHUNKS',
   };
 
+  /** Delete chat lokal akun ini saja (WA wipe / TG delete_dialog) — bukan dissolve. */
+  const leaveDelete = {
+    ...toLeaveDeleteJobPayload(workerSettings),
+    requireOwnerForDelete: false,
+  };
+
   for (const chunk of chunks) {
     lastResult = await enqueueAutomationJob({
       brandName: exitJob.brandName,
@@ -52,7 +58,7 @@ export async function enqueueDeleteFromExitJob(
         groups: chunk,
         sourceExitJobId: exitJob.id,
         exitDeletePhase: 'delete',
-        leaveDelete: toLeaveDeleteJobPayload(workerSettings),
+        leaveDelete,
       },
       storedSessionString: exitJob.storedSessionString ?? ctx.storedSessionString,
       expectedPhone: exitJob.expectedPhone ?? ctx.expectedPhone,

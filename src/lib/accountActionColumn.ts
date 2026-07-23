@@ -1,16 +1,18 @@
+import { computeAccountGapMetrics } from '@/lib/accountGapMetrics';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 
 export type AccountActionProcessIntent = 'sync' | 'scraper';
 
 export type AccountActionColumnKind =
   | 'none'
-  | 'group-link'
+  | 'aligned'
+  | 'not-aligned'
   | 'cancel-scrape'
   | 'proc-sync';
 
 /**
- * Group link hanya bila >0/>0 (Y scrape + X master dari pipeline).
- * Selain itu — termasuk kiamat / di luar nalar — caller fallback ke kosong.
+ * Ada data scrape + master untuk menilai alignment Remark.
+ * (Legacy name retained for audit / callers.)
  */
 export function accountHasGroupLinkData(row: {
   groupsCurrent: number;
@@ -44,8 +46,8 @@ function isActiveScraperProcess(
 }
 
 /**
- * Kolom Action — prioritas:
- * Cancel scrape (scrape aktif) → Proc Sync → Group link (hanya >0/>0) → kosong (fallback).
+ * Kolom Remark — prioritas:
+ * Cancel scrape → Proc Sync → Not Aligned (ada Junk/Missing/Not admin) → Aligned (clean) → kosong.
  */
 export function resolveAccountActionColumn(
   row: AccountBrandRow,
@@ -63,9 +65,12 @@ export function resolveAccountActionColumn(
   if (activeProcessIntent === 'sync') {
     return 'proc-sync';
   }
-  if (accountHasGroupLinkData(row)) {
-    return 'group-link';
+  if (!accountHasGroupLinkData(row)) {
+    return 'none';
   }
-  return 'none';
+  const gaps = computeAccountGapMetrics(row);
+  if (gaps.isClean) {
+    return 'aligned';
+  }
+  return 'not-aligned';
 }
-

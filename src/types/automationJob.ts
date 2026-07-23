@@ -78,6 +78,7 @@ export interface AutomationJobPayload {
     joinError?: string;
     photoStatus?: 'set' | 'failed';
     exitStatus?: 'left' | 'failed' | 'pending';
+    exitError?: string;
     deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
   }>;
 }

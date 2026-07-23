@@ -1,6 +1,6 @@
 # Supabase migrations
 
-Migrasi di folder ini — jalankan urutan di `SUPABASE_RUNBOOK.md` / `JALANKAN_INI.md`.
+Migrasi di folder ini — jalankan urutan di `SUPABASE_RUNBOOK.md` saja.
 
 **Panduan lengkap step-by-step:** baca `SUPABASE_RUNBOOK.md` di root project.
 

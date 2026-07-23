@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wireframe Review &amp; Breakdown · ID</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --line: #2d3a47;
+      --text: #e8eef4;
+      --muted: #9aabbc;
+      --head: #1e2a38;
+      --c1: rgba(120, 130, 150, 0.14);
+      --c2: rgba(139, 90, 60, 0.18);
+      --c3: rgba(45, 106, 79, 0.18);
+      --c4: rgba(78, 168, 222, 0.14);
+      --accent: #4ea8de;
+      --warn: #e9c46a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 1.75rem 1rem 2.75rem;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    header {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .lang {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.45rem;
+    }
+    header h1 {
+      margin: 0 0 0.4rem;
+      font-size: 1.4rem;
+      font-weight: 650;
+    }
+    header .meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      max-width: 46rem;
+    }
+    h2 {
+      margin: 1.5rem 0 0.7rem;
+      font-size: 1.02rem;
+      color: var(--accent);
+      font-weight: 650;
+    }
+    .key-grid { display: grid; gap: 0.65rem; }
+    .key-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.95rem 1.05rem;
+    }
+    .key-card .num {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      margin-bottom: 0.3rem;
+    }
+    .key-card strong {
+      display: block;
+      font-size: 0.98rem;
+      margin-bottom: 0.45rem;
+    }
+    .key-card p {
+      margin: 0 0 0.4rem;
+      color: #d7e3ee;
+      font-size: 0.88rem;
+    }
+    .key-card p:last-child { margin-bottom: 0; color: var(--muted); }
+    .key-card b { color: #e8eef4; font-weight: 650; }
+    .key-card .label {
+      display: block;
+      margin: 0 0 0.35rem;
+      color: #d7e3ee;
+      font-size: 0.88rem;
+      font-weight: 650;
+    }
+    .key-card ol {
+      margin: 0 0 0.55rem;
+      padding-left: 1.25rem;
+      color: #d7e3ee;
+      font-size: 0.88rem;
+    }
+    .key-card ol:last-of-type { margin-bottom: 0.45rem; }
+    .key-card ol li { margin-bottom: 0.35rem; }
+    .key-card ol li:last-child { margin-bottom: 0; }
+    .key-card .reason {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .scroll {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 940px;
+      font-size: 0.86rem;
+    }
+    th, td {
+      padding: 0.7rem 0.8rem;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+    }
+    th:last-child, td:last-child { border-right: none; }
+    tr:last-child td { border-bottom: none; }
+    thead th {
+      background: var(--head);
+      color: #d5e0ea;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+    td:nth-child(1) { width: 22%; background: var(--c1); font-weight: 650; }
+    td:nth-child(2) { width: 24%; background: var(--c2); }
+    td:nth-child(3) { width: 24%; background: var(--c3); }
+    td:nth-child(4) { width: 30%; background: var(--c4); }
+    .hod-note {
+      background: rgba(233, 196, 106, 0.12);
+      border: 1px solid rgba(233, 196, 106, 0.45);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      margin: 1.5rem 0 0.25rem;
+    }
+    .hod-note .label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--warn);
+      margin-bottom: 0.4rem;
+    }
+    .hod-note p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #f0e6c8;
+      line-height: 1.55;
+    }
+    .hod-note strong { color: #ffe8a3; }
+    .args { margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+    .args li {
+      list-style: none;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      padding: 0.75rem 0.9rem;
+      font-size: 0.9rem;
+    }
+    footer {
+      margin-top: 1.75rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      header .meta, .key-card p:last-child, footer { color: #444; }
+      h2, .key-card .num, header h1, .key-card strong, .key-card p, .key-card b { color: #111; }
+      td:nth-child(1) { background: #f2f2f2; }
+      td:nth-child(2) { background: #fff4ec; }
+      td:nth-child(3) { background: #eaf7f0; }
+      td:nth-child(4) { background: #eef6fb; }
+      .key-card, .args li, .scroll, .hod-note { border-color: #ccc; background: #fff; }
+      .hod-note p, .hod-note strong, .hod-note .label { color: #333; }
+      table { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="lang">Bahasa Indonesia</span>
+      <h1>Tinjauan Wireframe dan Uraian Perubahan</h1>
+      <p class="meta">
+        Perbandingan struktur aplikasi Versi 1.0.30 dan Versi Usulan.
+        Implementasi, pengujian, dan publikasi menunggu persetujuan HOD.
+      </p>
+    </header>
+
+    <h2>1. Poin utama perubahan</h2>
+    <div class="key-grid">
+      <article class="key-card">
+        <span class="num">Poin 01</span>
+        <strong>Tab utama dari tiga menjadi dua</strong>
+        <p class="label">Perubahan</p>
+        <ol>
+          <li>Tab Reporting dihapus.</li>
+          <li>Tab tersisa: Account dan Operations.</li>
+        </ol>
+        <p class="reason"><b>Alasan:</b> Tiga tab memecah alur kerja harian.</p>
+      </article>
+
+      <article class="key-card">
+        <span class="num">Poin 02</span>
+        <strong>Account sebagai pusat pantauan dan keputusan</strong>
+        <p class="label">Perubahan</p>
+        <ol>
+          <li>Status stock dipindah ke kartu brand di Account.</li>
+          <li>Matrix grup dibuka dari kartu brand di Account.</li>
+        </ol>
+        <p class="reason"><b>Alasan:</b> Keputusan operasional harus dekat dengan kondisi akun brand yang dikerjakan.</p>
+      </article>
+
+      <article class="key-card">
+        <span class="num">Poin 03</span>
+        <strong>Penggabungan tugas Job Queue berurutan</strong>
+        <p class="label">Perubahan</p>
+        <ol>
+          <li><b>Create Group dan Set Photo</b> — setelah create selesai, Set Photo masuk antrian otomatis jika foto brand tersedia.</li>
+          <li><b>Leave dan Delete</b> — setelah leave selesai, Delete masuk antrian otomatis hanya untuk grup yang berhasil ditinggalkan.</li>
+          <li><b>Foto di modal Create Group</b> — tanpa foto: Upload Photo (wajib sebelum Queue). Ada foto: Preview Photo; Queue diizinkan.</li>
+        </ol>
+        <p class="reason"><b>Alasan:</b> Tugas berurutan digabung. Foto diminta saat Create Group, bukan saat menambah brand.</p>
+      </article>
+
+      <article class="key-card">
+        <span class="num">Poin 04</span>
+        <strong>Operations difokuskan pada Job Queue</strong>
+        <p class="label">Perubahan</p>
+        <ol>
+          <li>Tab Operations menampilkan Job Queue secara langsung.</li>
+          <li>Proses Queue Leave/Delete tanpa gangguan tampilan.</li>
+          <li>Alasan kegagalan Leave ditampilkan di Remark.</li>
+        </ol>
+        <p class="reason"><b>Alasan:</b> Antarmuka eksekusi harus stabil; kegagalan harus dapat diaudit.</p>
+      </article>
+
+      <article class="key-card">
+        <span class="num">Poin 05</span>
+        <strong>Ketahanan eksekusi perangkat</strong>
+        <p class="label">Perubahan</p>
+        <ol>
+          <li><b>Telegram scrape</b> — quality gate yang menghentikan scrape karena banyak member count 0 dihapus; member count dan invite link mengutamakan data lengkap dari server.</li>
+          <li><b>Telegram otomasi</b> — kunci sesi diperbaiki agar job create/otomasi tidak saling mengunci hingga hang.</li>
+          <li><b>WhatsApp Leave</b> — percobaan ulang, jalur cadangan, dan alasan gagal di Remark.</li>
+        </ol>
+        <p class="reason"><b>Alasan:</b> Perubahan struktur layar tidak cukup jika eksekusi perangkat masih gagal tanpa alasan yang terdokumentasi.</p>
+      </article>
+    </div>
+
+    <h2>2. Edge case Point 03</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Skenario</th>
+            <th>Perilaku sistem</th>
+            <th>Tindak lanjut operator</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Create Group tanpa foto brand</td>
+            <td>Modal menampilkan Upload Photo. Queue diblokir sampai upload berhasil.</td>
+            <td>Upload di modal Create Group. Setelah create selesai, Set Photo masuk antrian otomatis.</td>
+          </tr>
+          <tr>
+            <td>Create selesai; Set Photo perlu diulang</td>
+            <td>Set Photo tetap dapat di-queue manual dari VIEW create.</td>
+            <td>Buka VIEW create → Queue Set Photo (jika foto brand tersedia).</td>
+          </tr>
+          <tr>
+            <td>Leave berhasil (status left)</td>
+            <td>Delete masuk antrian otomatis hanya untuk grup berstatus left.</td>
+            <td>Pantau antrian Delete; intervensi hanya jika Delete gagal.</td>
+          </tr>
+          <tr>
+            <td>Leave gagal</td>
+            <td>Grup gagal tidak masuk Delete otomatis. Status dan alasan ditampilkan di Remark.</td>
+            <td>Perbaiki penyebab → jalankan ulang Leave dari antrian/VIEW. Tidak ada Delete otomatis untuk grup yang belum left.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>3. Perbandingan Versi 1.0.30 dan Versi Usulan</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Yang diubah</th>
+            <th>Versi 1.0.30</th>
+            <th>Versi Usulan</th>
+            <th>Manfaat operasional</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Tab utama</td>
+            <td>Account · Operations · Reporting</td>
+            <td>Account · Operations</td>
+            <td>Navigasi lebih singkat; peran tab lebih jelas.</td>
+          </tr>
+          <tr>
+            <td>Tab Reporting</td>
+            <td>Tab terpisah</td>
+            <td>Dihapus</td>
+            <td>Mengurangi duplikasi halaman.</td>
+          </tr>
+          <tr>
+            <td>Isi tab Operations</td>
+            <td>Ringkasan stock dan antrian kerja</td>
+            <td>Job Queue langsung</td>
+            <td>Operations untuk eksekusi; stock di Account.</td>
+          </tr>
+          <tr>
+            <td>Create Group dan Set Photo</td>
+            <td>Terpisah; Set Photo manual dari VIEW</td>
+            <td>Digabung; Set Photo otomatis setelah create jika foto tersedia</td>
+            <td>Satu rangkaian create hingga foto.</td>
+          </tr>
+          <tr>
+            <td>Foto di modal Create Group</td>
+            <td>Tanpa foto: teks kosong; Queue terkunci tanpa aksi jelas</td>
+            <td>Tanpa foto: Upload wajib. Ada foto: Preview; Queue diizinkan</td>
+            <td>Upload saat create; tidak dapat dilewati tanpa foto.</td>
+          </tr>
+          <tr>
+            <td>Leave dan Delete</td>
+            <td>Terpisah; Delete manual dari VIEW</td>
+            <td>Digabung; Delete otomatis setelah leave hanya untuk grup left</td>
+            <td>Satu rangkaian leave hingga delete.</td>
+          </tr>
+          <tr>
+            <td>Status stock grup</td>
+            <td>Ringkasan Operations</td>
+            <td>Kartu brand Account</td>
+            <td>Keputusan stock bersama pantauan akun brand.</td>
+          </tr>
+          <tr>
+            <td>Akses matrix grup</td>
+            <td>Tab Reporting</td>
+            <td>Kartu brand Account (Group)</td>
+            <td>Audit matrix terikat brand yang dikerjakan.</td>
+          </tr>
+          <tr>
+            <td>Queue Leave dan Delete</td>
+            <td>Gangguan tampilan; daftar reload mendadak</td>
+            <td>Tanpa gangguan; modal tutup dulu, lalu pesan hasil</td>
+            <td>Tampilan stabil; risiko salah klik berkurang.</td>
+          </tr>
+          <tr>
+            <td>Scrape dan otomasi Telegram</td>
+            <td>Quality gate menghentikan scrape; data sering tidak lengkap; otomasi dapat hang</td>
+            <td>Quality gate ketat dihapus; GetFull-first; kunci sesi diperbaiki</td>
+            <td>Job dan data harian lebih andal.</td>
+          </tr>
+          <tr>
+            <td>Leave WhatsApp gagal</td>
+            <td>Status gagal tanpa alasan</td>
+            <td>Jalur cadangan; alasan gagal di Remark</td>
+            <td>Kegagalan dapat diaudit dan ditindaklanjuti.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>4. Tolok ukur keberhasilan (KPI)</h2>
+    <ol class="args">
+      <li><b>Navigasi (Poin 01).</b> Kerja harian lewat dua tab (Account · Operations). Reporting dihapus.</li>
+      <li><b>Account (Poin 02).</b> Stock dan matrix tersedia dari kartu brand Account.</li>
+      <li><b>Job Queue (Poin 03).</b> Create→Set Photo dan Leave→Delete otomatis sesuai syarat (lihat bagian 2).</li>
+      <li><b>Operations (Poin 04).</b> Fokus Job Queue; Queue tanpa gangguan tampilan; alasan gagal di Remark.</li>
+      <li><b>Perangkat (Poin 05).</b> Scrape/otomasi Telegram lebih andal; Leave WhatsApp punya jalur cadangan dan Remark. Opsional pasca-rilis: bandingkan intervensi manual sebelum vs sesudah.</li>
+    </ol>
+
+    <h2>5. Estimasi effort</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Klaster</th>
+            <th>Cakupan</th>
+            <th>Estimasi relatif</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>IA / UI Account–Operations</td>
+            <td>Tab, stock di Account, matrix dari kartu brand, Operations = Job Queue</td>
+            <td>Sedang</td>
+          </tr>
+          <tr>
+            <td>Job Queue</td>
+            <td>Auto Set Photo, auto Delete, Upload wajib di Create, anti-flash Queue, Remark</td>
+            <td>Sedang–besar</td>
+          </tr>
+          <tr>
+            <td>Ketahanan perangkat</td>
+            <td>Telegram scrape/otomasi, WhatsApp Leave</td>
+            <td>Sedang</td>
+          </tr>
+          <tr>
+            <td>Uji dan dokumen HOD</td>
+            <td>Uji WA+TG, checklist penerimaan, dokumen approval</td>
+            <td>Kecil–sedang</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="meta" style="margin-top:0.75rem;">
+      Urutan: Job Queue → uji perangkat → dokumen → persetujuan HOD → publikasi.
+    </p>
+
+    <h2>6. Argumen bisnis</h2>
+    <ol class="args">
+      <li><b>Status quo — navigasi.</b> Kerja terpecah ke Reporting, Overview stock, dan Job Queue; menambah waktu dan risiko salah konteks brand.</li>
+      <li><b>Status quo — Create dan Set Photo.</b> Setelah create, Set Photo masih manual dari VIEW; mudah terlewat.</li>
+      <li><b>Status quo — Leave dan Delete.</b> Setelah leave, Delete masih manual; mudah terlewat pada volume tinggi.</li>
+      <li><b>Status quo — kegagalan tanpa alasan.</b> Leave gagal tanpa Remark memperlambat perbaikan.</li>
+      <li><b>Versi Usulan.</b> Pantauan dan keputusan di Account; eksekusi di Operations; alur berurutan otomatis sesuai syarat; kegagalan dapat diaudit.</li>
+    </ol>
+
+    <h2>7. Risiko dan rollback</h2>
+    <ol class="args">
+      <li><b>Risiko:</b> Auto Set Photo / Auto Delete berjalan pada kondisi yang tidak diinginkan.<br /><b>Mitigasi:</b> Set Photo hanya jika foto tersedia; Delete hanya untuk status left; Remark untuk audit.</li>
+      <li><b>Risiko:</b> Operator belum terbiasa tanpa tab Reporting.<br /><b>Mitigasi:</b> Matrix tetap dari kartu brand Account; briefing singkat saat rilis.</li>
+      <li><b>Rollback operasional:</b> Auto follow-up dapat dinonaktifkan tanpa mengembalikan seluruh struktur. Create→Photo dan Leave→Delete tetap dapat dijalankan manual dari VIEW.</li>
+      <li><b>Rollback UI (Reporting / Overview):</b> Hanya jika diminta approval; biaya lebih tinggi. Evaluasi KPI sebelum rollback struktur tab.</li>
+    </ol>
+
+    <aside class="hod-note" role="note">
+      <span class="label">Keputusan implementasi</span>
+      <p>
+        Implementasi, pengujian, dan publikasi dilakukan
+        <strong>setelah persetujuan HOD</strong>.
+      </p>
+    </aside>
+
+    <footer>
+      Tinjauan Wireframe dan Uraian Perubahan · Versi 1.0.30 dan Versi Usulan ·
+      Implementasi setelah persetujuan HOD
+    </footer>
+  </div>
+</body>
+</html>

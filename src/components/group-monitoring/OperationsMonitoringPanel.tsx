@@ -1,99 +1,16 @@
-import {
-  AccountSlicerBar,
-  ContentNestedPanel,
-} from '@/components/group-monitoring/ContentAreaCard';
-import { OperationsBrandCardList } from '@/components/group-monitoring/OperationsBrandCardList';
+import { useState } from 'react';
+import { AccountSlicerBar } from '@/components/group-monitoring/ContentAreaCard';
 import { OperationsGlobalJobQueuePanel } from '@/components/group-monitoring/OperationsGlobalJobQueuePanel';
 import { OperationsSlicerHeader } from '@/components/group-monitoring/OperationsSlicerHeader';
 import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
-import { loadAvgNewDepositorByLine } from '@/lib/loadAvgNewDepositor';
-import { loadMasterGroupCountsByBrandPlatform } from '@/lib/loadOperationsMasterCounts';
-import { loadOperationsStockCountsByBrandPlatform } from '@/lib/loadOperationsStockCounts';
-import { readOperationsPolicyByBrand, type OperationsPolicyByBrand } from '@/config/operationsStockPolicy';
-import type { GroupStockCounts } from '@/types/groupStock';
-import {
-  filterOperationsBrandGroups,
-  normalizeOperationsFilters,
-  OPERATIONS_FILTER_DEFAULT,
-  type OperationsSlicerFilters,
-} from '@/lib/operationsFilters';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Platform } from '@/types/database';
 
-/** Tab Operations — bookmark Overview (stock) | Job Queue (antrian + join). */
+/** Tab Operations — Job Queue saja; stock overview sudah hidup di header card Account. */
 export function OperationsMonitoringPanel() {
   const { t } = useLanguage();
   const { groups, loading } = useGroupMonitoring();
-  const reloadSeqRef = useRef(0);
-  const [filters, setFilters] = useState<OperationsSlicerFilters>(OPERATIONS_FILTER_DEFAULT);
-  const [masterCounts, setMasterCounts] = useState<Map<string, number>>(() => new Map());
-  const [stockCounts, setStockCounts] = useState<Map<string, GroupStockCounts>>(() => new Map());
-  const [avgNdByLine, setAvgNdByLine] = useState<Map<string, number>>(() => new Map());
-  const [operationsPolicyByBrand, setOperationsPolicyByBrand] = useState<OperationsPolicyByBrand>(
-    () => readOperationsPolicyByBrand(),
-  );
-
-  useEffect(() => {
-    if (groups.length === 0) return;
-    setFilters((prev) => normalizeOperationsFilters(groups, prev));
-  }, [groups]);
-
-  const patchFilters = useCallback((patch: Partial<OperationsSlicerFilters>) => {
-    setFilters((prev) => ({ ...prev, ...patch }));
-  }, []);
-
-  const reloadOperationsData = useCallback(async () => {
-    const brandNames = [...new Set(groups.map((g) => g.brandName.trim()).filter(Boolean))];
-    const seq = ++reloadSeqRef.current;
-    try {
-      const [master, stock, avgNd] = await Promise.all([
-        loadMasterGroupCountsByBrandPlatform(),
-        loadOperationsStockCountsByBrandPlatform(),
-        loadAvgNewDepositorByLine(brandNames),
-      ]);
-      if (seq !== reloadSeqRef.current) return;
-      setMasterCounts(master);
-      setStockCounts(stock);
-      setAvgNdByLine(avgNd);
-    } catch {
-      if (seq !== reloadSeqRef.current) return;
-      setMasterCounts(new Map());
-      setStockCounts(new Map());
-      setAvgNdByLine(new Map());
-    }
-  }, [groups]);
-
-  useEffect(() => {
-    void reloadOperationsData();
-  }, [reloadOperationsData]);
-
-  useEffect(() => {
-    const onReload = () => void reloadOperationsData();
-    window.addEventListener('rm-operations-reload', onReload);
-    return () => window.removeEventListener('rm-operations-reload', onReload);
-  }, [reloadOperationsData]);
-
-  useEffect(() => {
-    const syncPolicy = () => setOperationsPolicyByBrand(readOperationsPolicyByBrand());
-    window.addEventListener('rm-operations-policy-changed', syncPolicy);
-    return () => window.removeEventListener('rm-operations-policy-changed', syncPolicy);
-  }, []);
-
-  const visibleGroups = useMemo(
-    () => filterOperationsBrandGroups(groups, filters),
-    [groups, filters],
-  );
-
-  const brandList = (
-    <OperationsBrandCardList
-      groups={visibleGroups}
-      activePlatform={filters.platform}
-      masterCounts={masterCounts}
-      stockCounts={stockCounts}
-      avgNdByLine={avgNdByLine}
-      operationsPolicyByBrand={operationsPolicyByBrand}
-    />
-  );
+  const [platform, setPlatform] = useState<Platform>('whatsapp');
 
   return (
     <div className="page-stack flex h-full min-h-0 flex-col gap-(--layout-gap)">
@@ -101,40 +18,24 @@ export function OperationsMonitoringPanel() {
         <header className="content-area-header shrink-0">
           <AccountSlicerBar>
             <OperationsSlicerHeader
-              groups={groups}
-              filters={filters}
-              onChange={patchFilters}
+              platform={platform}
+              onPlatformChange={setPlatform}
             />
           </AccountSlicerBar>
         </header>
 
         <div className="content-area-body flex min-h-0 flex-1 flex-col overflow-hidden">
-          {filters.bookmark === 'job_queue' ? (
-            <div className="operations-job-queue-view flex min-h-0 flex-1 flex-col overflow-hidden">
-              {loading ? (
-                <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>
-              ) : (
-                <OperationsGlobalJobQueuePanel
-                  groups={groups}
-                  platform={filters.platform}
-                  brandFilter="all"
-                />
-              )}
-            </div>
-          ) : (
-            <ContentNestedPanel className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
-              {loading ? (
-                <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>
-              ) : visibleGroups.length === 0 ? (
-                <div className="ticket-card-list ticket-card-list--empty account-filter-empty">
-                  <p className="ticket-empty-title">{t('groupMonitoring.noFilterMatch')}</p>
-                  <p className="ticket-empty-desc">{t('groupMonitoring.noFilterMatchDesc')}</p>
-                </div>
-              ) : (
-                brandList
-              )}
-            </ContentNestedPanel>
-          )}
+          <div className="operations-job-queue-view flex min-h-0 flex-1 flex-col overflow-hidden">
+            {loading ? (
+              <p className="account-sync-loading">{t('groupMonitoring.loadingAccounts')}</p>
+            ) : (
+              <OperationsGlobalJobQueuePanel
+                groups={groups}
+                platform={platform}
+                brandFilter="all"
+              />
+            )}
+          </div>
         </div>
       </section>
     </div>

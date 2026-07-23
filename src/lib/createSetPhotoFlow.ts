@@ -142,7 +142,13 @@ export function resolveCreateJobSetPhotoFollowUpRemarkKey(
   if (resolveCreatedGroupsFromCreateJob(createJob).length === 0) return null;
 
   const setPhotoJob = findSetPhotoJobForCreateJob(createJob.id, allJobs);
-  if (!setPhotoJob) return 'operations.jobQueue.createRemarkPressView';
+  if (!setPhotoJob) {
+    // Create sudah bawa photoPath → follow-up auto (opsi C); fallback VIEW manual bila tanpa foto.
+    if (createJob.payload.photoPath?.trim()) {
+      return 'operations.jobQueue.createRemarkSetPhotoAutoPending';
+    }
+    return 'operations.jobQueue.createRemarkPressView';
+  }
 
   return resolveSetPhotoJobFollowUpRemarkKey(setPhotoJob);
 }

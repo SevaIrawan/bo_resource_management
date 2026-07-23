@@ -65,7 +65,7 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
 12. MULTI-AKUN (100+ WA & Telegram per platform)
     Produk ini multi-akun: setiap baris `messaging_accounts` = satu sesi terpisah.
     - Device key: selalu `resolveDeviceSessionId()` (WA: LocalAuth `clientId` / UUID DB; TG: UUID akun).
-    - WA: satu folder profil per akun (`wa-sessions/session-{sessionId}`), lock per `sessionId`, pool global max ~4 Chrome bersamaan (`waBrowserPool.ts`, env `RM_WA_MAX_CONCURRENT_BROWSERS`).
+    - WA: satu folder profil per akun (`wa-sessions/session-{sessionId}`), lock per `sessionId`, pool global max **10** Chrome user bersamaan + lane auto max **6** (`waBrowserPool.ts` / `waAutoScrapeBrowserPool.ts`, `deviceConcurrencyPolicy.ts`, env `RM_WA_MAX_CONCURRENT_BROWSERS`).
     - Jangan buka dua Puppeteer untuk akun yang sama (lock sampai `initialize()` selesai; jangan cabut lock di `forceRelease`).
     - TG: sidecar `SESSIONS[session_id]` — kunci = UUID akun; auto-sync berurutan antar akun.
     - Issue/KPI hanya dari grup/admin, bukan login/logout session.
@@ -98,19 +98,19 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     Urutan wajib setelah scrape execute:
     1. Tulis daily atomik (`rm_commit_account_scrape`) + snapshot
     2. Patch grid akun (`applyResult` manual / `runAutoAccountScrape` auto) + `refreshAccountAfterDailyWrite` via realtime `group_scrape_daily`
-    3. `scheduleMonitoringReload` di `GroupMonitoringProvider.refreshAccountAfterDailyWrite` → Reporting + Operations reload (debounce 500ms)
-    Auto scrape: lane terpisah (`scraper:run-auto`, pool Chrome auto max 1) — tidak ambil execute slot user, tidak suspend probe global.
+    3. `scheduleMonitoringReload` di `GroupMonitoringProvider.refreshAccountAfterDailyWrite` → Group matrix (`rm-reporting-reload`) + Operations reload (debounce 500ms)
+    Auto scrape: lane terpisah (`scraper:run-auto`, pool Chrome auto max **6**/platform) — tidak ambil execute slot user, tidak suspend probe global.
     Trigger: Supabase realtime daily → `onAccountDailyChanged`; master brand → patch master; manual/auto scrape → `recordSyncActivity` + dispatch reload.
 
-16. TAB REPORTING — DATA REAL + REALTIME SUPABASE (wajib)
-    Tab Reporting = read-only; TIDAK ubah session, scraper, sync, ticket, reconcile.
-    Semua slicer & tabel WAJIB dari DB Supabase — bukan mock, cache lama, atau hardcode:
-    - Platform / Brand / Acc Name: dari `messaging_accounts` (+ brands) via `loadAccountMonitoringGroups`; platform = kolom `platform` (`whatsapp` / `telegram`), hanya tampil platform yang punya akun aktif user.
-    - Matrix (Acc=All): baris `groups_master` (brand+platform) × join/admin per akun dari `group_scrape_daily` terbaru per `group_id` (`dedupeDailyRowsByGroupIdKeepLatest` by `scraped_at`).
-    - Full Group per akun: semua baris daily akun (scrape terbaru).
-    - Full Admin per akun: master brand+platform + status admin/join dari daily terbaru (`fetchAccountGroupLinks` keepLatest).
-    Realtime wajib: saat `group_scrape_daily`, `groups_master`, scrape selesai, atau registry berubah → `scheduleReportingReload` → `rm-reporting-reload` → `ReportingMonitoringPanel.loadReport()` (debounce 500ms). UI harus menampilkan data terbaru tanpa asumsi stale.
-    Implementasi: `loadJoinGroupReport.ts`, `ReportingMonitoringPanel.tsx`, `GroupMonitoringProvider.scheduleReportingReload`, `useRealtimeMonitoring`.
+16. GROUP MATRIX (Account header) — DATA REAL + REALTIME SUPABASE (wajib)
+    Tab Reporting shell **dihapus**. Matrix join/admin = modal dari badge grup header brand card (`BrandMasterGroupsModal`) — read-only; TIDAK ubah session, scraper, sync, ticket.
+    Semua data WAJIB dari DB Supabase — bukan mock, cache lama, atau hardcode:
+    - Scope: brand + platform kartu yang dibuka; matrix semua akun platform tersebut.
+    - Matrix: baris `groups_master` (brand+platform) × join/admin per akun dari `group_scrape_daily` terbaru per `group_id` (`dedupeDailyRowsByGroupIdKeepLatest` by `scraped_at`).
+    - Bookmark Full Group / Full Admin di modal.
+    Realtime wajib: saat `group_scrape_daily`, `groups_master`, scrape selesai, atau registry berubah → `scheduleReportingReload` → `rm-reporting-reload` → `BrandMasterGroupsModal` reload (debounce 500ms). UI harus menampilkan data terbaru tanpa asumsi stale.
+    Implementasi: `loadJoinGroupReport.ts` / `loadJoinGroupMatrix`, `BrandMasterGroupsModal.tsx`, `ReportingJoinMatrixTable.tsx`, `GroupMonitoringProvider.scheduleReportingReload`, `useRealtimeMonitoring`.
+    Stock chips: header Account (`AccountBrandStockChips`) — bukan tab Operations Overview.
 
 17. DATA NYATA — SCRAPE & OPERATIONS (wajib, tanpa mock/dummy/fake)
     Semua path scrape + job queue WAJIB data dari sesi WA/TG live — BUKAN mock, dummy, placeholder DB, atau hardcode null untuk field device.

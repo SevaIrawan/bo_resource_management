@@ -11,7 +11,7 @@ Setelah install, **operator tidak** perlu menginstal Chrome, Python, Node, atau 
 | **org-default.env** | `resources/org-default.env` | Supabase + Telegram API (dari `.env` IT saat build) |
 | **env-template.env** | `resources/env-template.env` | Referensi / perbaikan `.env` user |
 | **whatsapp-web.js + puppeteer** | `app.asar.unpacked/node_modules/...` | Runtime WA (asarUnpack) |
-| **Aplikasi React + Electron** | `app.asar` + `dist` | UI, ticket, monitoring |
+| **Aplikasi React + Electron** | `app.asar` + `dist` | UI, monitoring, Operations |
 
 ## Build (IT)
 
@@ -28,7 +28,7 @@ Setiap build menjalankan:
 
 1. Unduh Chrome + build sidecar PyInstaller  
 2. Salin `.env` → `resources/org-default.env`  
-3. `validate-installer-package` + `validate-installer-runtime` (QR, skala 3000 grup, ticket)  
+3. `validate-installer-package` + `validate-installer-runtime` (QR, skala hingga 6000 grup)  
 4. Vite + electron-builder `--publish never`  
 5. **`validate-release-artifact`** — scan folder `release/` bahwa bundel benar-benar masuk installer  
 
@@ -37,8 +37,8 @@ Setiap build menjalankan:
 | Isu user | Pencegahan |
 |----------|------------|
 | QR tidak tampil | Chrome terbundel + `validate-wa-qr-login-flow` + timeout UI 150s/180s |
-| Timeout sync ~3000 grup | `DEVICE_GROUP_TARGET_MAX=3000`, timeout dinamis hingga 15–20 menit (`validate-device-group-scale`) |
-| Ticket tidak muncul / tidak match | `validate-ticket-reconcile` + reconcile di app |
+| Timeout sync akun besar | `DEVICE_GROUP_TARGET_MAX=6000`, timeout dinamis + idle watchdog (`validate-device-group-scale`) |
+| Issue KPI tidak sinkron grid | Engine `accountMasterDailyCompare` + `validate:gm-master-contract` |
 | Config Supabase hilang | `org-default.env` wajib di build + post-build scan |
 | Telegram gagal | Sidecar binary per OS di `extraResources` |
 

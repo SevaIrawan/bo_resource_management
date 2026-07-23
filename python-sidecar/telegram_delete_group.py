@@ -1,18 +1,19 @@
-"""Delete / clear Telegram group chat — owner DeleteChannel atau hapus dialog."""
+"""Delete / clear Telegram group chat — owner DeleteChannel atau hapus dialog lokal."""
 
 from __future__ import annotations
 
 import asyncio
 
 from telethon.errors import (
+    ChannelPrivateError,
     ChannelTooLargeError,
     ChatAdminRequiredError,
     FloodWaitError,
     UserCreatorError,
+    UserNotParticipantError,
 )
 from telethon.tl.functions.channels import DeleteChannelRequest
 from telethon.tl.functions.messages import DeleteHistoryRequest
-from telethon.tl.types import ChannelParticipantCreator
 
 from telegram_automation import _prepare_session, _resolve_group_entity
 from telegram_human_delay import (
@@ -39,6 +40,59 @@ async def _is_creator(client, entity, me) -> bool:
         return part.participant.__class__.__name__ in ("ChannelParticipantCreator",)
     except Exception:  # noqa: BLE001
         return False
+
+
+async def _delete_local_dialog(
+    client,
+    entity,
+    *,
+    clear_chat_history: bool,
+    creator: bool,
+    gid: str,
+    action: str,
+) -> dict:
+    """
+    Hapus chat/dialog di akun ini saja (bukan bubarkan grup).
+
+    Setelah leave_group, Telethon delete_dialog untuk channel = LeaveChannel lagi —
+    UserNotParticipantError / ChannelPrivateError = sudah left → treat sukses.
+    """
+    if clear_chat_history:
+        try:
+            await client(
+                DeleteHistoryRequest(peer=entity, max_id=0, just_clear=True, revoke=False)
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        await client.delete_dialog(entity)
+        return _ok(
+            action,
+            {
+                "group_id": gid,
+                "outcome": "dialog_deleted",
+                "creator": creator,
+            },
+        )
+    except UserNotParticipantError:
+        return _ok(
+            action,
+            {
+                "group_id": gid,
+                "outcome": "already_left",
+                "creator": creator,
+            },
+        )
+    except ChannelPrivateError:
+        return _ok(
+            action,
+            {
+                "group_id": gid,
+                "outcome": "already_gone",
+                "creator": creator,
+            },
+        )
 
 
 async def run_delete_group(
@@ -69,6 +123,16 @@ async def run_delete_group(
                 delay_cfg=delay_cfg,
             )
         except Exception as exc:  # noqa: BLE001
+            # Setelah leave, peer kadang tidak resolve — chat lokal sudah tidak relevan.
+            if not require_owner:
+                return _ok(
+                    action,
+                    {
+                        "group_id": str(group_id or "").strip(),
+                        "outcome": "already_gone",
+                        "resolve_error": str(exc) or "not found",
+                    },
+                )
             return _err(action, f"Cannot resolve group: {exc}", error_code="GROUP_NOT_FOUND")
 
         gid = str(getattr(entity, "id", "") or group_id or "")
@@ -93,22 +157,13 @@ async def run_delete_group(
                     },
                 )
 
-            if clear_chat_history:
-                try:
-                    await client(
-                        DeleteHistoryRequest(peer=entity, max_id=0, just_clear=True, revoke=False)
-                    )
-                except Exception:  # noqa: BLE001
-                    pass
-
-            await client.delete_dialog(entity)
-            return _ok(
-                action,
-                {
-                    "group_id": gid,
-                    "outcome": "dialog_deleted",
-                    "creator": creator,
-                },
+            return await _delete_local_dialog(
+                client,
+                entity,
+                clear_chat_history=clear_chat_history,
+                creator=creator,
+                gid=gid,
+                action=action,
             )
         except ChannelTooLargeError:
             return _err(

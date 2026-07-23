@@ -11,6 +11,7 @@ import {
 } from '@/components/admin/WorkerPlatformSettingsSection';
 import { AutoSyncSettingsSection } from '@/components/settings/AutoSyncSettingsSection';
 import { LanguageToggle } from '@/components/settings/LanguageToggle';
+import { formatScheduledHourAmPm } from '@/config/autoScrapeSchedule';
 import { useAutoSyncSettings } from '@/contexts/AutoSyncSettingsContext';
 import { RM_ACTIVE_TABLES } from '@/config/tables';
 import { useAppUpdateStatus } from '@/hooks/useAppUpdateStatus';
@@ -87,7 +88,7 @@ export function SettingsPage() {
 
   const autoSyncSummary = enabled
     ? t('admin.autoSyncSummaryOn', {
-        hour: String(scheduledHour).padStart(2, '0'),
+        time: formatScheduledHourAmPm(scheduledHour),
       })
     : t('admin.autoSyncSummaryOff');
 

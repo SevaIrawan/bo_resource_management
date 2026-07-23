@@ -1,2 +1,6 @@
-/** Default selaras `RM_WA_MAX_CONCURRENT_BROWSERS` / `waBrowserPool` / `executeSlotPool`. */
-export const DEFAULT_MAX_EXECUTE_SLOTS = 4;
+/** Default selaras kuota per platform (WA/TG terpisah). */
+export {
+  DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM as DEFAULT_MAX_EXECUTE_SLOTS,
+  DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM,
+  DEFAULT_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM,
+} from '@/config/deviceConcurrencyPolicy';

@@ -176,7 +176,7 @@ export function OperationsJobQueueDetailModal({
   }
 
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
+    <BrandModalRoot open={open} onBackdropClick={onClose}>
       <div
         className="brand-modal-panel brand-modal-panel--job-queue-detail"
         role="dialog"

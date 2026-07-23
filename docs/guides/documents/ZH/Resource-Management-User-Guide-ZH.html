@@ -22,7 +22,7 @@
 <li><a href="#3-导航与布局">3. 导航与布局</a></li>
 <li><a href="#4-账号-标签-账号监控">4. 「账号」标签 — 账号监控</a></li>
 <li><a href="#5-工单-标签-问题与修复">5. 「工单」标签 — 问题与修复</a></li>
-<li><a href="#6-reporting-标签-入群-管理员矩阵">6. 「Reporting」标签 — 入群/管理员矩阵</a></li>
+<li><a href="#6-群组矩阵-入群-管理员-账号页卡片">6. 群组矩阵 — 入群/管理员（账号页卡片）</a></li>
 <li><a href="#7-管理-页面">7. 「管理」页面</a></li>
 <li><a href="#8-数据同步-实时">8. 数据同步（实时）</a></li>
 <li><a href="#9-推荐日常工作流">9. 推荐日常工作流</a></li>
@@ -69,7 +69,7 @@
 <li><a href="#3-%E5%AF%BC%E8%88%AA%E4%B8%8E%E5%B8%83%E5%B1%80">导航与布局</a></li>
 <li><a href="#4-%E8%B4%A6%E5%8F%B7%E6%A0%87%E7%AD%BE--%E8%B4%A6%E5%8F%B7%E7%9B%91%E6%8E%A7">「账号」标签 — 账号监控</a></li>
 <li><a href="#5-%E5%B7%A5%E5%8D%95%E6%A0%87%E7%AD%BE--%E9%97%AE%E9%A2%98%E4%B8%8E%E4%BF%AE%E5%A4%8D">「工单」标签 — 问题与修复</a></li>
-<li><a href="#6-reporting-%E6%A0%87%E7%AD%BE--%E5%85%A5%E7%BE%A4%E7%AE%A1%E7%90%86%E5%91%98%E7%9F%A9%E9%98%B5">「Reporting」标签 — 入群/管理员矩阵</a></li>
+<li><a href="#6-%E7%BE%A4%E7%BB%84%E7%9F%A9%E9%98%B5--%E5%85%A5%E7%BE%A4%E7%AE%A1%E7%90%86%E5%91%98%E8%B4%A6%E5%8F%B7%E9%A1%B5%E5%8D%A1%E7%89%87">群组矩阵 — 入群/管理员（账号页卡片）</a></li>
 <li><a href="#7-%E7%AE%A1%E7%90%86%E9%A1%B5%E9%9D%A2">「管理」页面</a></li>
 <li><a href="#8-%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E5%AE%9E%E6%97%B6">数据同步（实时）</a></li>
 <li><a href="#9-%E6%8E%A8%E8%8D%90%E6%97%A5%E5%B8%B8%E5%B7%A5%E4%BD%9C%E6%B5%81">推荐日常工作流</a></li>
@@ -276,13 +276,16 @@
 </thead>
 <tbody><tr>
 <td><strong>账号</strong></td>
-<td>品牌卡片与 WA/TG 账号行</td>
+<td>品牌卡片、WA/TG 行、问题 KPI、<strong>库存 chips</strong> + <strong>群组矩阵</strong>（卡片标题栏）</td>
 </tr>
 <tr>
-<td><strong>工单</strong></td>
-<td>待处理问题（数字为待处理工单数）</td>
+<td><strong>Operations</strong></td>
+<td><strong>仅 Job Queue</strong>（入群 / 建群 / 设管理员 / 退出删除 / 设头像）</td>
 </tr>
 </tbody></table>
+<blockquote>
+<p><strong>无</strong>独立 Reporting 标签。从账号页品牌卡片标题栏的 <strong>群数量徽章</strong> 打开入群/管理员矩阵。库存 chips 也在同一标题栏。</p>
+</blockquote>
 <p>切换标签会更新 KPI 卡片与下方筛选工具栏。</p>
 <h3 id="3-4-kpi-卡片-汇总数字">3.4 KPI 卡片（汇总数字）</h3>
 <p>切换标签或数据库更新时，数字会刷新。</p>
@@ -965,38 +968,33 @@
 </tbody></table>
 <p>手机上已修复但工单仍在：<strong>同步 → 抓取</strong> 以推送最新设备数据。抓取后工单数量与 Groups 列从最新数据库刷新（非旧缓存）。</p>
 <hr>
-<h2 id="6-reporting-标签-入群-管理员矩阵">6. 「Reporting」标签 — 入群/管理员矩阵</h2>
-<p>只读 — 不修改会话、抓取或工单。</p>
+<h2 id="6-群组矩阵-入群-管理员-账号页卡片">6. 群组矩阵 — 入群/管理员（账号页卡片）</h2>
+<p>Reporting 标签壳层<strong>已移除</strong>。入群/管理员矩阵从账号页品牌卡片 <strong>群数量徽章</strong> 打开（<code>BrandMasterGroupsModal</code>）— 只读。</p>
 <table>
 <thead>
 <tr>
-<th>筛选</th>
-<th>作用</th>
+<th>控件</th>
+<th>用途</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Platform</strong></td>
-<td>WhatsApp 或 Telegram</td>
-</tr>
-<tr>
-<td><strong>Brand</strong></td>
-<td>有账号的品牌</td>
-</tr>
-<tr>
-<td><strong>Acc Name</strong></td>
-<td><strong>All</strong> = 全部账号矩阵；选单个 = 单账号报表</td>
+<td>入口</td>
+<td>账号 → 品牌卡片标题栏 → 群数量</td>
 </tr>
 <tr>
 <td><strong>Full Group / Full Admin</strong></td>
-<td>入群状态或管理员状态 vs 主数据</td>
+<td>相对主表的入群或管理员 Yes/No（该品牌+平台下全部账号）</td>
 </tr>
 <tr>
-<td><strong>Search group name</strong></td>
-<td>按群名筛选</td>
+<td>搜索 / Status</td>
+<td>按名称 / 库存状态筛选</td>
+</tr>
+<tr>
+<td>列筛选</td>
+<td>账号列头 Yes / No / All</td>
 </tr>
 </tbody></table>
-<p><strong>矩阵（Acc Name = All）：</strong> 主数据行 × 账号列（Yes/No）。列头下拉：Yes / No / All。若无匹配行，表头仍显示 — 点击 <strong>Back to all groups</strong> 或选 <strong>All</strong>。</p>
-<p>抓取或 Supabase 变更后自动更新（实时）。</p>
+<p>抓取或 Supabase 变更后自动刷新（<code>rm-reporting-reload</code>）。</p>
 <hr>
 <h2 id="7-管理-页面">7. 「管理」页面</h2>
 <p>从侧边栏打开：<strong>管理</strong>。</p>
@@ -1362,7 +1360,7 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>本手册对应应用版本 <strong>1.0.30</strong>。Ticket 标签页已于 1.0.24 移除；每次发布后请运行 <code>npm run build:handbook-docs</code> 更新 PDF/Word。</em></p>
+<p><em>本手册对应应用版本 <strong>1.0.30</strong>。每次发布后请运行 <code>npm run build:handbook-docs</code> 更新 PDF/Word。</em></p>
 
   </main>
   <footer class="doc-footer">

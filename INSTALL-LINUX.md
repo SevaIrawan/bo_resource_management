@@ -1,7 +1,7 @@
 # Install Resource Management (Linux) — Tim Internal
 
 > **Status:** Skrip build & konfigurasi electron-builder **sudah ada** (v1.0.4+). Versi produksi terbaru: **1.0.30**.  
-> Installer Linux harus di-build di **mesin Linux** (atau GitHub Actions). Lihat [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md).
+> Installer Linux harus di-build di **mesin Linux** (atau GitHub Actions). Lihat [docs/RELEASE-CI.md](./docs/RELEASE-CI.md).
 
 Dokumen resmi lengkap: **[PROJECT.md](./PROJECT.md)**
 
@@ -14,13 +14,12 @@ Dokumen resmi lengkap: **[PROJECT.md](./PROJECT.md)**
 ```bash
 cd "/path/to/Resource Management"
 npm install
-npm run build:installer:linux   # tersedia setelah implementasi rencana cross-platform
+npm run build:installer:linux
 ```
 
 Output (contoh):
 
-- `release/Resource Management-1.1.0.AppImage`
-- `release/resource-management_1.1.0_amd64.deb` (jika format deb dipilih)
+- `release/Resource.Management-1.0.30.AppImage` (nama artefak mengikuti `package.json` / CI)
 
 **Update kode:** naikkan `version` → GitHub Release dengan `latest-linux.yml` → operator **Restart** app.
 
@@ -31,20 +30,15 @@ Output (contoh):
 ### Opsi A — AppImage (disarankan, portable)
 
 ```bash
-chmod +x "Resource Management-1.1.0.AppImage"
-./Resource\ Management-1.1.0.AppImage
+chmod +x "Resource.Management-1.0.30.AppImage"
+./Resource.Management-1.0.30.AppImage
 ```
 
 Opsional: integrasi menu desktop sesuai kebijakan IT (AppImageLauncher, dll.).
 
-### Opsi B — Debian/Ubuntu (.deb)
+### Format rilis Linux
 
-```bash
-sudo dpkg -i resource-management_1.1.0_amd64.deb
-sudo apt-get install -f   # jika ada dependency missing
-```
-
-Jalankan **Resource Management** dari menu aplikasi.
+Produksi memakai **AppImage** (lihat [docs/RELEASE-CI.md](./docs/RELEASE-CI.md)). Paket `.deb` tidak menjadi artefak rilis utama.
 
 ---
 
@@ -85,4 +79,4 @@ Jalankan **Resource Management** dari menu aplikasi.
 
 ---
 
-*Format rilis Linux final (AppImage vs deb) ditetapkan di [docs/PLAN-CROSS-PLATFORM-INSTALLERS.md](./docs/PLAN-CROSS-PLATFORM-INSTALLERS.md) §17.*
+*Format rilis Linux produksi: **AppImage** — lihat [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) dan [docs/CLIENT-INSTALL.md](./docs/CLIENT-INSTALL.md).*

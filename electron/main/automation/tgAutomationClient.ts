@@ -8,6 +8,23 @@ import {
   resolveCreateBatchGroupName,
 } from './createGroupBatchNaming';
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function jitterMs(baseMs: number, jitterPercent = 35): number {
+  const jitter = jitterPercent / 100;
+  const low = baseMs * (1 - jitter);
+  const high = baseMs * (1 + jitter);
+  return Math.max(100, Math.floor(low + Math.random() * (high - low)));
+}
+
+async function sleepBetweenGroups(payload: AutomationRunPayload, index: number, total: number): Promise<void> {
+  if (index >= total - 1) return;
+  const betweenSec = payload.delay?.between_groups_sec ?? 60;
+  const jitterPercent = payload.delay?.jitter_percent ?? 35;
+  await sleep(jitterMs(betweenSec * 1000, jitterPercent));
+}
 async function postTelegramAutomation(
   sessionId: string,
   path: string,
@@ -129,6 +146,7 @@ export async function runTelegramAutomation(
       } else {
         failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
       }
+      await sleepBetweenGroups(payload, i, groups.length);
     }
     return {
       status: success > 0 ? 'ok' : 'error',
@@ -205,6 +223,7 @@ export async function runTelegramAutomation(
           photoStatus: 'failed',
         });
       }
+      await sleepBetweenGroups(payload, i, groups.length);
     }
 
     return {
@@ -306,6 +325,7 @@ export async function runTelegramAutomation(
       groupName?: string;
       groupLink?: string;
       exitStatus: 'left' | 'failed';
+      exitError?: string;
     }> = [];
     for (let i = 0; i < groups.length; i += 1) {
       const group = groups[i];
@@ -329,19 +349,28 @@ export async function runTelegramAutomation(
         });
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Left');
       } else {
-        failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+        const exitError = result.message ?? 'failed';
+        failed.push(`${group.groupName ?? group.groupId}: ${exitError}`);
         groupOutcomes.push({
           groupId: group.groupId,
           groupName: group.groupName,
           groupLink: group.groupLink,
           exitStatus: 'failed',
+          exitError,
         });
+        onProgress?.(i + 1, groups.length, group.groupName ?? 'Exit failed');
       }
+      await sleepBetweenGroups(payload, i, groups.length);
     }
+    const baseMessage = `Left ${success}/${groups.length} groups`;
+    const detailSuffix =
+      failed.length > 0
+        ? ` — ${failed.slice(0, 3).join('; ')}${failed.length > 3 ? ` (+${failed.length - 3} more)` : ''}`
+        : '';
     return {
       status: success > 0 ? 'ok' : 'error',
       action: 'leave_group',
-      message: `Left ${success}/${groups.length} groups`,
+      message: `${baseMessage}${detailSuffix}`,
       errorCode: success > 0 ? undefined : 'LEAVE_GROUP_BATCH_FAILED',
       result: { success, total: groups.length, failed, groupOutcomes },
     };
@@ -383,6 +412,7 @@ export async function runTelegramAutomation(
       } else {
         failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
       }
+      await sleepBetweenGroups(payload, i, groups.length);
     }
     return {
       status: success > 0 ? 'ok' : 'error',

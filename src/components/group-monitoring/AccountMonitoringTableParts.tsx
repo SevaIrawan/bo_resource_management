@@ -1,6 +1,6 @@
 import { useLanguage } from '@/hooks/useLanguage';
 
-/** 9 kolom card view — lebar via CSS % (total 100%). */
+/** Brand card: 9 kolom (tambah Junk). Flat: 9 kolom (tanpa Last update, + Brand + Junk). */
 export const ACCOUNT_TABLE_COLUMN_COUNT = 9;
 
 export type AccountMonitoringTableLayout = 'brandCard' | 'flat';
@@ -16,9 +16,9 @@ export function AccountMonitoringTableColGroup({
         <col className="brand-col brand-col--account" />
         <col className="brand-col brand-col--brand-name" />
         <col className="brand-col brand-col--location" />
-        <col className="brand-col brand-col--status" />
         <col className="brand-col brand-col--session" />
         <col className="brand-col brand-col--on-device" />
+        <col className="brand-col brand-col--junk" />
         <col className="brand-col brand-col--in-brand" />
         <col className="brand-col brand-col--admin" />
         <col className="brand-col brand-col--action" />
@@ -30,9 +30,9 @@ export function AccountMonitoringTableColGroup({
     <colgroup>
       <col className="brand-col brand-col--account" />
       <col className="brand-col brand-col--location" />
-      <col className="brand-col brand-col--status" />
       <col className="brand-col brand-col--session" />
       <col className="brand-col brand-col--on-device" />
+      <col className="brand-col brand-col--junk" />
       <col className="brand-col brand-col--in-brand" />
       <col className="brand-col brand-col--admin" />
       <col className="brand-col brand-col--last-update" />
@@ -61,20 +61,32 @@ export function AccountMonitoringTableHead({
           <th className="brand-col-head brand-col-head--location">
             {t('groupMonitoring.accountCard.colLocation')}
           </th>
-          <th className="brand-col-head brand-col-head--status">
-            {t('groupMonitoring.accountCard.colStatus')}
-          </th>
           <th className="brand-col-head brand-col-head--session">
             {t('groupMonitoring.accountCard.colSession')}
           </th>
-          <th className="brand-col-head brand-col-head--on-device">
+          <th
+            className="brand-col-head brand-col-head--on-device"
+            title={t('groupMonitoring.accountCard.colOnDeviceHint')}
+          >
             {t('groupMonitoring.accountCard.colOnDevice')}
           </th>
-          <th className="brand-col-head brand-col-head--in-brand">
-            {t('groupMonitoring.accountCard.colInBrand')}
+          <th
+            className="brand-col-head brand-col-head--junk"
+            title={t('groupMonitoring.accountCard.colJunkHint')}
+          >
+            {t('groupMonitoring.accountCard.colJunk')}
           </th>
-          <th className="brand-col-head brand-col-head--admin">
-            {t('groupMonitoring.accountCard.colAdmin')}
+          <th
+            className="brand-col-head brand-col-head--in-brand"
+            title={t('groupMonitoring.accountCard.colMissingHint')}
+          >
+            {t('groupMonitoring.accountCard.colMissing')}
+          </th>
+          <th
+            className="brand-col-head brand-col-head--admin"
+            title={t('groupMonitoring.accountCard.colNotAdminHint')}
+          >
+            {t('groupMonitoring.accountCard.colNotAdmin')}
           </th>
           <th className="brand-col-head brand-col-head--action">
             {t('groupMonitoring.accountCard.colAction')}
@@ -93,20 +105,32 @@ export function AccountMonitoringTableHead({
         <th className="brand-col-head brand-col-head--location">
           {t('groupMonitoring.accountCard.colLocation')}
         </th>
-        <th className="brand-col-head brand-col-head--status">
-          {t('groupMonitoring.accountCard.colStatus')}
-        </th>
         <th className="brand-col-head brand-col-head--session">
           {t('groupMonitoring.accountCard.colSession')}
         </th>
-        <th className="brand-col-head brand-col-head--on-device">
+        <th
+          className="brand-col-head brand-col-head--on-device"
+          title={t('groupMonitoring.accountCard.colOnDeviceHint')}
+        >
           {t('groupMonitoring.accountCard.colOnDevice')}
         </th>
-        <th className="brand-col-head brand-col-head--in-brand">
-          {t('groupMonitoring.accountCard.colInBrand')}
+        <th
+          className="brand-col-head brand-col-head--junk"
+          title={t('groupMonitoring.accountCard.colJunkHint')}
+        >
+          {t('groupMonitoring.accountCard.colJunk')}
         </th>
-        <th className="brand-col-head brand-col-head--admin">
-          {t('groupMonitoring.accountCard.colAdmin')}
+        <th
+          className="brand-col-head brand-col-head--in-brand"
+          title={t('groupMonitoring.accountCard.colMissingHint')}
+        >
+          {t('groupMonitoring.accountCard.colMissing')}
+        </th>
+        <th
+          className="brand-col-head brand-col-head--admin"
+          title={t('groupMonitoring.accountCard.colNotAdminHint')}
+        >
+          {t('groupMonitoring.accountCard.colNotAdmin')}
         </th>
         <th className="brand-col-head brand-col-head--last-update">
           {t('groupMonitoring.accountCard.colLastUpdate')}

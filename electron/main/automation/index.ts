@@ -102,8 +102,12 @@ export function registerAutomationIpc(): void {
 
   ipcMain.handle(
     'executeSlots:tryAcquire',
-    (_event, accountId: string, kind: 'sync' | 'scraper' | 'job') =>
-      tryAcquireExecuteSlot(accountId, kind),
+    (
+      _event,
+      accountId: string,
+      kind: 'sync' | 'scraper' | 'job',
+      platform: 'whatsapp' | 'telegram',
+    ) => tryAcquireExecuteSlot(accountId, kind, platform),
   );
 
   ipcMain.handle('executeSlots:release', (_event, accountId: string) => {
@@ -114,13 +118,18 @@ export function registerAutomationIpc(): void {
 
   ipcMain.handle(
     'executeSlots:acquireOrWait',
-    async (_event, accountId: string, kind: 'sync' | 'scraper' | 'job') => {
-      const immediate = tryAcquireExecuteSlot(accountId, kind);
+    async (
+      _event,
+      accountId: string,
+      kind: 'sync' | 'scraper' | 'job',
+      platform: 'whatsapp' | 'telegram',
+    ) => {
+      const immediate = tryAcquireExecuteSlot(accountId, kind, platform);
       if (immediate.ok) return { ok: true as const, queued: false };
       if (immediate.reason === 'same_account') {
         return { ok: false as const, reason: 'same_account' as const };
       }
-      await waitForExecuteSlot(accountId, kind);
+      await waitForExecuteSlot(accountId, kind, platform);
       return { ok: true as const, queued: true };
     },
   );

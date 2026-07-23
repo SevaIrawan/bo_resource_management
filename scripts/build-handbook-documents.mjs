@@ -143,12 +143,19 @@ function mdToHtmlDocument(md, guide) {
 async function writePdf(htmlPath, pdfPath, cssFile) {
   const { mdToPdf } = await import('md-to-pdf');
   const html = fs.readFileSync(htmlPath, 'utf8');
+  const executablePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    process.env.CHROME_PATH ||
+    undefined;
   await mdToPdf(
     { content: html },
     {
       dest: pdfPath,
       css: cssFile,
-      launch_options: { args: ['--no-sandbox'] },
+      launch_options: {
+        args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+        ...(executablePath ? { executablePath } : {}),
+      },
       pdf_options: {
         format: 'A4',
         margin: { top: '14mm', right: '14mm', bottom: '16mm', left: '14mm' },

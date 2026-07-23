@@ -1,25 +1,32 @@
-import { useEffect, useState, type CSSProperties } from 'react';
-import { ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
-import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, X } from 'lucide-react';
+import { ReportingCardFooter, sliceReportingPage } from '@/components/group-monitoring/ReportingCardFooter';
+import { ReportingJoinMatrixTable } from '@/components/group-monitoring/ReportingJoinMatrixTable';
 import { PlatformGroupsCountBadge } from '@/components/group-monitoring/PlatformGroupsCountBadge';
-import {
-  GROUP_LINKS_PAGE_SIZE,
-  GROUP_LINKS_VISIBLE_ROWS,
-} from '@/config/groupLinksTable';
+import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { useLanguage } from '@/hooks/useLanguage';
 import {
-  fetchBrandMasterGroupDetails,
-  type BrandMasterGroupDetailRow,
-} from '@/lib/brandMasterGroupDetails';
-import { exportBrandMasterGroupsExcel } from '@/lib/exportExcel';
-import { formatLastSyncAt } from '@/lib/formatLastSync';
+  exportReportingMatrixExcel,
+  type ReportingExportBookmark,
+} from '@/lib/exportExcel';
+import {
+  loadJoinGroupMatrix,
+  type JoinGroupMatrixRow,
+  type ReportingAccountRef,
+} from '@/lib/loadJoinGroupReport';
+import {
+  filterReportingMatrixRows,
+  type ReportingMatrixColumnFilter,
+} from '@/lib/reportingMatrixColumn';
 import { cn } from '@/lib/utils';
+import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
 interface BrandMasterGroupsModalProps {
   open: boolean;
   brandName: string;
   platform: Platform;
+  accounts: AccountBrandRow[];
   onClose: () => void;
 }
 
@@ -44,75 +51,125 @@ export function BrandPlatformGroupsBadgeButton({
   );
 }
 
+/** Detail Group header Account — matrix Acc=All (semua akun brand+platform), Full Group | Full Admin. */
 export function BrandMasterGroupsModal({
   open,
   brandName,
   platform,
+  accounts,
   onClose,
 }: BrandMasterGroupsModalProps) {
-  const { t, locale } = useLanguage();
-  const [rows, setRows] = useState<BrandMasterGroupDetailRow[]>([]);
+  const { t } = useLanguage();
+  const [bookmark, setBookmark] = useState<ReportingExportBookmark>('full_group');
+  const [rows, setRows] = useState<JoinGroupMatrixRow[]>([]);
+  const [columnFilter, setColumnFilter] = useState<ReportingMatrixColumnFilter>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const hasRowsRef = useRef(false);
+
+  useEffect(() => {
+    hasRowsRef.current = rows.length > 0;
+  }, [rows]);
+
+  const reportingAccounts = useMemo<ReportingAccountRef[]>(
+    () =>
+      accounts
+        .filter((account) => account.platform === platform)
+        .map((account) => ({ id: account.id, accountName: account.accountName }))
+        .sort((a, b) => a.accountName.localeCompare(b.accountName)),
+    [accounts, platform],
+  );
+
+  const reload = useCallback(
+    async (soft = false) => {
+      if (!open) return;
+      if (!brandName.trim() || reportingAccounts.length === 0) {
+        setRows([]);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      const keepPrevious = soft && hasRowsRef.current;
+      if (!keepPrevious) {
+        setLoading(true);
+        setError(null);
+      }
+
+      try {
+        const next = await loadJoinGroupMatrix({
+          brandName,
+          platform,
+          accounts: reportingAccounts,
+        });
+        setRows(next);
+        setError(null);
+      } catch (loadError) {
+        if (!keepPrevious) {
+          setRows([]);
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : t('groupMonitoring.brandMasterDetail.loadFailed'),
+          );
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [brandName, open, platform, reportingAccounts, t],
+  );
+
+  useEffect(() => {
+    if (!open) {
+      setRows([]);
+      setError(null);
+      setLoading(false);
+      hasRowsRef.current = false;
+      return;
+    }
+    setBookmark('full_group');
+    setColumnFilter(null);
+    setPage(1);
+    void reload(false);
+  }, [open, reload]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onReload = () => void reload(true);
+    window.addEventListener('rm-reporting-reload', onReload);
+    return () => window.removeEventListener('rm-reporting-reload', onReload);
+  }, [open, reload]);
+
+  const mode = bookmark === 'full_admin' ? 'admin' : 'join';
+  const filteredRows = useMemo(
+    () => filterReportingMatrixRows(rows, columnFilter, mode),
+    [columnFilter, mode, rows],
+  );
+  const matrixPage = sliceReportingPage(filteredRows, page);
+
+  useEffect(() => {
+    setColumnFilter(null);
+    setPage(1);
+  }, [bookmark]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [columnFilter]);
 
   const platformLabel =
     platform === 'whatsapp'
       ? t('groupMonitoring.brandMasterDetail.platformWa')
       : t('groupMonitoring.brandMasterDetail.platformTg');
 
-  useEffect(() => {
-    if (!open) return;
-    setPage(1);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    void fetchBrandMasterGroupDetails(brandName, platform)
-      .then((data) => {
-        if (!cancelled) setRows(data);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : t('groupMonitoring.brandMasterDetail.loadFailed'),
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [brandName, open, platform, t]);
-
-  const pageCount = Math.max(1, Math.ceil(rows.length / GROUP_LINKS_PAGE_SIZE));
-  const currentPage = Math.min(Math.max(1, page), pageCount);
-  const pageOffset = (currentPage - 1) * GROUP_LINKS_PAGE_SIZE;
-  const pageRows = rows.slice(pageOffset, pageOffset + GROUP_LINKS_PAGE_SIZE);
-  const showPagination = rows.length > GROUP_LINKS_PAGE_SIZE;
-  const tableNeedsScroll = pageRows.length > GROUP_LINKS_VISIBLE_ROWS;
-  const pageFrom = rows.length === 0 ? 0 : pageOffset + 1;
-  const pageTo = Math.min(pageOffset + GROUP_LINKS_PAGE_SIZE, rows.length);
-
-  if (!open) return null;
-
-  function handleExport() {
-    if (!rows.length) return;
-    exportBrandMasterGroupsExcel({ brandName, platform, rows });
-  }
+  /** Spinner hanya buka awal — soft realtime tetap tampilkan matrix. */
+  const showInitialLoading = loading && rows.length === 0;
 
   return (
-    <BrandModalRoot onBackdropClick={onClose}>
-      <div
-        className="brand-modal-panel brand-modal-panel--group-links"
+    <BrandModalRoot open={open} onBackdropClick={onClose}>
+      <section
+        className="brand-modal-panel brand-modal-panel--group-links brand-modal-panel--reporting-matrix"
         role="dialog"
         aria-modal="true"
         aria-labelledby="brand-master-groups-title"
@@ -122,7 +179,28 @@ export function BrandMasterGroupsModal({
           <h2 id="brand-master-groups-title" className="brand-modal-title group-links-modal-title">
             {brandName} {platformLabel}
           </h2>
-          <div className="group-links-header-tools">
+          <div className="brand-modal-header-actions">
+            <div
+              className="account-slicer-view-toggle"
+              role="group"
+              aria-label={t('groupMonitoring.reporting.bookmarksLabel')}
+            >
+              {(['full_group', 'full_admin'] as ReportingExportBookmark[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={cn(
+                    'account-slicer-view-btn',
+                    bookmark === value && 'account-slicer-view-btn--active',
+                  )}
+                  onClick={() => setBookmark(value)}
+                >
+                  {value === 'full_group'
+                    ? t('groupMonitoring.reporting.bookmarkFullGroup')
+                    : t('groupMonitoring.reporting.bookmarkFullAdmin')}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               className="brand-modal-close"
@@ -134,8 +212,8 @@ export function BrandMasterGroupsModal({
           </div>
         </header>
 
-        <div className="group-links-modal-body">
-          {loading ? (
+        <div className="brand-master-reporting-modal-body">
+          {showInitialLoading ? (
             <div className="group-links-modal-loading">
               <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
             </div>
@@ -143,118 +221,44 @@ export function BrandMasterGroupsModal({
             <p className="platform-login-field-error" role="alert">
               {error}
             </p>
-          ) : rows.length === 0 ? (
-            <p className="sync-modal-message">{t('groupMonitoring.brandMasterDetail.empty')}</p>
+          ) : reportingAccounts.length === 0 ? (
+            <p className="reporting-empty px-5 py-4 text-sm text-text-muted">
+              {t('groupMonitoring.reporting.noAccounts')}
+            </p>
           ) : (
-            <>
-              <div
-                className={cn(
-                  'group-links-table-wrap',
-                  tableNeedsScroll && 'group-links-table-wrap--scroll',
-                )}
-                style={
-                  {
-                    '--group-links-visible-rows': GROUP_LINKS_VISIBLE_ROWS,
-                  } as CSSProperties
-                }
-              >
-                <table className="group-links-table">
-                  <thead>
-                    <tr>
-                      <th>{t('groupMonitoring.brandMasterDetail.colName')}</th>
-                      <th>{t('groupMonitoring.brandMasterDetail.colId')}</th>
-                      <th>{t('groupMonitoring.brandMasterDetail.colLink')}</th>
-                      <th>{t('groupMonitoring.brandMasterDetail.colLastSync')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageRows.map((row) => (
-                      <tr key={`${row.groupId}-${row.groupName}`}>
-                        <td className="group-links-table__name" title={row.groupName}>
-                          {row.groupName}
-                        </td>
-                        <td className="group-links-table__id" title={row.groupId}>
-                          {row.groupId || '—'}
-                        </td>
-                        <td className="group-links-table__link">
-                          {row.inviteLink ? (
-                            <a href={row.inviteLink} target="_blank" rel="noreferrer" title={row.inviteLink}>
-                              {row.inviteLink}
-                            </a>
-                          ) : (
-                            <span className="group-links-table__muted">—</span>
-                          )}
-                        </td>
-                        <td className="group-links-table__sync tabular-nums text-text-secondary">
-                          {formatLastSyncAt(row.lastSync, locale)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {showPagination ? (
-                <nav
-                  className="group-links-pagination"
-                  aria-label={t('groupMonitoring.groupLinks.pageLabel', {
-                    page: currentPage,
-                    pages: pageCount,
-                  })}
-                >
-                  <span className="group-links-pagination-range">
-                    {t('groupMonitoring.groupLinks.pageRange', {
-                      from: pageFrom,
-                      to: pageTo,
-                      total: rows.length,
-                    })}
-                  </span>
-                  <span className="group-links-pagination-label">
-                    {t('groupMonitoring.groupLinks.pageLabel', {
-                      page: currentPage,
-                      pages: pageCount,
-                    })}
-                  </span>
-                  <div className="group-links-pagination-actions">
-                    <button
-                      type="button"
-                      className="group-links-page-btn"
-                      disabled={currentPage <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      aria-label={t('groupMonitoring.groupLinks.prevPage')}
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                      {t('groupMonitoring.groupLinks.prevPage')}
-                    </button>
-                    <button
-                      type="button"
-                      className="group-links-page-btn"
-                      disabled={currentPage >= pageCount}
-                      onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                      aria-label={t('groupMonitoring.groupLinks.nextPage')}
-                    >
-                      {t('groupMonitoring.groupLinks.nextPage')}
-                      <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-                    </button>
-                  </div>
-                </nav>
-              ) : null}
-            </>
+            <ReportingJoinMatrixTable
+              rows={matrixPage.pageRows}
+              accounts={reportingAccounts}
+              brandName={brandName}
+              mode={mode}
+              pageOffset={matrixPage.pageOffset}
+              columnFilter={columnFilter}
+              onColumnFilterChange={setColumnFilter}
+            />
           )}
         </div>
 
-        <footer className="group-links-modal-footer">
-          <button
-            type="button"
-            className="group-links-export-btn"
-            onClick={handleExport}
-            disabled={loading || rows.length === 0}
-          >
-            <Download className="h-3 w-3" strokeWidth={2} aria-hidden />
-            {t('groupMonitoring.accountCard.export')}
-          </button>
-        </footer>
-      </div>
+        {!showInitialLoading && !error && reportingAccounts.length > 0 ? (
+          <ReportingCardFooter
+            totalRows={filteredRows.length}
+            page={page}
+            onPageChange={setPage}
+            onExport={() =>
+              exportReportingMatrixExcel({
+                meta: {
+                  brandName,
+                  platform,
+                  bookmark,
+                  accountScope: 'all',
+                },
+                accounts: reportingAccounts,
+                rows: filteredRows,
+              })
+            }
+            exportDisabled={filteredRows.length === 0}
+          />
+        ) : null}
+      </section>
     </BrandModalRoot>
   );
 }

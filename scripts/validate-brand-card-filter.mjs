@@ -9,6 +9,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const filterTs = read('src/lib/filterAccountGroups.ts');
+const slicerTs = read('src/components/group-monitoring/AccountSlicerHeader.tsx');
 const cardListTs = read('src/components/group-monitoring/AccountBrandCardList.tsx');
 const utilsTs = read('src/lib/accountBrandUtils.ts');
 const removeTs = read('src/hooks/useRemoveAccountFromSlot.ts');
@@ -18,6 +19,23 @@ const realtimeTs = read('src/hooks/useRealtimeMonitoring.ts');
 const bodyTs = read('src/components/group-monitoring/AccountMonitoringBody.tsx');
 
 const checks = [
+  {
+    name: 'Account platform default = WhatsApp',
+    ok: /ACCOUNT_FILTER_DEFAULT[\s\S]*?platform:\s*['"]whatsapp['"]/.test(filterTs),
+  },
+  {
+    name: 'Account platform dropdown tanpa All platforms',
+    ok:
+      slicerTs.includes("ACCOUNT_PLATFORM_OPTIONS: Platform[] = ['whatsapp', 'telegram']") &&
+      !slicerTs.includes("t('groupMonitoring.filters.allPlatforms')"),
+  },
+  {
+    name: 'Account platform fallback WA→TG sekali saat data tersedia',
+    ok:
+      slicerTs.includes('platformInitDoneRef') &&
+      slicerTs.includes("platform: 'telegram'") &&
+      slicerTs.includes('availablePlatforms.includes'),
+  },
   {
     name: 'Tidak ada filter "accounts.length > 0" yang buang kartu brand',
     ok: !/\.filter\(\(group\)\s*=>\s*group\.accounts\.length\s*>\s*0\)/.test(filterTs),

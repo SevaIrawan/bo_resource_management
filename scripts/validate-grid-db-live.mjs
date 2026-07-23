@@ -170,7 +170,7 @@ async function main() {
 
   console.log(`Grid vs DB live — ${filtered.length} akun (env: ${envPath})\n`);
   console.log(
-    'Kolom grid dari engine: On device=dailyY, In brand=joinedInMaster/X\n',
+    'Kolom grid dari engine: On device=dailyY, Missing=X−joined, Not admin=joined−admin\n',
   );
 
   const warnings = [];

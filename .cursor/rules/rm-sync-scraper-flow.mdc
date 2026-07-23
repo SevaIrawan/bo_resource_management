@@ -5,11 +5,12 @@ alwaysApply: true
 
 # Sync & Scrape (logic_sync_scraper.txt)
 
-- Metrik: GROUP (Y/X) + ADMIN (Y/X). Grup dari device, bukan isi pesan.
-- **VALID** Sync: probe device → update grid → [Now|Later] atau resume-empty.
-- **INVALID**: login → sukses → [Now|Later] (scrape intent → auto-scrape tanpa prompt).
+- Metrik: GROUP (Y/X) + ADMIN (Y/X). Grup dari device **saat scrape**, bukan isi pesan.
+- **VALID** Sync (Case 3): check Session **ringan** (disk/DB / getState; tanpa cold Chrome) → patch session valid → [Now|Later]. **Tidak** hitung Y/X; **tidak** busy/timeout sebagai gagal Sync bila session tersimpan.
+- **INVALID**: login realtime → sukses → persist session UI+DB saja → [Now|Later] (scrape intent → auto-scrape tanpa prompt).
+- Probe busy/timeout pada Sync → **bukan** Logout (session tersimpan = Valid).
 - **Scrape manual**: hanya lewat Sync → Scrape Now; kolom **Last update** read-only (tanpa tombol Run).
-- **Later** = tutup modal, **tidak** scrape. **Cancel scrape** = stop total.
+- **Later** = session Active/Valid di UI lokal + DB saja; **tidak** scrape, **tidak** count device. **Cancel scrape** = stop total.
 
 # Kolom Last update
 

@@ -27,14 +27,19 @@ const checks = [
       const scrape = read('electron/main/scraper/whatsappScrape.ts');
       return (
         scrape.includes('fetchWhatsAppGroupInviteLink') &&
-        !scrape.includes('invite_link: null') &&
-        scrape.includes('waInviteExportDelayMs')
+        scrape.includes('waInviteExportDelayMs') &&
+        scrape.includes("is_admin === 'yes'") &&
+        !scrape.includes('chat.whatsapp.com/PLACEHOLDER') &&
+        !scrape.includes('invite_link: `https://')
       );
     })(),
   },
   {
-    name: 'WA scrape: modul getInviteCode ada',
-    ok: waInvite.includes('getInviteCode'),
+    name: 'WA scrape: modul getInviteCode + store Mex fallback',
+    ok:
+      waInvite.includes('getInviteCode') &&
+      waInvite.includes('WAWebMexFetchGroupInviteCodeJob') &&
+      waInvite.includes('fetchInviteCodeFromStore'),
   },
   {
     name: 'WA create group: invite_link real setelah create',

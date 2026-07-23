@@ -4,7 +4,6 @@ import { invalidSessionMetricsFromDaily } from '@/lib/accountSessionUi';
 import { prepareDeviceForPlatformLogin } from '@/lib/prepareDeviceForLogin';
 import { invalidatePlatformSessionEverywhere } from '@/lib/platformSessionSync';
 import { logSessionLogoutActivity } from '@/lib/platformSessionLogs';
-import { cancelDeviceGroupCount } from '@/lib/runAccountCount';
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 
@@ -27,11 +26,12 @@ async function cancelActiveDeviceWork(input: {
     })
     .catch(() => undefined);
 
-  await cancelDeviceGroupCount({
-    sessionId: input.account.id,
-    platform: input.account.platform,
-    accountId: input.dbAccountId,
-  });
+  await window.electronAPI?.scraper
+    ?.cancelAuto?.({
+      sessionId: deviceSessionId,
+      platform: input.account.platform,
+    })
+    .catch(() => undefined);
 }
 
 /**

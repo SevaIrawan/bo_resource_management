@@ -69,19 +69,47 @@ def set_scrape_progress(
     total: int = 0,
     label: str = "",
 ) -> None:
+    prev = _scrape_progress.get(session_id) or {}
+    seq = int(prev.get("seq") or 0) + 1
     _scrape_progress[session_id] = {
         "phase": phase,
         "current": current,
         "total": total,
         "label": label,
+        "seq": seq,
     }
 
 
 def get_scrape_progress(session_id: str) -> dict:
     return _scrape_progress.get(
         session_id,
-        {"phase": "idle", "current": 0, "total": 0, "label": ""},
+        {"phase": "idle", "current": 0, "total": 0, "label": "", "seq": 0},
     )
+
+
+async def _sleep_flood_with_heartbeat(
+    session_id: str,
+    seconds: float,
+    *,
+    current: int = 0,
+    total: int = 0,
+    label_base: str = "FloodWait",
+) -> None:
+    """Sleep FloodWait sambil update progress — idle watchdog Electron tetap hidup. """
+    remaining = max(0.0, float(seconds))
+    while remaining > 0:
+        if is_scrape_cancelled(session_id):
+            return
+        set_scrape_progress(
+            session_id,
+            phase="group",
+            current=current,
+            total=total,
+            label=f"{label_base} — waiting {int(remaining)}s (Telegram rate limit)",
+        )
+        chunk = min(15.0, remaining)
+        await asyncio.sleep(chunk)
+        remaining -= chunk
 
 
 def _admin_label(is_admin: bool) -> str:
@@ -253,6 +281,9 @@ async def _resolve_invite_link(
     *,
     is_admin: bool,
     existing_invite: str | None = None,
+    session_id: str | None = None,
+    current: int = 0,
+    total: int = 0,
 ) -> str | None:
     """Username → t.me; admin: pakai exported_invite dari GetFull dulu, baru ExportChatInvite.
 
@@ -282,7 +313,17 @@ async def _resolve_invite_link(
             if int(exc.seconds) > cap:
                 print(f"[tg-scrape] invite FloodWait {exc.seconds}s exceeds cap — skip")
                 return None
-            await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
+            wait_s = flood_wait_seconds(delay_cfg, exc.seconds)
+            if session_id:
+                await _sleep_flood_with_heartbeat(
+                    session_id,
+                    wait_s,
+                    current=current,
+                    total=total,
+                    label_base="invite FloodWait",
+                )
+            else:
+                await asyncio.sleep(wait_s)
             if attempt >= retries:
                 return None
         except Exception:  # noqa: BLE001
@@ -290,7 +331,14 @@ async def _resolve_invite_link(
     return None
 
 
-async def _count_with_flood_retry(coro_factory, *, label: str):
+async def _count_with_flood_retry(
+    coro_factory,
+    *,
+    label: str,
+    session_id: str | None = None,
+    current: int = 0,
+    total: int = 0,
+):
     delay_cfg = _SCRAPE_DELAY
     try:
         return await coro_factory()
@@ -299,7 +347,17 @@ async def _count_with_flood_retry(coro_factory, *, label: str):
         if int(exc.seconds) > cap:
             print(f"[tg-scrape] {label} FloodWait {exc.seconds}s exceeds cap")
             raise
-        await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
+        wait_s = flood_wait_seconds(delay_cfg, exc.seconds)
+        if session_id:
+            await _sleep_flood_with_heartbeat(
+                session_id,
+                wait_s,
+                current=current,
+                total=total,
+                label_base=f"{label} FloodWait",
+            )
+        else:
+            await asyncio.sleep(wait_s)
         return await coro_factory()
 
 
@@ -429,6 +487,9 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                 is_admin_flag = await _count_with_flood_retry(
                     lambda: _is_group_admin(client, entity, me),
                     label="is_admin",
+                    session_id=session_id,
+                    current=index,
+                    total=total,
                 )
             except FloodWaitError:
                 is_admin_flag = False
@@ -439,6 +500,9 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                 owner_count, admin_count = await _count_with_flood_retry(
                     lambda: _count_admin_roles(client, entity),
                     label="admin_roles",
+                    session_id=session_id,
+                    current=index,
+                    total=total,
                 )
             except FloodWaitError:
                 owner_count, admin_count = 0, 0
@@ -452,6 +516,9 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                 username,
                 is_admin=bool(is_admin_flag),
                 existing_invite=existing_invite,
+                session_id=session_id,
+                current=index,
+                total=total,
             )
 
             current = index + 1
@@ -518,91 +585,6 @@ async def scrape_telegram_groups(
     payload.pop("valid", None)
     payload.pop("adminCount", None)
     return payload
-
-
-async def _count_groups_quick_locked(session_id: str) -> dict:
-    session = SESSIONS.get(session_id)
-    if not session:
-        return {"status": "error", "message": "Login session not found. Log in first.", "valid": False}
-    if session.status != "ready":
-        return {
-            "status": "error",
-            "message": f"Session not ready (status={session.status}). Complete login first.",
-            "valid": False,
-        }
-
-    client = session.client
-    if not await client.is_user_authorized():
-        return {"status": "error", "message": "Session is not authorized", "valid": False}
-
-    me = await client.get_me()
-    total_groups = 0
-    admin_groups = 0
-
-    async for dialog in client.iter_dialogs():
-        if not _is_group_dialog(dialog):
-            continue
-        total_groups += 1
-        try:
-            if await _is_group_admin(client, dialog.entity, me):
-                admin_groups += 1
-        except Exception:  # noqa: BLE001
-            pass
-
-    return {
-        "status": "ok",
-        "valid": True,
-        "totalGroups": total_groups,
-        "adminGroups": admin_groups,
-    }
-
-
-async def _count_groups_quick(session_id: str) -> dict:
-    async with tg_session_lock(session_id):
-        return await _count_groups_quick_locked(session_id)
-
-
-async def count_telegram_groups(
-    session_id: str,
-    session_string: str | None = None,
-    *,
-    quick: bool = False,
-) -> dict:
-    session = SESSIONS.get(session_id)
-    if not session and session_string:
-        restored = await restore_telegram_session(session_id, session_string)
-        if restored.get("status") == "error":
-            return {
-                "status": "error",
-                "valid": False,
-                "message": restored.get("message", "Session restore failed"),
-            }
-
-    if quick:
-        quick_result = await _count_groups_quick(session_id)
-        if quick_result.get("status") == "error":
-            return quick_result
-        return {
-            "status": "ok",
-            "valid": True,
-            "totalGroups": quick_result.get("totalGroups", 0),
-            "adminGroups": quick_result.get("adminGroups", 0),
-        }
-
-    result = await _collect_groups(session_id)
-    if result.get("status") == "error":
-        return {
-            "status": "error",
-            "valid": False,
-            "message": result.get("message", "Count failed"),
-        }
-
-    return {
-        "status": "ok",
-        "valid": True,
-        "totalGroups": result["count"],
-        "adminGroups": result["adminCount"],
-    }
 
 
 async def validate_telegram_session(session_id: str, session_string: str | None = None) -> dict:

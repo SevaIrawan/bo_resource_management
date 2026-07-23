@@ -1,6 +1,6 @@
 /**
  * Sync / session-column routing — acuan logic_sync_scraper.txt + sessionColumnFlowSpec.
- * Satu modul: routing INVALID/VALID, probe device, payload sync.
+ * Sync Active = check Session ringan → Now/Later (tanpa count/detect device).
  */
 import { SYNC_SCRAPER_POLICY } from '@/config/syncScraperPolicy';
 import { todayScrapeDate } from '@/lib/accountMonitoringEngine';
@@ -9,11 +9,10 @@ import {
   fetchMasterGroupStatsForAccount,
 } from '@/lib/accountSyncData';
 import { ensurePlatformSessionInDatabase } from '@/lib/ensureWaSessionInDb';
-import { backfillPlatformSessionIfNeeded, hasStoredPlatformSession } from '@/lib/sessionAvailability';
+import { hasStoredPlatformSession } from '@/lib/sessionAvailability';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
 import { isRowMisaligned, postSyncModalStep, type PostSyncModalStep } from '@/lib/accountSyncUiFlow';
 import { sessionColumnRoute } from '@/lib/sessionColumnFlowSpec';
-import { completeSyncAfterLiveSession, type SyncSuccessPayload } from '@/lib/syncAccountFlow';
 import { resolveDbAccountForRow } from '@/lib/accountSessionResolve';
 import { verifyUserSessionForAction } from '@/lib/verifyUserSessionAction';
 import {
@@ -102,27 +101,6 @@ export async function checkDeviceSessionForValidColumn(input: {
   };
 }
 
-export async function detectGroupsAndBuildSyncPayload(input: {
-  userId: string;
-  account: AccountBrandRow;
-  dbAccountId: string;
-  brandStandardHint: number;
-  skipPersist?: boolean;
-  quickDeviceCount?: boolean;
-  freshLogin?: boolean;
-}): Promise<SyncSuccessPayload> {
-  return completeSyncAfterLiveSession({
-    userId: input.userId,
-    account: input.account,
-    dbAccountId: input.dbAccountId,
-    brandStandardHint: input.brandStandardHint,
-    skipPersist: input.skipPersist,
-    assumeSessionValid: true,
-    quickDeviceCount: input.quickDeviceCount,
-    freshLogin: input.freshLogin,
-  });
-}
-
 export async function buildLogoutRowAfterDeviceFailure(input: {
   dbAccountId: string;
   brand: string;
@@ -146,10 +124,7 @@ export async function buildLogoutRowAfterDeviceFailure(input: {
   });
 }
 
-async function loadMasterForAccount(
-  account: AccountBrandRow,
-  dbAccountId: string,
-) {
+async function loadMasterForAccount(account: AccountBrandRow, dbAccountId: string) {
   return fetchMasterGroupStatsForAccount({
     accountId: dbAccountId,
     brand: account.brandName,
@@ -180,9 +155,50 @@ export type SyncCheckOutcome =
       syncMessage: string;
       modalStep: PostSyncModalStep;
       updatedAccount: AccountBrandRow;
-    }
-  | { kind: 'device_busy'; message: string; dbAccountId: string }
-  | { kind: 'error'; code: 'SYNC_TIMED_OUT' | 'SYNC_FAILED' };
+    };
+
+function buildSyncValidSuccess(input: {
+  account: AccountBrandRow;
+  dbAccountId: string;
+  brandX: number;
+  masterJoined: number;
+  hasDaily: boolean;
+}): Extract<SyncCheckOutcome, { kind: 'success' }> {
+  const { account, dbAccountId, brandX, masterJoined, hasDaily } = input;
+  const syncedAt = new Date().toISOString();
+  const result: AccountSyncResult = {
+    groupsCurrent: account.groupsCurrent,
+    groupsTotal: brandX,
+    adminCurrent: account.adminCurrent,
+    adminTotal: brandX,
+    sessionStatus: 'valid',
+  };
+  const updatedAccount: AccountBrandRow = {
+    ...account,
+    status: 'active',
+    sessionStatus: 'valid',
+    syncState: 'synced',
+    isMisaligned: isRowMisaligned(result),
+  };
+
+  return {
+    kind: 'success',
+    dbAccountId,
+    result,
+    masterJoined,
+    syncedAt,
+    syncMessage:
+      account.platform === 'telegram'
+        ? 'Telegram session valid.'
+        : 'WhatsApp session valid.',
+    modalStep: postSyncModalStep({
+      result,
+      deviceGroupCount: hasDaily ? account.groupsCurrent : 0,
+      hasDailyToday: hasDaily,
+    }),
+    updatedAccount,
+  };
+}
 
 export async function executeSyncCheck(input: {
   userId: string;
@@ -190,7 +206,8 @@ export async function executeSyncCheck(input: {
   dbAccountId: string;
   onSessionProbeComplete?: () => void;
 }): Promise<SyncCheckOutcome> {
-  const { account, dbAccountId, userId } = input;
+  const { account, dbAccountId } = input;
+  void input.userId;
 
   if (routeFromSessionColumn(account.sessionStatus) === 'open_login') {
     const hasStored = await hasStoredPlatformSession(dbAccountId, account.platform);
@@ -227,8 +244,7 @@ export async function executeSyncCheck(input: {
     });
   }
 
-  await backfillPlatformSessionIfNeeded({ userId, account, dbAccountId });
-
+  /** Sync Active: check Session light — tanpa count/detect/cold Chrome. */
   const deviceCheck = await checkDeviceSessionForValidColumn({
     sessionId: account.id,
     platform: account.platform,
@@ -237,15 +253,7 @@ export async function executeSyncCheck(input: {
     hasDailyToday: hasDaily,
   });
 
-  if (!deviceCheck.ok) {
-    if (deviceCheck.busy) {
-      return {
-        kind: 'device_busy',
-        message: deviceCheck.message,
-        dbAccountId,
-      };
-    }
-
+  if (!deviceCheck.ok && !deviceCheck.busy) {
     const invalidResult = await buildLogoutRowAfterDeviceFailure({
       dbAccountId,
       brand: account.brandName,
@@ -265,44 +273,16 @@ export async function executeSyncCheck(input: {
     };
   }
 
+  /** Kontrak Case 3: sync valid = probe session saja; grid metrik hanya dari scrape / DB. */
   input.onSessionProbeComplete?.();
 
-  const syncedAt = new Date().toISOString();
-  /** Kontrak Case 3: sync valid = probe session saja; grid metrik hanya dari scrape / DB. */
-  const result: AccountSyncResult = {
-    groupsCurrent: account.groupsCurrent,
-    groupsTotal: brandX,
-    adminCurrent: account.adminCurrent,
-    adminTotal: brandX,
-    sessionStatus: 'valid',
-  };
-
-  const updatedAccount: AccountBrandRow = {
-    ...account,
-    status: 'active',
-    sessionStatus: 'valid',
-    syncState: 'synced',
-    isMisaligned: isRowMisaligned(result),
-  };
-
-  return {
-    kind: 'success',
+  return buildSyncValidSuccess({
+    account,
     dbAccountId,
-    result,
+    brandX,
     masterJoined: master.joinedInMaster,
-    syncedAt,
-    syncMessage:
-      account.platform === 'telegram'
-        ? 'Telegram session valid.'
-        : 'WhatsApp session valid.',
-    modalStep: postSyncModalStep({
-      result,
-      /** Grid Y hanya dipakai jika daily hari ini ada — sync valid tidak baca device. */
-      deviceGroupCount: hasDaily ? account.groupsCurrent : 0,
-      hasDailyToday: hasDaily,
-    }),
-    updatedAccount,
-  };
+    hasDaily,
+  });
 }
 
 export async function recordSyncCheckActivity(input: {

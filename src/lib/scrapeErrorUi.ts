@@ -290,9 +290,6 @@ export function resolveSyncFlowAlertMessage(
   if (code === 'SYNC_FAILED') {
     return t('groupMonitoring.sync.syncFailed');
   }
-  if (code === 'SYNC_TIMED_OUT') {
-    return t('groupMonitoring.sync.syncTimedOut');
-  }
   if (code === 'SESSION_WARM_PENDING') {
     return t('groupMonitoring.sync.sessionWarmPending');
   }

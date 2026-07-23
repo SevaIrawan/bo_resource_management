@@ -20,6 +20,8 @@ export type DeviceSessionGateResult =
 
 const PROBE_RETRY_DELAY_MS = 1_500;
 const PROBE_MAX_ATTEMPTS = 3;
+/** Sync light: getState / disk saja — jangan tunggu cold Chrome. */
+const SYNC_LIGHT_TIMEOUT_MS = 8_000;
 
 function probeFailureResult(msg: string): DeviceSessionGateResult {
   const dead = isDeviceSessionDeadMessage(msg);
@@ -74,18 +76,53 @@ async function probeSessionLinked(input: {
 }
 
 /**
- * Sync / Run: probe valid/invalid — 1 akun, getState saja.
- * Busy/timeout tidak invalidate DB; hanya UNPAIRED / logout / mati di HP.
- * (logic_sync_scraper.txt BAGIAN 7)
+ * Sync Active: probe ringan (strict=false) — tanpa cold Chrome / TG restore.
+ * Busy / timeout / warm-pending → Valid jika session tersimpan (bukan Logout).
  */
-async function gateUserActionSession(
+async function gateSyncSession(
   input: {
     sessionId: string;
     platform: Platform;
     accountId: string;
   },
-  _hasStored: boolean,
-  _mode: DeviceSessionGateMode,
+  hasStored: boolean,
+): Promise<DeviceSessionGateResult> {
+  let lastMessage = 'device_not_connected';
+  try {
+    const probe = await withTimeout(
+      probePlatformSession({
+        ...input,
+        strict: false,
+      }),
+      SYNC_LIGHT_TIMEOUT_MS,
+      'Session check',
+    );
+    if (probe.valid) return { ok: true };
+    lastMessage = probe.message ?? lastMessage;
+
+    if (isDeviceBusyMessage(lastMessage) && hasStored) {
+      return { ok: true };
+    }
+
+    return probeFailureResult(lastMessage);
+  } catch (error) {
+    if (error instanceof OperationTimeoutError) {
+      if (hasStored) return { ok: true };
+      return probeFailureResult('Session check timed out');
+    }
+    throw error;
+  }
+}
+
+/**
+ * Scrape: probe strict — 1 akun; busy/timeout tidak invalidate DB.
+ */
+async function gateScrapeSession(
+  input: {
+    sessionId: string;
+    platform: Platform;
+    accountId: string;
+  },
 ): Promise<DeviceSessionGateResult> {
   const probe = await probeSessionLinked(input);
   if (probe.valid) {
@@ -106,7 +143,11 @@ export async function gateDeviceSession(
   mode: DeviceSessionGateMode = 'scrape',
 ): Promise<DeviceSessionGateResult> {
   const hasStored = await hasStoredPlatformSession(input.accountId, input.platform);
-  void mode;
-  void hasStored;
-  return gateUserActionSession(input, hasStored, mode);
+  void input.uiSessionStatus;
+  void input.hasDaily;
+
+  if (mode === 'sync') {
+    return gateSyncSession(input, hasStored);
+  }
+  return gateScrapeSession(input);
 }

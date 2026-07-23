@@ -566,7 +566,6 @@ export const zh: Messages = {
       checkFailed: '检查失败，请重试。',
       supabaseNotConfigured: '未配置数据库。',
       syncFailed: '同步失败，请重试。',
-      syncTimedOut: '同步超时（超过 3 分钟）。Telegram 群组较多时请重试；若仍失败请重启应用。',
       telegramLoginTitle: 'Telegram 扫码登录',
       whatsappLoginTitle: '扫码登录',
       telegramStep1: '在手机上打开 Telegram',

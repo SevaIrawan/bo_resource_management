@@ -158,30 +158,13 @@ declare global {
           sessionId: string;
           platform: Platform;
         }) => Promise<{ ok: boolean }>;
-        cancelCount: (payload: {
-          sessionId: string;
-          platform: Platform;
-        }) => Promise<{ ok: boolean }>;
-        countGroups: (payload: {
+        validateSession: (payload: {
           sessionId: string;
           platform: Platform;
           accountId?: string;
           storedSessionString?: string | null;
-          quick?: boolean;
-          reuseLiveLogin?: boolean;
-        }) => Promise<{
-          valid: boolean;
-          totalGroups: number;
-          adminGroups: number;
-          message?: string;
-        }>;
-    validateSession: (payload: {
-      sessionId: string;
-      platform: Platform;
-      accountId?: string;
-      storedSessionString?: string | null;
-      strict?: boolean;
-    }) => Promise<{ valid: boolean; message?: string }>;
+          strict?: boolean;
+        }) => Promise<{ valid: boolean; message?: string }>;
         exportTelegramSession: (
           sessionId: string,
         ) => Promise<{ sessionString: string; loginMethod?: string }>;

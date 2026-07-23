@@ -1,6 +1,5 @@
 import type { AccountSyncResult } from '@/lib/accountBrandUtils';
 import type { MasterGroupStats } from '@/lib/accountSyncData';
-import type { DeviceGroupCountResult } from '@/lib/runAccountCount';
 import { isRowMisaligned } from '@/lib/accountSyncUiFlow';
 
 /**
@@ -22,7 +21,11 @@ export function computeIsMisaligned(input: {
 
 export function buildAccountSyncResult(input: {
   master: MasterGroupStats;
-  device: DeviceGroupCountResult;
+  device: {
+    valid: boolean;
+    totalGroups: number;
+    adminGroups: number;
+  };
   brandStandard: number;
 }): AccountSyncResult {
   const { master, device, brandStandard } = input;

@@ -6,10 +6,11 @@ import type { SessionUiStatus } from '@/types/accountMonitoringUi';
  *
  * UX (konfirmasi produk):
  * - "Modal utama" pada jalur INVALID = modal login; tutup (X/backdrop) = batalkan scan, kolom Session tidak berubah.
- * - Jalur VALID + SYNC: tidak ada modal login; langsung backend lalu Now/Later atau resume-empty.
- * - resume-empty hanya bila 0 grup (device/DB/brand); Now/Later bila ada data yang bisa di-scrape.
+ * - Jalur VALID + SYNC: check Session **ringan** (disk/DB / getState in-memory; tanpa cold Chrome) → Now/Later.
+ * - resume-empty hanya bila 0 grup (daily/DB/brand); Now/Later bila ada data yang bisa di-scrape.
  * - Ticket / Reporting / Stock: reload hanya setelah scrape tulis daily (bukan setelah sync probe saja).
- * - VALID + RUN/SYNC: probe device tetap jalan; gagal → login meski badge grid masih valid.
+ * - VALID + SYNC: check Session light; Invalid jelas (no disk / unpaired) → login. Busy/timeout ≠ Logout.
+ * - VALID + RUN (scrape): probe device strict; gagal → login meski badge grid masih valid.
  * - Login FAIL: WA auto-QR; TG error + pesan (tanpa auto-loop QR).
  * - VALID + tombol X (Clear Session, hover row/kolom): WA purge disk + TG stop sidecar + DB invalid → badge Invalid; Sync berikutnya `open_login`.
  */
@@ -20,9 +21,8 @@ export const SESSION_COLUMN_FLOW = {
   },
   valid: {
     sync: [
-      'check_device_session',
-      'detect_brand_x_and_device_groups',
-      'update_groups_admin_columns',
+      'check_device_session_light',
+      'session_only_patch',
       'scrape_now_or_not_modal_or_resume_empty',
     ] as const,
     run: ['check_device_session', 'execute_scraper'] as const,

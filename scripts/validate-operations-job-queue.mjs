@@ -396,10 +396,12 @@ const checks = [
     name: 'Real data: WA scrape + create ambil invite_link device',
     ok: (() => {
       const scrape = read('electron/main/scraper/whatsappScrape.ts');
+      const invite = read('electron/main/scraper/whatsappGroupInviteLink.ts');
       const wa = read('electron/main/automation/waAutomation.ts');
       return (
         scrape.includes('fetchWhatsAppGroupInviteLink') &&
-        !scrape.includes('invite_link: null') &&
+        invite.includes('fetchInviteCodeFromStore') &&
+        scrape.includes("is_admin === 'yes' && !row.invite_link") &&
         wa.includes('fetchWhatsAppGroupInviteLink')
       );
     })(),
@@ -556,15 +558,38 @@ const checks = [
       const store = read('electron/main/automation/jobQueueStore.ts');
       const pool = read('electron/main/automation/executeSlotPool.ts');
       const conc = read('electron/main/automation/jobQueueConcurrency.ts');
+      const freeFn = store.slice(
+        store.indexOf('export function countFreeExecuteSlots'),
+        store.indexOf('export function pickQueuedJobsForDispatch'),
+      );
       return (
         conc.includes('getMaxWaBrowserSlots') &&
         conc.includes('getMaxTgExecuteSlots') &&
         pool.includes('getMaxTgExecuteSlots') &&
         pool.includes('byPlatform') &&
+        pool.includes('drainExecuteSlotFifo(platform)') &&
         runner.includes('waitForExecuteSlot') &&
         runner.includes('job.platform') &&
         store.includes('countFreeExecuteSlots') &&
-        store.includes('getExecuteSlotStats')
+        store.includes('getExecuteSlotStats') &&
+        freeFn.includes('maxConcurrent - stats.activeCount') &&
+        !freeFn.includes('queuedCount')
+      );
+    })(),
+  },
+  {
+    name: 'Scrape Now + job berbagi slot pool (kind scraper|job, FIFO drain)',
+    ok: (() => {
+      const pool = read('electron/main/automation/executeSlotPool.ts');
+      const sync = read('src/hooks/useAccountSyncFlow.ts');
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const client = read('src/lib/executeSlotClient.ts');
+      return (
+        pool.includes("ExecuteSlotKind = 'sync' | 'scraper' | 'job'") &&
+        sync.includes("acquireExecuteSlot(account.id, 'scraper'") &&
+        runner.includes("waitForExecuteSlot(job.accountId, 'job'") &&
+        client.includes('acquireOrWait') &&
+        /fifoWaiters\.push[\s\S]{0,120}drainExecuteSlotFifo/.test(pool)
       );
     })(),
   },

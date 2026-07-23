@@ -318,13 +318,17 @@ export function removeAutomationJobs(jobIds: string[]): number {
   return removed;
 }
 
-/** Slot kosong di pool Sync/Scrape/Job — per platform (WA/TG terpisah). */
+/**
+ * Slot execute kosong sekarang — hanya hitung active (bukan FIFO waiters).
+ * Waiter FIFO sudah mengantri; jangan kurangi budget dispatch job/scrape lain.
+ * Scrape Now + job berbeda akun berbagi kuota maxConcurrent per platform (default 10).
+ */
 export function countFreeExecuteSlots(platform: 'whatsapp' | 'telegram'): number {
   const stats = getExecuteSlotStats().byPlatform[platform];
-  return Math.max(0, stats.maxConcurrent - stats.activeCount - stats.queuedCount);
+  return Math.max(0, stats.maxConcurrent - stats.activeCount);
 }
 
-/** FIFO per platform — hingga maxConcurrent job berbeda akun per platform. */
+/** FIFO per platform — hingga maxConcurrent job berbeda akun; sisa slot diisi scrape/job campur. */
 export function pickQueuedJobsForDispatch(): AutomationJobRecord[] {
   ensureLoaded();
   const picked: AutomationJobRecord[] = [];
@@ -334,6 +338,7 @@ export function pickQueuedJobsForDispatch(): AutomationJobRecord[] {
     const maxConcurrent = getMaxConcurrentAutomationJobs(platform);
     const running = listRunningJobs().filter((job) => job.platform === platform);
     const freeSlots = countFreeExecuteSlots(platform);
+    // Jangan lewat max job running ATAU slot execute (scrape manual juga pegang slot).
     const dispatchBudget = Math.min(maxConcurrent - running.length, freeSlots);
     if (dispatchBudget <= 0) continue;
 

@@ -132,7 +132,7 @@ function drainExecuteSlotFifo(platform: ExecuteSlotPlatform): void {
   }
 }
 
-/** Tunggu slot kosong (FIFO per platform). Dipakai job queue runner. */
+/** Tunggu slot kosong (FIFO per platform). Dipakai job queue runner + Scrape Now saat penuh. */
 export function waitForExecuteSlot(
   accountId: string,
   kind: ExecuteSlotKind,
@@ -146,5 +146,7 @@ export function waitForExecuteSlot(
   const pool = poolFor(platform);
   return new Promise<void>((resolve) => {
     pool.fifoWaiters.push({ accountId, kind, resolve });
+    // Race: slot bisa free antara tryAcquire gagal dan push — drain ulang.
+    drainExecuteSlotFifo(platform);
   });
 }

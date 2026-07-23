@@ -21,7 +21,6 @@ from telegram_login import (
     submit_telegram_code,
 )
 from telegram_scraper import (
-    count_telegram_groups,
     get_scrape_progress,
     request_scrape_cancel,
     scrape_telegram_groups,
@@ -79,7 +78,6 @@ class TwoFaBody(BaseModel):
 class CountBody(BaseModel):
     sessionId: str
     sessionString: str | None = None
-    quick: bool = False
 
 class RestoreBody(BaseModel):
     sessionId: str
@@ -217,12 +215,6 @@ async def telegram_scrape_progress(session_id: str) -> dict:
 async def telegram_scrape_cancel(session_id: str) -> dict:
     request_scrape_cancel(session_id)
     return {"ok": True}
-
-@app.post("/telegram/count/{session_id}")
-async def telegram_count(session_id: str, body: CountBody | None = None) -> dict:
-    session_string = body.sessionString if body else None
-    quick = bool(body.quick) if body else False
-    return await count_telegram_groups(session_id, session_string, quick=quick)
 
 @app.post("/telegram/validate/{session_id}")
 async def telegram_validate(session_id: str, body: CountBody | None = None) -> dict:

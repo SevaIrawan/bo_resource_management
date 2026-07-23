@@ -878,8 +878,40 @@ async function releaseProbeSessionUnlessConnected(sessionId: string): Promise<vo
 }
 
 /**
- * Cek session WA — 1 akun, `getState()` saja.
- * Boleh buka Chrome minimal; tidak baca daftar grup; tidak `waitForWhatsAppStoreReady`.
+ * Sync Active — check Session **ringan**:
+ * - Client sudah di memori → `getState()` saja
+ * - Belum di memori → cek LocalAuth di disk saja
+ * **Tidak** `client.initialize()` / cold Chrome / Puppeteer (hindari timeout/busy/crash).
+ */
+async function probeWhatsAppSessionForSyncInner(
+  sessionId: string,
+): Promise<{ valid: boolean; message: string }> {
+  const existing = sessions.get(sessionId);
+  if (existing) {
+    try {
+      const state = await existing.client.getState();
+      const immediate = waStateProbeResult(state);
+      if (classifyWaSocketState(state) === 'unlinked') {
+        return immediate;
+      }
+      if (immediate.valid) return immediate;
+      if (hasWhatsAppDiskAuth(sessionId)) {
+        return { valid: true, message: 'WA_DISK_AUTH_SYNC_LIGHT' };
+      }
+      return immediate;
+    } catch {
+      /* fall through to disk */
+    }
+  }
+
+  if (hasWhatsAppDiskAuth(sessionId)) {
+    return { valid: true, message: 'WA_DISK_AUTH_SYNC_LIGHT' };
+  }
+  return { valid: false, message: 'WA_NOT_CONNECTED' };
+}
+
+/**
+ * Scrape / strict — boleh cold-boot Chrome; tidak baca daftar grup; tidak `waitForWhatsAppStoreReady`.
  */
 async function probeWhatsAppSessionLinkedInner(
   sessionId: string,
@@ -918,6 +950,13 @@ async function probeWhatsAppSessionLinkedInner(
   } finally {
     await releaseProbeSessionUnlessConnected(sessionId);
   }
+}
+
+/** Sync Active: tanpa cold Chrome. */
+export function probeWhatsAppSessionForSync(
+  sessionId: string,
+): Promise<{ valid: boolean; message: string }> {
+  return runWhatsAppLoginOperation(sessionId, () => probeWhatsAppSessionForSyncInner(sessionId));
 }
 
 export function probeWhatsAppSessionLinked(

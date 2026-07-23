@@ -1,9 +1,24 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
 import {
   forceReleaseWhatsAppForLogin,
+  probeWhatsAppSessionForSync,
   probeWhatsAppSessionLinked,
 } from '../platformLogin/whatsapp';
 import { SESSION_CHECK_TIMEOUT_MS } from './deviceGroupScale';
+
+/**
+ * Sync Active TG — ringan: string session di DB = Valid.
+ * **Tidak** restore / connect / get_me (hindari timeout/busy).
+ */
+export async function validateTelegramSessionForSync(
+  _sessionId: string,
+  storedSessionString?: string | null,
+): Promise<{ valid: boolean; message?: string }> {
+  if (storedSessionString?.trim()) {
+    return { valid: true, message: 'TG_STORED_SESSION_SYNC_LIGHT' };
+  }
+  return { valid: false, message: 'Login session not found. Log in first.' };
+}
 
 export async function validateTelegramSession(
   sessionId: string,
@@ -45,18 +60,24 @@ export async function validateTelegramSession(
   }
 }
 
-/** WA: 1 akun, getState — timeout di probeWhatsAppSessionLinked (bukan race ganda di sini). */
+/** WA: Sync = light (no cold Chrome); scrape/strict = boleh initialize. */
 export async function validateWhatsAppSession(
   sessionId: string,
-  _options?: { strict?: boolean },
+  options?: { strict?: boolean },
 ): Promise<{
   valid: boolean;
   message?: string;
 }> {
+  const light = options?.strict === false;
   try {
-    return await probeWhatsAppSessionLinked(sessionId);
+    return light
+      ? await probeWhatsAppSessionForSync(sessionId)
+      : await probeWhatsAppSessionLinked(sessionId);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'WhatsApp validate failed';
+    if (light) {
+      return { valid: false, message };
+    }
     await forceReleaseWhatsAppForLogin(sessionId, { urgent: true, fast: true }).catch(
       () => undefined,
     );

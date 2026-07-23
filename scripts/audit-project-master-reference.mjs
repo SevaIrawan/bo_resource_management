@@ -162,9 +162,20 @@ check('session check fixed 20s not group-scaled', () => {
   if (!validate.includes('probeWhatsAppSessionLinked')) {
     return fail('WA session probe must use probeWhatsAppSessionLinked');
   }
+  if (!validate.includes('probeWhatsAppSessionForSync')) {
+    return fail('Sync Active must use probeWhatsAppSessionForSync (no cold Chrome)');
+  }
   const wa = read('electron/main/platformLogin/whatsapp.ts');
+  if (!wa.includes('probeWhatsAppSessionForSyncInner') || !wa.includes('WA_DISK_AUTH_SYNC_LIGHT')) {
+    return fail('Sync WA probe must trust disk without initialize');
+  }
   if (wa.includes('waitForWhatsAppStoreReady') && /probeWhatsAppSessionLinkedInner/.test(wa)) {
-    const probeBlock = wa.slice(wa.indexOf('probeWhatsAppSessionLinkedInner'), wa.indexOf('export function getWhatsAppSessionClient'));
+    const probeBlock = wa.slice(
+      wa.indexOf('probeWhatsAppSessionLinkedInner'),
+      wa.indexOf('export function probeWhatsAppSessionForSync') > 0
+        ? wa.indexOf('/** Sync Active: tanpa cold Chrome. */')
+        : wa.indexOf('export function getWhatsAppSessionClient'),
+    );
     if (probeBlock.includes('waitForWhatsAppStoreReady')) {
       return fail('session probe must not wait for WA store');
     }
@@ -172,7 +183,14 @@ check('session check fixed 20s not group-scaled', () => {
   if (!read('electron/main/scraper/deviceGroupScale.ts').includes('SESSION_CHECK_TIMEOUT_MS = 20_000')) {
     return fail('SESSION_CHECK_TIMEOUT_MS missing');
   }
-    return ok('session check: 20s getState probe, no group read');
+  if (!gate.includes("mode === 'sync'") || !gate.includes('strict: false')) {
+    return fail('Sync gate must use light probe (strict:false)');
+  }
+  const syncFlow = read('src/services/syncFlowService.ts');
+  if (syncFlow.includes('backfillPlatformSessionIfNeeded')) {
+    return fail('Sync Active must not warm/restore via backfillPlatformSessionIfNeeded');
+  }
+  return ok('session check: Sync light (disk/getState); scrape strict ≤20s');
 });
 
 check('scraper cancel IPC', () => {

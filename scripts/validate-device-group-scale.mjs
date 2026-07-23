@@ -11,13 +11,17 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const scaleElectron = read('electron/main/scraper/deviceGroupScale.ts');
 const scalePolicy = read('src/config/syncScraperPolicy.ts');
 const loginFlow = read('src/services/loginFlowService.ts');
+const loginHook = read('src/hooks/useAccountSyncFlow.ts');
 const syncFlow = read('src/services/syncFlowService.ts');
-const waCount = read('electron/main/scraper/countWhatsApp.ts');
+const gateSrc = read('src/lib/deviceSessionGate.ts');
+const waLogin = read('electron/main/platformLogin/whatsapp.ts');
+const validateSession = read('electron/main/scraper/validateSession.ts');
 const waScrape = read('electron/main/scraper/whatsappScrape.ts');
 const tgPy = read('python-sidecar/telegram_scraper.py');
 const tgScrape = read('electron/main/scraper/telegramScrape.ts');
 const watchdog = read('electron/main/scraper/scrapeWatchdog.ts');
 const scrapeProgress = read('electron/main/scraper/scrapeProgress.ts');
+const scraperIdx = read('electron/main/scraper/index.ts');
 
 const executeSyncCheckBody = syncFlow.slice(
   syncFlow.indexOf('export async function executeSyncCheck'),
@@ -76,7 +80,20 @@ const checks = [
     ok:
       scaleElectron.includes('scrapeTotalPlanMs') &&
       scaleElectron.includes('scrapeInvitePhaseBudgetMs') &&
-      waScrape.includes('scrapeTotalPlanMs(total, adminRows.length)'),
+      scaleElectron.includes('formatScrapeEtaLabel') &&
+      (waScrape.includes('scrapeTotalPlanMs(total, adminRows.length)') ||
+        waScrape.includes('scrapeTotalPlanMs(total, adminNeedInvite.length)')),
+  },
+  {
+    name: 'TG progress poll hanya emit jika fingerprint berubah',
+    ok: tgScrape.includes('lastFingerprint') && tgScrape.includes('json.seq'),
+  },
+  {
+    name: 'WA scrape checkpoint resume',
+    ok:
+      waScrape.includes('loadScrapeCheckpoint') &&
+      waScrape.includes('clearScrapeCheckpoint') &&
+      waScrape.includes('WA_STORE_UNDERCOUNT'),
   },
   {
     name: 'TG idle watchdog + cancel sidecar on stale',
@@ -92,20 +109,40 @@ const checks = [
       tgPy.includes('get_scrape_progress'),
   },
   {
-    name: 'Manual sync valid: probe session saja (tanpa device count)',
+    name: 'Manual sync valid: probe light tanpa device count / cold Chrome',
     ok:
       !executeSyncCheckBody.includes('detectGroupsAndBuildSyncPayload') &&
-      !executeSyncCheckBody.includes('syncDetectTimeoutMs'),
+      !executeSyncCheckBody.includes('syncDetectTimeoutMs') &&
+      !executeSyncCheckBody.includes('backfillPlatformSessionIfNeeded'),
   },
   {
-    name: 'Post-login detect timeout tetap (bukan skala grup)',
+    name: 'Sync gate light (strict:false) + WA disk probe',
     ok:
-      scalePolicy.includes('postLoginDetect') &&
-      loginFlow.includes('postLoginDetectTimeoutMs'),
+      gateSrc.includes("mode === 'sync'") &&
+      gateSrc.includes('strict: false') &&
+      waLogin.includes('probeWhatsAppSessionForSync') &&
+      validateSession.includes('probeWhatsAppSessionForSync'),
   },
   {
-    name: 'WA quick count + runPooled full admin',
-    ok: waCount.includes('runPooled') && waCount.includes('countWhatsAppGroupsQuick'),
+    name: 'Post-login Sync: tanpa detect/count device (hindari skala grup)',
+    ok: (() => {
+      const start = loginFlow.indexOf('export async function applyDailyMetricsAfterLogin');
+      const next = loginFlow.indexOf('\nexport async function', start + 1);
+      const body = start >= 0 ? loginFlow.slice(start, next > start ? next : undefined) : '';
+      return (
+        body.length > 0 &&
+        !body.includes('quickDeviceCount') &&
+        !body.includes('detectGroupsAndBuildSyncPayload')
+      );
+    })(),
+  },
+  {
+    name: 'Device count IPC/stack dihapus (estimasi inbox hanya di scrape via countWhatsAppGroupsOnDevice)',
+    ok:
+      !fs.existsSync(path.join(root, 'electron/main/scraper/countWhatsApp.ts')) &&
+      !scraperIdx.includes('scraper:count-groups') &&
+      waScrape.includes('countWhatsAppGroupsOnDevice') &&
+      waScrape.includes('runPooled'),
   },
   {
     name: 'WA scrape metadata concurrency capped',
@@ -118,8 +155,11 @@ const checks = [
     ok: read('electron/main/platformLogin/waPuppeteerChrome.ts').includes('protocolTimeout'),
   },
   {
-    name: 'Post-login pakai quickDeviceCount (bukan manual sync valid)',
-    ok: /quickDeviceCount:\s*true/.test(loginFlow),
+    name: 'Later finalisasi sessionOnly + markPlatformSessionSynced',
+    ok:
+      loginHook.includes('dismissScrapePrompt') &&
+      /sessionOnly:\s*true/.test(loginHook) &&
+      loginHook.includes('markPlatformSessionSynced'),
   },
 ];
 

@@ -25,7 +25,7 @@ export type VerifyUserSessionResult =
       reloginCode: 'SESSION_INVALID_RELOGIN' | 'SESSION_INVALID_FORCE_SCRAPER';
     };
 
-/** Sync / Run: DB → probe device strict → gagal = siap invalidasi DB + modal login. */
+/** Sync: DB → probe light. Scrape: DB → probe strict. Gagal mati → siap invalidasi + login. */
 export async function verifyUserSessionForAction(input: {
   sessionId: string;
   platform: import('@/types/database').Platform;

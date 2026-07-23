@@ -1,12 +1,10 @@
 import { ipcMain } from 'electron';
-import { countTelegramGroups } from './countGroups';
-import { countWhatsAppGroups, countWhatsAppGroupsQuick } from './countWhatsApp';
 import {
   exportTelegramSession,
   runTelegramScrape,
   runTelegramScrapeAutoLane,
 } from './telegramScrape';
-import { validateTelegramSession, validateWhatsAppSession } from './validateSession';
+import { validateTelegramSession, validateTelegramSessionForSync, validateWhatsAppSession } from './validateSession';
 import { normalizeScrapeResult } from './scrapeOutput';
 import { assertScrapeHasGroups } from './scrapeGroupValidation';
 import { runWhatsAppScrape, runWhatsAppScrapeAutoLane } from './whatsappScrape';
@@ -32,11 +30,6 @@ import {
   tryAcquireAutoScrapeLane,
 } from './autoScrapeLane';
 import {
-  cancelCountGroups,
-  clearCountAbort,
-  registerCountAbort,
-} from './countGroupsCancel';
-import {
   assertAccountExecuteAllowed,
   accountExecuteBusyProbeResult,
 } from '../automation/jobQueueGuard';
@@ -54,14 +47,13 @@ export interface ScrapeRunPayload {
   expectedPhone?: string;
 }
 
-export interface CountGroupsPayload {
+/** Payload session probe (Sync Active / strict). Bukan count device. */
+export interface ValidateSessionPayload {
   sessionId: string;
   platform: Platform;
   accountId?: string;
   storedSessionString?: string | null;
   strict?: boolean;
-  quick?: boolean;
-  reuseLiveLogin?: boolean;
 }
 
 export interface ScrapedGroupRow {
@@ -197,32 +189,9 @@ export function registerScraperIpc() {
     },
   );
 
-  ipcMain.handle('scraper:count-groups', async (_event, payload: CountGroupsPayload) => {
-    guardAccountExecute(payload.sessionId, payload.accountId);
-    registerCountAbort(payload.sessionId);
-    try {
-      if (payload.platform === 'telegram') {
-        return await countTelegramGroups(payload.sessionId, payload.storedSessionString, {
-          quick: payload.quick,
-        });
-      }
-      return payload.quick
-        ? await countWhatsAppGroupsQuick(payload.sessionId, {
-            reuseLiveLogin: payload.reuseLiveLogin,
-          })
-        : await countWhatsAppGroups(payload.sessionId);
-    } finally {
-      clearCountAbort(payload.sessionId);
-    }
-  });
-
-  ipcMain.handle(
-    'scraper:cancel-count',
-    async (_event, payload: { sessionId: string; platform: Platform }) =>
-      cancelCountGroups(payload.sessionId, payload.platform),
-  );
-
-  ipcMain.handle('scraper:validate-session', async (_event, payload: CountGroupsPayload) => {
+  ipcMain.handle('scraper:validate-session', async (_event, payload: ValidateSessionPayload) => {
+    /** Sync Active: strict=false — tanpa busy gate, tanpa cold Chrome / TG restore. */
+    const syncLight = payload.strict === false;
     if (payload.strict) {
       const jobs = getJobQueueSnapshot().jobs;
       const busy = accountExecuteBusyProbeResult(
@@ -234,9 +203,13 @@ export function registerScraperIpc() {
     }
     try {
       if (payload.platform === 'telegram') {
-        return validateTelegramSession(payload.sessionId, payload.storedSessionString);
+        return syncLight
+          ? await validateTelegramSessionForSync(payload.sessionId, payload.storedSessionString)
+          : await validateTelegramSession(payload.sessionId, payload.storedSessionString);
       }
-      return validateWhatsAppSession(payload.sessionId, { strict: payload.strict });
+      return validateWhatsAppSession(payload.sessionId, {
+        strict: syncLight ? false : true,
+      });
     } catch (error) {
       return {
         valid: false,

@@ -83,11 +83,24 @@ const implChecks = [
       fs.existsSync(path.join(root, 'supabase/migrations/029_rm_account_master_stats_raw.sql')),
   },
   {
-    name: 'quick sync skip merge device group ids',
+    name: 'Sync Active: tanpa detect/count/merge device group ids',
     ok:
-      read('src/lib/accountMonitoringEngine.ts').includes('skipMergeDeviceGroups') &&
-      read('electron/main/scraper/countWhatsApp.ts').includes("mode === 'quick'") &&
-      !/mode === 'quick'[\s\S]{0,120}groupIds/.test(read('electron/main/scraper/countWhatsApp.ts')),
+      !read('src/services/syncFlowService.ts').includes('detectGroupsAndBuildSyncPayload') &&
+      !read('src/lib/accountMonitoringEngine.ts').includes('export async function refreshAccountMetrics') &&
+      !fs.existsSync(path.join(root, 'src/lib/syncAccountFlow.ts')) &&
+      !fs.existsSync(path.join(root, 'src/lib/mergeDeviceGroupIdsIntoDaily.ts')) &&
+      !fs.existsSync(path.join(root, 'electron/main/scraper/countWhatsApp.ts')) &&
+      !read('electron/main/scraper/index.ts').includes('scraper:count-groups'),
+  },
+  {
+    name: 'Scrape Now: progress fingerprint + FloodWait heartbeat + checkpoint',
+    ok:
+      read('electron/main/scraper/telegramScrape.ts').includes('lastFingerprint') &&
+      read('python-sidecar/telegram_scraper.py').includes('_sleep_flood_with_heartbeat') &&
+      read('electron/main/scraper/scrapeCheckpoint.ts').includes('loadScrapeCheckpoint') &&
+      read('electron/main/scraper/whatsappScrape.ts').includes('loadScrapeCheckpoint') &&
+      read('electron/main/scraper/deviceGroupScale.ts').includes('formatScrapeEtaLabel') &&
+      read('src/lib/accountScraper.ts').includes('Commit scrape daily'),
   },
   {
     name: 'Modal QR besar + refresh overlay',
@@ -138,13 +151,19 @@ const implChecks = [
       const concurrency = read('src/config/deviceConcurrencyPolicy.ts');
       const gate = read('src/lib/userActionGate.ts');
       const client = read('src/lib/executeSlotClient.ts');
+      const waPool = read('electron/main/platformLogin/waBrowserPool.ts');
+      const tgSlots = read('electron/main/platformLogin/tgExecuteSlots.ts');
       return (
         pool.includes('getMaxWaBrowserSlots') &&
         pool.includes('getMaxTgExecuteSlots') &&
         concurrency.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM = 10') &&
+        concurrency.includes('HARD_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM = 10') &&
         policy.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM') &&
         gate.includes('DEFAULT_MAX_EXECUTE_SLOTS') &&
-        client.includes('acquireOrWait')
+        client.includes('acquireOrWait') &&
+        waPool.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM') &&
+        tgSlots.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM') &&
+        /fifoWaiters\.push[\s\S]{0,120}drainExecuteSlotFifo/.test(pool)
       );
     })(),
   },
@@ -195,8 +214,8 @@ const implChecks = [
         concurrency.includes('DEFAULT_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM = 6') &&
         autoPool.includes('DEFAULT_MAX_AUTO_SCRAPE_BRAND_SLOTS_PER_PLATFORM') &&
         waLogin.includes("browserPool === 'auto'") &&
-        waLogin.includes('withWaAutoScrapeBrowserSlot(run)') &&
-        waLogin.includes('skipBrowserPool: browserPool === \'auto\'') &&
+        waLogin.includes('withWaAutoScrapeBrowserSlot') &&
+        waLogin.includes('withBrowserSlot') &&
         lane.includes('maxSessionsPerPlatform') &&
         autoScrape.includes('runAutoAccountScraper') &&
         autoScrape.includes("kind: 'start'") &&

@@ -17,7 +17,6 @@ import {
   markAccountScrapeGrace,
   isAccountInLoginGrace,
 } from '@/lib/sessionRealtimePolicy';
-import { postLoginDetectTimeoutMs } from '@/config/syncScraperPolicy';
 import { recordSessionActivityStatus } from '@/lib/recordSessionActivity';
 import { markPlatformSessionSynced } from '@/lib/platformSessions';
 import { getErrorMessage } from '@/lib/errorMessage';
@@ -459,12 +458,6 @@ export function useAccountSyncFlow({
           return;
         }
 
-        if (outcome.kind === 'device_busy') {
-          stopLoading();
-          showSyncError(outcome.message || SESSION_SETTLING_CODE, groupId, account);
-          return;
-        }
-
         if (outcome.kind === 'invalidated-login') {
           updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
           await recordSyncActivity({
@@ -526,9 +519,6 @@ export function useAccountSyncFlow({
         }
 
         stopLoading();
-        if (outcome.kind === 'error') {
-          showSyncError(outcome.code, groupId, account);
-        }
       } catch {
         stopLoading();
         showSyncError('SYNC_FAILED', groupId, account);
@@ -861,13 +851,45 @@ export function useAccountSyncFlow({
     });
   }, [runScrapeInBackground, setRowProcessing, target]);
 
+  /**
+   * Later: hanya pastikan session Active/Valid di UI lokal + DB.
+   * Tidak scrape, tidak count device — hindari busy/timeout akun banyak grup.
+   */
   const dismissScrapePrompt = useCallback(() => {
-    if (target) {
-      clearRowProcessing(target.groupId, target.account.id);
+    if (!target) {
+      dismissSyncModals();
+      setTarget(null);
+      return;
     }
+
+    const { groupId, account, dbAccountId } = target;
+    const syncedAt = new Date().toISOString();
+
+    updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'valid'));
+    void applyResult(
+      groupId,
+      account.id,
+      {
+        groupsCurrent: account.groupsCurrent,
+        groupsTotal: account.groupsTotal,
+        adminCurrent: account.adminCurrent,
+        adminTotal: account.adminTotal,
+        sessionStatus: 'valid',
+      },
+      {
+        sessionOnly: true,
+        lastSyncAt: syncedAt,
+      },
+    );
+    if (dbAccountId) {
+      void markPlatformSessionSynced(dbAccountId);
+    }
+
+    clearRowProcessing(groupId, account.id);
+    void releaseExecuteSlot(account.id);
     dismissSyncModals();
     setTarget(null);
-  }, [clearRowProcessing, dismissSyncModals, target]);
+  }, [applyResult, clearRowProcessing, dismissSyncModals, target, updateGroups]);
 
   const requestCancelScrape = useCallback(
     (groupId: string, account: AccountBrandRow) => {
@@ -934,9 +956,9 @@ export function useAccountSyncFlow({
     const savedIntent = loginIntent;
     setLoginIntent(null);
     setRowProcessing(groupId, account.id, savedIntent === 'scraper' ? 'scraper' : 'sync');
-    markAccountLoginGrace(account.id, POST_LOGIN_GRACE_MS + postLoginDetectTimeoutMs());
+    markAccountLoginGrace(account.id, POST_LOGIN_GRACE_MS);
     setPostLoginGraceAccountId(account.id);
-    const postLoginGraceTotalMs = POST_LOGIN_GRACE_MS + postLoginDetectTimeoutMs();
+    const postLoginGraceTotalMs = POST_LOGIN_GRACE_MS;
     window.setTimeout(() => {
       setPostLoginGraceAccountId((current) => (current === account.id ? null : current));
     }, postLoginGraceTotalMs);
@@ -969,7 +991,7 @@ export function useAccountSyncFlow({
         message: 'Login QR success',
       });
 
-      const metrics = await applyDailyMetricsAfterLogin({ userId, account, dbAccountId });
+      const metrics = await applyDailyMetricsAfterLogin({ account, dbAccountId });
       await applyResult(
         groupId,
         account.id,

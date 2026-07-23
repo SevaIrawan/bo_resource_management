@@ -13,8 +13,10 @@ import { assertWhatsAppScrapeHasRows } from './whatsappScrapeQuality';
 import { emitScrapeProgress } from './scrapeProgress';
 import {
   DEVICE_GROUP_TARGET_MAX,
+  formatScrapeEtaLabel,
   runPooled,
   scrapeGroupsBudgetMs,
+  scrapeInvitePhaseBudgetMs,
   scrapeTotalPlanMs,
   SCRAPE_IDLE_TIMEOUT_MS,
   waInboxStableTimeoutMs,
@@ -29,6 +31,12 @@ import {
   isAutoScrapeCancelled,
   AutoScrapeCancelledError,
 } from './autoScrapeCancel';
+import {
+  clearScrapeCheckpoint,
+  loadScrapeCheckpoint,
+  mergeCheckpointRows,
+  saveScrapeCheckpoint,
+} from './scrapeCheckpoint';
 import type { ScrapedGroupRow } from './index';
 import type { WhatsAppGroupScrapeCore } from './whatsappGroupScrapeStore';
 
@@ -74,33 +82,50 @@ async function assertWhatsAppLoggedInPhone(
 /**
  * Scrape penuh WA — fase 1: metadata paralel (store); fase 2: invite link serial per grup admin.
  * `getInviteCode` tidak boleh paralel pada satu Puppeteer client (learning scraper sequential).
+ * Checkpoint lokal: resume setelah crash tanpa ulang semua grup.
  */
 async function scrapeWhatsAppGroupsFromStore(input: {
   client: InstanceType<typeof Client>;
   sessionId: string;
   throwIfCancelled?: (sessionId: string) => void;
-}): Promise<{ rows: ScrapedGroupRow[]; skipped: number; inviteExported: number }> {
+}): Promise<{
+  rows: ScrapedGroupRow[];
+  skipped: number;
+  inviteExported: number;
+  deviceGroupCount: number;
+  truncated: boolean;
+  resumedFromCheckpoint: boolean;
+}> {
   const throwIfCancelled = input.throwIfCancelled ?? throwIfScrapeCancelled;
   const groupIds = await listWhatsAppGroupIds(input.client);
   const scanIds = groupIds.slice(0, DEVICE_GROUP_TARGET_MAX);
   const total = scanIds.length;
   let skipped = 0;
+  const truncated = groupIds.length > DEVICE_GROUP_TARGET_MAX;
 
-  if (groupIds.length > DEVICE_GROUP_TARGET_MAX) {
+  if (truncated) {
     console.warn(
       `[wa-scrape] ${groupIds.length} groups; scraping first ${DEVICE_GROUP_TARGET_MAX}`,
     );
   }
 
+  const checkpoint = loadScrapeCheckpoint(input.sessionId, 'whatsapp');
+  const doneSet = new Set(checkpoint?.doneGroupIds ?? []);
+  const pendingIds = scanIds.filter((id) => !doneSet.has(id));
+  const resumedFromCheckpoint = Boolean(checkpoint && doneSet.size > 0);
+
+  const planMs = scrapeTotalPlanMs(total, Math.max(0, Math.floor(total * 0.35)));
   emitScrapeProgress({
     sessionId: input.sessionId,
     phase: 'discover',
-    current: total,
+    current: doneSet.size,
     total,
-    label: `${total} groups on device`,
+    label: resumedFromCheckpoint
+      ? `Resume: ${doneSet.size}/${total} done · ${pendingIds.length} left · ${formatScrapeEtaLabel(planMs)}`
+      : `${total} groups on device · ${formatScrapeEtaLabel(planMs)}`,
   });
 
-  const pooled = await runPooled(scanIds, WA_SCRAPE_METADATA_CONCURRENCY, async (groupId, index) => {
+  const pooled = await runPooled(pendingIds, WA_SCRAPE_METADATA_CONCURRENCY, async (groupId, index) => {
     throwIfCancelled(input.sessionId);
 
     const core = await scrapeWhatsAppGroupFromStore(input.client, groupId);
@@ -112,62 +137,109 @@ async function scrapeWhatsAppGroupsFromStore(input: {
       return null;
     }
 
-    if ((index + 1) % 25 === 0 || index === scanIds.length - 1) {
+    const doneCount = doneSet.size + index + 1;
+    if (doneCount % 25 === 0 || index === pendingIds.length - 1) {
       emitScrapeProgress({
         sessionId: input.sessionId,
         phase: 'group',
-        current: index + 1,
+        current: Math.min(doneCount, total),
         total,
-        label: `Reading groups (${index + 1}/${total})`,
+        label: `Reading groups (${Math.min(doneCount, total)}/${total}) · ${formatScrapeEtaLabel(planMs)}`,
       });
     }
 
     return { groupId, core };
   });
 
-  const coreRows = pooled.filter(
+  const newCoreRows = pooled.filter(
     (row): row is { groupId: string; core: WhatsAppGroupScrapeCore } => row !== null,
   );
 
-  const adminRows = coreRows.filter((row) => row.core.is_admin === 'yes');
-  console.info(
-    `[wa-scrape] sessionId=${input.sessionId} deviceGroups=${groupIds.length} scan=${total} admin=${adminRows.length} planMs=${scrapeTotalPlanMs(total, adminRows.length)} metadataMs=${scrapeGroupsBudgetMs(total)} idleMs=${SCRAPE_IDLE_TIMEOUT_MS}`,
+  let rows: ScrapedGroupRow[] = mergeCheckpointRows(
+    checkpoint?.rows ?? [],
+    newCoreRows.map(({ core }) => ({ ...core, invite_link: null })),
   );
+
+  const adminNeedInvite = rows.filter(
+    (row) => row.is_admin === 'yes' && !row.invite_link,
+  );
+  console.info(
+    `[wa-scrape] sessionId=${input.sessionId} deviceGroups=${groupIds.length} scan=${total} pendingMeta=${pendingIds.length} adminInvite=${adminNeedInvite.length} planMs=${scrapeTotalPlanMs(total, adminNeedInvite.length)} metadataMs=${scrapeGroupsBudgetMs(total)} idleMs=${SCRAPE_IDLE_TIMEOUT_MS} resumed=${resumedFromCheckpoint}`,
+  );
+
+  saveScrapeCheckpoint({
+    sessionId: input.sessionId,
+    platform: 'whatsapp',
+    updatedAt: new Date().toISOString(),
+    rows,
+    doneGroupIds: rows.map((r) => String(r.group_id)),
+  });
 
   let inviteExported = 0;
   let adminInviteDone = 0;
-  const rows: ScrapedGroupRow[] = [];
+  const invitePlanMs = scrapeInvitePhaseBudgetMs(adminNeedInvite.length);
 
-  for (let i = 0; i < coreRows.length; i += 1) {
+  for (let i = 0; i < adminNeedInvite.length; i += 1) {
     throwIfCancelled(input.sessionId);
-    const { groupId, core } = coreRows[i];
-    let invite_link: string | null = null;
-
-    if (core.is_admin === 'yes') {
-      adminInviteDone += 1;
-      emitScrapeProgress({
-        sessionId: input.sessionId,
-        phase: 'group',
-        current: i + 1,
-        total: coreRows.length,
-        label: `Export invite link: ${core.group_name} (${adminInviteDone}/${adminRows.length})`,
-      });
-      invite_link = await fetchWhatsAppGroupInviteLink(input.client, groupId);
-      touchScrapeWatchdog(input.sessionId);
-      if (invite_link) inviteExported += 1;
-      if (adminInviteDone < adminRows.length) {
-        await sleep(waInviteExportDelayMs());
-      }
+    const row = adminNeedInvite[i];
+    adminInviteDone += 1;
+    emitScrapeProgress({
+      sessionId: input.sessionId,
+      phase: 'group',
+      current: adminInviteDone,
+      total: adminNeedInvite.length,
+      label: `Export invite: ${row.group_name} (${adminInviteDone}/${adminNeedInvite.length}) · ${formatScrapeEtaLabel(invitePlanMs)}`,
+    });
+    const invite_link = await fetchWhatsAppGroupInviteLink(input.client, row.group_id);
+    touchScrapeWatchdog(input.sessionId);
+    if (invite_link) {
+      inviteExported += 1;
+      row.invite_link = invite_link;
+    } else {
+      console.warn(
+        `[wa-scrape] invite missing for ADMIN group ${row.group_id} (${row.group_name}) — is_admin=yes but getInviteCode/store returned empty`,
+      );
+    }
+    if (adminInviteDone < adminNeedInvite.length) {
+      await sleep(waInviteExportDelayMs());
     }
 
-    rows.push({ ...core, invite_link });
+    if (adminInviteDone % 10 === 0 || adminInviteDone === adminNeedInvite.length) {
+      saveScrapeCheckpoint({
+        sessionId: input.sessionId,
+        platform: 'whatsapp',
+        updatedAt: new Date().toISOString(),
+        rows,
+        doneGroupIds: rows.map((r) => String(r.group_id)),
+      });
+    }
   }
 
+  const priorInvites = (checkpoint?.rows ?? []).filter(
+    (r) => r.is_admin === 'yes' && r.invite_link,
+  ).length;
+  inviteExported += priorInvites;
+
+  saveScrapeCheckpoint({
+    sessionId: input.sessionId,
+    platform: 'whatsapp',
+    updatedAt: new Date().toISOString(),
+    rows,
+    doneGroupIds: rows.map((r) => String(r.group_id)),
+  });
+
   console.info(
-    `[wa-scrape] invite_links exported=${inviteExported}/${adminRows.length} admin groups`,
+    `[wa-scrape] invite_links exported=${inviteExported}/${rows.filter((r) => r.is_admin === 'yes').length} admin groups`,
   );
 
-  return { rows, skipped, inviteExported };
+  return {
+    rows,
+    skipped,
+    inviteExported,
+    deviceGroupCount: groupIds.length,
+    truncated,
+    resumedFromCheckpoint,
+  };
 }
 
 export async function runWhatsAppScrape(
@@ -179,89 +251,20 @@ export async function runWhatsAppScrape(
   count: number;
   loggedInAs?: string;
   elapsedMs?: number;
+  hint?: string;
 }> {
-  emitScrapeProgress({ sessionId, phase: 'start' });
-  const startedAt = Date.now();
-
-  try {
-    return await withWhatsAppClient(
-      sessionId,
-      async (client) =>
-        withScrapeWatchdog(
-          sessionId,
-          async () => {
-            assertWhatsAppScrapeClient(client);
-
-            emitScrapeProgress({ sessionId, phase: 'connect', label: 'Opening WhatsApp session…' });
-
-            const loggedInAs = await assertWhatsAppLoggedInPhone(client, expectedPhone);
-            console.info(`[wa-scrape] sessionId=${sessionId} loggedInAs=${loggedInAs}`);
-
-            const state = await client.getState();
-            if (state !== 'CONNECTED') {
-              throw new Error(
-                `WA_NOT_CONNECTED: WhatsApp is not connected (${state ?? 'unknown'}). Log in again.`,
-              );
-            }
-
-            emitScrapeProgress({
-              sessionId,
-              phase: 'connect',
-              label: 'Syncing WhatsApp inbox from server…',
-            });
-            await waitForWhatsAppStoreReady(client, 120_000);
-            const deviceGroupCount = await countWhatsAppGroupsOnDevice(client);
-            await waitForWhatsAppInboxStable(client, {
-              maxMs: waInboxStableTimeoutMs(deviceGroupCount),
-            });
-            throwIfScrapeCancelled(sessionId);
-
-            const { rows, skipped, inviteExported } = await scrapeWhatsAppGroupsFromStore({
-              client,
-              sessionId,
-            });
-
-            assertWhatsAppScrapeHasRows(rows);
-
-            const elapsedMs = Date.now() - startedAt;
-            const adminCount = rows.filter((row) => row.is_admin === 'yes').length;
-
-            emitScrapeProgress({
-              sessionId,
-              phase: 'done',
-              current: rows.length,
-              total: rows.length,
-              label: `Scrape finished: ${rows.length} groups, ${inviteExported}/${adminCount} invite links (${loggedInAs}, ${Math.round(elapsedMs / 1000)}s)`,
-            });
-
-            console.info(
-              `[wa-scrape] done sessionId=${sessionId} groups=${rows.length} skipped=${skipped} inviteExported=${inviteExported}/${adminCount} elapsedMs=${elapsedMs}`,
-            );
-
-            return {
-              ok: true,
-              groups: rows,
-              count: rows.length,
-              loggedInAs,
-              elapsedMs,
-            };
-          },
-          {
-            label: 'WhatsApp scrape',
-            idleMs: SCRAPE_IDLE_TIMEOUT_MS,
-            onStale: (sid) => abortActiveScrape(sid, 'whatsapp'),
-          },
-        ),
-      { storeWaitMs: 120_000 },
-    );
-  } catch (error) {
-    if (isScrapeCancelled(sessionId)) {
-      throw new ScrapeCancelledError();
-    }
-    const message = error instanceof Error ? error.message : 'WhatsApp scrape failed';
-    emitScrapeProgress({ sessionId, phase: 'error', label: message });
-    throw error;
-  }
+  return runWhatsAppScrapeLane({
+    sessionId,
+    expectedPhone,
+    logTag: 'wa-scrape',
+    doneLabel: 'Scrape finished',
+    cancelError: () => new ScrapeCancelledError(),
+    isCancelled: isScrapeCancelled,
+    throwIfCancelled: throwIfScrapeCancelled,
+    onStale: (sid) => abortActiveScrape(sid, 'whatsapp'),
+    watchdogLabel: 'WhatsApp scrape',
+    clientOpts: { storeWaitMs: 120_000 },
+  });
 }
 
 /** Auto scrape lane — pool Chrome terpisah + cancel registry terpisah dari user scrape. */
@@ -274,7 +277,50 @@ export async function runWhatsAppScrapeAutoLane(
   count: number;
   loggedInAs?: string;
   elapsedMs?: number;
+  hint?: string;
 }> {
+  return runWhatsAppScrapeLane({
+    sessionId,
+    expectedPhone,
+    logTag: 'wa-auto-scrape',
+    doneLabel: 'Auto scrape finished',
+    undercountDoneLabel: 'Auto scrape',
+    cancelError: () => new AutoScrapeCancelledError(),
+    isCancelled: isAutoScrapeCancelled,
+    throwIfCancelled: throwIfAutoScrapeCancelled,
+    onStale: (sid) => abortActiveAutoScrape(sid, 'whatsapp'),
+    watchdogLabel: 'WhatsApp auto scrape',
+    clientOpts: { storeWaitMs: 120_000, freshBoot: true, browserPool: 'auto' },
+  });
+}
+
+type WaScrapeLaneOpts = {
+  sessionId: string;
+  expectedPhone?: string;
+  logTag: string;
+  doneLabel: string;
+  undercountDoneLabel?: string;
+  cancelError: () => Error;
+  isCancelled: (sessionId: string) => boolean;
+  throwIfCancelled: (sessionId: string) => void;
+  onStale: (sessionId: string) => void | Promise<void>;
+  watchdogLabel: string;
+  clientOpts: {
+    storeWaitMs: number;
+    freshBoot?: boolean;
+    browserPool?: 'user' | 'auto';
+  };
+};
+
+async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
+  ok: boolean;
+  groups: ScrapedGroupRow[];
+  count: number;
+  loggedInAs?: string;
+  elapsedMs?: number;
+  hint?: string;
+}> {
+  const { sessionId, expectedPhone } = opts;
   emitScrapeProgress({ sessionId, phase: 'start' });
   const startedAt = Date.now();
 
@@ -290,7 +336,7 @@ export async function runWhatsAppScrapeAutoLane(
             emitScrapeProgress({ sessionId, phase: 'connect', label: 'Opening WhatsApp session…' });
 
             const loggedInAs = await assertWhatsAppLoggedInPhone(client, expectedPhone);
-            console.info(`[wa-auto-scrape] sessionId=${sessionId} loggedInAs=${loggedInAs}`);
+            console.info(`[${opts.logTag}] sessionId=${sessionId} loggedInAs=${loggedInAs}`);
 
             const state = await client.getState();
             if (state !== 'CONNECTED') {
@@ -305,33 +351,50 @@ export async function runWhatsAppScrapeAutoLane(
               label: 'Syncing WhatsApp inbox from server…',
             });
             await waitForWhatsAppStoreReady(client, 120_000);
-            const deviceGroupCount = await countWhatsAppGroupsOnDevice(client);
+            const inboxGroupEstimate = await countWhatsAppGroupsOnDevice(client);
             await waitForWhatsAppInboxStable(client, {
-              maxMs: waInboxStableTimeoutMs(deviceGroupCount),
+              maxMs: waInboxStableTimeoutMs(inboxGroupEstimate),
             });
-            throwIfAutoScrapeCancelled(sessionId);
+            opts.throwIfCancelled(sessionId);
 
-            const { rows, skipped, inviteExported } = await scrapeWhatsAppGroupsFromStore({
-              client,
-              sessionId,
-              throwIfCancelled: throwIfAutoScrapeCancelled,
-            });
+            const { rows, skipped, inviteExported, deviceGroupCount, truncated, resumedFromCheckpoint } =
+              await scrapeWhatsAppGroupsFromStore({
+                client,
+                sessionId,
+                throwIfCancelled: opts.throwIfCancelled,
+              });
 
             assertWhatsAppScrapeHasRows(rows);
+            clearScrapeCheckpoint(sessionId);
 
             const elapsedMs = Date.now() - startedAt;
             const adminCount = rows.filter((row) => row.is_admin === 'yes').length;
+            const undercount =
+              !truncated &&
+              deviceGroupCount > 50 &&
+              rows.length < Math.floor(deviceGroupCount * 0.85);
 
+            const hintParts: string[] = [];
+            if (resumedFromCheckpoint) hintParts.push('RESUMED_CHECKPOINT');
+            if (truncated) hintParts.push(`TRUNCATED_${DEVICE_GROUP_TARGET_MAX}`);
+            if (undercount) hintParts.push('WA_STORE_UNDERCOUNT');
+            if (adminCount > 0 && inviteExported < adminCount) {
+              hintParts.push('WA_INVITE_EXPORT_PARTIAL');
+            }
+
+            const underPrefix = opts.undercountDoneLabel ?? opts.doneLabel;
             emitScrapeProgress({
               sessionId,
               phase: 'done',
               current: rows.length,
               total: rows.length,
-              label: `Auto scrape finished: ${rows.length} groups, ${inviteExported}/${adminCount} invite links (${loggedInAs}, ${Math.round(elapsedMs / 1000)}s)`,
+              label: undercount
+                ? `${underPrefix}: ${rows.length}/${deviceGroupCount} groups (store may still be syncing) · ${inviteExported}/${adminCount} invites (${loggedInAs}, ${Math.round(elapsedMs / 1000)}s)`
+                : `${opts.doneLabel}: ${rows.length} groups, ${inviteExported}/${adminCount} invite links (${loggedInAs}, ${Math.round(elapsedMs / 1000)}s)`,
             });
 
             console.info(
-              `[wa-auto-scrape] done sessionId=${sessionId} groups=${rows.length} skipped=${skipped} inviteExported=${inviteExported}/${adminCount} elapsedMs=${elapsedMs}`,
+              `[${opts.logTag}] done sessionId=${sessionId} groups=${rows.length} device=${deviceGroupCount} skipped=${skipped} inviteExported=${inviteExported}/${adminCount} elapsedMs=${elapsedMs} hints=${hintParts.join(',') || 'none'}`,
             );
 
             return {
@@ -340,21 +403,22 @@ export async function runWhatsAppScrapeAutoLane(
               count: rows.length,
               loggedInAs,
               elapsedMs,
+              hint: hintParts.length ? hintParts.join('|') : undefined,
             };
           },
           {
-            label: 'WhatsApp auto scrape',
+            label: opts.watchdogLabel,
             idleMs: SCRAPE_IDLE_TIMEOUT_MS,
-            onStale: (sid) => abortActiveAutoScrape(sid, 'whatsapp'),
+            onStale: opts.onStale,
           },
         ),
-      { storeWaitMs: 120_000, freshBoot: true, browserPool: 'auto' },
+      opts.clientOpts,
     );
   } catch (error) {
-    if (isAutoScrapeCancelled(sessionId)) {
-      throw new AutoScrapeCancelledError();
+    if (opts.isCancelled(sessionId)) {
+      throw opts.cancelError();
     }
-    const message = error instanceof Error ? error.message : 'WhatsApp auto scrape failed';
+    const message = error instanceof Error ? error.message : 'WhatsApp scrape failed';
     emitScrapeProgress({ sessionId, phase: 'error', label: message });
     throw error;
   }

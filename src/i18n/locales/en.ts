@@ -644,8 +644,6 @@ export const en = {
         'Login OK. Device counts were not read in time — scrape via Sync to refresh totals. Save the full group list to the database now?',
       scrapeProgressHint: 'Scraping in background. Counts update in the table.',
       syncFailed: 'Sync failed. Try again.',
-      syncTimedOut:
-        'Sync took too long. Accounts with many groups need more time — try again or restart the app.',
       scraperFailed: 'Scraper failed. Try again.',
       scraperConnectionLostWa:
         'WhatsApp connection to the server was lost or interrupted. Check internet on this PC and that WhatsApp works on your phone, then run the scraper again.',

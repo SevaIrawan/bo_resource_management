@@ -16,7 +16,9 @@ import {
 import { dedupeScrapedGroupsByGroupId } from '@/lib/dedupeScrapedGroups';
 import type { ScrapedGroupPayload } from '@/lib/dedupeScrapedGroups';
 import { invalidateMasterDailyCacheForScrape } from '@/lib/masterDailyLoadCache';
+import { withNetworkRetry } from '@/lib/networkRetry';
 import { getSupabase } from '@/lib/supabase';
+import { withTimeout } from '@/lib/withTimeout';
 import type { Platform } from '@/types/database';
 import type { MessagingAccount } from '@/types/database';
 
@@ -240,16 +242,29 @@ export async function writeScrapeDailyRows(input: {
   });
 
   const brand = input.brand.trim();
-  const { data, error } = await supabase.rpc('rm_commit_account_scrape', {
-    p_account_id: input.accountId,
-    p_brand: brand,
-    p_platform: input.platform,
-    p_rows: rows,
+  const commitTimeoutMs = Math.min(
+    600_000,
+    Math.max(120_000, 30_000 + uniqueGroups.length * 40),
+  );
+
+  const commitResult = await withNetworkRetry('Commit scrape daily', async () => {
+    const result = await withTimeout(
+      supabase.rpc('rm_commit_account_scrape', {
+        p_account_id: input.accountId,
+        p_brand: brand,
+        p_platform: input.platform,
+        p_rows: rows,
+      }),
+      commitTimeoutMs,
+      'Commit scrape daily',
+    );
+    if (result.error) {
+      throw new Error(`SCRAPER_DB_COMMIT: ${result.error.message}`);
+    }
+    return result;
   });
 
-  if (error) {
-    throw new Error(`SCRAPER_DB_COMMIT: ${error.message}`);
-  }
+  const data = commitResult.data;
 
   const commit = (data ?? {}) as {
     daily_count?: number;

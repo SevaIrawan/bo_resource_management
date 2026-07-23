@@ -2,10 +2,12 @@ BAGIAN 1: ALUR UTAMA (SYNC & SCRAPE)
 Setiap update metrik mencakup GROUP (Y/X) dan ADMIN (Y/X).
 Daftar grup di device dibaca di Electron/sidecar (bukan isi pesan). Pencocokan master↔daily di Postgres RPC.
 
-A. SYNC — cek kolom session:
-VALID: tanpa modal login → hitung grup+admin di device → update grid → [Now|Later] atau resume-empty (0 grup).
-INVALID: modal login → sukses: save session, update group+admin, tutup login → [Now|Later].
+A. SYNC — cek kolom session (Case 3):
+VALID: tanpa modal login → **check Session ringan** (WA: getState in-memory atau LocalAuth di disk; TG: session string DB; **tanpa** cold Chrome / Puppeteer / restore / hitung grup) → patch session valid → [Now|Later] atau resume-empty. Metrik Y/X hanya dari scrape / DB. Busy/timeout probe **bukan** alasan gagal Sync (session tersimpan → Valid).
+INVALID: modal login realtime → sukses: save session UI+DB saja (tanpa hitung grup di device) → [Now|Later].
+**Later** = update session Active/Valid di UI lokal + DB saja; **tidak** scrape, **tidak** count device.
 Login FAIL: WA auto-QR; TG error + pesan (tanpa auto-loop). Tutup modal = batalkan, session tetap INVALID.
+Busy/timeout (job queue / Chrome lain): **bukan** Logout / modal login pada Sync Active.
 
 B. SCRAPE (hanya lewat Sync → Scrape Now; kolom Last update read-only):
 VALID (+ probe device; gagal → login meski grid valid): langsung scraper.
@@ -22,7 +24,8 @@ Panel lebar (min ~36rem), kotak QR besar (~14rem), skeleton saat generate, overl
 WA: auto-regenerate QR. TG: error dulu, refresh manual.
 
 BAGIAN 4: PERFORMA (hingga 6000 grup)
-- quickDeviceCount: hanya total dari device; tidak merge ribuan group_id ke daily di renderer.
+- Sync / Later: **tanpa** device count — session UI+DB saja (hindari busy/timeout akun banyak grup).
+- Scrape Now: idle watchdog + dua fase WA; tidak wall-clock tetap per sync detect lama.
 - Agregasi master↔daily: accountMasterDailyCompare.ts (in-memory) + RPC rm_commit_account_scrape saat tulis scrape.
 - Issue/kartu: buildTicketSummariesFromEngine.ts dari engine yang sama dengan grid; patch grid setelah scrape via patchAccountGridAfterDailyWrite.
 
@@ -55,5 +58,5 @@ Implementasi: useAccountSyncFlow.ts, clearAccountSession.ts, accountMasterDailyC
 buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx, BrandMasterGroupsModal.tsx,
 ReportingJoinMatrixTable.tsx, loadJoinGroupReport.ts, masterDailyLoadCache.ts, accountSessionResolve.ts,
 PlatformLoginModal.tsx, GroupMonitoringProvider.tsx, useRealtimeMonitoring.ts,
-electron/main/scraper/countWhatsApp.ts
+electron/main/scraper/whatsappScrape.ts, whatsappGroupInviteLink.ts,
 deviceConcurrencyPolicy.ts (user execute max 10/platform; auto scrape max 6/platform)

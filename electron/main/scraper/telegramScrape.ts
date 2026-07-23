@@ -78,6 +78,9 @@ async function pollTelegramScrapeProgress(
   sessionId: string,
   until: { done: boolean },
 ): Promise<void> {
+  /** Hanya emit (dan touch idle watchdog) bila progress benar-benar berubah — hindari fake-alive. */
+  let lastFingerprint = '';
+
   while (!until.done) {
     await sleep(PROGRESS_POLL_MS);
     try {
@@ -92,8 +95,19 @@ async function pollTelegramScrapeProgress(
         current?: number;
         total?: number;
         label?: string;
+        seq?: number;
       };
       if (!json.phase || json.phase === 'idle') continue;
+
+      const fingerprint = [
+        json.phase,
+        json.current ?? 0,
+        json.total ?? 0,
+        json.label ?? '',
+        json.seq ?? 0,
+      ].join('|');
+      if (fingerprint === lastFingerprint) continue;
+      lastFingerprint = fingerprint;
 
       emitScrapeProgress({
         sessionId,

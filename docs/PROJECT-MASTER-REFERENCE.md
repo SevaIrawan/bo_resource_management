@@ -359,7 +359,8 @@ Data: `accountGroupLinks.ts`, `dedupeScrapeDaily.ts`, `exportExcel.ts`
 
 | Operasi | Sumber |
 |---------|--------|
-| Setelah sync | `completeSyncAfterLiveSession` / quick device count |
+| Setelah sync valid | sessionOnly UI + DB (`markPlatformSessionSynced`); metrik dari scrape |
+| Setelah scrape | `rm_commit_account_scrape` + applyResult grid |
 | Setelah scrape | `buildMetricsFromScrapeDaily` dari `group_scrape_daily` |
 | Master X | `groups_master` + RPC `rm_account_master_stats` (fallback JS) |
 | Dedupe | `dedupeDailyRowsByGroupId`, `dedupeMasterRowsByGroupId` |
@@ -388,8 +389,9 @@ sessionStatus === 'valid'    →  check_device
   → cek phone wajib (WA) → modal missing-phone jika kosong
   → executeSyncCheck → kind: 'login'
   → modal PlatformLogin (session badge tetap INVALID)
-  → login sukses → persist session → applyDailyMetricsAfterLogin
-  → modal Now/Later (scrape-prompt) ATAU resume-empty (0 grup)
+  → login sukses → persist session UI+DB saja (tanpa device count)
+  → modal Now/Later (scrape-prompt) ATAU resume-empty (0 grup daily)
+  → Later = sessionOnly UI + markPlatformSessionSynced; Now = scrape device
   → refreshIssues (ticket reconcile)
 ```
 
@@ -401,11 +403,12 @@ sessionStatus === 'valid'    →  check_device
 [↻ Sync]
   → actionProcess: session_check (Checking Session)
   → backfill session DB jika perlu
-  → checkDeviceSessionForValidColumn (probe strict)
-  → gagal → invalidate + modal login
-  → sukses → detectGroupsAndBuildSyncPayload (quickDeviceCount)
-  → applyResult → update grid Y/X
+  → checkDeviceSessionForValidColumn (Sync light: disk/getState; tanpa cold Chrome)
+  → gagal jelas (no disk / unpaired) → invalidate + modal login
+  → busy/timeout + session tersimpan → tetap Valid (bukan error Sync)
+  → sukses → applyResult sessionOnly (metrik Y/X tetap dari scrape/DB)
   → modal Now/Later ATAU resume-empty
+  → Later = session UI+DB saja; Now = scrape device
   → refreshIssues
 ```
 
@@ -413,11 +416,12 @@ sessionStatus === 'valid'    →  check_device
 
 | Step | Modal | Kapan |
 |------|-------|-------|
-| `scrape-prompt` | Now \| Later | Ada data scrapeable (device > 0, daily hari ini, atau brand X > 0) |
-| `resume-empty` | Info 0 grup | Device 0, tidak ada daily, brand X = 0 |
-| `sync-error` | Alert error | Gagal sync / timeout / lock busy |
+| `scrape-prompt` | Now \| Later | Ada data scrapeable (daily hari ini, Y/X grid, atau brand X > 0) |
+| `resume-empty` | Info 0 grup | Daily hari ini ada + semua count 0 |
+| `sync-error` | Alert error | Gagal sync jarang (auth / desktop); busy≠Logout pada Sync Active |
 
 Now → `runScrapeInBackground({ skipDeviceCheck: true })`
+Later → `dismissScrapePrompt` → sessionOnly UI + `markPlatformSessionSynced`
 
 ### 7.4 Gate & lock
 
@@ -426,7 +430,8 @@ Now → `runScrapeInBackground({ skipDeviceCheck: true })`
 | Desktop only | `electronAPI.isElectron` |
 | Satu aksi per akun | `userActionGate.ts` — `tryLockUserAction` |
 | Satu scrape global per PC | `scraper:run` → `scrapeRunInFlight` |
-| Timeout sync | `manualSyncTimeoutMs` — `syncScraperPolicy.ts` |
+| Timeout Sync Active | session light ≤8s (disk/getState); busy → tetap Valid |
+| Timeout scrape probe | `sessionCheckTimeoutMs` — `syncScraperPolicy.ts` |
 
 ---
 
@@ -665,7 +670,6 @@ Endpoint **aktual** (`python-sidecar/main.py`):
 | POST | `/telegram/scrape/{session_id}` | Full scrape |
 | POST | `/telegram/scrape/cancel/{session_id}` | Cancel scrape |
 | GET | `/telegram/scrape/progress/{session_id}` | Progress poll |
-| POST | `/telegram/count/{session_id}` | Count groups |
 | POST | `/telegram/validate/{session_id}` | Validate session |
 | GET | `/telegram/session/export/{session_id}` | Export session string |
 | POST | `/telegram/session/restore` | Restore session string |
@@ -677,8 +681,8 @@ Build sidecar: `npm run build:sidecar` → `resources/sidecar/` + nama dari `sid
 `syncScraperPolicy.ts` + `deviceGroupScale.ts`:
 
 - Timeout QR / scan / confirming diskalakan per estimasi grup
-- `quickDeviceCount` — sync tidak merge ribuan group_id di renderer
-- RPC `rm_account_master_stats` — agregasi SQL
+- Sync Active / Later: session light saja — tanpa count/merge group_id di renderer
+- Scrape Now: `rm_commit_account_scrape` atomik + idle watchdog
 
 ---
 

@@ -7,12 +7,6 @@ export const DEVICE_GROUP_TARGET_MAX = WA_STORE_GROUP_LIST_CAP;
 /** Cek session valid/invalid — cold WA Chrome + TG restore; tidak baca daftar grup; tidak skala Y/X. */
 export const SESSION_CHECK_TIMEOUT_MS = 20_000;
 
-/** Post-login detect total grup — satu pass store; tidak skala jumlah grup. */
-export const POST_LOGIN_DETECT_TIMEOUT_MS = 90_000;
-
-/** Setelah QR ready — store biasanya sudah siap; tunggu pendek saja. */
-export const QUICK_COUNT_STORE_WAIT_MS = 20_000;
-
 /** Scrape metadata — evaluate berat; jangan 12 paralel di satu Puppeteer page. */
 export const WA_SCRAPE_METADATA_CONCURRENCY = Math.max(
   1,
@@ -21,9 +15,6 @@ export const WA_SCRAPE_METADATA_CONCURRENCY = Math.max(
     Math.floor(Number(process.env.RM_WA_SCRAPE_METADATA_CONCURRENCY) || 4),
   ),
 );
-
-/** Scrape / admin detail — paralel terbatas (count full admin scan). */
-export const WA_GROUP_PROCESS_CONCURRENCY = 12;
 
 /** Jeda antar grup saat scrape penuh (RM_WA_SCRAPE_GROUP_DELAY_MS / JITTER). */
 export const WA_SCRAPE_GROUP_DELAY_MS = Math.max(
@@ -41,10 +32,6 @@ export function waInviteExportDelayMs(): number {
   return WA_SCRAPE_GROUP_DELAY_MS + Math.floor(Math.random() * WA_SCRAPE_GROUP_JITTER_MS);
 }
 
-const COUNT_BASE_MS = 120_000;
-const COUNT_PER_GROUP_MS = 30;
-const COUNT_MAX_MS = 1_200_000;
-
 const SCRAPE_BASE_MS = Math.max(
   60_000,
   Math.floor(Number(process.env.RM_SCRAPE_BASE_MS) || 120_000),
@@ -55,7 +42,7 @@ const SCRAPE_PER_GROUP_MS = Math.max(
 );
 
 /** Selaras INVITE_CODE_TIMEOUT_MS di whatsappGroupInviteLink.ts */
-const WA_INVITE_FETCH_TIMEOUT_MS = 15_000;
+const WA_INVITE_FETCH_TIMEOUT_MS = 20_000;
 
 /** Gagal jika tidak ada progress scrape selama interval ini (ms). Override: RM_SCRAPE_IDLE_MS */
 export const SCRAPE_IDLE_TIMEOUT_MS = Math.max(
@@ -65,11 +52,6 @@ export const SCRAPE_IDLE_TIMEOUT_MS = Math.max(
 
 export function clampGroupCount(count: number): number {
   return Math.max(0, Math.min(Math.floor(count) || 0, WA_STORE_GROUP_LIST_CAP));
-}
-
-/** @deprecated gunakan clampGroupCount */
-function clampGroupEstimate(estimate: number): number {
-  return clampGroupCount(estimate);
 }
 
 function scaledMs(
@@ -107,14 +89,14 @@ export function scrapeTotalPlanMs(groupCount: number, adminCount: number): numbe
   return scrapeGroupsBudgetMs(groupCount) + scrapeInvitePhaseBudgetMs(adminCount);
 }
 
-export function countGroupsTimeoutMs(estimate = 0, quick = false): number {
-  if (quick) return POST_LOGIN_DETECT_TIMEOUT_MS;
-  return scaledMs(COUNT_BASE_MS, COUNT_PER_GROUP_MS, COUNT_MAX_MS, estimate);
-}
-
-/** Alias kompat — estimate = jumlah grup nyata. */
-export function scrapeGroupsTimeoutMs(groupCount = 0): number {
-  return scrapeGroupsBudgetMs(groupCount);
+/** Label ETA manusiawi untuk progress UI (≈Xm / ≈Xh). */
+export function formatScrapeEtaLabel(planMs: number): string {
+  const sec = Math.max(0, Math.round(planMs / 1000));
+  if (sec < 90) return `≈${sec}s left`;
+  const min = Math.round(sec / 60);
+  if (min < 90) return `≈${min} min left`;
+  const hours = Math.round(min / 60);
+  return `≈${hours}h left`;
 }
 
 /** Tunggu inbox WA stabil — skala dari hitungan grup di store. */
@@ -147,27 +129,6 @@ export class ScrapeTimeoutError extends Error {
     super(`${label} timed out after ${Math.round(ms / 1000)}s`);
     this.name = 'ScrapeTimeoutError';
   }
-}
-
-/** @deprecated Pakai withScrapeWatchdog — tetap untuk count operasi pendek. */
-export function withScrapeTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label = 'Scrape',
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new ScrapeTimeoutError(label, ms)), ms);
-    void promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
 }
 
 /** Jalankan promise per item dengan pool konkuren (urutan hasil = urutan items). */

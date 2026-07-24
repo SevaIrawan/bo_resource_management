@@ -3,6 +3,8 @@ import type { AutomationJobDelayConfig } from '@/types/automationJob';
 export const WHATSAPP_WORKER_SETTINGS_STORAGE_KEY = 'rm_worker_settings_whatsapp';
 export const TELEGRAM_WORKER_SETTINGS_STORAGE_KEY = 'rm_worker_settings_telegram';
 
+import { CREATE_GROUP_MAX_PER_ACCOUNT_RUN } from '@/config/accountOpsRole';
+
 export type HumanDelayProfile = 'safe' | 'fast' | 'off';
 
 export interface WorkerStandardSettings {
@@ -87,18 +89,18 @@ export interface PlatformWorkerSettings {
 }
 
 const SAFE_STANDARD: WorkerStandardSettings = {
-  perRun: 30,
-  betweenGroupsSec: 90,
-  betweenTargetsSec: 30,
-  afterCreateSec: 90,
-  floodWaitExtraSec: 60,
+  perRun: 25,
+  betweenGroupsSec: 180,
+  betweenTargetsSec: 45,
+  afterCreateSec: 150,
+  floodWaitExtraSec: 90,
   maxFloodwaitAutoSleepSec: 7200,
   setPhotoMaxRetry: 1,
   humanProfile: 'safe',
-  pauseBetweenRunsMinLow: 45,
-  pauseBetweenRunsMinHigh: 65,
-  pauseBetweenScriptsMinLow: 45,
-  pauseBetweenScriptsMinHigh: 65,
+  pauseBetweenRunsMinLow: 60,
+  pauseBetweenRunsMinHigh: 90,
+  pauseBetweenScriptsMinLow: 60,
+  pauseBetweenScriptsMinHigh: 90,
 };
 
 const SAFE_TELEGRAM_ADMIN_RIGHTS: TelegramAdminRightsSettings = {
@@ -142,7 +144,14 @@ const SAFE_LEAVE_DELETE: WorkerLeaveDeleteSettings = {
 
 export function defaultWhatsAppWorkerSettings(): PlatformWorkerSettings {
   return {
-    standard: { ...SAFE_STANDARD, perRun: 20, betweenGroupsSec: 120, setPhotoMaxRetry: 0 },
+    standard: {
+      ...SAFE_STANDARD,
+      perRun: 25,
+      betweenGroupsSec: 180,
+      afterCreateSec: 150,
+      setPhotoMaxRetry: 0,
+      humanProfile: 'safe',
+    },
     createGroup: {
       hideChatHistoryForMembers: false,
       messagesAdminsOnly: false,
@@ -204,7 +213,7 @@ function normalizeStandard(
     d.pauseBetweenScriptsMinLow,
   );
   return {
-    perRun: clampInt(raw?.perRun, 1, 500, d.perRun),
+    perRun: clampInt(raw?.perRun, 1, CREATE_GROUP_MAX_PER_ACCOUNT_RUN, d.perRun),
     betweenGroupsSec: clampInt(raw?.betweenGroupsSec, 5, 3600, d.betweenGroupsSec),
     betweenTargetsSec: clampInt(raw?.betweenTargetsSec, 5, 600, d.betweenTargetsSec),
     afterCreateSec: clampInt(raw?.afterCreateSec, 5, 3600, d.afterCreateSec),
@@ -423,22 +432,38 @@ export function toAutomationDelayConfig(
       ? settings.setAdmin.betweenTargetsSec
       : settings.standard.betweenTargetsSec;
 
-  const betweenGroupsSec =
+  let betweenGroupsSec =
     action === 'leave_group' || action === 'delete_group' || action === 'exit_delete_group'
       ? settings.leaveDelete.betweenGroupsSec
       : settings.standard.betweenGroupsSec;
 
+  let afterCreateSec = settings.standard.afterCreateSec;
+  let jitterPercent = jitterPercentFromHumanProfile(settings.standard.humanProfile);
+  let pauseRunsMin = settings.standard.pauseBetweenRunsMinLow * 60;
+  let pauseRunsMax = settings.standard.pauseBetweenRunsMinHigh * 60;
+  let floodExtra = settings.standard.floodWaitExtraSec;
+
+  /** Create Group — paksa human/safe anti-bot (random delay lebih longgar). */
+  if (action === 'create_group') {
+    betweenGroupsSec = Math.max(betweenGroupsSec, 180);
+    afterCreateSec = Math.max(afterCreateSec, 150);
+    jitterPercent = Math.max(jitterPercent, 40);
+    pauseRunsMin = Math.max(pauseRunsMin, 60 * 60);
+    pauseRunsMax = Math.max(pauseRunsMax, 90 * 60);
+    floodExtra = Math.max(floodExtra, 90);
+  }
+
   return {
     between_groups_sec: betweenGroupsSec,
     between_targets_sec: betweenTargetsSec,
-    after_create_sec: settings.standard.afterCreateSec,
-    flood_wait_extra_sec: settings.standard.floodWaitExtraSec,
+    after_create_sec: afterCreateSec,
+    flood_wait_extra_sec: floodExtra,
     max_floodwait_auto_sleep_sec: settings.standard.maxFloodwaitAutoSleepSec,
     invite_export_retries: settings.inviteLink.inviteExportRetries,
     invite_export_retry_sec: settings.inviteLink.inviteExportRetrySec,
-    jitter_percent: jitterPercentFromHumanProfile(settings.standard.humanProfile),
-    pause_between_runs_min_sec: settings.standard.pauseBetweenRunsMinLow * 60,
-    pause_between_runs_max_sec: settings.standard.pauseBetweenRunsMinHigh * 60,
+    jitter_percent: jitterPercent,
+    pause_between_runs_min_sec: pauseRunsMin,
+    pause_between_runs_max_sec: pauseRunsMax,
     invite_delay_min_sec: settings.inviteLink.delayMinSec,
     invite_delay_max_sec: settings.inviteLink.delayMaxSec,
     invite_batch_every: settings.inviteLink.batchEvery,

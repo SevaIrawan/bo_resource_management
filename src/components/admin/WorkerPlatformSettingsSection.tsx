@@ -349,7 +349,7 @@ function WorkerPlatformSettingsPanel({ platform }: { platform: WorkerPlatform })
             label={t('admin.workerCommon.perRun')}
             value={draft.standard.perRun}
             min={1}
-            max={500}
+            max={25}
             onChange={(perRun) => patch({ standard: { ...draft.standard, perRun } })}
           />
           <NumberRow

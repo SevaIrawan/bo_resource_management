@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CREATE_GROUP_MAX_PER_ACCOUNT_RUN, isMasterOpsRole } from '@/config/accountOpsRole';
 import { buildAutomationJobRunContext } from '@/lib/automationJobRunContext';
+import {
+  clampCreateGroupTotalToMax,
+  createGroupDayUsageForAccount,
+  shouldHideCreateAccountFromSelect,
+} from '@/lib/createGroupAccountEligibility';
 import { resolveCurrentUserId } from '@/lib/brandGroupPhotoStorage';
 import {
   enqueueAndTryRunAutomationJob,
@@ -400,8 +406,30 @@ export function useJobQueueSetupEnqueue({
   async function saveCreateBatch(draft: JobQueueCreateGroupDraft): Promise<string | null> {
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+    const maxPerRun = Math.min(
+      CREATE_GROUP_MAX_PER_ACCOUNT_RUN,
+      Math.max(1, workerSettings.standard.perRun || CREATE_GROUP_MAX_PER_ACCOUNT_RUN),
+    );
+    const totalToCreate = clampCreateGroupTotalToMax(draft.totalToCreate, maxPerRun);
 
     if (selectedAccounts.length === 0 || !activeBrand) return null;
+
+    for (const account of selectedAccounts) {
+      if (!isMasterOpsRole(account.opsRole)) {
+        onFeedback?.(t('operations.jobQueue.createAccountNotCreator'));
+        return null;
+      }
+    }
+
+    const snapshot = await fetchJobQueueSnapshot({ platform });
+    const createJobs = (snapshot?.jobs ?? []).filter((job) => job.action === 'create_group');
+    for (const account of selectedAccounts) {
+      const usage = createGroupDayUsageForAccount(createJobs, account.id);
+      if (shouldHideCreateAccountFromSelect(usage, maxPerRun)) {
+        onFeedback?.(t('operations.jobQueue.createAccountHiddenToday'));
+        return null;
+      }
+    }
 
     let enqueueSettings: ReturnType<typeof buildCreateGroupEnqueueFromJobDraft>;
     try {
@@ -429,10 +457,10 @@ export function useJobQueueSetupEnqueue({
           payload: {
             groupName: draft.groupName,
             groupNamePrefix: draft.groupName,
-            totalToCreate: draft.totalToCreate,
+            totalToCreate,
             useGroupNumbering: draft.useGroupNumbering,
             startFrom: draft.startFrom,
-            perRun: workerSettings.standard.perRun,
+            perRun: maxPerRun,
             hideChatHistory: enqueueSettings.hideChatHistoryForMembers,
             createGroupSettings: enqueueSettings.createGroupSettings,
             photoPath: draft.photoPath,
@@ -450,7 +478,7 @@ export function useJobQueueSetupEnqueue({
       }
 
       if (queued > 0) {
-        return t('operations.jobQueue.queuedCreateBatchOk', { total: draft.totalToCreate });
+        return t('operations.jobQueue.queuedCreateBatchOk', { total: totalToCreate });
       }
       return null;
     } finally {
@@ -545,16 +573,23 @@ export function useJobQueueSetupEnqueue({
       return enqueueErrorResult(message);
     }
 
-    const allExitGroups = accountExitGroups.daily;
-    const allowedIds = new Set(allExitGroups.map((row) => row.groupId));
+    /** Daily + junk — CTA Account junk / tab Exit junk harus bisa di-enqueue. */
+    const exitGroupById = new Map<string, (typeof accountExitGroups.daily)[number]>();
+    for (const group of accountExitGroups.daily) {
+      exitGroupById.set(group.groupId, group);
+    }
+    for (const group of accountExitGroups.junk) {
+      if (!exitGroupById.has(group.groupId)) exitGroupById.set(group.groupId, group);
+    }
+
     const selectedGroups = groupIds
-      .filter((groupId) => allowedIds.has(groupId))
+      .filter((groupId) => exitGroupById.has(groupId))
       .map((groupId) => {
-        const group = allExitGroups.find((row) => row.groupId === groupId);
-        const inviteLink = group?.inviteLink?.trim() || undefined;
+        const group = exitGroupById.get(groupId)!;
+        const inviteLink = group.inviteLink?.trim() || undefined;
         return {
           groupId,
-          groupName: group?.groupName ?? groupId,
+          groupName: group.groupName ?? groupId,
           inviteLink,
           groupLink: platform === 'telegram' ? inviteLink : undefined,
         };
@@ -591,7 +626,11 @@ export function useJobQueueSetupEnqueue({
           payload: {
             groups: chunk,
             exitDeletePhase: 'exit',
-            leaveDelete: toLeaveDeleteJobPayload(workerSettings),
+            leaveDelete: {
+              ...toLeaveDeleteJobPayload(workerSettings),
+              /** Dipakai auto-delete after left; false = jangan auto enqueue delete. */
+              deleteEnabled: workerSettings.leaveDelete.deleteEnabled,
+            },
           },
           storedSessionString: ctx.storedSessionString,
           expectedPhone: ctx.expectedPhone,

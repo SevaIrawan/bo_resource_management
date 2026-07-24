@@ -2578,7 +2578,11 @@
   }
 
   .brand-col--account {
-    width: 32%;
+    width: 28%;
+  }
+
+  .brand-col--role {
+    width: 7%;
   }
 
   .brand-col--location {
@@ -5772,6 +5776,35 @@
     color: var(--color-text-muted);
   }
 
+  .brand-modal-field-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem 0.625rem;
+    align-items: start;
+  }
+
+  .brand-modal-field-col {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .operations-job-queue-hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.6875rem;
+    line-height: 1.35;
+    color: var(--color-text-muted);
+  }
+
+  .brand-account-role-text {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    color: var(--color-text-secondary);
+  }
+
   .brand-modal-input {
     width: 100%;
     height: 2.25rem;
@@ -5943,8 +5976,12 @@
     width: 19%;
   }
 
+  .brand-card-table--flat .brand-col--role {
+    width: 7%;
+  }
+
   .brand-card-table--flat .brand-col--location {
-    width: 8%;
+    width: 7%;
   }
 
   .brand-card-table--flat .brand-col--session,

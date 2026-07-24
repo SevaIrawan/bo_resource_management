@@ -1,3 +1,7 @@
+import {
+  effectiveAccountOpsRole,
+  type AccountOpsRole,
+} from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { ensureBrand } from '@/lib/brands';
 import { markPlatformSessionInvalid } from '@/lib/platformSessions';
@@ -13,12 +17,19 @@ export interface CreateMessagingAccountInput {
   label: string;
   phoneNumber?: string;
   locationDevice?: string;
+  opsRole: AccountOpsRole;
   brand: string;
   brandId?: string;
 }
 
-function buildAccountMetadata(brand: string): Record<string, string> {
-  return { brand: brand.trim() };
+function buildAccountMetadata(
+  brand: string,
+  opsRole: AccountOpsRole,
+): Record<string, string> {
+  return {
+    brand: brand.trim(),
+    ops_role: effectiveAccountOpsRole(opsRole),
+  };
 }
 
 function normalizeLocationDevice(value?: string): string | null {
@@ -51,6 +62,7 @@ async function reactivateInactiveMessagingAccount(input: {
   brandName: string;
   phoneNumber?: string;
   locationDevice?: string;
+  opsRole: AccountOpsRole;
 }): Promise<string> {
   const supabase = getSupabase();
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED');
@@ -64,7 +76,7 @@ async function reactivateInactiveMessagingAccount(input: {
       brand_id: input.brandId,
       phone_number: phone || null,
       location_device: normalizeLocationDevice(input.locationDevice),
-      metadata: buildAccountMetadata(input.brandName),
+      metadata: buildAccountMetadata(input.brandName, input.opsRole),
       notes: null,
       updated_at: new Date().toISOString(),
     })
@@ -114,6 +126,7 @@ export async function createMessagingAccount(
       brandName: input.brand,
       phoneNumber: input.phoneNumber,
       locationDevice: input.locationDevice,
+      opsRole: input.opsRole,
     });
   }
 
@@ -126,7 +139,7 @@ export async function createMessagingAccount(
       label,
       phone_number: phone || null,
       location_device: normalizeLocationDevice(input.locationDevice),
-      metadata: buildAccountMetadata(input.brand),
+      metadata: buildAccountMetadata(input.brand, input.opsRole),
     })
     .select('id')
     .single();
@@ -212,6 +225,7 @@ export interface UpdateMessagingAccountDetailsInput {
   label: string;
   phoneNumber?: string;
   locationDevice?: string;
+  opsRole: AccountOpsRole;
   brandName: string;
 }
 
@@ -246,7 +260,7 @@ export async function updateMessagingAccountDetails(
       label,
       phone_number: phone || null,
       location_device: normalizeLocationDevice(input.locationDevice),
-      metadata: buildAccountMetadata(input.brandName),
+      metadata: buildAccountMetadata(input.brandName, input.opsRole),
       updated_at: new Date().toISOString(),
     })
     .eq('id', input.accountId);

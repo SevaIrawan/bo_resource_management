@@ -499,8 +499,10 @@ export async function runTelegramCreateGroupBatch(
   payload: AutomationRunPayload,
   onProgress: (current: number, total: number, label: string) => void,
 ): Promise<AutomationRunResult> {
-  const totalTarget = Math.max(1, Math.floor(Number(payload.totalToCreate) || 1));
-  const perRun = Math.max(1, Math.floor(Number(payload.perRun) || totalTarget));
+  const totalRequested = Math.max(1, Math.floor(Number(payload.totalToCreate) || 1));
+  const perRun = Math.max(1, Math.floor(Number(payload.perRun) || totalRequested));
+  /** Satu execute = max perRun (jangan multi-slice mass create). */
+  const totalTarget = Math.min(totalRequested, perRun);
   const startFrom = Math.max(1, Math.floor(Number(payload.startFrom) || 1));
   const useNumbering = createGroupBatchUsesNumbering(payload, totalTarget);
   const prefix = (payload.groupNamePrefix ?? payload.groupName ?? '').trim();
@@ -515,7 +517,6 @@ export async function runTelegramCreateGroupBatch(
   }
 
   let created = 0;
-  let nextNum = startFrom;
   const failed: string[] = [];
   const groupOutcomes: Array<{
     groupId: string;
@@ -525,58 +526,36 @@ export async function runTelegramCreateGroupBatch(
   }> = [];
   onProgress(0, totalTarget, prefix);
 
-  while (created < totalTarget) {
-    const createdBeforeSlice = created;
-    const sliceSize = Math.min(perRun, totalTarget - created);
+  for (let i = 0; i < totalTarget; i += 1) {
+    const num = startFrom + i;
+    const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
+    onProgress(created, totalTarget, groupName);
 
-    for (let i = 0; i < sliceSize; i += 1) {
-      const num = nextNum + i;
-      const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
-      onProgress(created, totalTarget, groupName);
+    const result = await runTelegramAutomation({
+      ...payload,
+      action: 'create_group',
+      groupName,
+      batchIndex: created + 1,
+    });
 
-      const result = await runTelegramAutomation({
-        ...payload,
-        action: 'create_group',
-        groupName,
-        batchIndex: created + 1,
+    if (result.status === 'ok') {
+      created += 1;
+      const detail = result.result ?? {};
+      groupOutcomes.push({
+        groupId: String(detail.group_id ?? '').trim(),
+        groupName: String(detail.group_name ?? groupName).trim() || groupName,
+        inviteLink: typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
+        createStatus: 'created',
       });
-
-      if (result.status === 'ok') {
-        created += 1;
-        const detail = result.result ?? {};
-        groupOutcomes.push({
-          groupId: String(detail.group_id ?? '').trim(),
-          groupName: String(detail.group_name ?? groupName).trim() || groupName,
-          inviteLink: typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
-          createStatus: 'created',
-        });
-        onProgress(created, totalTarget, groupName);
-      } else {
-        failed.push(`${groupName}: ${result.message ?? 'failed'}`);
-        groupOutcomes.push({
-          groupId: '',
-          groupName,
-          createStatus: 'failed',
-        });
-      }
+      onProgress(created, totalTarget, groupName);
+    } else {
+      failed.push(`${groupName}: ${result.message ?? 'failed'}`);
+      groupOutcomes.push({
+        groupId: '',
+        groupName,
+        createStatus: 'failed',
+      });
     }
-
-    nextNum += sliceSize;
-    if (created >= totalTarget) break;
-
-    if (created === createdBeforeSlice) {
-      console.warn(
-        `[tg-automation] batch slice produced 0 creates (${created}/${totalTarget}); stopping`,
-      );
-      break;
-    }
-
-    const minSec = payload.delay?.pause_between_runs_min_sec ?? 45 * 60;
-    const maxSec = payload.delay?.pause_between_runs_max_sec ?? 65 * 60;
-    const low = Math.min(minSec, maxSec);
-    const high = Math.max(minSec, maxSec);
-    const pauseSec = high <= low ? low : low + Math.floor(Math.random() * (high - low + 1));
-    await new Promise((resolve) => setTimeout(resolve, pauseSec * 1000));
   }
 
   return {

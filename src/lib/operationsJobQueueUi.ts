@@ -223,6 +223,9 @@ export function jobQueueStatusLabel(
   if (job.status === 'queued' && job.paused) {
     return t('operations.jobQueue.statusJobPaused');
   }
+  if (job.status === 'running' && job.paused) {
+    return t('operations.jobQueue.statusJobPaused');
+  }
   const batch = jobQueueBatchProgress(job);
   const step = jobQueueStepProgress(job);
   if (job.status === 'running' && batch) {
@@ -247,10 +250,22 @@ export function jobQueueResultText(
   job: AutomationJobRecord,
   t?: (key: string, vars?: Record<string, string | number>) => string,
 ): string {
-  if (job.status === 'failed' && job.error) return job.error;
   const batch = jobQueueBatchProgress(job);
   const step = jobQueueStepProgress(job);
   const progress = batch ?? step;
+
+  if (job.status === 'failed') {
+    const raw = (job.error?.trim() || job.message?.trim() || '').trim();
+    const err =
+      !raw || raw.length <= 3 || /^r(:\s*r)?$/i.test(raw)
+        ? 'WhatsApp store flake — retry'
+        : raw;
+    if (progress && progress.total > 0) {
+      return `${progress.current}/${progress.total} — ${err}`;
+    }
+    return err || '—';
+  }
+
   if (progress && (job.status === 'running' || job.status === 'queued')) {
     if (step?.label?.trim()) return `${progress.current}/${progress.total} — ${step.label.trim()}`;
     if (t) {
@@ -276,7 +291,7 @@ export function jobQueueResultText(
 }
 
 export function jobQueueStatusClass(job: AutomationJobRecord): string {
-  if (job.status === 'queued' && job.paused) {
+  if (job.paused && (job.status === 'queued' || job.status === 'running')) {
     return 'operations-job-status--paused';
   }
   if (isJobQueueStepInProgress(job)) {
@@ -291,7 +306,7 @@ export function jobQueueCanRun(job: AutomationJobRecord): boolean {
 }
 
 export function jobQueueCanPause(job: AutomationJobRecord): boolean {
-  if (job.status === 'running') return true;
+  if (job.status === 'running' && !job.paused) return true;
   return job.status === 'queued' && !job.paused;
 }
 

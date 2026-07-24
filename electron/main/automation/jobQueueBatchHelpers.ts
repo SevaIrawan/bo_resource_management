@@ -87,11 +87,12 @@ export function isJobQueueBlockingExecutes(_jobs: AutomationJobRecord[]): boolea
 
 /** Kontrak isolasi per akun — job queue akun A tidak blok Sync/Scrape akun B. */
 export function isAccountJobQueueBusy(jobs: AutomationJobRecord[], accountId: string): boolean {
-  return jobs.some(
-    (job) =>
-      job.accountId === accountId &&
-      (job.status === 'running' || (job.status === 'queued' && !job.paused)),
-  );
+  return jobs.some((job) => {
+    if (job.accountId !== accountId) return false;
+    // running (termasuk pause-in-progress) selalu busy; queued aktif juga busy.
+    if (job.status === 'running') return true;
+    return job.status === 'queued' && !job.paused;
+  });
 }
 
 export function listBusyAccountIds(jobs: AutomationJobRecord[]): string[] {

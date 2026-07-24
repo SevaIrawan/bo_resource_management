@@ -154,6 +154,7 @@ export async function resolveMessagingAccountId(input: {
     platform: input.platform,
     label: accKey,
     phoneNumber: phoneRaw,
+    opsRole: 'gcs',
     brand: brandKey,
     brandId: brand.id,
   });

@@ -1,4 +1,8 @@
 import { isMisalignedFromSyncResult } from '@/lib/accountDisplayMetrics';
+import {
+  effectiveAccountOpsRole,
+  type AccountOpsRole,
+} from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { buildStandardCountByPlatformFromRows } from '@/lib/brandStandardCount';
 import { ensureBrand } from '@/lib/brands';
@@ -117,6 +121,7 @@ export function addAccountToGroup(
     accountName: input.accountName.trim(),
     phoneNumber: phone,
     locationDevice: locationDevice || undefined,
+    opsRole: effectiveAccountOpsRole(input.opsRole),
     brandName: group.brandName,
     status: 'logout' as const,
     groupsCurrent: 0,
@@ -248,6 +253,7 @@ export function patchAccountDetailsInGroups(
     accountName: string;
     phoneNumber: string;
     locationDevice: string;
+    opsRole: AccountOpsRole;
   },
 ): AccountBrandGroup[] {
   return patchBrandGroup(groups, groupId, (group) => ({
@@ -259,6 +265,7 @@ export function patchAccountDetailsInGroups(
             accountName: patch.accountName.trim(),
             phoneNumber: patch.phoneNumber.trim(),
             locationDevice: normalizeLocationDeviceOption(patch.locationDevice) || undefined,
+            opsRole: effectiveAccountOpsRole(patch.opsRole),
           }
         : account,
     ),

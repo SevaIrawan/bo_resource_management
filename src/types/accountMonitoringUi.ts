@@ -1,3 +1,4 @@
+import type { AccountOpsRole } from '@/config/accountOpsRole';
 import type { Platform } from '@/types/database';
 
 export type AccountViewMode = 'card' | 'table';
@@ -42,6 +43,8 @@ export interface AccountBrandRow {
   lastSyncAt?: string | null;
   /** Lokasi device HP (metadata akun). */
   locationDevice?: string;
+  /** Role operasi — Master boleh Create Group; GCS selain Create. */
+  opsRole?: AccountOpsRole;
 }
 
 export interface AccountBrandEmptySlot {
@@ -70,6 +73,8 @@ export interface AddAccountInput {
   accountName: string;
   phoneNumber?: string;
   locationDevice?: string;
+  /** Wajib saat add dari UI — Master | GCS. */
+  opsRole: AccountOpsRole;
   slotId?: string;
   dbAccountId?: string;
 }

@@ -50,6 +50,8 @@ export function maybeAutoEnqueueDeleteFromExit(exitJob: AutomationJobRecord): vo
   if (exitJob.action !== 'leave_group') return;
   if (exitJob.payload.exitDeletePhase !== 'exit') return;
   if (exitJob.status !== 'completed' && exitJob.status !== 'failed') return;
+  /** Settings delete off — jangan auto; VIEW manual juga blocked. */
+  if (exitJob.payload.leaveDelete?.deleteEnabled === false) return;
 
   const groups = resolveLeftGroups(exitJob);
   if (groups.length === 0) return;
@@ -59,6 +61,7 @@ export function maybeAutoEnqueueDeleteFromExit(exitJob: AutomationJobRecord): vo
     clearChatHistoryOnDelete: exitJob.payload.leaveDelete?.clearChatHistoryOnDelete === true,
     /** Path chat lokal per akun — bukan DeleteChannel / dissolve. */
     requireOwnerForDelete: false,
+    deleteEnabled: true,
   };
 
   const maxPerRun = DEFAULT_DELETE_MAX_PER_RUN;

@@ -10,13 +10,22 @@ function sleep(ms: number): Promise<void> {
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(`${label} timed out`));
+    }, ms);
     void promise.then(
       (value) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         resolve(value);
       },
       (error) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         reject(error);
       },
@@ -42,8 +51,8 @@ function normalizeInviteCode(raw: unknown): string | null {
 }
 
 /**
- * Export invite lewat WA Web store (sama sumber GroupChat.getInviteCode di wwebjs 1.34),
- * tanpa bergantung `getChatById` mengembalikan GroupChat (sering Chat polos → getInviteCode undefined).
+ * Export invite lewat WA Web store/Mex/page saja.
+ * Tidak serialize chat penuh ke Node (hindari Error "r").
  */
 async function fetchInviteCodeFromStore(client: Client, groupId: string): Promise<string | null> {
   assertWhatsAppScrapeClient(client);
@@ -76,7 +85,6 @@ async function fetchInviteCodeFromStore(client: Client, groupId: string): Promis
       // optional refresh
     }
 
-    // Primary — wwebjs 1.34 GroupChat.getInviteCode
     try {
       const mex = window.require('WAWebMexFetchGroupInviteCodeJob') as {
         fetchMexGroupInviteCode?: (id: string) => Promise<unknown>;
@@ -86,14 +94,10 @@ async function fetchInviteCodeFromStore(client: Client, groupId: string): Promis
         const code = pickCode(res);
         if (code) return code;
       }
-    } catch (err) {
-      const name = err && typeof err === 'object' ? String((err as { name?: string }).name) : '';
-      if (name && name !== 'ServerStatusCodeError') {
-        // continue fallbacks
-      }
+    } catch {
+      // continue fallbacks in-page
     }
 
-    // Legacy Store.GroupInvite
     try {
       const WidFactory = window.require('WAWebWidFactory') as {
         createWid: (id: string) => unknown;
@@ -111,7 +115,6 @@ async function fetchInviteCodeFromStore(client: Client, groupId: string): Promis
       // continue
     }
 
-    // Some builds expose invite on group metadata after refresh
     try {
       if (typeof window.WWebJS?.getChat === 'function') {
         const chat = (await window.WWebJS.getChat(gid, { getAsModel: false })) as {
@@ -130,32 +133,9 @@ async function fetchInviteCodeFromStore(client: Client, groupId: string): Promis
   }, groupId);
 }
 
-async function fetchInviteCodeViaGroupChatApi(
-  client: Client,
-  groupId: string,
-): Promise<string | null> {
-  type InviteChat = {
-    isGroup?: boolean;
-    getInviteCode?: () => Promise<unknown>;
-  };
-
-  const chat = (await withTimeout(
-    client.getChatById(groupId),
-    INVITE_CODE_TIMEOUT_MS,
-    'getChatById',
-  )) as InviteChat;
-
-  if (typeof chat.getInviteCode !== 'function') {
-    return null;
-  }
-
-  const raw = await withTimeout(chat.getInviteCode(), INVITE_CODE_TIMEOUT_MS, 'getInviteCode');
-  return normalizeInviteCode(raw);
-}
-
 /**
  * Ambil invite link WA untuk grup tempat akun adalah admin.
- * Non-admin / gagal → null (bukan placeholder). Error di-log — jangan gagal diam-diam.
+ * Hanya store/page di browser. Gagal → null.
  */
 export async function fetchWhatsAppGroupInviteLink(
   client: Client,
@@ -170,18 +150,12 @@ export async function fetchWhatsAppGroupInviteLink(
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
-      // 1) Store/Mex langsung — konsisten dengan is_admin dari store scrape
       const fromStore = await withTimeout(
         fetchInviteCodeFromStore(client, groupId),
         INVITE_CODE_TIMEOUT_MS,
         'inviteFromStore',
       );
       if (fromStore) return `https://chat.whatsapp.com/${fromStore}`;
-
-      // 2) API GroupChat bila instance benar
-      const fromApi = await fetchInviteCodeViaGroupChatApi(client, groupId);
-      if (fromApi) return `https://chat.whatsapp.com/${fromApi}`;
-
       lastError = 'empty_invite_code';
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);

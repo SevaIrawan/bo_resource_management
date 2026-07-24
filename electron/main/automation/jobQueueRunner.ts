@@ -7,22 +7,25 @@ import type { AutomationJobRecord } from './jobQueueTypes';
 import type { AutomationRunPayload, AutomationRunResult } from './types';
 import { runTelegramCreateGroupBatch } from './tgAutomationClient';
 import { runWhatsAppCreateGroupBatch } from './waAutomation';
-import { withJobTimeout } from './promiseTimeout';
+import { withJobTimeoutSettle } from './promiseTimeout';
 import {
   releaseExecuteSlot,
   waitForExecuteSlot,
 } from './executeSlotPool';
 import {
-  broadcastJobQueueChanged,
   consumeJobStopRequest,
+  demoteRunningJobToPaused,
   failStaleRunningJobs,
+  getAutomationJobStatus,
   getRunnerState,
   markJobFinished,
   markJobRunning,
+  peekJobStopRequest,
   pickQueuedJobsForDispatch,
+  releaseClaimedJobToQueue,
+  signalJobStop,
   updateJobProgress,
 } from './jobQueueStore';
-import { getMaxConcurrentAutomationJobs } from './jobQueueConcurrency';
 import { maybeAutoEnqueueSetPhotoFromCreate } from './autoEnqueueSetPhotoFromCreate';
 import { maybeAutoEnqueueDeleteFromExit } from './autoEnqueueDeleteFromExit';
 
@@ -85,6 +88,16 @@ function batchSuccessCount(result: AutomationRunResult, job: AutomationJobRecord
     return accountJobStepTotal(job);
   }
   return 0;
+}
+
+/** WA Web evaluate flake sering jadi Error message "r" — jangan tampilkan mentah di UI. */
+function humanizeJobError(raw: string): string {
+  const msg = raw.trim();
+  if (!msg) return 'AUTOMATION_ERROR';
+  if (msg.length <= 3 || /^r(:\s*r)?$/i.test(msg)) {
+    return 'WhatsApp store flake (getChatById) — retry the job';
+  }
+  return msg;
 }
 
 function resultGroupOutcomes(
@@ -162,7 +175,7 @@ async function runCreateGroupBatchJob(job: AutomationJobRecord): Promise<Automat
     updateJobProgress(job.id, { current, total, label });
   };
 
-  return withJobTimeout(
+  const settled = await withJobTimeoutSettle(
     withAutomationAccountLock(job.sessionId, async () => {
       if (job.platform === 'telegram') {
         return runTelegramCreateGroupBatch(payload, onProgress);
@@ -170,8 +183,19 @@ async function runCreateGroupBatchJob(job: AutomationJobRecord): Promise<Automat
       return runWhatsAppCreateGroupBatch(payload, onProgress);
     }),
     jobTimeoutMs(job),
-    job.action,
+    () => signalJobStop(job.id, 'cancel'),
   );
+
+  if (settled.timedOut) {
+    return {
+      status: 'error',
+      action: job.action,
+      message: `JOB_${job.action}_TIMEOUT`,
+      errorCode: `JOB_${job.action}_TIMEOUT`,
+      result: settled.value?.result,
+    };
+  }
+  return settled.value!;
 }
 
 async function runAccountAutomationJob(job: AutomationJobRecord): Promise<AutomationRunResult> {
@@ -179,38 +203,93 @@ async function runAccountAutomationJob(job: AutomationJobRecord): Promise<Automa
     updateJobProgress(job.id, { current, total, label });
   };
 
-  return withJobTimeout(
+  const settled = await withJobTimeoutSettle(
     runAutomationAction(jobToRunPayload(job), onProgress),
     jobTimeoutMs(job),
-    job.action,
+    () => signalJobStop(job.id, 'cancel'),
   );
+
+  if (settled.timedOut) {
+    return {
+      status: 'error',
+      action: job.action,
+      message: `JOB_${job.action}_TIMEOUT`,
+      errorCode: `JOB_${job.action}_TIMEOUT`,
+      result: settled.value && typeof settled.value === 'object' && 'result' in settled.value
+        ? (settled.value as AutomationRunResult).result
+        : undefined,
+    };
+  }
+  return settled.value!;
 }
 
+/**
+ * Claim running dulu (anti double-dispatch), baru tunggu execute slot.
+ * Pause/cancel cooperative; timeout signal stop lalu tunggu settle sebelum lepas slot.
+ */
 async function runSingleJob(job: AutomationJobRecord): Promise<void> {
-  try {
-    await waitForExecuteSlot(job.accountId, 'job', job.platform);
-  } catch {
-    scheduleRunnerRetry(1000);
-    return;
-  }
-
   if (!markJobRunning(job.id)) {
-    releaseExecuteSlot(job.accountId);
     return;
   }
 
-  const batch = isCreateGroupBatch(job);
-  const stepTotal = accountJobStepTotal(job);
-  updateJobProgress(job.id, {
-    current: 0,
-    total: stepTotal,
-    label: job.payload.groupNamePrefix ?? job.payload.groupName ?? job.accountName,
-  });
-
+  let slotHeld = false;
   try {
+    try {
+      await waitForExecuteSlot(job.accountId, 'job', job.platform);
+      slotHeld = true;
+    } catch {
+      releaseClaimedJobToQueue(job.id);
+      scheduleRunnerRetry(1000);
+      return;
+    }
+
+    if (getAutomationJobStatus(job.id) !== 'running') {
+      // Cancel saat menunggu slot — status sudah cancelled.
+      return;
+    }
+
+    const stopBeforeRun = peekJobStopRequest(job.id);
+    if (stopBeforeRun === 'cancel') {
+      consumeJobStopRequest(job.id);
+      return;
+    }
+    if (stopBeforeRun === 'pause') {
+      demoteRunningJobToPaused(job.id);
+      return;
+    }
+
+    const batch = isCreateGroupBatch(job);
+    const stepTotal = accountJobStepTotal(job);
+    updateJobProgress(job.id, {
+      current: 0,
+      total: stepTotal,
+      label: job.payload.groupNamePrefix ?? job.payload.groupName ?? job.accountName,
+    });
+
     const result = batch ? await runCreateGroupBatchJob(job) : await runAccountAutomationJob(job);
 
-    if (consumeJobStopRequest(job.id) || result.errorCode === 'JOB_STOPPED') {
+    if (getAutomationJobStatus(job.id) !== 'running') {
+      return;
+    }
+
+    const stopMode = consumeJobStopRequest(job.id);
+    const timedOut = Boolean(result.errorCode?.endsWith('_TIMEOUT'));
+    if (timedOut) {
+      markJobFinished(job.id, 'failed', {
+        message: result.message,
+        error: humanizeJobError(result.errorCode ?? 'JOB_TIMEOUT'),
+        batchSuccess: batchSuccessCount(result, job),
+        ...(resolveJobGroupOutcomes(result, job)
+          ? { groupOutcomes: resolveJobGroupOutcomes(result, job) }
+          : {}),
+      });
+      return;
+    }
+    if (stopMode === 'cancel') {
+      return;
+    }
+    if (stopMode === 'pause' || result.errorCode === 'JOB_STOPPED') {
+      demoteRunningJobToPaused(job.id);
       return;
     }
 
@@ -230,34 +309,8 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       job.action === 'leave_group' && job.payload.exitDeletePhase === 'exit';
 
     if (result.status === 'ok') {
-      if (
-        success < total &&
-        !isExitLeave &&
-        (job.action === 'join_by_invite_link' ||
-          job.action === 'set_admin' ||
-          job.action === 'set_group_photo' ||
-          job.action === 'leave_group' ||
-          job.action === 'delete_group' ||
-          job.action === 'exit_delete_group')
-      ) {
-        markJobFinished(job.id, 'failed', {
-          message,
-          batchSuccess: success,
-          error: message,
-          ...outcomeExtras,
-        });
-        return;
-      }
-      if (batch && success < total) {
-        markJobFinished(job.id, 'failed', {
-          message,
-          batchSuccess: success,
-          error: message,
-          ...outcomeExtras,
-        });
-        tryAutoEnqueueSetPhotoAfterCreate(job);
-        return;
-      }
+      // Partial batch (create/join/admin/…) tetap completed jika device ada yang sukses.
+      // success === 0 + status ok tidak diharapkan; tetap completed dengan message.
       markJobFinished(job.id, 'completed', {
         message:
           job.action === 'join_by_invite_link'
@@ -273,8 +326,8 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
                   : job.action === 'set_group_photo'
                     ? `Set photo ${success}/${total} group(s)`
                     : job.action === 'exit_delete_group'
-                    ? `Exited ${success} group(s)`
-                    : message,
+                      ? `Exited ${success} group(s)`
+                      : message,
         batchSuccess: success,
         ...outcomeExtras,
       });
@@ -286,18 +339,24 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
     markJobFinished(job.id, 'failed', {
       message,
       batchSuccess: success,
-      error: result.errorCode ?? message ?? 'AUTOMATION_ERROR',
+      error: humanizeJobError(result.errorCode ?? message ?? 'AUTOMATION_ERROR'),
       ...outcomeExtras,
     });
     tryAutoEnqueueSetPhotoAfterCreate(job);
     tryAutoEnqueueDeleteAfterExit(job);
   } catch (error) {
-    markJobFinished(job.id, 'failed', {
-      error: error instanceof Error ? error.message : 'AUTOMATION_EXCEPTION',
-    });
+    if (getAutomationJobStatus(job.id) === 'running') {
+      markJobFinished(job.id, 'failed', {
+        error: humanizeJobError(
+          error instanceof Error ? error.message : 'AUTOMATION_EXCEPTION',
+        ),
+      });
+    }
   } finally {
     markSessionSettleAfterJob(job.sessionId);
-    releaseExecuteSlot(job.accountId);
+    if (slotHeld) {
+      releaseExecuteSlot(job.accountId);
+    }
     scheduleRunnerTick(0);
   }
 }

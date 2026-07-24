@@ -128,7 +128,7 @@ export const en = {
       createGroupName: 'Group name',
       createGroupNamePlaceholder: 'e.g. FWSG Customer A',
       createGroupNameRequired: 'Group name is required.',
-      createTotalInvalid: 'Total groups must be between 1 and 500.',
+      createTotalInvalid: 'Total groups must be between 1 and {{max}} (max per account run).',
       createStartFromRequired: 'Start Number is required when numbering is enabled.',
       createSelectAccountRequired: 'Select an account before queueing.',
       createSetupMissingFields: 'Complete all required settings before queueing:',
@@ -139,7 +139,17 @@ export const en = {
       createSetupCardPermissions: 'Group permissions',
       createSetupCardPermissionsHint:
         'Starts from Settings defaults. Changes here apply to this job only.',
-      createPerRunHint: 'Worker max per run (Settings): {{perRun}} — one batch job creates {{total}} groups in one Chrome session with delay between each.',
+      createPerRunHint:
+        'Max {{perRun}} groups per Master account per run (human delays). One execute = one batch up to this limit.',
+      createNoEligibleCreators:
+        'No Master accounts available — set role to Master, or all Masters already ran / hit daily limit',
+      createNoMasterAccounts: 'No Master account — set Role to Master on Account card first',
+      createAllMastersUsedToday:
+        'All Master accounts already created today — pick another brand or wait until tomorrow',
+      createAccountUsedTodaySuffix: '(used today)',
+      createAccountNotCreator: 'Selected account is not Master — edit account role first.',
+      createAccountHiddenToday:
+        'This Master already ran create today or hit the max per run — pick another account.',
       setAdminSuperAccount: 'OWNER/ADMIN',
       setAdminHint: 'Owner promotes selected account as admin — only shows groups where owner is admin and target has joined but not yet admin.',
       setAdminTargetAccounts: 'Account to promote',
@@ -507,6 +517,12 @@ export const en = {
       locationDeviceLabel: 'Location device',
       locationDeviceSelectPlaceholder: 'Select location',
       locationDevicePlaceholder: 'e.g. PC-01, Jakarta-Worker-2',
+      opsRoleLabel: 'Set Role Acc',
+      opsRoleSelectPlaceholder: 'Select role',
+      opsRoleMaster: 'Master',
+      opsRoleGcs: 'GCS',
+      opsRoleRequired: 'Select Master or GCS',
+      colRole: 'Role',
       optional: 'optional',
       accNameRequired: 'Account name is required',
       phoneRequired: 'Phone number is required',

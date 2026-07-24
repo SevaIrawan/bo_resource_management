@@ -97,6 +97,7 @@ export function resolveExitJobDeleteFollowUpRemarkKey(
 
   const deleteJob = findDeleteJobForExitJob(exitJob.id, allJobs);
   if (!deleteJob) {
+    if (exitJob.payload.leaveDelete?.deleteEnabled === false) return null;
     return 'operations.jobQueue.exitRemarkDeleteAutoPending';
   }
   switch (deleteJob.status) {

@@ -156,6 +156,7 @@ export function AccountBrandCardList({
         label: input.accountName,
         phoneNumber: input.phoneNumber,
         locationDevice: input.locationDevice,
+        opsRole: input.opsRole,
         brand: group.brandName,
         brandId: group.dbBrandId,
       });

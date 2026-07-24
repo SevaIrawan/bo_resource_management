@@ -35,11 +35,12 @@ const checks = [
     })(),
   },
   {
-    name: 'WA scrape: modul getInviteCode + store Mex fallback',
+    name: 'WA scrape: modul store/Mex invite (no getChatById Node)',
     ok:
-      waInvite.includes('getInviteCode') &&
       waInvite.includes('WAWebMexFetchGroupInviteCodeJob') &&
-      waInvite.includes('fetchInviteCodeFromStore'),
+      waInvite.includes('fetchInviteCodeFromStore') &&
+      !/client\.getChatById/.test(waInvite) &&
+      !waInvite.includes('fetchInviteCodeViaGroupChatApi'),
   },
   {
     name: 'WA create group: invite_link real setelah create',

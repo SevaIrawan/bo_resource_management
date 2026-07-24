@@ -3,7 +3,9 @@ import { X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { AddAccountPlatformBadge } from '@/components/group-monitoring/AddAccountHeaderMenu';
+import { AccountOpsRoleSelect } from '@/components/group-monitoring/AccountOpsRoleSelect';
 import { LocationDeviceSelect } from '@/components/group-monitoring/LocationDeviceSelect';
+import { normalizeAccountOpsRole, type AccountOpsRole } from '@/config/accountOpsRole';
 import { normalizePhoneDigits } from '@/lib/phoneNormalize';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { Platform } from '@/types/database';
@@ -12,6 +14,7 @@ export interface AddAccountFormValues {
   accountName: string;
   phoneNumber: string;
   locationDevice: string;
+  opsRole: AccountOpsRole;
 }
 
 interface AddAccountModalProps {
@@ -38,6 +41,7 @@ export function AddAccountModal({
   const [accountName, setAccountName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [locationDevice, setLocationDevice] = useState('');
+  const [opsRole, setOpsRole] = useState<AccountOpsRole | ''>('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,6 +51,7 @@ export function AddAccountModal({
     setAccountName('');
     setPhoneNumber('');
     setLocationDevice('');
+    setOpsRole('');
     setLocalError(null);
   }, [open, platform]);
 
@@ -71,6 +76,7 @@ export function AddAccountModal({
 
     const name = accountName.trim();
     const phone = phoneNumber.trim();
+    const role = normalizeAccountOpsRole(opsRole);
 
     if (!name) {
       setLocalError(t('groupMonitoring.accountCard.accNameRequired'));
@@ -82,9 +88,19 @@ export function AddAccountModal({
       return;
     }
 
+    if (!role) {
+      setLocalError(t('groupMonitoring.accountCard.opsRoleRequired'));
+      return;
+    }
+
     setLocalError(null);
     onSubmit(
-      { accountName: name, phoneNumber: phone, locationDevice: locationDevice.trim() },
+      {
+        accountName: name,
+        phoneNumber: phone,
+        locationDevice: locationDevice.trim(),
+        opsRole: role,
+      },
       selectedPlatform,
     );
   }
@@ -186,22 +202,40 @@ export function AddAccountModal({
                 disabled={saving}
               />
 
-              <label htmlFor="add-account-location-device" className="brand-modal-label">
-                {t('groupMonitoring.accountCard.locationDeviceLabel')}
-                <span className="brand-modal-label-optional">
-                  {' '}
-                  ({t('groupMonitoring.accountCard.optional')})
-                </span>
-              </label>
-              <LocationDeviceSelect
-                id="add-account-location-device"
-                value={locationDevice}
-                disabled={saving}
-                onChange={(value) => {
-                  setLocationDevice(value);
-                  if (localError) setLocalError(null);
-                }}
-              />
+              <div className="brand-modal-field-row">
+                <div className="brand-modal-field-col">
+                  <label htmlFor="add-account-location-device" className="brand-modal-label">
+                    {t('groupMonitoring.accountCard.locationDeviceLabel')}
+                    <span className="brand-modal-label-optional">
+                      {' '}
+                      ({t('groupMonitoring.accountCard.optional')})
+                    </span>
+                  </label>
+                  <LocationDeviceSelect
+                    id="add-account-location-device"
+                    value={locationDevice}
+                    disabled={saving}
+                    onChange={(value) => {
+                      setLocationDevice(value);
+                      if (localError) setLocalError(null);
+                    }}
+                  />
+                </div>
+                <div className="brand-modal-field-col">
+                  <label htmlFor="add-account-ops-role" className="brand-modal-label">
+                    {t('groupMonitoring.accountCard.opsRoleLabel')}
+                  </label>
+                  <AccountOpsRoleSelect
+                    id="add-account-ops-role"
+                    value={opsRole}
+                    disabled={saving}
+                    onChange={(value) => {
+                      setOpsRole(value);
+                      if (localError) setLocalError(null);
+                    }}
+                  />
+                </div>
+              </div>
             </>
           )}
 

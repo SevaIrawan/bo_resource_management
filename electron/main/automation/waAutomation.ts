@@ -66,6 +66,255 @@ function normalizeGroupChatId(groupId: string): string {
   return `${value}@g.us`;
 }
 
+/** WA Web kadang throw Error("r") / name "r" dari evaluate — bukan pesan berguna. */
+function isCrypticWaEvaluateError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : String(error);
+  const msg = raw.trim();
+  if (!msg || msg.length <= 3) return true;
+  if (/^r(:\s*r)?$/i.test(msg)) return true;
+  const name = error instanceof Error ? error.name.trim() : '';
+  return Boolean(name && name.length <= 3 && /^[a-z]$/i.test(name));
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  const raw = String(error ?? '').trim();
+  return raw || 'unknown error';
+}
+
+/**
+ * getChatById sering flake (Error "r") saat serialize chat ke Node.
+ * Jangan andalkan getChats (serialize semua chat — sama flake).
+ * Probe ringan lewat page.evaluate → hanya scalar (id/name/isGroup).
+ */
+async function probeGroupViaPage(
+  client: InstanceType<typeof Client>,
+  chatIdRaw: string,
+): Promise<{ id: string; name?: string; isGroup: boolean } | null> {
+  const chatId = normalizeGroupChatId(chatIdRaw);
+  const page = client.pupPage;
+  if (!chatId || !page) return null;
+
+  try {
+    return await withDetachedFrameRetry('probeGroupViaPage', () =>
+      withPromiseTimeout(
+        page.evaluate(async (gid: string) => {
+          const w = window as unknown as {
+            WWebJS?: {
+              getChat?: (
+                id: string,
+                opts?: { getAsModel?: boolean },
+              ) => Promise<{
+                name?: string;
+                groupMetadata?: unknown;
+                isGroup?: boolean;
+              } | null>;
+            };
+            require?: (name: string) => {
+              queryAndUpdateGroupMetadataById?: (input: { id: string }) => Promise<unknown> | unknown;
+            };
+          };
+
+          try {
+            const job = w.require?.('WAWebGroupQueryJob');
+            const q = job?.queryAndUpdateGroupMetadataById?.({ id: gid });
+            if (q && typeof (q as Promise<unknown>).then === 'function') await q;
+          } catch {
+            /* optional metadata refresh */
+          }
+
+          const chat = await w.WWebJS?.getChat?.(gid, { getAsModel: false });
+          if (!chat) return null;
+          return {
+            id: gid,
+            name: typeof chat.name === 'string' ? chat.name : undefined,
+            isGroup: Boolean(chat.groupMetadata) || Boolean(chat.isGroup),
+          };
+        }, chatId),
+        WA_CHAT_LOOKUP_TIMEOUT_MS,
+        'probeGroupViaPage',
+      ),
+    );
+  } catch (error) {
+    console.warn(
+      `[wa-automation] probeGroupViaPage failed (${chatId}):`,
+      isCrypticWaEvaluateError(error) ? 'cryptic evaluate error' : errorMessage(error),
+    );
+    return null;
+  }
+}
+
+/**
+ * Promote admin langsung di page (sama path wwebjs GroupChat.promoteParticipants).
+ * Return terstruktur — jangan throw dari evaluate (Puppeteer sering jadi Error "r").
+ */
+async function promoteViaPageEvaluate(
+  client: InstanceType<typeof Client>,
+  chatIdRaw: string,
+  participantIds: string[],
+): Promise<{ promoted: string[]; missing: string[] }> {
+  const chatId = normalizeGroupChatId(chatIdRaw);
+  const page = client.pupPage;
+  if (!page) throw new Error('WA_PAGE_UNAVAILABLE');
+  if (!chatId) throw new Error('GROUP_ID_REQUIRED');
+
+  const result = await withDetachedFrameRetry('promoteViaPage', () =>
+    withPromiseTimeout(
+      page.evaluate(
+        async (gid: string, ids: string[]) => {
+          type PromotePageResult =
+            | { ok: true; promoted: string[]; missing: string[] }
+            | { ok: false; reason: string };
+
+          try {
+            const w = window as unknown as {
+              WWebJS?: {
+                getChat?: (
+                  id: string,
+                  opts?: { getAsModel?: boolean },
+                ) => Promise<{
+                  groupMetadata?: {
+                    participants?: { get?: (id: string) => unknown };
+                  };
+                } | null>;
+                enforceLidAndPnRetrieval?: (p: string) => Promise<{
+                  lid?: { _serialized?: string };
+                  phone?: { _serialized?: string };
+                }>;
+              };
+              require?: (name: string) => {
+                queryAndUpdateGroupMetadataById?: (input: { id: string }) => Promise<unknown> | unknown;
+                promoteParticipants?: (chat: unknown, parts: unknown[]) => Promise<unknown>;
+                createWid?: (id: string) => unknown;
+                get?: (wid: unknown) => unknown;
+                find?: (wid: unknown) => Promise<unknown>;
+                Chat?: { get?: (wid: unknown) => unknown; find?: (wid: unknown) => Promise<unknown> };
+              };
+            };
+
+            try {
+              const job = w.require?.('WAWebGroupQueryJob');
+              const q = job?.queryAndUpdateGroupMetadataById?.({ id: gid });
+              if (q && typeof (q as Promise<unknown>).then === 'function') await q;
+            } catch {
+              /* optional */
+            }
+
+            let chat: {
+              groupMetadata?: { participants?: { get?: (id: string) => unknown } };
+            } | null = null;
+
+            try {
+              chat = (await w.WWebJS?.getChat?.(gid, { getAsModel: false })) ?? null;
+            } catch {
+              chat = null;
+            }
+
+            if (!chat) {
+              try {
+                const widFactory = w.require?.('WAWebWidFactory');
+                const collections = w.require?.('WAWebCollections');
+                const wid = widFactory?.createWid?.(gid);
+                chat =
+                  ((collections?.Chat?.get?.(wid) as typeof chat) ?? null) ||
+                  ((await collections?.Chat?.find?.(wid)) as typeof chat) ||
+                  null;
+              } catch {
+                chat = null;
+              }
+            }
+
+            if (!chat) return { ok: false, reason: 'GROUP_NOT_FOUND' } satisfies PromotePageResult;
+            if (!chat.groupMetadata?.participants) {
+              return { ok: false, reason: 'NOT_A_GROUP' } satisfies PromotePageResult;
+            }
+
+            const promoted: string[] = [];
+            const missing: string[] = [];
+            const parts: unknown[] = [];
+
+            for (const p of ids) {
+              let lidSerialized = '';
+              let phoneSerialized = '';
+              try {
+                const resolved = await w.WWebJS?.enforceLidAndPnRetrieval?.(p);
+                lidSerialized = resolved?.lid?._serialized ?? '';
+                phoneSerialized = resolved?.phone?._serialized ?? '';
+              } catch {
+                phoneSerialized = p.includes('@') ? p : `${p}@c.us`;
+              }
+
+              const part =
+                (lidSerialized
+                  ? chat.groupMetadata.participants.get?.(lidSerialized)
+                  : undefined) ||
+                (phoneSerialized
+                  ? chat.groupMetadata.participants.get?.(phoneSerialized)
+                  : undefined) ||
+                chat.groupMetadata.participants.get?.(p);
+
+              if (part) {
+                parts.push(part);
+                promoted.push(p);
+              } else {
+                missing.push(p);
+              }
+            }
+
+            if (parts.length === 0) {
+              return { ok: false, reason: 'TARGETS_NOT_IN_GROUP' } satisfies PromotePageResult;
+            }
+
+            const action = w.require?.('WAWebModifyParticipantsGroupAction');
+            if (typeof action?.promoteParticipants !== 'function') {
+              return { ok: false, reason: 'PROMOTE_ACTION_UNAVAILABLE' } satisfies PromotePageResult;
+            }
+            await action.promoteParticipants(chat, parts);
+            return { ok: true, promoted, missing } satisfies PromotePageResult;
+          } catch (err) {
+            const msg =
+              err instanceof Error
+                ? err.message
+                : typeof err === 'string'
+                  ? err
+                  : 'PROMOTE_FAILED';
+            return {
+              ok: false,
+              reason: msg.trim().length <= 3 ? 'CRYPTIC_EVALUATE' : msg.slice(0, 200),
+            } satisfies PromotePageResult;
+          }
+        },
+        chatId,
+        participantIds,
+      ),
+      WA_PROMOTE_TIMEOUT_MS,
+      'promoteViaPage',
+    ),
+  );
+
+  if (result.ok) {
+    return { promoted: result.promoted, missing: result.missing };
+  }
+  throw new Error(result.reason);
+}
+
+/**
+ * Lookup grup ringan di page (scalar) — tidak pernah serialize chat penuh ke Node.
+ */
+async function resolveGroupChatOptional(
+  client: InstanceType<typeof Client>,
+  chatIdRaw: string,
+): Promise<{ id: string; name?: string; isGroup?: boolean; chat: unknown } | null> {
+  const chatId = normalizeGroupChatId(chatIdRaw);
+  if (!chatId) return null;
+
+  const probed = await probeGroupViaPage(client, chatId);
+  if (probed) {
+    return { id: probed.id, name: probed.name, isGroup: probed.isGroup, chat: null };
+  }
+  return null;
+}
+
 function isDetachedFrameError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
@@ -115,23 +364,129 @@ async function assertWhatsAppAccount(
   }
 }
 
-async function applyWaCreateGroupSettings(
-  chat: {
-    setMessagesAdminsOnly?: (value: boolean) => Promise<boolean>;
-    setAddMembersAdminsOnly?: (value: boolean) => Promise<boolean>;
-    setInfoAdminsOnly?: (value: boolean) => Promise<boolean>;
-  },
+/**
+ * Apply permission grup di page — return terstruktur, jangan throw cryptic ("t"/"r").
+ * Dipanggil setelah settle singkat pasca-create (store WA sering belum siap).
+ */
+async function applyCreateGroupSettingsViaPage(
+  client: InstanceType<typeof Client>,
+  chatIdRaw: string,
   settings?: WaCreateGroupSettings,
 ): Promise<void> {
   if (!settings) return;
-  if (typeof chat.setMessagesAdminsOnly === 'function') {
-    await chat.setMessagesAdminsOnly(Boolean(settings.messagesAdminsOnly));
-  }
-  if (typeof chat.setAddMembersAdminsOnly === 'function') {
-    await chat.setAddMembersAdminsOnly(Boolean(settings.addMembersAdminsOnly));
-  }
-  if (typeof chat.setInfoAdminsOnly === 'function') {
-    await chat.setInfoAdminsOnly(Boolean(settings.infoAdminsOnly));
+  const chatId = normalizeGroupChatId(chatIdRaw);
+  const page = client.pupPage;
+  if (!page || !chatId) return;
+
+  try {
+    const result = await withPromiseTimeout(
+      page.evaluate(
+        async (
+          gid: string,
+          opts: {
+            messagesAdminsOnly: boolean;
+            addMembersAdminsOnly: boolean;
+            infoAdminsOnly: boolean;
+          },
+        ) => {
+          type SettingsResult = { ok: true } | { ok: false; reason: string };
+          try {
+            const w = window as unknown as {
+              WWebJS?: {
+                getChat?: (id: string, o?: { getAsModel?: boolean }) => Promise<unknown>;
+              };
+              require?: (name: string) => {
+                setGroupProperty?: (chat: unknown, key: string, value: number) => Promise<unknown>;
+                createWid?: (id: string) => unknown;
+                Chat?: { get?: (wid: unknown) => unknown; find?: (wid: unknown) => Promise<unknown> };
+                queryAndUpdateGroupMetadataById?: (input: { id: string }) => Promise<unknown> | unknown;
+              };
+            };
+
+            try {
+              const job = w.require?.('WAWebGroupQueryJob');
+              const q = job?.queryAndUpdateGroupMetadataById?.({ id: gid });
+              if (q && typeof (q as Promise<unknown>).then === 'function') await q;
+            } catch {
+              /* optional */
+            }
+
+            let chat: unknown = null;
+            try {
+              chat = (await w.WWebJS?.getChat?.(gid, { getAsModel: false })) ?? null;
+            } catch {
+              chat = null;
+            }
+            if (!chat) {
+              try {
+                const wid = w.require?.('WAWebWidFactory')?.createWid?.(gid);
+                const collections = w.require?.('WAWebCollections');
+                chat =
+                  collections?.Chat?.get?.(wid) ??
+                  (await collections?.Chat?.find?.(wid)) ??
+                  null;
+              } catch {
+                chat = null;
+              }
+            }
+            if (!chat) return { ok: false, reason: 'chat_not_ready' } satisfies SettingsResult;
+
+            const action = w.require?.('WAWebSetPropertyGroupAction');
+            if (typeof action?.setGroupProperty !== 'function') {
+              return { ok: false, reason: 'setGroupProperty_unavailable' } satisfies SettingsResult;
+            }
+
+            const applyOne = async (key: string, value: number) => {
+              try {
+                await action.setGroupProperty!(chat, key, value);
+                return true;
+              } catch (err) {
+                const name =
+                  err && typeof err === 'object' ? String((err as { name?: string }).name) : '';
+                if (name === 'ServerStatusCodeError') return false;
+                throw err;
+              }
+            };
+
+            await applyOne('announcement', opts.messagesAdminsOnly ? 1 : 0);
+            await applyOne('member_add_mode', opts.addMembersAdminsOnly ? 0 : 1);
+            await applyOne('restrict', opts.infoAdminsOnly ? 1 : 0);
+            return { ok: true } satisfies SettingsResult;
+          } catch (err) {
+            const msg =
+              err instanceof Error
+                ? err.message
+                : typeof err === 'string'
+                  ? err
+                  : 'settings_failed';
+            return {
+              ok: false,
+              reason: msg.trim().length <= 3 ? 'cryptic_evaluate' : msg.slice(0, 120),
+            } satisfies SettingsResult;
+          }
+        },
+        chatId,
+        {
+          messagesAdminsOnly: Boolean(settings.messagesAdminsOnly),
+          addMembersAdminsOnly: Boolean(settings.addMembersAdminsOnly),
+          infoAdminsOnly: Boolean(settings.infoAdminsOnly),
+        },
+      ),
+      WA_CHAT_LOOKUP_TIMEOUT_MS,
+      'applyCreateSettings',
+    );
+
+    if (!result.ok && result.reason !== 'chat_not_ready') {
+      console.warn(
+        `[wa-automation] create settings skipped (${chatId}):`,
+        result.reason === 'cryptic_evaluate' ? 'store not ready' : result.reason,
+      );
+    }
+  } catch (err) {
+    const msg = errorMessage(err);
+    if (!isCrypticWaEvaluateError(err) && msg.length > 3) {
+      console.warn('[wa-automation] apply create group settings via page failed:', msg);
+    }
   }
 }
 
@@ -175,27 +530,33 @@ async function runCreateGroup(
     (created as { id?: { _serialized?: string } }).id?._serialized ??
     '';
 
-  const chat = gid ? await client.getChatById(gid) : null;
-  if (chat && 'groupMetadata' in chat) {
-    try {
-      await applyWaCreateGroupSettings(
-        chat as {
-          setMessagesAdminsOnly?: (value: boolean) => Promise<boolean>;
-          setAddMembersAdminsOnly?: (value: boolean) => Promise<boolean>;
-          setInfoAdminsOnly?: (value: boolean) => Promise<boolean>;
-        },
-        payload.createGroupSettings,
-      );
-    } catch (err) {
-      console.warn('[wa-automation] apply create group settings failed:', err);
-    }
+  const afterCreateSec = payload.delay?.after_create_sec ?? 90;
+  const afterCreateMs = jitterMs(afterCreateSec * 1000, payload.delay?.jitter_percent);
+  /** Settle dulu sebelum settings + invite — kurangi flake evaluate & tekanan WA API. */
+  const settleMs = Math.min(12_000, Math.max(3_000, Math.floor(afterCreateMs * 0.25)));
+  const remainderMs = Math.max(0, afterCreateMs - settleMs);
+  await sleep(settleMs);
+
+  if (gid && payload.createGroupSettings) {
+    await applyCreateGroupSettingsViaPage(client, gid, payload.createGroupSettings);
   }
 
-  const afterCreateSec = payload.delay?.after_create_sec ?? 90;
-  await sleep(jitterMs(afterCreateSec * 1000, payload.delay?.jitter_percent));
+  if (remainderMs > 0) {
+    await sleep(remainderMs);
+  }
 
   const groupId = gid.replace(/@g\.us$/i, '');
-  const invite_link = gid ? await fetchWhatsAppGroupInviteLink(client, gid) : null;
+  let invite_link: string | null = null;
+  if (gid) {
+    try {
+      invite_link = await fetchWhatsAppGroupInviteLink(client, gid);
+    } catch (err) {
+      const msg = errorMessage(err);
+      if (!isCrypticWaEvaluateError(err) && msg.length > 3) {
+        console.warn('[wa-automation] invite link after create failed:', msg);
+      }
+    }
+  }
 
   return {
     status: 'ok',
@@ -239,45 +600,71 @@ async function runSetAdmin(
   if (!options?.skipStoreReady) {
     await waitForWhatsAppStoreReady(client);
   }
-  onProgress?.(0, targets.length, 'Loading group…');
-  const chatId = normalizeGroupChatId(groupRef);
-  const chat = await withDetachedFrameRetry('getChatById', () =>
-    withPromiseTimeout(client.getChatById(chatId), WA_CHAT_LOOKUP_TIMEOUT_MS, 'getChatById'),
-  );
-  if (!chat.isGroup) {
-    return {
-      status: 'error',
-      action: 'set_admin',
-      message: 'Not a group chat',
-      errorCode: 'GROUP_NOT_FOUND',
-    };
-  }
 
+  const chatId = normalizeGroupChatId(groupRef);
   const participantIds = targets.map(toWaParticipantId);
   const maxSlots = Math.max(1, Math.floor(payload.delay?.max_admin_slots ?? 5));
   const limitedIds = participantIds.slice(0, maxSlots);
   const promoted: string[] = [];
   const errors: Array<{ target: string; error: string }> = [];
 
+  /**
+   * Path utama: page.evaluate (wwebjs promote) — TIDAK lewat getChatById Node
+   * (Error "r" serialize). Retry singkat jika store flake.
+   */
+  const maxAttempts = 3;
   for (let i = 0; i < limitedIds.length; i += 1) {
     const target = limitedIds[i];
     onProgress?.(i, limitedIds.length, `Promote ${target.replace(/@.*/, '')}`);
-    try {
-      await withDetachedFrameRetry('promoteParticipants', () =>
-        withPromiseTimeout(
-          chat.promoteParticipants([target]),
-          WA_PROMOTE_TIMEOUT_MS,
-          'promoteParticipants',
-        ),
-      );
-      promoted.push(target);
-      onProgress?.(i + 1, limitedIds.length, `Promoted ${target.replace(/@.*/, '')}`);
-    } catch (err) {
+
+    let lastErr = '';
+    let ok = false;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        if (attempt > 0) {
+          await waitForWhatsAppStoreReady(client, 30_000);
+          await sleep(WA_DETACHED_FRAME_RETRY_MS * attempt);
+        }
+        const result = await promoteViaPageEvaluate(client, chatId, [target]);
+        if (result.promoted.includes(target)) {
+          promoted.push(target);
+          ok = true;
+          onProgress?.(i + 1, limitedIds.length, `Promoted ${target.replace(/@.*/, '')}`);
+          break;
+        }
+        lastErr =
+          result.missing.includes(target)
+            ? 'Target not in group (join first)'
+            : 'Promote returned empty';
+        break;
+      } catch (err) {
+        lastErr = errorMessage(err);
+        if (lastErr === 'TARGETS_NOT_IN_GROUP') {
+          lastErr = 'Target not in group (join first)';
+          break;
+        }
+        if (lastErr === 'GROUP_NOT_FOUND' || lastErr === 'NOT_A_GROUP') {
+          break;
+        }
+        if (!isCrypticWaEvaluateError(err) && !/TIMEOUT|detached/i.test(lastErr)) {
+          break;
+        }
+        console.warn(
+          `[wa-automation] promote flake attempt ${attempt + 1}/${maxAttempts} (${chatId}):`,
+          isCrypticWaEvaluateError(err) ? 'cryptic evaluate error' : lastErr,
+        );
+      }
+    }
+
+    if (!ok) {
       errors.push({
         target,
-        error: err instanceof Error ? err.message : String(err),
+        error: isCrypticWaEvaluateError(lastErr)
+          ? 'WhatsApp store flake during promote — retry'
+          : lastErr || 'Promote failed',
       });
     }
+
     if (i < limitedIds.length - 1) {
       const baseSec = (payload.delay?.between_targets_sec ?? 3) * 1000;
       await sleep(jitterMs(baseSec, payload.delay?.jitter_percent));
@@ -378,20 +765,36 @@ async function runJoinByInviteLink(
       WA_ACCEPT_INVITE_TIMEOUT_MS,
       'acceptInvite',
     );
-    const chat = chatId
-      ? await withPromiseTimeout(
-          client.getChatById(chatId),
-          WA_CHAT_LOOKUP_TIMEOUT_MS,
-          'getChatById',
-        )
-      : null;
-    onProgress?.(1, 1, chat?.name?.trim() || 'Joined');
+    const acceptedId = chatId ? String(chatId) : '';
+    // acceptInvite sukses = sudah join di device. Lookup nama chat opsional (Error "r").
+    let groupName = '';
+    if (acceptedId) {
+      const resolved = await resolveGroupChatOptional(client, acceptedId);
+      groupName = resolved?.name?.trim() || '';
+    } else if (payload.groupId?.trim()) {
+      const resolved = await resolveGroupChatOptional(client, payload.groupId.trim());
+      if (resolved?.isGroup) {
+        groupName = resolved.name?.trim() || '';
+        onProgress?.(1, 1, groupName || 'Joined');
+        return {
+          status: 'ok',
+          action: 'join_by_invite_link',
+          result: {
+            group_id: resolved.id.replace(/@g\.us$/i, ''),
+            group_name: groupName,
+            invite_link: link,
+            already_member: false,
+          },
+        };
+      }
+    }
+    onProgress?.(1, 1, groupName || 'Joined');
     return {
       status: 'ok',
       action: 'join_by_invite_link',
       result: {
-        group_id: String(chatId ?? '').replace(/@g\.us$/i, ''),
-        group_name: chat?.name ?? '',
+        group_id: acceptedId.replace(/@g\.us$/i, ''),
+        group_name: groupName,
         invite_link: link,
         already_member: false,
       },
@@ -404,6 +807,24 @@ async function runJoinByInviteLink(
         action: 'join_by_invite_link',
         result: { invite_link: link, already_member: true },
       };
+    }
+    // Timeout / cryptic evaluate: verifikasi membership lewat groupId payload.
+    const expectedId = payload.groupId?.trim();
+    if (expectedId) {
+      const resolved = await resolveGroupChatOptional(client, expectedId);
+      if (resolved?.isGroup) {
+        onProgress?.(1, 1, resolved.name?.trim() || 'Joined');
+        return {
+          status: 'ok',
+          action: 'join_by_invite_link',
+          result: {
+            group_id: resolved.id.replace(/@g\.us$/i, ''),
+            group_name: resolved.name ?? '',
+            invite_link: link,
+            already_member: /already|timeout/i.test(raw) || isCrypticWaEvaluateError(err),
+          },
+        };
+      }
     }
     const msg = humanizeJoinError(raw, link);
     return {
@@ -440,22 +861,14 @@ function isJobStopRequested(jobId?: string): boolean {
   return Boolean(jobId && peekJobStopRequest(jobId));
 }
 
-function pauseBetweenRunsMs(delay?: AutomationRunPayload['delay']): number {
-  const minSec = delay?.pause_between_runs_min_sec ?? 45 * 60;
-  const maxSec = delay?.pause_between_runs_max_sec ?? 65 * 60;
-  const low = Math.min(minSec, maxSec);
-  const high = Math.max(minSec, maxSec);
-  if (high <= low) return low * 1000;
-  const picked = low + Math.floor(Math.random() * (high - low + 1));
-  return picked * 1000;
-}
-
 export async function runWhatsAppCreateGroupBatch(
   payload: AutomationRunPayload,
   onProgress: (current: number, total: number, label: string) => void,
 ): Promise<AutomationRunResult> {
-  const totalTarget = Math.max(1, Math.floor(Number(payload.totalToCreate) || 1));
-  const perRun = Math.max(1, Math.floor(Number(payload.perRun) || totalTarget));
+  const totalRequested = Math.max(1, Math.floor(Number(payload.totalToCreate) || 1));
+  const perRun = Math.max(1, Math.floor(Number(payload.perRun) || totalRequested));
+  /** Satu execute = max perRun (jangan multi-slice mass create). */
+  const totalTarget = Math.min(totalRequested, perRun);
   const startFrom = Math.max(1, Math.floor(Number(payload.startFrom) || 1));
   const useNumbering = createGroupBatchUsesNumbering(payload, totalTarget);
   const prefix = (payload.groupNamePrefix ?? payload.groupName ?? '').trim();
@@ -485,67 +898,57 @@ export async function runWhatsAppCreateGroupBatch(
 
       onProgress(0, totalTarget, prefix);
 
-      while (created < totalTarget) {
+      const sliceSize = totalTarget;
+      for (let i = 0; i < sliceSize; i += 1) {
         if (isJobStopRequested(payload.jobId)) {
           return buildBatchStopResult({ created, totalTarget, failed, groupOutcomes });
         }
 
-        const createdBeforeSlice = created;
-        const sliceSize = Math.min(perRun, totalTarget - created);
+        const num = nextNum + i;
+        const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
+        const batchIndex = created + 1;
 
-        for (let i = 0; i < sliceSize; i += 1) {
-          if (isJobStopRequested(payload.jobId)) {
-            return buildBatchStopResult({ created, totalTarget, failed, groupOutcomes });
-          }
+        onProgress(created, totalTarget, groupName);
 
-          const num = nextNum + i;
-          const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
-          const batchIndex = created + 1;
-
-          onProgress(created, totalTarget, groupName);
-
-          const result = await runCreateGroup(client, {
+        let result: AutomationRunResult;
+        try {
+          result = await runCreateGroup(client, {
             ...payload,
             groupName,
             batchIndex,
           });
-
-          if (result.status === 'ok') {
-            created += 1;
-            const detail = result.result ?? {};
-            groupOutcomes.push({
-              groupId: String(detail.group_id ?? '').trim(),
-              groupName: String(detail.group_name ?? groupName).trim() || groupName,
-              inviteLink:
-                typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
-              createStatus: 'created',
-            });
-            onProgress(created, totalTarget, groupName);
-          } else {
-            failed.push(`${groupName}: ${result.message ?? 'failed'}`);
-            groupOutcomes.push({
-              groupId: '',
-              groupName,
-              createStatus: 'failed',
-            });
-          }
+        } catch (err) {
+          const msg = isCrypticWaEvaluateError(err)
+            ? `WhatsApp store flake after create (${errorMessage(err)})`
+            : errorMessage(err);
+          console.warn(`[wa-automation] create "${groupName}" threw:`, msg);
+          result = {
+            status: 'error',
+            action: 'create_group',
+            message: msg,
+            errorCode: 'CREATE_GROUP_FAILED',
+          };
         }
 
-        nextNum += sliceSize;
-
-        if (created >= totalTarget) break;
-
-        if (created === createdBeforeSlice) {
-          console.warn(
-            `[wa-automation] batch slice produced 0 creates (${created}/${totalTarget}); stopping`,
-          );
-          break;
+        if (result.status === 'ok') {
+          created += 1;
+          const detail = result.result ?? {};
+          groupOutcomes.push({
+            groupId: String(detail.group_id ?? '').trim(),
+            groupName: String(detail.group_name ?? groupName).trim() || groupName,
+            inviteLink:
+              typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
+            createStatus: 'created',
+          });
+          onProgress(created, totalTarget, groupName);
+        } else {
+          failed.push(`${groupName}: ${result.message ?? 'failed'}`);
+          groupOutcomes.push({
+            groupId: '',
+            groupName,
+            createStatus: 'failed',
+          });
         }
-
-        console.warn(
-          `[wa-automation] batch slice done ${created}/${totalTarget}; pause before next slice`,
-        );
-        await sleep(pauseBetweenRunsMs(payload.delay));
       }
 
       return {
@@ -598,6 +1001,15 @@ export async function runWhatsAppAutomation(
           joinError?: string;
         }> = [];
         for (let i = 0; i < joinGroups.length; i += 1) {
+          if (isJobStopRequested(payload.jobId)) {
+            return {
+              status: 'error',
+              action: 'join_by_invite_link',
+              message: `Stopped after ${success}/${joinGroups.length} groups`,
+              errorCode: 'JOB_STOPPED',
+              result: { success, total: joinGroups.length, failed, groupOutcomes },
+            };
+          }
           const group = joinGroups[i];
           onProgress?.(i, joinGroups.length, group.groupName ?? group.groupId);
           const result = await runJoinByInviteLink(
@@ -653,7 +1065,23 @@ export async function runWhatsAppAutomation(
         await waitForWhatsAppStoreReady(client);
         let success = 0;
         const failed: string[] = [];
+        const groupOutcomes: Array<{
+          groupId: string;
+          groupName?: string;
+          groupLink?: string;
+          adminStatus?: 'promoted' | 'failed';
+          adminError?: string;
+        }> = [];
         for (let i = 0; i < adminGroups.length; i += 1) {
+          if (isJobStopRequested(payload.jobId)) {
+            return {
+              status: 'error',
+              action: 'set_admin',
+              message: `Stopped after ${success}/${adminGroups.length} groups`,
+              errorCode: 'JOB_STOPPED',
+              result: { success, total: adminGroups.length, failed, groupOutcomes },
+            };
+          }
           const group = adminGroups[i];
           onProgress?.(i, adminGroups.length, group.groupName ?? group.groupId);
           const result = await runSetAdmin(
@@ -669,9 +1097,23 @@ export async function runWhatsAppAutomation(
           );
           if (result.status === 'ok') {
             success += 1;
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              groupLink: group.groupLink,
+              adminStatus: 'promoted',
+            });
             onProgress?.(i + 1, adminGroups.length, group.groupName ?? 'Done');
           } else {
-            failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+            const err = result.message ?? 'failed';
+            failed.push(`${group.groupName ?? group.groupId}: ${err}`);
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              groupLink: group.groupLink,
+              adminStatus: 'failed',
+              adminError: err,
+            });
           }
           if (i < adminGroups.length - 1) {
             const sec = randomBetweenSec(
@@ -686,7 +1128,7 @@ export async function runWhatsAppAutomation(
           action: 'set_admin',
           message: `Promoted targets in ${success}/${adminGroups.length} groups`,
           errorCode: success > 0 ? undefined : 'SET_ADMIN_BATCH_FAILED',
-          result: { success, total: adminGroups.length, failed },
+          result: { success, total: adminGroups.length, failed, groupOutcomes },
         };
       },
       { purpose: 'operation' },

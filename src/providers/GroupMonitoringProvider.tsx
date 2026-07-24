@@ -46,7 +46,10 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
   const [probeSuspendAccountIds, setProbeSuspendAccountIds] = useState<string[]>([]);
   const [accountFilters, setAccountFilters] = useState(ACCOUNT_FILTER_DEFAULT);
   const reloadAllBusyRef = useRef(false);
+  const reloadAllQueuedRef = useRef(false);
   const reloadAllSeqRef = useRef(0);
+  const translateRef = useRef(t);
+  translateRef.current = t;
   const reportingReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const operationsReloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dailyChangeDebounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -132,33 +135,70 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
       setLoading(false);
       return;
     }
-    if (reloadAllBusyRef.current) return;
+    if (reloadAllBusyRef.current) {
+      reloadAllQueuedRef.current = true;
+      return;
+    }
 
     const seq = ++reloadAllSeqRef.current;
     reloadAllBusyRef.current = true;
     setLoading(true);
     setError(null);
 
+    const LOAD_ACCOUNTS_TIMEOUT_MS = 45_000;
+    let timedOut = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     try {
       clearMasterDailyLoadCache();
-      await assertRmSchema();
-      const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+      const loadPromise = (async () => {
+        await assertRmSchema();
+        const dataUserId = await resolveMonitoringUserId(user.id, user.userName);
+        return loadAccountMonitoringGroups(dataUserId);
+      })();
 
-      const loadedGroups = await loadAccountMonitoringGroups(dataUserId);
+      const loadedGroups = await Promise.race([
+        loadPromise.then((value) => {
+          if (timeoutId !== undefined) clearTimeout(timeoutId);
+          return value;
+        }),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            timedOut = true;
+            reject(new Error('LOAD_ACCOUNTS_TIMEOUT'));
+          }, LOAD_ACCOUNTS_TIMEOUT_MS);
+        }),
+      ]);
+
       if (seq !== reloadAllSeqRef.current) return;
       setGroups((prev) => mergeReloadPreservingActionProcess(prev, loadedGroups));
     } catch (e) {
       if (seq !== reloadAllSeqRef.current) return;
-      setError(getErrorMessage(e, t('groupMonitoring.loadAccountsFailed')));
+      const tr = translateRef.current;
+      const message =
+        timedOut || (e instanceof Error && e.message === 'LOAD_ACCOUNTS_TIMEOUT')
+          ? tr('groupMonitoring.loadAccountsFailed')
+          : getErrorMessage(e, tr('groupMonitoring.loadAccountsFailed'));
+      console.warn('[group-monitoring] reloadAll failed:', message, e);
+      setError(message);
       setGroups([]);
       clearMasterDailyLoadCache();
     } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      /** Selalu lepas loading untuk seq ini jika masih current — anti stuck 11+ menit. */
       if (seq === reloadAllSeqRef.current) {
         setLoading(false);
       }
       reloadAllBusyRef.current = false;
+
+      const shouldReplay =
+        reloadAllQueuedRef.current && seq === reloadAllSeqRef.current && !timedOut;
+      reloadAllQueuedRef.current = false;
+      if (shouldReplay) {
+        void reloadAll();
+      }
     }
-  }, [user?.id, user?.userName, t]);
+  }, [user?.id, user?.userName]);
 
   useEffect(() => {
     void reloadAll();

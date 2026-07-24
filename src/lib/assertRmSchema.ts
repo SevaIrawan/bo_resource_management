@@ -28,8 +28,12 @@ function isSchemaError(message: string | undefined): boolean {
   );
 }
 
-/** Verifikasi tabel/kolom RM sekali saat load — tanpa RPC probe, tanpa UUID palsu. */
+/** Verifikasi tabel/kolom RM sekali per sesi renderer — tanpa RPC probe, tanpa UUID palsu. */
+let schemaAssertedOk = false;
+
 export async function assertRmSchema(): Promise<void> {
+  if (schemaAssertedOk) return;
+
   const supabase = getSupabase();
   if (!supabase) return;
 
@@ -65,4 +69,6 @@ export async function assertRmSchema(): Promise<void> {
     }
     throw new Error(`${probe.table}: ${result.error.message}`);
   }
+
+  schemaAssertedOk = true;
 }

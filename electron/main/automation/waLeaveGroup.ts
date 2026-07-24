@@ -36,6 +36,14 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isCrypticWaEvaluateError(error: unknown): boolean {
+  const raw = errorMessage(error).trim();
+  if (!raw || raw.length <= 3) return true;
+  if (/^r(:\s*r)?$/i.test(raw)) return true;
+  const name = error instanceof Error ? error.name.trim() : '';
+  return Boolean(name && name.length <= 3 && /^[a-z]$/i.test(name));
+}
+
 function isNotFoundError(error: unknown): boolean {
   const msg = errorMessage(error).toLowerCase();
   return (
@@ -69,45 +77,9 @@ async function withDetachedFrameRetry<T>(label: string, fn: () => Promise<T>): P
   throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
 }
 
-type WaGroupChat = Awaited<ReturnType<InstanceType<typeof Client>['getChatById']>> & {
-  isGroup?: boolean;
-  leave?: () => Promise<unknown>;
-  id?: { _serialized?: string };
-};
-
-async function resolveGroupChat(
-  client: InstanceType<typeof Client>,
-  chatId: string,
-): Promise<WaGroupChat | null> {
-  try {
-    const chat = (await withDetachedFrameRetry('getChatById', () =>
-      withPromiseTimeout(client.getChatById(chatId), WA_LEAVE_STEP_TIMEOUT_MS, 'getChatById'),
-    )) as WaGroupChat | null;
-    if (chat?.isGroup) return chat;
-    if (chat && !chat.isGroup) return null;
-  } catch (error) {
-    if (isNotFoundError(error)) return null;
-    console.warn('[wa-leave] getChatById failed, trying getChats fallback:', errorMessage(error));
-  }
-
-  try {
-    const chats = await withDetachedFrameRetry('getChats', () =>
-      withPromiseTimeout(client.getChats(), WA_LEAVE_STEP_TIMEOUT_MS, 'getChats'),
-    );
-    const found = chats.find((row) => {
-      const serialized = (row as WaGroupChat).id?._serialized ?? '';
-      return Boolean((row as WaGroupChat).isGroup) && serialized === chatId;
-    }) as WaGroupChat | undefined;
-    return found ?? null;
-  } catch (error) {
-    if (isNotFoundError(error)) return null;
-    throw error;
-  }
-}
-
 /**
- * Fallback leave via WA Web page modules — used when GroupChat.leave() throws
- * (module rename / evaluate flake).
+ * Leave grup lewat page modules — tanpa tarik objek chat ke Node (hindari Error "r").
+ * Path sama hardening set admin / set photo.
  */
 async function leaveViaPageEvaluate(
   client: InstanceType<typeof Client>,
@@ -132,6 +104,16 @@ async function leaveViaPageEvaluate(
         Cmd?: { exitChat?: (chat: unknown) => Promise<unknown> };
       };
     };
+
+    try {
+      const job = w.require?.('WAWebGroupQueryJob') as
+        | { queryAndUpdateGroupMetadataById?: (input: { id: string }) => Promise<unknown> | unknown }
+        | undefined;
+      const q = job?.queryAndUpdateGroupMetadataById?.({ id });
+      if (q && typeof (q as Promise<unknown>).then === 'function') await q;
+    } catch {
+      /* optional */
+    }
 
     const chat = await w.WWebJS?.getChat?.(id, { getAsModel: false });
     if (!chat) {
@@ -161,34 +143,6 @@ async function leaveViaPageEvaluate(
   }, chatId);
 }
 
-async function performLeave(
-  client: InstanceType<typeof Client>,
-  chat: WaGroupChat,
-  chatId: string,
-): Promise<void> {
-  const tryChatLeave = async () => {
-    if (typeof chat.leave !== 'function') {
-      throw new Error('chat.leave is not a function');
-    }
-    await withPromiseTimeout(chat.leave(), WA_LEAVE_STEP_TIMEOUT_MS, 'leave');
-  };
-
-  try {
-    await withDetachedFrameRetry('leave', tryChatLeave);
-    return;
-  } catch (error) {
-    if (isNotFoundError(error)) throw error;
-    console.warn(
-      '[wa-leave] chat.leave failed, trying page evaluate fallback:',
-      errorMessage(error),
-    );
-  }
-
-  await withDetachedFrameRetry('leaveViaPage', () =>
-    withPromiseTimeout(leaveViaPageEvaluate(client, chatId), WA_LEAVE_STEP_TIMEOUT_MS, 'leaveViaPage'),
-  );
-}
-
 type LeaveOutcome = 'left' | 'not_found' | 'error';
 
 export async function leaveOneGroup(
@@ -196,21 +150,48 @@ export async function leaveOneGroup(
   groupId: string,
 ): Promise<{ outcome: LeaveOutcome; message?: string }> {
   const chatId = normalizeGroupChatId(groupId);
-  try {
-    const chat = await resolveGroupChat(client, chatId);
-    if (!chat) {
-      return { outcome: 'not_found', message: 'chat not found' };
+  const maxAttempts = 3;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      if (attempt > 0) {
+        await sleep(WA_DETACHED_FRAME_RETRY_MS * attempt);
+      }
+      await withDetachedFrameRetry('leaveViaPage', () =>
+        withPromiseTimeout(
+          leaveViaPageEvaluate(client, chatId),
+          WA_LEAVE_STEP_TIMEOUT_MS,
+          'leaveViaPage',
+        ),
+      );
+      return { outcome: 'left' };
+    } catch (error) {
+      lastError = error;
+      if (isNotFoundError(error)) {
+        return { outcome: 'not_found', message: errorMessage(error) };
+      }
+      if (!isCrypticWaEvaluateError(error) && !/TIMEOUT|detached/i.test(errorMessage(error))) {
+        break;
+      }
+      console.warn(
+        `[wa-leave] leave flake attempt ${attempt + 1}/${maxAttempts} (${chatId}):`,
+        isCrypticWaEvaluateError(error) ? 'cryptic evaluate error' : errorMessage(error),
+      );
     }
-    await performLeave(client, chat, chatId);
-    return { outcome: 'left' };
-  } catch (error) {
-    const message = errorMessage(error);
-    console.warn('[wa-leave] leaveOneGroup failed', chatId, message);
-    if (isNotFoundError(error)) {
-      return { outcome: 'not_found', message };
-    }
-    return { outcome: 'error', message };
   }
+
+  const message = errorMessage(lastError);
+  console.warn('[wa-leave] leaveOneGroup failed', chatId, message);
+  if (isNotFoundError(lastError)) {
+    return { outcome: 'not_found', message };
+  }
+  return {
+    outcome: 'error',
+    message: isCrypticWaEvaluateError(lastError)
+      ? 'WhatsApp store flake during leave — retry'
+      : message,
+  };
 }
 
 export async function runWaLeaveGroup(
@@ -269,9 +250,8 @@ export async function runWaLeaveGroup(
             exitStatus: 'failed',
             exitError,
           });
-          onProgress?.(i + 1, groups.length, group.groupName ?? 'Not Found');
         } else {
-          const exitError = result.message ?? 'error';
+          const exitError = result.message ?? 'leave failed';
           failed.push(`${group.groupName ?? group.groupId}: ${exitError}`);
           groupOutcomes.push({
             groupId: group.groupId,
@@ -280,7 +260,6 @@ export async function runWaLeaveGroup(
             exitStatus: 'failed',
             exitError,
           });
-          onProgress?.(i + 1, groups.length, group.groupName ?? 'Exit failed');
         }
 
         if (i < groups.length - 1) {
@@ -290,15 +269,10 @@ export async function runWaLeaveGroup(
 
       const success = left;
       const total = groups.length;
-      const baseMessage = `Left ${left}/${total}${notFound > 0 ? `, Not Found ${notFound}` : ''}`;
-      const detailSuffix =
-        failed.length > 0
-          ? ` — ${failed.slice(0, 3).join('; ')}${failed.length > 3 ? ` (+${failed.length - 3} more)` : ''}`
-          : '';
       return {
         status: success > 0 ? 'ok' : 'error',
         action: 'leave_group',
-        message: `${baseMessage}${detailSuffix}`,
+        message: `Left ${left}/${total}${notFound > 0 ? `, Not Found ${notFound}` : ''}`,
         errorCode: success > 0 ? undefined : 'LEAVE_GROUP_FAILED',
         result: { success, total, left, notFound, failed, groupOutcomes },
       };

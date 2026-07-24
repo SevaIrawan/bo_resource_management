@@ -1,7 +1,7 @@
 import { useLanguage } from '@/hooks/useLanguage';
 
-/** Brand card: 9 kolom (tambah Junk). Flat: 9 kolom (tanpa Last update, + Brand + Junk). */
-export const ACCOUNT_TABLE_COLUMN_COUNT = 9;
+/** Brand card: 10 kolom (Role + Junk). Flat: 10 kolom (tanpa Last update, + Brand + Role + Junk). */
+export const ACCOUNT_TABLE_COLUMN_COUNT = 10;
 
 export type AccountMonitoringTableLayout = 'brandCard' | 'flat';
 
@@ -15,6 +15,7 @@ export function AccountMonitoringTableColGroup({
       <colgroup>
         <col className="brand-col brand-col--account" />
         <col className="brand-col brand-col--brand-name" />
+        <col className="brand-col brand-col--role" />
         <col className="brand-col brand-col--location" />
         <col className="brand-col brand-col--session" />
         <col className="brand-col brand-col--on-device" />
@@ -29,6 +30,7 @@ export function AccountMonitoringTableColGroup({
   return (
     <colgroup>
       <col className="brand-col brand-col--account" />
+      <col className="brand-col brand-col--role" />
       <col className="brand-col brand-col--location" />
       <col className="brand-col brand-col--session" />
       <col className="brand-col brand-col--on-device" />
@@ -57,6 +59,9 @@ export function AccountMonitoringTableHead({
           </th>
           <th className="brand-col-head brand-col-head--brand-name">
             {t('groupMonitoring.accountCard.colBrand')}
+          </th>
+          <th className="brand-col-head brand-col-head--role">
+            {t('groupMonitoring.accountCard.colRole')}
           </th>
           <th className="brand-col-head brand-col-head--location">
             {t('groupMonitoring.accountCard.colLocation')}
@@ -101,6 +106,9 @@ export function AccountMonitoringTableHead({
       <tr>
         <th className="brand-col-head brand-col-head--account">
           {t('groupMonitoring.accountCard.colAccount')}
+        </th>
+        <th className="brand-col-head brand-col-head--role">
+          {t('groupMonitoring.accountCard.colRole')}
         </th>
         <th className="brand-col-head brand-col-head--location">
           {t('groupMonitoring.accountCard.colLocation')}

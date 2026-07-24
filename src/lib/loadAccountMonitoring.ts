@@ -20,6 +20,10 @@ import {
   upsertAccountSnapshot,
 } from '@/lib/accountSnapshots';
 import { MESSAGING_ACCOUNT_SELECT } from '@/config/dbColumns';
+import {
+  effectiveAccountOpsRole,
+  readOpsRoleFromMetadata,
+} from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { readPhoneFromAccount } from '@/lib/accountPhone';
 import { loadUserBrands } from '@/lib/brands';
@@ -68,6 +72,7 @@ function accountRowFromDb(
     accountName: account.label,
     phoneNumber: readPhoneFromAccount(account),
     locationDevice: readLocationDevice(account) || undefined,
+    opsRole: effectiveAccountOpsRole(readOpsRoleFromMetadata(account.metadata)),
     brandName,
     status,
     groupsCurrent: 0,

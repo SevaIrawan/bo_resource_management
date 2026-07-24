@@ -59,6 +59,19 @@ export function SessionBadge({ status }: { status: AccountBrandRow['sessionStatu
   );
 }
 
+function AccountOpsRoleCell({ role }: { role: AccountBrandRow['opsRole'] }) {
+  const { t } = useLanguage();
+  const isMaster = role === 'master';
+
+  return (
+    <span className="brand-account-role-text">
+      {isMaster
+        ? t('groupMonitoring.accountCard.opsRoleMaster')
+        : t('groupMonitoring.accountCard.opsRoleGcs')}
+    </span>
+  );
+}
+
 function SessionClearButton({
   onClear,
   loading = false,
@@ -594,6 +607,11 @@ function AccountRemoveSlotIcon({
             </div>
           </td>
         ) : null}
+        <td className="brand-col-cell brand-col-cell--role">
+          <div className="brand-col-cell-inner">
+            <AccountOpsRoleCell role={row.opsRole} />
+          </div>
+        </td>
         <td className="brand-col-cell brand-col-cell--location">
           <div className="brand-col-cell-inner">
             <span className="truncate text-text-secondary">
@@ -705,7 +723,7 @@ function AccountRemoveSlotIcon({
 
       {setupFeedback ? (
         <tr className="brand-account-row brand-account-row--feedback">
-          <td colSpan={9} className="brand-col-cell">
+          <td colSpan={10} className="brand-col-cell">
             <p className="brand-metric-feedback text-xs text-amber-300" role="status">
               {setupFeedback}{' '}
               <button
@@ -789,6 +807,11 @@ export function AccountEmptySlotRow({
             <p className="brand-account-slot-text">{t('groupMonitoring.accountCard.emptySlotAccount')}</p>
             <p className="brand-account-slot-subtext">{t('groupMonitoring.accountCard.emptySlotHint')}</p>
           </div>
+        </div>
+      </td>
+      <td className="brand-col-cell brand-col-cell--role">
+        <div className="brand-col-cell-inner">
+          <span className="brand-account-slot-muted text-xs">—</span>
         </div>
       </td>
       <td className="brand-col-cell brand-col-cell--location">

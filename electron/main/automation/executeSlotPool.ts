@@ -122,13 +122,23 @@ export function releaseExecuteSlot(accountId: string): void {
 function drainExecuteSlotFifo(platform: ExecuteSlotPlatform): void {
   const pool = poolFor(platform);
   const max = maxSlots(platform);
+  /** Waiter same-account: jangan buang resolve — taruh ulang di belakang antrian. */
+  const deferred: PlatformPool['fifoWaiters'] = [];
+
   while (pool.activeByAccountId.size < max && pool.fifoWaiters.length > 0) {
     const next = pool.fifoWaiters.shift();
     if (!next) break;
-    if (isExecuteSlotActiveForAccount(next.accountId)) continue;
+    if (isExecuteSlotActiveForAccount(next.accountId)) {
+      deferred.push(next);
+      continue;
+    }
     pool.activeByAccountId.set(next.accountId, { kind: next.kind, platform });
     broadcastExecuteSlotsChanged();
     next.resolve();
+  }
+
+  if (deferred.length > 0) {
+    pool.fifoWaiters.push(...deferred);
   }
 }
 

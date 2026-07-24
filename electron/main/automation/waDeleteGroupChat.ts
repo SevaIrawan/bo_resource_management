@@ -11,6 +11,8 @@ import type {
 const { Client } = pkg;
 
 const WA_WIPE_TIMEOUT_MS = 45_000;
+const WA_DELETE_MAX_ATTEMPTS = 3;
+const WA_DELETE_RETRY_MS = 1_200;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -30,17 +32,90 @@ function normalizeGroupChatId(groupId: string): string {
   return `${value}@g.us`;
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  return String(error ?? '').trim() || 'unknown error';
+}
+
+function isCrypticWaEvaluateError(error: unknown): boolean {
+  const raw = errorMessage(error);
+  if (!raw || raw.length <= 3) return true;
+  if (/^r(:\s*r)?$/i.test(raw)) return true;
+  const name = error instanceof Error ? error.name.trim() : '';
+  return Boolean(name && name.length <= 3 && /^[a-z]$/i.test(name));
+}
+
 function isNotFoundError(error: unknown): boolean {
-  const msg = String(error instanceof Error ? error.message : error).toLowerCase();
+  const msg = errorMessage(error).toLowerCase();
   return (
     msg.includes('not found') ||
     msg.includes('invalid wid') ||
     msg.includes('wid error') ||
-    msg.includes('no chat')
+    msg.includes('no chat') ||
+    msg.includes('chat not found')
   );
 }
 
 type WipeOutcome = 'deleted' | 'not_found' | 'error';
+
+/**
+ * Wipe chat lokal lewat WWebJS.sendClearChat / sendDeleteChat di page —
+ * sama path Chat.clearMessages / Chat.delete, tanpa serialize chat ke Node.
+ */
+async function wipeViaPageEvaluate(
+  client: InstanceType<typeof Client>,
+  chatId: string,
+  clearHistory: boolean,
+): Promise<WipeOutcome> {
+  const page = client.pupPage;
+  if (!page) throw new Error('WA_PAGE_UNAVAILABLE');
+
+  const result = await withPromiseTimeout(
+    page.evaluate(
+      async (gid: string, clear: boolean) => {
+        const w = window as unknown as {
+          WWebJS?: {
+            getChat?: (
+              id: string,
+              opts?: { getAsModel?: boolean },
+            ) => Promise<unknown | null | undefined>;
+            sendClearChat?: (id: string) => Promise<boolean>;
+            sendDeleteChat?: (id: string) => Promise<boolean>;
+          };
+        };
+
+        const chat = await w.WWebJS?.getChat?.(gid, { getAsModel: false });
+        if (chat == null) {
+          return { ok: false as const, reason: 'not_found' as const };
+        }
+
+        if (clear && typeof w.WWebJS?.sendClearChat === 'function') {
+          try {
+            await w.WWebJS.sendClearChat(gid);
+          } catch {
+            /* lanjut delete */
+          }
+        }
+
+        if (typeof w.WWebJS?.sendDeleteChat !== 'function') {
+          return { ok: false as const, reason: 'unavailable' as const };
+        }
+
+        const deleted = await w.WWebJS.sendDeleteChat(gid);
+        if (!deleted) return { ok: false as const, reason: 'delete_failed' as const };
+        return { ok: true as const };
+      },
+      chatId,
+      clearHistory,
+    ),
+    WA_WIPE_TIMEOUT_MS,
+    'wipeViaPage',
+  );
+
+  if (result.ok) return 'deleted';
+  if (result.reason === 'not_found') return 'not_found';
+  return 'error';
+}
 
 export async function wipeGroupChat(
   client: InstanceType<typeof Client>,
@@ -48,54 +123,29 @@ export async function wipeGroupChat(
   clearHistory: boolean,
 ): Promise<WipeOutcome> {
   const chatId = normalizeGroupChatId(groupId);
-  let chat: Awaited<ReturnType<InstanceType<typeof Client>['getChatById']>> | null = null;
+  let lastError: unknown;
 
-  try {
-    chat = await withPromiseTimeout(
-      client.getChatById(chatId),
-      WA_WIPE_TIMEOUT_MS,
-      'getChatById',
-    );
-  } catch (error) {
-    if (isNotFoundError(error)) return 'not_found';
-    throw error;
-  }
-
-  if (!chat) return 'not_found';
-
-  try {
-    await withPromiseTimeout(
-      chat.fetchMessages({ limit: 1 }),
-      15_000,
-      'fetchMessages',
-    );
-  } catch {
-    // sync ringan — optional
-  }
-
-  if (chat.archived) {
+  for (let attempt = 0; attempt < WA_DELETE_MAX_ATTEMPTS; attempt += 1) {
     try {
-      await withPromiseTimeout(chat.unarchive(), 15_000, 'unarchive');
-    } catch {
-      // ignore
+      if (attempt > 0) {
+        await sleep(WA_DELETE_RETRY_MS * attempt);
+      }
+      return await wipeViaPageEvaluate(client, chatId, clearHistory);
+    } catch (error) {
+      lastError = error;
+      if (isNotFoundError(error)) return 'not_found';
+      if (!isCrypticWaEvaluateError(error) && !/TIMEOUT|detached/i.test(errorMessage(error))) {
+        throw error;
+      }
+      console.warn(
+        `[wa-delete] wipe flake attempt ${attempt + 1}/${WA_DELETE_MAX_ATTEMPTS} (${chatId}):`,
+        isCrypticWaEvaluateError(error) ? 'cryptic evaluate error' : errorMessage(error),
+      );
     }
   }
 
-  if (clearHistory) {
-    try {
-      await withPromiseTimeout(chat.clearMessages(), 22_000, 'clearMessages');
-    } catch {
-      // continue to delete
-    }
-    await sleep(900);
-  }
-
-  try {
-    await withPromiseTimeout(chat.delete(), 22_000, 'delete');
-    return 'deleted';
-  } catch {
-    return 'error';
-  }
+  if (lastError) throw lastError instanceof Error ? lastError : new Error(errorMessage(lastError));
+  return 'error';
 }
 
 export async function runWaDeleteGroupChat(
@@ -122,6 +172,11 @@ export async function runWaDeleteGroupChat(
       let deleted = 0;
       let notFound = 0;
       const failed: string[] = [];
+      const groupOutcomes: Array<{
+        groupId: string;
+        groupName?: string;
+        deleteStatus: 'deleted' | 'failed';
+      }> = [];
 
       for (let i = 0; i < groups.length; i += 1) {
         const group = groups[i];
@@ -134,17 +189,38 @@ export async function runWaDeleteGroupChat(
           );
           if (outcome === 'deleted') {
             deleted += 1;
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              deleteStatus: 'deleted',
+            });
             onProgress?.(i + 1, groups.length, group.groupName ?? 'Deleted');
           } else if (outcome === 'not_found') {
             notFound += 1;
             failed.push(`${group.groupName ?? group.groupId}: Not Found`);
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              deleteStatus: 'failed',
+            });
           } else {
             failed.push(`${group.groupName ?? group.groupId}: delete failed`);
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              deleteStatus: 'failed',
+            });
           }
         } catch (error) {
-          failed.push(
-            `${group.groupName ?? group.groupId}: ${error instanceof Error ? error.message : 'error'}`,
-          );
+          const msg = isCrypticWaEvaluateError(error)
+            ? 'WhatsApp store flake during delete — retry'
+            : errorMessage(error);
+          failed.push(`${group.groupName ?? group.groupId}: ${msg}`);
+          groupOutcomes.push({
+            groupId: group.groupId,
+            groupName: group.groupName,
+            deleteStatus: 'failed',
+          });
         }
 
         if (i < groups.length - 1) {
@@ -159,7 +235,7 @@ export async function runWaDeleteGroupChat(
         action: 'delete_group',
         message: `Deleted ${deleted}/${total}${notFound > 0 ? `, Not Found ${notFound}` : ''}`,
         errorCode: success > 0 ? undefined : 'DELETE_GROUP_FAILED',
-        result: { success, total, deleted, notFound, failed },
+        result: { success, total, deleted, notFound, failed, groupOutcomes },
       };
     },
     { purpose: 'operation' },

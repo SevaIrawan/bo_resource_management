@@ -14,7 +14,8 @@ import type {
 const { Client, MessageMedia } = pkg;
 
 const WA_SET_PICTURE_TIMEOUT_MS = 120_000;
-const WA_CHAT_LOOKUP_TIMEOUT_MS = 90_000;
+const WA_SET_PHOTO_MAX_ATTEMPTS = 3;
+const WA_SET_PHOTO_RETRY_MS = 1_500;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,40 +35,144 @@ function normalizeGroupChatId(groupId: string): string {
   return `${value}@g.us`;
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  const raw = String(error ?? '').trim();
+  return raw || 'unknown error';
+}
+
+/** WA Web evaluate flake — Error("r") saat serialize chat ke Node. */
+function isCrypticWaEvaluateError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : String(error);
+  const msg = raw.trim();
+  if (!msg || msg.length <= 3) return true;
+  if (/^r(:\s*r)?$/i.test(msg)) return true;
+  const name = error instanceof Error ? error.name.trim() : '';
+  return Boolean(name && name.length <= 3 && /^[a-z]$/i.test(name));
+}
+
 function isNotFoundError(error: unknown): boolean {
   const msg = String(error instanceof Error ? error.message : error).toLowerCase();
   return (
     msg.includes('not found') ||
     msg.includes('invalid wid') ||
     msg.includes('wid error') ||
-    msg.includes('no chat')
+    msg.includes('no chat') ||
+    msg.includes('group_not_found')
   );
+}
+
+type SetPhotoOutcome = 'set' | 'not_found' | 'denied' | 'error';
+
+/**
+ * Set foto grup lewat WWebJS.setPicture di page — sama path GroupChat.setPicture,
+ * tanpa tarik objek chat ke Node (hindari Error "r" serialize → 0 foto di device).
+ */
+async function setPhotoViaPageEvaluate(
+  client: InstanceType<typeof Client>,
+  chatId: string,
+  media: { mimetype: string; data: string; filename?: string },
+): Promise<SetPhotoOutcome> {
+  const page = client.pupPage;
+  if (!page) throw new Error('WA_PAGE_UNAVAILABLE');
+
+  const result = await withPromiseTimeout(
+    page.evaluate(
+      async (gid: string, mediaPayload: { mimetype: string; data: string; filename?: string }) => {
+        const w = window as unknown as {
+          WWebJS?: {
+            setPicture?: (
+              chatId: string,
+              media: { mimetype: string; data: string; filename?: string },
+            ) => Promise<boolean>;
+            getChat?: (
+              id: string,
+              opts?: { getAsModel?: boolean },
+            ) => Promise<{ groupMetadata?: unknown; isGroup?: boolean } | null>;
+          };
+          require?: (name: string) => {
+            queryAndUpdateGroupMetadataById?: (input: { id: string }) => Promise<unknown> | unknown;
+          };
+        };
+
+        try {
+          const job = w.require?.('WAWebGroupQueryJob');
+          const q = job?.queryAndUpdateGroupMetadataById?.({ id: gid });
+          if (q && typeof (q as Promise<unknown>).then === 'function') await q;
+        } catch {
+          /* optional refresh */
+        }
+
+        // Pastikan peer grup ada di store (tanpa serialize ke Node).
+        try {
+          const chat = await w.WWebJS?.getChat?.(gid, { getAsModel: false });
+          if (!chat) return { ok: false as const, reason: 'not_found' as const };
+          if (!chat.groupMetadata && !chat.isGroup) {
+            return { ok: false as const, reason: 'not_found' as const };
+          }
+        } catch {
+          /* lanjut setPicture — createWid + ProfilePicThumb bisa tetap jalan */
+        }
+
+        if (typeof w.WWebJS?.setPicture !== 'function') {
+          return { ok: false as const, reason: 'unavailable' as const };
+        }
+
+        const ok = await w.WWebJS.setPicture(gid, mediaPayload);
+        if (!ok) return { ok: false as const, reason: 'denied' as const };
+        return { ok: true as const };
+      },
+      chatId,
+      {
+        mimetype: media.mimetype,
+        data: media.data,
+        filename: media.filename,
+      },
+    ),
+    WA_SET_PICTURE_TIMEOUT_MS,
+    'setPicture',
+  );
+
+  if (result.ok) return 'set';
+  if (result.reason === 'not_found') return 'not_found';
+  if (result.reason === 'denied') return 'denied';
+  throw new Error('SET_PICTURE_UNAVAILABLE');
 }
 
 async function setPhotoOnGroup(
   client: InstanceType<typeof Client>,
   groupId: string,
   photoPath: string,
-): Promise<'set' | 'not_found' | 'error'> {
+): Promise<SetPhotoOutcome> {
   const chatId = normalizeGroupChatId(groupId);
-  let chat: Awaited<ReturnType<InstanceType<typeof Client>['getChatById']>> | null = null;
+  const media = MessageMedia.fromFilePath(photoPath);
 
-  try {
-    chat = await withPromiseTimeout(
-      client.getChatById(chatId),
-      WA_CHAT_LOOKUP_TIMEOUT_MS,
-      'getChatById',
-    );
-  } catch (error) {
-    if (isNotFoundError(error)) return 'not_found';
-    throw error;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < WA_SET_PHOTO_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      if (attempt > 0) {
+        await waitForWhatsAppStoreReady(client, 30_000);
+        await sleep(WA_SET_PHOTO_RETRY_MS * attempt);
+      }
+      const outcome = await setPhotoViaPageEvaluate(client, chatId, media);
+      if (outcome === 'set' || outcome === 'not_found' || outcome === 'denied') {
+        return outcome;
+      }
+    } catch (error) {
+      lastError = error;
+      if (isNotFoundError(error)) return 'not_found';
+      if (!isCrypticWaEvaluateError(error) && !/TIMEOUT|detached/i.test(errorMessage(error))) {
+        throw error;
+      }
+      console.warn(
+        `[wa-set-photo] setPicture flake attempt ${attempt + 1}/${WA_SET_PHOTO_MAX_ATTEMPTS} (${chatId}):`,
+        isCrypticWaEvaluateError(error) ? 'cryptic evaluate error' : errorMessage(error),
+      );
+    }
   }
 
-  if (!chat?.isGroup) return 'not_found';
-
-  const media = MessageMedia.fromFilePath(photoPath);
-  await withPromiseTimeout(chat.setPicture(media), WA_SET_PICTURE_TIMEOUT_MS, 'setPicture');
-  return 'set';
+  if (lastError) throw lastError instanceof Error ? lastError : new Error(errorMessage(lastError));
+  return 'error';
 }
 
 export async function runWaSetGroupPhoto(
@@ -144,7 +249,13 @@ export async function runWaSetGroupPhoto(
             });
             onProgress?.(i + 1, groups.length, group.groupName ?? 'Photo set');
           } else {
-            failed.push(`${group.groupName ?? group.groupId}: Not Found`);
+            const reason =
+              outcome === 'not_found'
+                ? 'Not Found'
+                : outcome === 'denied'
+                  ? 'Permission denied (canSet=false)'
+                  : 'setPicture failed';
+            failed.push(`${group.groupName ?? group.groupId}: ${reason}`);
             groupOutcomes.push({
               groupId: group.groupId,
               groupName: group.groupName,
@@ -152,7 +263,9 @@ export async function runWaSetGroupPhoto(
             });
           }
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'setPicture failed';
+          const message = isCrypticWaEvaluateError(error)
+            ? 'WhatsApp store flake during setPicture — retry'
+            : errorMessage(error);
           failed.push(`${group.groupName ?? group.groupId}: ${message}`);
           groupOutcomes.push({
             groupId: group.groupId,

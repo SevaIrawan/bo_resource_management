@@ -55,6 +55,8 @@ export interface AutomationJobPayload {
   leaveDelete?: {
     clearChatHistoryOnDelete?: boolean;
     requireOwnerForDelete?: boolean;
+    /** false = jangan auto-enqueue delete setelah left (Settings). */
+    deleteEnabled?: boolean;
   };
   /** Exit & delete module — fase exit (leave) dari SETUP; delete dari VIEW result. */
   exitDeletePhase?: 'exit' | 'delete';
@@ -76,6 +78,8 @@ export interface AutomationJobPayload {
     createStatus?: 'created' | 'failed';
     joinStatus?: 'joined' | 'already_member' | 'failed';
     joinError?: string;
+    adminStatus?: 'promoted' | 'failed';
+    adminError?: string;
     photoStatus?: 'set' | 'failed';
     exitStatus?: 'left' | 'failed' | 'pending';
     exitError?: string;

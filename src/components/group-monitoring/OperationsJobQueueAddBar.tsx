@@ -3,12 +3,23 @@ import { Settings } from 'lucide-react';
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import { JobQueueSetupHost } from '@/components/group-monitoring/JobQueueSetupHost';
 import {
+  CREATE_GROUP_MAX_PER_ACCOUNT_RUN,
+  isMasterOpsRole,
+} from '@/config/accountOpsRole';
+import {
   readTelegramWorkerSettings,
   readWhatsAppWorkerSettings,
 } from '@/config/workerPlatformSettings';
 import { useLanguage } from '@/hooks/useLanguage';
+import { fetchJobQueueSnapshot } from '@/lib/automationJobQueueClient';
+import {
+  createGroupDayUsageForAccount,
+  isEligibleCreateGroupAccount,
+  shouldHideCreateAccountFromSelect,
+} from '@/lib/createGroupAccountEligibility';
 import type { JobQueueTaskType, JobQueueTaskTypeSelection } from '@/lib/operationsJobQueueUi';
-import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
+import type { AutomationJobRecord } from '@/types/automationJob';
+import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
 interface OperationsJobQueueAddBarProps {
@@ -23,6 +34,19 @@ function resolveBrandName(brandFilter: string, selectedBrand: string, brandOptio
   if (brandFilter !== 'all') return brandFilter;
   if (selectedBrand && brandOptions.includes(selectedBrand)) return selectedBrand;
   return '';
+}
+
+function createMaxPerRun(platform: Platform): number {
+  const settings =
+    platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+  return Math.min(
+    CREATE_GROUP_MAX_PER_ACCOUNT_RUN,
+    Math.max(1, settings.standard.perRun || CREATE_GROUP_MAX_PER_ACCOUNT_RUN),
+  );
+}
+
+function isCreateMasterCandidate(row: AccountBrandRow): boolean {
+  return isMasterOpsRole(row.opsRole) && row.sessionStatus === 'valid';
 }
 
 /** Thin UI bar — setup/enqueue lewat JobQueueSetupHost (shared). */
@@ -51,6 +75,7 @@ export function OperationsJobQueueAddBar({
   const [superAdminAccountId, setSuperAdminAccountId] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [createJobs, setCreateJobs] = useState<AutomationJobRecord[]>([]);
 
   const activeBrand = resolveBrandName(brandFilter, selectedBrand, brandOptions);
 
@@ -76,10 +101,80 @@ export function OperationsJobQueueAddBar({
     setSuperAdminAccountId('');
   }, [activeBrand]);
 
+  useEffect(() => {
+    if (taskType !== 'create_group') {
+      setCreateJobs([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadCreateJobs() {
+      const snapshot = await fetchJobQueueSnapshot({ platform });
+      if (cancelled) return;
+      setCreateJobs(
+        (snapshot?.jobs ?? []).filter((job) => job.action === 'create_group'),
+      );
+    }
+
+    void loadCreateJobs();
+    const unsub = window.electronAPI?.jobQueue?.onChanged?.(() => {
+      void loadCreateJobs();
+    });
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [platform, taskType]);
+
+  const createMax = createMaxPerRun(platform);
+
+  /** Master + valid — termasuk yang sudah create hari ini (ditampilkan disabled). */
+  const createMasterCandidates = useMemo(
+    () => platformAccounts.filter(isCreateMasterCandidate),
+    [platformAccounts],
+  );
+
+  const createEligibleAccounts = useMemo(() => {
+    return createMasterCandidates.filter((row) =>
+      isEligibleCreateGroupAccount(
+        row,
+        createGroupDayUsageForAccount(createJobs, row.id),
+        createMax,
+      ),
+    );
+  }, [createJobs, createMax, createMasterCandidates]);
+
+  const createHiddenTodayIds = useMemo(() => {
+    return createMasterCandidates
+      .filter((row) =>
+        shouldHideCreateAccountFromSelect(
+          createGroupDayUsageForAccount(createJobs, row.id),
+          createMax,
+        ),
+      )
+      .map((row) => row.id);
+  }, [createJobs, createMax, createMasterCandidates]);
+
+  const accountSelectSource =
+    taskType === 'create_group' ? createMasterCandidates : platformAccounts;
+
   const selectedAccounts = useMemo(() => {
-    const account = validAccounts.find((row) => row.id === selectedAccountId);
-    return account ? [account] : [];
-  }, [selectedAccountId, validAccounts]);
+    if (taskType === 'create_group') {
+      const account = createEligibleAccounts.find((row) => row.id === selectedAccountId);
+      return account ? [account] : [];
+    }
+    const row = accountSelectSource.find((r) => r.id === selectedAccountId);
+    return row ? [row] : [];
+  }, [accountSelectSource, createEligibleAccounts, selectedAccountId, taskType]);
+
+  useEffect(() => {
+    if (taskType !== 'create_group') return;
+    if (selectedAccountId && !createEligibleAccounts.some((row) => row.id === selectedAccountId)) {
+      setSelectedAccountId('');
+    }
+  }, [createEligibleAccounts, selectedAccountId, taskType]);
 
   const superAdminAccount = validAccounts.find((row) => row.id === superAdminAccountId);
   const setAdminTargetCandidates = validAccounts.filter((row) => row.id !== superAdminAccountId);
@@ -99,9 +194,15 @@ export function OperationsJobQueueAddBar({
         workerSettings.leaveDelete.leaveEnabled
       );
     }
+    if (taskType === 'create_group') {
+      return Boolean(
+        selectedAccountId && createEligibleAccounts.some((r) => r.id === selectedAccountId),
+      );
+    }
     return Boolean(selectedAccountId && selectedAccounts.length > 0);
   }, [
     activeBrand,
+    createEligibleAccounts,
     selectedAccountId,
     selectedAccounts.length,
     superAdminAccount,
@@ -115,15 +216,43 @@ export function OperationsJobQueueAddBar({
     [brandOptions],
   );
 
-  const accountSelectOptions = useMemo(
-    () => platformAccounts.map((row) => ({ value: row.id, label: row.accountName })),
-    [platformAccounts],
-  );
+  const accountSelectOptions = useMemo(() => {
+    if (taskType !== 'create_group') {
+      return accountSelectSource.map((row) => ({ value: row.id, label: row.accountName }));
+    }
+    const usedSuffix = t('operations.jobQueue.createAccountUsedTodaySuffix');
+    return createMasterCandidates.map((row) => ({
+      value: row.id,
+      label: createHiddenTodayIds.includes(row.id)
+        ? `${row.accountName} ${usedSuffix}`
+        : row.accountName,
+    }));
+  }, [accountSelectSource, createHiddenTodayIds, createMasterCandidates, t, taskType]);
 
-  const invalidAccountIds = useMemo(
-    () => platformAccounts.filter((row) => row.sessionStatus !== 'valid').map((row) => row.id),
-    [platformAccounts],
-  );
+  const invalidAccountIds = useMemo(() => {
+    if (taskType === 'create_group') {
+      return [
+        ...createHiddenTodayIds,
+        ...accountSelectSource
+          .filter((row) => row.sessionStatus !== 'valid')
+          .map((row) => row.id),
+      ];
+    }
+    return accountSelectSource
+      .filter((row) => row.sessionStatus !== 'valid')
+      .map((row) => row.id);
+  }, [accountSelectSource, createHiddenTodayIds, taskType]);
+
+  const createAccountPlaceholder = useMemo(() => {
+    if (taskType !== 'create_group') return t('operations.jobQueue.selectAccount');
+    if (createMasterCandidates.length === 0) {
+      return t('operations.jobQueue.createNoMasterAccounts');
+    }
+    if (createEligibleAccounts.length === 0) {
+      return t('operations.jobQueue.createAllMastersUsedToday');
+    }
+    return t('operations.jobQueue.selectAccount');
+  }, [createEligibleAccounts.length, createMasterCandidates.length, t, taskType]);
 
   const superAdminSelectOptions = useMemo(
     () => validAccounts.map((row) => ({ value: row.id, label: row.accountName })),
@@ -204,7 +333,7 @@ export function OperationsJobQueueAddBar({
                 ariaLabel={t('operations.jobQueue.account')}
                 triggerClassName="account-slicer-select operations-job-queue-select"
                 disabled={!activeBrand}
-                placeholder={t('operations.jobQueue.selectAccount')}
+                placeholder={createAccountPlaceholder}
               />
             </div>
           )}
@@ -226,10 +355,7 @@ export function OperationsJobQueueAddBar({
           </div>
         </div>
 
-        <div
-          className="operations-job-queue-feedback-slot"
-          aria-live="polite"
-        >
+        <div className="operations-job-queue-feedback-slot" aria-live="polite">
           {feedback ? <p className="operations-schedule-join-feedback">{feedback}</p> : null}
         </div>
       </div>

@@ -7,6 +7,11 @@ import {
   readCreateGroupWorkerSettings,
 } from '@/lib/createGroupWorkerSettings';
 import { collectCreateGroupSetupValidationCodes } from '@/lib/createGroupSetupValidation';
+import { CREATE_GROUP_MAX_PER_ACCOUNT_RUN } from '@/config/accountOpsRole';
+import {
+  readTelegramWorkerSettings,
+  readWhatsAppWorkerSettings,
+} from '@/config/workerPlatformSettings';
 import {
   brandGroupPhotoPreviewUrl,
   ensureLocalBrandGroupPhoto,
@@ -207,7 +212,19 @@ export function OperationsJobQueueSetupModal({
   const [createPhotoUploading, setCreatePhotoUploading] = useState(false);
   const [createPhotoError, setCreatePhotoError] = useState<string | null>(null);
 
-  const createTotalParsed = Math.max(1, Math.min(500, Math.floor(Number(createTotalToCreate)) || 1));
+  const createMaxPerRun = useMemo(() => {
+    const settings =
+      platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
+    return Math.min(
+      CREATE_GROUP_MAX_PER_ACCOUNT_RUN,
+      Math.max(1, settings.standard.perRun || CREATE_GROUP_MAX_PER_ACCOUNT_RUN),
+    );
+  }, [platform]);
+
+  const createTotalParsed = Math.max(
+    1,
+    Math.min(createMaxPerRun, Math.floor(Number(createTotalToCreate)) || 1),
+  );
 
   const setAdminOwnerOptions = useMemo(
     () => (ownerAccountCandidates ?? []).map((row) => ({ value: row.id, label: row.accountName })),
@@ -339,7 +356,12 @@ export function OperationsJobQueueSetupModal({
       useGroupNumbering: createUseGroupNumbering,
       startFromRaw: createStartFrom,
       hasSelectedAccount: selectedAccounts.length > 0,
-    }).map((code) => t(`operations.jobQueue.${code}`));
+      maxPerRun: createMaxPerRun,
+    }).map((code) =>
+      code === 'createTotalInvalid'
+        ? t('operations.jobQueue.createTotalInvalid', { max: String(createMaxPerRun) })
+        : t(`operations.jobQueue.${code}`),
+    );
   }
 
   function currentCreateGroupPermissionDraft() {
@@ -1091,11 +1113,16 @@ export function OperationsJobQueueSetupModal({
                         <input
                           type="number"
                           min={1}
-                          max={500}
+                          max={createMaxPerRun}
                           value={createTotalToCreate}
                           onChange={(event) => setCreateTotalToCreate(event.target.value)}
                           disabled={saving}
                         />
+                        <p className="operations-job-queue-hint">
+                          {t('operations.jobQueue.createPerRunHint', {
+                            perRun: String(createMaxPerRun),
+                          })}
+                        </p>
                       </div>
                     </div>
                     <div className="operations-job-queue-create-row">

@@ -2,7 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { AddAccountPlatformBadge } from '@/components/group-monitoring/AddAccountHeaderMenu';
+import { AccountOpsRoleSelect } from '@/components/group-monitoring/AccountOpsRoleSelect';
 import { LocationDeviceSelect } from '@/components/group-monitoring/LocationDeviceSelect';
+import { normalizeAccountOpsRole, type AccountOpsRole } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { normalizePhoneDigits } from '@/lib/phoneNormalize';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -12,6 +14,7 @@ export interface EditAccountFormValues {
   accountName: string;
   phoneNumber: string;
   locationDevice: string;
+  opsRole: AccountOpsRole;
 }
 
 interface EditAccountModalProps {
@@ -37,6 +40,7 @@ export function EditAccountModal({
   const [accountName, setAccountName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [locationDevice, setLocationDevice] = useState('');
+  const [opsRole, setOpsRole] = useState<AccountOpsRole | ''>('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,6 +49,7 @@ export function EditAccountModal({
     setAccountName(account.accountName);
     setPhoneNumber(account.phoneNumber ?? '');
     setLocationDevice(normalizeLocationDeviceOption(account.locationDevice ?? ''));
+    setOpsRole(normalizeAccountOpsRole(account.opsRole) ?? '');
     setLocalError(null);
   }, [open, account]);
 
@@ -64,6 +69,7 @@ export function EditAccountModal({
 
     const name = accountName.trim();
     const phone = phoneNumber.trim();
+    const role = normalizeAccountOpsRole(opsRole);
 
     if (!name) {
       setLocalError(t('groupMonitoring.accountCard.accNameRequired'));
@@ -75,11 +81,17 @@ export function EditAccountModal({
       return;
     }
 
+    if (!role) {
+      setLocalError(t('groupMonitoring.accountCard.opsRoleRequired'));
+      return;
+    }
+
     setLocalError(null);
     onSubmit({
       accountName: name,
       phoneNumber: phone,
       locationDevice: locationDevice.trim(),
+      opsRole: role,
     });
   }
 
@@ -149,22 +161,40 @@ export function EditAccountModal({
             disabled={saving}
           />
 
-          <label htmlFor="edit-account-location-device" className="brand-modal-label">
-            {t('groupMonitoring.accountCard.locationDeviceLabel')}
-            <span className="brand-modal-label-optional">
-              {' '}
-              ({t('groupMonitoring.accountCard.optional')})
-            </span>
-          </label>
-          <LocationDeviceSelect
-            id="edit-account-location-device"
-            value={locationDevice}
-            disabled={saving}
-            onChange={(value) => {
-              setLocationDevice(value);
-              if (localError) setLocalError(null);
-            }}
-          />
+          <div className="brand-modal-field-row">
+            <div className="brand-modal-field-col">
+              <label htmlFor="edit-account-location-device" className="brand-modal-label">
+                {t('groupMonitoring.accountCard.locationDeviceLabel')}
+                <span className="brand-modal-label-optional">
+                  {' '}
+                  ({t('groupMonitoring.accountCard.optional')})
+                </span>
+              </label>
+              <LocationDeviceSelect
+                id="edit-account-location-device"
+                value={locationDevice}
+                disabled={saving}
+                onChange={(value) => {
+                  setLocationDevice(value);
+                  if (localError) setLocalError(null);
+                }}
+              />
+            </div>
+            <div className="brand-modal-field-col">
+              <label htmlFor="edit-account-ops-role" className="brand-modal-label">
+                {t('groupMonitoring.accountCard.opsRoleLabel')}
+              </label>
+              <AccountOpsRoleSelect
+                id="edit-account-ops-role"
+                value={opsRole}
+                disabled={saving}
+                onChange={(value) => {
+                  setOpsRole(value);
+                  if (localError) setLocalError(null);
+                }}
+              />
+            </div>
+          </div>
 
           {displayError ? <p className="brand-modal-error">{displayError}</p> : null}
 

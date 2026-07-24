@@ -169,6 +169,7 @@ export function AccountBrandCard({
         accountName: values.accountName,
         phoneNumber: values.phoneNumber,
         locationDevice: values.locationDevice,
+        opsRole: values.opsRole,
         slotId: addSlotId,
       });
       setAddModalOpen(false);
@@ -206,6 +207,10 @@ export function AccountBrandCard({
       setEditTarget(null);
       setEditError(null);
     } catch (error) {
+      if (error instanceof Error && error.message === 'OPS_ROLE_REQUIRED') {
+        setEditError(t('groupMonitoring.accountCard.opsRoleRequired'));
+        return;
+      }
       const code = resolveMessagingAccountSaveErrorCode(error);
       setEditError(
         code === 'SUPABASE_NOT_CONFIGURED'

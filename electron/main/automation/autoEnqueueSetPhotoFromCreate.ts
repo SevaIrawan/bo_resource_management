@@ -33,7 +33,7 @@ function hasSetPhotoFollowUp(createJobId: string): boolean {
 }
 
 /**
- * Opsi C — setelah create_group selesai (ada grup created + photoPath di payload),
+ * Opsi C — setelah create_group selesai (ada grup created + photoPath/userId),
  * auto-enqueue set_group_photo follow-up. Create tetap valid meski foto gagal nanti.
  */
 export function maybeAutoEnqueueSetPhotoFromCreate(createJob: AutomationJobRecord): void {
@@ -41,7 +41,10 @@ export function maybeAutoEnqueueSetPhotoFromCreate(createJob: AutomationJobRecor
   if (createJob.status !== 'completed' && createJob.status !== 'failed') return;
 
   const photoPath = createJob.payload.photoPath?.trim() ?? '';
-  if (!photoPath || !fs.existsSync(photoPath)) return;
+  const userId = createJob.payload.userId?.trim() ?? '';
+  const pathOk = Boolean(photoPath && fs.existsSync(photoPath));
+  /** Path lokal hilang tapi userId ada — runner resolve dari brand storage. */
+  if (!pathOk && !userId) return;
 
   const groups = resolveCreatedGroups(createJob);
   if (groups.length === 0) return;
@@ -66,8 +69,8 @@ export function maybeAutoEnqueueSetPhotoFromCreate(createJob: AutomationJobRecor
         groups: chunk,
         sourceCreateJobId: createJob.id,
         setPhotoPhase: 'apply',
-        photoPath,
-        userId: createJob.payload.userId,
+        photoPath: photoPath || undefined,
+        userId: userId || undefined,
       },
       storedSessionString: createJob.storedSessionString ?? null,
       expectedPhone: createJob.expectedPhone,

@@ -163,7 +163,7 @@ const checks = [
     ok: (() => {
       const wa = read('electron/main/automation/waAutomation.ts');
       return (
-        wa.includes('applyWaCreateGroupSettings') &&
+        wa.includes('applyCreateGroupSettingsViaPage') &&
         wa.includes('after_create_sec') &&
         wa.includes('between_groups_sec')
       );
@@ -302,6 +302,9 @@ const checks = [
         enqueue.includes('set_group_photo') &&
         enqueue.includes('sourceCreateJobId') &&
         wa.includes('setPicture') &&
+        wa.includes('setPhotoViaPageEvaluate') &&
+        wa.includes('WWebJS.setPicture') &&
+        !wa.includes('client.getChatById') &&
         tg.includes('EditPhotoRequest') &&
         main.includes('set-group-photo') &&
         brand.includes('brand-group-photos')
@@ -384,11 +387,60 @@ const checks = [
       const wa = read('electron/main/automation/waAutomation.ts');
       const ui = read('src/lib/operationsJobQueueUi.ts');
       return (
-        runner.includes('withJobTimeout') &&
+        runner.includes('withJobTimeoutSettle') &&
         runner.includes('failStaleRunningJobs') &&
         wa.includes('withPromiseTimeout') &&
         wa.includes('acceptInvite') &&
         ui.includes('isJobQueueStepInProgress')
+      );
+    })(),
+  },
+  {
+    name: 'WA getChatById flake: create/join survive Error "r" + partial ok completed',
+    ok: (() => {
+      const wa = read('electron/main/automation/waAutomation.ts');
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const ui = read('src/lib/operationsJobQueueUi.ts');
+      const timeout = read('electron/main/automation/promiseTimeout.ts');
+      return (
+        wa.includes('resolveGroupChatOptional') &&
+        wa.includes('isCrypticWaEvaluateError') &&
+        wa.includes('probeGroupViaPage') &&
+        wa.includes('promoteViaPageEvaluate') &&
+        wa.includes('applyCreateGroupSettingsViaPage') &&
+        wa.includes('WAWebModifyParticipantsGroupAction') &&
+        !wa.includes('client.getChatById') &&
+        /acceptInvite[\s\S]{0,800}resolveGroupChatOptional/.test(wa) &&
+        runner.includes('humanizeJobError') &&
+        !runner.includes('if (batch && success < total)') &&
+        ui.includes('WhatsApp store flake — retry') &&
+        timeout.includes('if (settled) return')
+      );
+    })(),
+  },
+  {
+    name: 'Account reload: timeout + queue when busy (anti Loading stuck)',
+    ok: (() => {
+      const provider = read('src/providers/GroupMonitoringProvider.tsx');
+      return (
+        provider.includes('reloadAllQueuedRef') &&
+        provider.includes('LOAD_ACCOUNTS_TIMEOUT') &&
+        provider.includes('translateRef') &&
+        provider.includes('!timedOut') &&
+        provider.includes('45_000')
+      );
+    })(),
+  },
+  {
+    name: 'WA scrape invite: store/page only (no getChatById Node)',
+    ok: (() => {
+      const invite = read('electron/main/scraper/whatsappGroupInviteLink.ts');
+      return (
+        invite.includes('fetchInviteCodeFromStore') &&
+        invite.includes('inviteFromStore') &&
+        invite.includes('WAWebMexFetchGroupInviteCodeJob') &&
+        !/client\.getChatById/.test(invite) &&
+        !invite.includes('fetchInviteCodeViaGroupChatApi')
       );
     })(),
   },
@@ -450,16 +502,63 @@ const checks = [
     })(),
   },
   {
-    name: 'Exit enqueue: leave_group exit phase only (not legacy combined)',
+    name: 'Exit enqueue: leave_group exit phase + daily/junk + deleteEnabled flag',
     ok: (() => {
       const hook = read('src/hooks/useJobQueueSetupEnqueue.ts');
       const del = read('src/lib/enqueueDeleteFromExitJob.ts');
+      const start = hook.indexOf('async function saveExitBatch');
+      const body = start >= 0 ? hook.slice(start, start + 2800) : '';
       return (
-        hook.includes("action: 'leave_group'") &&
-        hook.includes("exitDeletePhase: 'exit'") &&
-        !hook.includes("action: 'exit_delete_group'") &&
+        body.includes("action: 'leave_group'") &&
+        body.includes("exitDeletePhase: 'exit'") &&
+        body.includes('accountExitGroups.daily') &&
+        body.includes('accountExitGroups.junk') &&
+        body.includes('deleteEnabled: workerSettings.leaveDelete.deleteEnabled') &&
+        !body.includes("action: 'exit_delete_group'") &&
         del.includes("action: 'delete_group'") &&
         del.includes('sourceExitJobId')
+      );
+    })(),
+  },
+  {
+    name: 'Auto set_photo after create + auto delete after left',
+    ok: (() => {
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const photo = read('electron/main/automation/autoEnqueueSetPhotoFromCreate.ts');
+      const del = read('electron/main/automation/autoEnqueueDeleteFromExit.ts');
+      return (
+        runner.includes('tryAutoEnqueueSetPhotoAfterCreate') &&
+        runner.includes('tryAutoEnqueueDeleteAfterExit') &&
+        /markJobFinished[\s\S]{0,500}tryAutoEnqueueSetPhotoAfterCreate/.test(runner) &&
+        /markJobFinished[\s\S]{0,800}tryAutoEnqueueDeleteAfterExit/.test(runner) &&
+        photo.includes('sourceCreateJobId') &&
+        photo.includes('userId') &&
+        del.includes("exitStatus === 'left'") &&
+        del.includes('deleteEnabled === false') &&
+        del.includes("action: 'delete_group'")
+      );
+    })(),
+  },
+  {
+    name: 'CTA table: Run/Pause/Cancel + VIEW queue delete/photo',
+    ok: (() => {
+      const panel = read('src/components/group-monitoring/OperationsGlobalJobQueuePanel.tsx');
+      const table = read('src/components/group-monitoring/OperationsJobQueueTable.tsx');
+      const ui = read('src/lib/operationsJobQueueUi.ts');
+      const account = read('src/components/group-monitoring/AccountMonitoringCells.tsx');
+      return (
+        panel.includes('handleRun') &&
+        panel.includes('handlePause') &&
+        panel.includes('enqueueDeleteFromExitJob') &&
+        panel.includes('enqueueSetPhotoFromCreateJob') &&
+        panel.includes('tryRunEnqueuedAutomationJob') &&
+        table.includes('jobQueueCanRun') &&
+        table.includes('jobQueueCanPause') &&
+        ui.includes('jobQueueCanRun') &&
+        account.includes('JobQueueSetupHost') &&
+        account.includes("mode === 'missing' ? 'join'") &&
+        account.includes("mode === 'notAdmin' ? 'set_admin'") &&
+        account.includes("preferredExitGroupTab={setupTask === 'exit_delete_group' ? 'junk'")
       );
     })(),
   },
@@ -502,7 +601,7 @@ const checks = [
     })(),
   },
   {
-    name: 'WA leave: hardened leave + exitError persisted to VIEW',
+    name: 'WA leave: page.evaluate leave (no Node getChatById) + exitError VIEW',
     ok: (() => {
       const leave = read('electron/main/automation/waLeaveGroup.ts');
       const tg = read('electron/main/automation/tgAutomationClient.ts');
@@ -510,7 +609,9 @@ const checks = [
       const types = read('src/types/automationJob.ts');
       return (
         leave.includes('leaveViaPageEvaluate') &&
-        leave.includes('resolveGroupChat') &&
+        leave.includes('WAWebExitGroupAction') &&
+        !leave.includes('client.getChatById') &&
+        !leave.includes('client.getChats') &&
         leave.includes('exitError') &&
         leave.includes('withDetachedFrameRetry') &&
         tg.includes('exitError') &&
@@ -520,25 +621,68 @@ const checks = [
     })(),
   },
   {
-    name: 'Batch create: stall guard when slice creates zero',
+    name: 'WA delete chat: page.evaluate wipe (sendDeleteChat) no Node getChatById',
     ok: (() => {
-      const wa = read('electron/main/automation/waAutomation.ts');
-      const tg = read('electron/main/automation/tgAutomationClient.ts');
+      const del = read('electron/main/automation/waDeleteGroupChat.ts');
       return (
-        wa.includes('createdBeforeSlice') &&
-        wa.includes('created === createdBeforeSlice') &&
-        tg.includes('createdBeforeSlice') &&
-        tg.includes('created === createdBeforeSlice')
+        del.includes('wipeViaPageEvaluate') &&
+        del.includes('sendDeleteChat') &&
+        del.includes('sendClearChat') &&
+        !del.includes('client.getChatById') &&
+        del.includes('groupOutcomes')
       );
     })(),
   },
   {
-    name: 'Batch create: withJobTimeout wrapper',
+    name: 'Batch create: one execute capped to perRun (no multi-slice)',
+    ok: (() => {
+      const wa = read('electron/main/automation/waAutomation.ts');
+      const tg = read('electron/main/automation/tgAutomationClient.ts');
+      return (
+        wa.includes('const totalTarget = Math.min(totalRequested, perRun)') &&
+        tg.includes('const totalTarget = Math.min(totalRequested, perRun)') &&
+        !wa.includes('createdBeforeSlice') &&
+        !tg.includes('createdBeforeSlice')
+      );
+    })(),
+  },
+  {
+    name: 'Create Group: Creator role + daily hide + max 25',
+    ok: (() => {
+      const role = read('src/config/accountOpsRole.ts');
+      const eligibility = read('src/lib/createGroupAccountEligibility.ts');
+      const addBar = read('src/components/group-monitoring/OperationsJobQueueAddBar.tsx');
+      const addModal = read('src/components/group-monitoring/AddAccountModal.tsx');
+      const editModal = read('src/components/group-monitoring/EditAccountModal.tsx');
+      const cells = read('src/components/group-monitoring/AccountMonitoringCells.tsx');
+      const worker = read('src/config/workerPlatformSettings.ts');
+      return (
+        role.includes('CREATE_GROUP_MAX_PER_ACCOUNT_RUN = 25') &&
+        role.includes("'gcs'") &&
+        role.includes("'master'") &&
+        eligibility.includes('shouldHideCreateAccountFromSelect') &&
+        eligibility.includes('executedToday') &&
+        addBar.includes('isEligibleCreateGroupAccount') &&
+        addBar.includes('create_group') &&
+        addModal.includes('AccountOpsRoleSelect') &&
+        addModal.includes('opsRoleRequired') &&
+        editModal.includes('AccountOpsRoleSelect') &&
+        cells.includes('AccountOpsRoleCell') &&
+        cells.includes('brand-col-cell--role') &&
+        worker.includes("action === 'create_group'") &&
+        worker.includes('jitterPercent = Math.max(jitterPercent, 40)')
+      );
+    })(),
+  },
+  {
+    name: 'Batch create: withJobTimeoutSettle wrapper',
     ok: (() => {
       const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const timeout = read('electron/main/automation/promiseTimeout.ts');
       return (
         runner.includes('async function runCreateGroupBatchJob') &&
-        runner.includes('withJobTimeout') &&
+        runner.includes('withJobTimeoutSettle') &&
+        timeout.includes('withJobTimeoutSettle') &&
         runner.includes('runWhatsAppCreateGroupBatch')
       );
     })(),
@@ -558,11 +702,18 @@ const checks = [
       const store = read('electron/main/automation/jobQueueStore.ts');
       const pool = read('electron/main/automation/executeSlotPool.ts');
       const conc = read('electron/main/automation/jobQueueConcurrency.ts');
+      const policy = read('src/config/deviceConcurrencyPolicy.ts');
+      const waPool = read('electron/main/platformLogin/waBrowserPool.ts');
+      const tgSlots = read('electron/main/platformLogin/tgExecuteSlots.ts');
       const freeFn = store.slice(
         store.indexOf('export function countFreeExecuteSlots'),
         store.indexOf('export function pickQueuedJobsForDispatch'),
       );
       return (
+        policy.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM = 10') &&
+        policy.includes('HARD_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM = 10') &&
+        waPool.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM') &&
+        tgSlots.includes('DEFAULT_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM') &&
         conc.includes('getMaxWaBrowserSlots') &&
         conc.includes('getMaxTgExecuteSlots') &&
         pool.includes('getMaxTgExecuteSlots') &&
@@ -589,7 +740,42 @@ const checks = [
         sync.includes("acquireExecuteSlot(account.id, 'scraper'") &&
         runner.includes("waitForExecuteSlot(job.accountId, 'job'") &&
         client.includes('acquireOrWait') &&
-        /fifoWaiters\.push[\s\S]{0,120}drainExecuteSlotFifo/.test(pool)
+        /fifoWaiters\.push[\s\S]{0,120}drainExecuteSlotFifo/.test(pool) &&
+        pool.includes('deferred.push(next)')
+      );
+    })(),
+  },
+  {
+    name: 'Runner: claim running sebelum wait slot (anti double-dispatch)',
+    ok: (() => {
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const store = read('electron/main/automation/jobQueueStore.ts');
+      const timeout = read('electron/main/automation/promiseTimeout.ts');
+      const claimIdx = runner.indexOf('if (!markJobRunning(job.id))');
+      const waitIdx = runner.indexOf('await waitForExecuteSlot(job.accountId');
+      return (
+        claimIdx >= 0 &&
+        waitIdx > claimIdx &&
+        store.includes('releaseClaimedJobToQueue') &&
+        store.includes('demoteRunningJobToPaused') &&
+        store.includes('touchProgress') &&
+        store.includes('EXIT_DELETE_LEGACY_DISABLED') &&
+        timeout.includes('withJobTimeoutSettle') &&
+        runner.includes('withJobTimeoutSettle') &&
+        runner.includes('signalJobStop')
+      );
+    })(),
+  },
+  {
+    name: 'WA set_admin batch: groupOutcomes + cooperative stop',
+    ok: (() => {
+      const wa = read('electron/main/automation/waAutomation.ts');
+      const start = wa.indexOf("if (payload.action === 'set_admin' && adminGroups.length > 0)");
+      const body = wa.slice(start, start + 2200);
+      return (
+        body.includes('adminStatus') &&
+        body.includes('groupOutcomes') &&
+        body.includes('isJobStopRequested(payload.jobId)')
       );
     })(),
   },

@@ -38,6 +38,41 @@ export function peekJobStopRequest(jobId: string): 'cancel' | 'pause' | null {
   return jobStopRequests.get(jobId) ?? null;
 }
 
+/** Signal cooperative stop dari runner (timeout / pause UI). */
+export function signalJobStop(jobId: string, mode: 'cancel' | 'pause'): void {
+  requestJobStop(jobId, mode);
+}
+
+const PROGRESS_PERSIST_MS = 400;
+let progressPersistTimer: ReturnType<typeof setTimeout> | null = null;
+let progressPersistPending = false;
+
+function flushProgressPersist(): void {
+  progressPersistTimer = null;
+  if (!progressPersistPending) return;
+  progressPersistPending = false;
+  persist();
+  broadcastJobQueueChanged();
+}
+
+/** Progress sering — debounce persist/broadcast; finish/cancel tetap sync via touch(). */
+function touchProgress(mutator: () => void): void {
+  ensureLoaded();
+  mutator();
+  progressPersistPending = true;
+  if (progressPersistTimer) return;
+  progressPersistTimer = setTimeout(flushProgressPersist, PROGRESS_PERSIST_MS);
+}
+
+function touchImmediate(mutator: () => void): void {
+  if (progressPersistTimer) {
+    clearTimeout(progressPersistTimer);
+    progressPersistTimer = null;
+  }
+  progressPersistPending = false;
+  touch(mutator);
+}
+
 function queueFilePath(): string {
   return path.join(app.getPath('userData'), 'automation-job-queue.json');
 }
@@ -156,6 +191,12 @@ export function setRunnerPaused(paused: boolean): AutomationJobRunnerState {
 export function enqueueAutomationJob(input: AutomationJobEnqueueInput): AutomationJobRecord {
   ensureLoaded();
 
+  if (input.action === 'exit_delete_group') {
+    throw new Error(
+      'EXIT_DELETE_LEGACY_DISABLED: use leave_group (exit) then delete_group',
+    );
+  }
+
   if (!input.allowMultipleQueued) {
     const duplicateAccount = jobs.some(
       (job) =>
@@ -251,7 +292,7 @@ export function runAutomationJob(jobId: string): boolean {
 
 export function pauseAutomationJob(jobId: string): boolean {
   let changed = false;
-  touch(() => {
+  touchImmediate(() => {
     const job = jobs.find((row) => row.id === jobId);
     if (!job) return;
     if (job.status === 'queued' && !job.paused) {
@@ -260,11 +301,9 @@ export function pauseAutomationJob(jobId: string): boolean {
       return;
     }
     if (job.status === 'running') {
+      // Tetap running sampai runner cooperative-stop; jangan queued prematur (race dispatch).
       requestJobStop(jobId, 'pause');
-      job.status = 'queued';
       job.paused = true;
-      delete job.startedAt;
-      markSessionSettleAfterJob(job.sessionId);
       changed = true;
     }
   });
@@ -273,7 +312,7 @@ export function pauseAutomationJob(jobId: string): boolean {
 
 export function cancelAutomationJob(jobId: string): boolean {
   let changed = false;
-  touch(() => {
+  touchImmediate(() => {
     const job = jobs.find((row) => row.id === jobId);
     if (!job) return;
     if (job.status === 'queued') {
@@ -368,10 +407,11 @@ export function pickQueuedJobsForDispatch(): AutomationJobRecord[] {
 
 export function markJobRunning(jobId: string): boolean {
   let started = false;
-  touch(() => {
+  touchImmediate(() => {
     const job = jobs.find((row) => row.id === jobId);
-    if (!job || job.status !== 'queued') return;
+    if (!job || job.status !== 'queued' || job.paused) return;
     job.status = 'running';
+    job.paused = false;
     job.startedAt = new Date().toISOString();
     const stepTotal = accountJobStepTotal(job);
     job.progress = job.progress ?? {
@@ -387,15 +427,48 @@ export function markJobRunning(jobId: string): boolean {
   return started;
 }
 
+/**
+ * Claim gagal dapat slot (same_account / error) — kembalikan ke queued agar tick berikutnya retry.
+ * Tidak overwrite jika sudah cancel/finish.
+ */
+export function releaseClaimedJobToQueue(jobId: string): void {
+  touchImmediate(() => {
+    const job = jobs.find((row) => row.id === jobId);
+    if (!job || job.status !== 'running') return;
+    jobStopRequests.delete(jobId);
+    job.status = 'queued';
+    job.paused = false;
+    delete job.startedAt;
+  });
+}
+
+/** Pause cooperative selesai — demote running → queued+paused, progress dipertahankan. */
+export function demoteRunningJobToPaused(jobId: string): void {
+  touchImmediate(() => {
+    const job = jobs.find((row) => row.id === jobId);
+    if (!job || job.status !== 'running') return;
+    jobStopRequests.delete(jobId);
+    job.status = 'queued';
+    job.paused = true;
+    delete job.startedAt;
+    markSessionSettleAfterJob(job.sessionId);
+  });
+}
+
+export function getAutomationJobStatus(jobId: string): AutomationJobStatus | null {
+  ensureLoaded();
+  return jobs.find((row) => row.id === jobId)?.status ?? null;
+}
+
 /** Jobs stuck in running (browser hang) — fail so queue can continue. */
 export function failStaleRunningJobs(maxAgeMs: number): number {
   let failed = 0;
-  const now = Date.now();
-  touch(() => {
+  touchImmediate(() => {
     for (const job of jobs) {
       if (job.status !== 'running' || !job.startedAt) continue;
-      const age = now - new Date(job.startedAt).getTime();
+      const age = Date.now() - new Date(job.startedAt).getTime();
       if (age <= maxAgeMs) continue;
+      jobStopRequests.delete(job.id);
       job.status = 'failed';
       job.finishedAt = new Date().toISOString();
       job.error = 'JOB_STALE_TIMEOUT';
@@ -412,7 +485,7 @@ export function updateJobProgress(
   progress: AutomationJobRecord['progress'],
 ): void {
   if (!progress) return;
-  touch(() => {
+  touchProgress(() => {
     const job = jobs.find((row) => row.id === jobId);
     if (!job || job.status !== 'running') return;
     job.progress = progress;
@@ -429,10 +502,13 @@ export function markJobFinished(
     groupOutcomes?: AutomationJobRecord['payload']['groupOutcomes'];
   },
 ): void {
-  touch(() => {
+  touchImmediate(() => {
     const job = jobs.find((row) => row.id === jobId);
+    // Cancel UI sudah set cancelled — jangan overwrite.
     if (!job || job.status !== 'running') return;
+    jobStopRequests.delete(jobId);
     job.status = status;
+    job.paused = false;
     job.finishedAt = new Date().toISOString();
     job.error = detail?.error;
     markSessionSettleAfterJob(job.sessionId);

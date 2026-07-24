@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Problem Solve — Resource Management</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --panel2: #232d3a;
+      --text: #e7edf4;
+      --muted: #9aabbc;
+      --accent: #3d9a6a;
+      --accent2: #5eb887;
+      --code: #c9d7e6;
+      --code-bg: #0c1015;
+      --border: #2e3a48;
+      --warn: #d4a017;
+      --danger: #c75c5c;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+    header.doc-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(15, 20, 25, 0.96);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 650;
+    }
+    header .sub {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 2px;
+    }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .toolbar button {
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .toolbar button.active {
+      background: #1e4d35;
+      border-color: var(--accent);
+      color: #c8f0d8;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 20px 18px 80px; }
+    .toc {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-bottom: 22px;
+    }
+    .toc h2 { margin: 0 0 10px; font-size: 1rem; }
+    .toc ol { margin: 0; padding-left: 1.25rem; }
+    .toc a { color: var(--accent2); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    details.sec {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    details.sec > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 14px 16px;
+      font-weight: 650;
+      background: var(--panel2);
+      border-bottom: 1px solid transparent;
+      user-select: none;
+    }
+    details.sec[open] > summary { border-bottom-color: var(--border); }
+    details.sec > summary::-webkit-details-marker { display: none; }
+    details.sec > summary::before {
+      content: "▸ ";
+      color: var(--accent2);
+      font-weight: 700;
+    }
+    details.sec[open] > summary::before { content: "▾ "; }
+    .body { padding: 14px 16px 18px; }
+    h3 { margin: 1.1em 0 0.45em; font-size: 1.02rem; }
+    h4 { margin: 0.95em 0 0.35em; font-size: 0.95rem; color: #c5d4e4; }
+    p { margin: 0.45em 0 0.7em; }
+    ul, ol { margin: 0.3em 0 0.8em; padding-left: 1.3rem; }
+    li { margin: 0.25em 0; }
+    .muted { color: var(--muted); }
+    .note {
+      border-left: 3px solid var(--warn);
+      background: #2a2414;
+      padding: 10px 12px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+    }
+    .gotcha {
+      border-left: 3px solid var(--danger);
+      background: #2a1818;
+      padding: 10px 12px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+    }
+    code, .path {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.86em;
+      color: var(--code);
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    pre.flow {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: #b8c9da;
+      white-space: pre-wrap;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--panel2); }
+    .lang-en { display: none; }
+    body.en .lang-id { display: none; }
+    body.en .lang-en { display: block; }
+    body.en span.lang-en { display: inline; }
+    body.en li .lang-en { display: list-item; }
+    span.lang-en { display: none; }
+    th.lang-en, td.lang-en { display: none; }
+    body.en th.lang-id, body.en td.lang-id { display: none; }
+    body.en th.lang-en, body.en td.lang-en { display: table-cell; }
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header class="doc-header">
+    <div>
+      <h1>Problem Solve — Resource Management</h1>
+      <div class="sub lang-id">Referensi debug produksi · bukan onboarding</div>
+      <div class="sub lang-en">Production debug reference · not an onboarding guide</div>
+    </div>
+    <div class="toolbar">
+      <button type="button" id="btn-id" class="active" onclick="setLang('id')">Indonesia</button>
+      <button type="button" id="btn-en" onclick="setLang('en')">English</button>
+      <button type="button" onclick="expandAll(true)">
+        <span class="lang-id">Buka semua</span><span class="lang-en">Expand all</span>
+      </button>
+      <button type="button" onclick="expandAll(false)">
+        <span class="lang-id">Tutup semua</span><span class="lang-en">Collapse all</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <nav class="toc" id="toc">
+      <h2 class="lang-id">Daftar isi</h2>
+      <h2 class="lang-en">Table of contents</h2>
+      <ol>
+        <li><a href="#overview">1. Overview &amp; Arsitektur / Architecture</a></li>
+        <li><a href="#ui-layout">2. UI Layout</a></li>
+        <li><a href="#ui-logic">3. UI Logic</a></li>
+        <li><a href="#sync">4. Core — Sync</a></li>
+        <li><a href="#login">5. Core — Modal Login</a></li>
+        <li><a href="#scrape">6. Core — Scrape &amp; Auto Scrape</a></li>
+        <li><a href="#job-queue">7. Core — Job Queue</a></li>
+        <li><a href="#cta">8. CTA → Job Queue</a></li>
+        <li><a href="#support">9. Logic Pendukung / Supporting</a></li>
+        <li><a href="#gotchas">10. Patterns &amp; Gotchas</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== 1 OVERVIEW ========== -->
+    <details class="sec" id="overview" open>
+      <summary>1. Overview &amp; Arsitektur / Architecture</summary>
+      <div class="body">
+        <p class="lang-id">
+          Resource Management (GM Apps) adalah aplikasi desktop Electron untuk mengelola ratusan akun WhatsApp &amp; Telegram
+          per brand. Data grup hidup di Supabase. Device action (login, scrape, join, create, admin, leave) jalan di mesin lokal —
+          bukan di server.
+        </p>
+        <p class="lang-en">
+          Resource Management (GM Apps) is an Electron desktop app that manages hundreds of WhatsApp &amp; Telegram accounts
+          per brand. Group data lives in Supabase. Device actions (login, scrape, join, create, admin, leave) run on the local machine —
+          not on a remote server.
+        </p>
+
+        <h3 class="lang-id">Struktur folder</h3>
+        <h3 class="lang-en">Folder structure</h3>
+        <table>
+          <thead><tr><th>Path</th><th class="lang-id">Fungsi</th><th class="lang-en">Role</th></tr></thead>
+          <tbody>
+            <tr><td><code>src/</code></td><td colspan="2">Renderer React — UI, hooks, services, lib, config</td></tr>
+            <tr><td><code>electron/</code></td><td colspan="2">Main process — WA Puppeteer, scrape IPC, Job Queue, platform login</td></tr>
+            <tr><td><code>python-sidecar/</code></td><td colspan="2">Telegram FastAPI/Telethon (login, scrape, automation)</td></tr>
+            <tr><td><code>supabase/migrations/</code></td><td colspan="2">Schema + RPC (<code>rm_commit_account_scrape</code>, master PK, …)</td></tr>
+            <tr><td><code>scripts/</code></td><td colspan="2"><code>validate-*.mjs</code> kontrak sebelum merge</td></tr>
+            <tr><td><code>docs/</code></td><td colspan="2">Handbook &amp; runbook (beda dari file Problem Solve ini)</td></tr>
+            <tr><td><code>Problem Solve/</code></td><td colspan="2">Dokumen debug ini</td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="lang-id">Tech stack per lapisan</h3>
+        <h3 class="lang-en">Stack by layer</h3>
+        <ul>
+          <li><strong>Renderer:</strong> Vite + React + TypeScript, HashRouter, Supabase JS client</li>
+          <li><strong>Main:</strong> Electron, whatsapp-web.js / Puppeteer Chrome, Job Queue in-memory + persist</li>
+          <li><strong>Telegram:</strong> Python sidecar Telethon (version 3 JSON API)</li>
+          <li><strong>DB:</strong> Supabase — <code>messaging_accounts</code>, <code>group_scrape_daily</code>, <code>groups_master</code></li>
+        </ul>
+
+        <h3 class="lang-id">Alur data umum</h3>
+        <h3 class="lang-en">Typical data flow</h3>
+        <pre class="flow">UI (Account / Operations / Settings)
+  → hooks / services (renderer)
+  → window.electronAPI (preload)
+  → Electron main (scraper / platformLogin / jobQueue)
+  → WA Chrome session  ATAU  TG sidecar
+  → tulis Supabase (RPC atomik / session row)
+  → realtime Supabase → patch grid + reload matrix</pre>
+
+        <div class="note">
+          <p class="lang-id"><strong>Multi-akun:</strong> tiap baris <code>messaging_accounts</code> = satu sesi terpisah.
+            Device key lewat <code>resolveDeviceSessionId()</code>. WA pool user max <strong>10</strong> Chrome,
+            lane auto max <strong>6</strong> — lihat <code>src/config/deviceConcurrencyPolicy.ts:5-13</code>.</p>
+          <p class="lang-en"><strong>Multi-account:</strong> each <code>messaging_accounts</code> row is its own session.
+            Device key via <code>resolveDeviceSessionId()</code>. WA user pool max <strong>10</strong> Chrome,
+            auto lane max <strong>6</strong> — <code>src/config/deviceConcurrencyPolicy.ts:5-13</code>.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== 2 UI LAYOUT ========== -->
+    <details class="sec" id="ui-layout">
+      <summary>2. UI Layout</summary>
+      <div class="body">
+        <h3 class="lang-id">Navigasi utama</h3>
+        <h3 class="lang-en">Main navigation</h3>
+        <ul>
+          <li><code>/login</code> — <code>src/pages/LoginPage.tsx</code> (login user app, bukan login device WA/TG)</li>
+          <li><code>/</code> — <code>src/pages/GroupMonitoringPage.tsx</code> (shell Group Monitoring)</li>
+          <li><code>/settings</code> — <code>src/pages/SettingsPage.tsx</code> (admin: worker, stock, Automatic account scrape)</li>
+          <li><code>/admin</code> → redirect ke <code>/settings</code> — <code>src/App.tsx:29</code></li>
+        </ul>
+        <p class="muted">Nav items: <code>src/config/navigation.ts:11-24</code> · Layout: <code>DashboardLayout</code> + <code>Sidebar</code> + <code>SubHeader</code></p>
+
+        <h3 class="lang-id">Tab di Group Monitoring</h3>
+        <h3 class="lang-en">Group Monitoring tabs</h3>
+        <p class="lang-id">Hanya dua tab: <strong>Account</strong> | <strong>Operations</strong>
+          (<code>(MonitoringTab)</code> — <code>src/types/monitoring.ts</code>, UI <code>MonitoringTabs.tsx</code>.
+          Tab Reporting &amp; Ticket sudah dihapus dari shell.</p>
+        <p class="lang-en">Only two tabs: <strong>Account</strong> | <strong>Operations</strong>
+          <code>(MonitoringTab)</code> — <code>src/types/monitoring.ts</code>, UI <code>MonitoringTabs.tsx</code>.
+          Reporting &amp; Ticket tabs were removed from the shell.</p>
+
+        <h4>Account</h4>
+        <ul>
+          <li>KPI + filter: <code>KpiGrid.tsx</code>, <code>AccountSlicerHeader.tsx</code></li>
+          <li>Kartu brand: <code>AccountBrandCardList.tsx</code>, <code>AccountBrandCard.tsx</code></li>
+          <li>Metrik gap (junk / missing / notAdmin): <code>AccountMonitoringCells.tsx</code></li>
+          <li>Stock chips + To prep: <code>AccountBrandStockChips.tsx</code>, <code>OperationsBrandHeaderMeta.tsx</code></li>
+          <li>Group matrix (bekas Reporting): modal <code>BrandMasterGroupsModal.tsx</code> + <code>ReportingJoinMatrixTable.tsx</code></li>
+        </ul>
+
+        <h4>Operations</h4>
+        <ul>
+          <li>Panel: <code>OperationsMonitoringPanel.tsx</code></li>
+          <li>Job Queue global: <code>OperationsGlobalJobQueuePanel.tsx</code></li>
+          <li>AddBar + Setup: <code>OperationsJobQueueAddBar.tsx</code>, <code>OperationsJobQueueSetupModal.tsx</code></li>
+          <li>Tabel job (VIEW / RUN / PAUSE / CANCEL): <code>OperationsJobQueueTable.tsx</code></li>
+        </ul>
+
+        <h4>Settings</h4>
+        <ul>
+          <li>Worker delay/policy: <code>WorkerPlatformSettingsSection.tsx</code></li>
+          <li>Stock policy: <code>OperationsStockPolicySection.tsx</code></li>
+          <li><strong>Automatic account scrape</strong> (On Scheduled / Scrape Now): <code>AutoSyncSettingsSection.tsx</code></li>
+        </ul>
+      </div>
+    </details>
+
+    <!-- ========== 3 UI LOGIC ========== -->
+    <details class="sec" id="ui-logic">
+      <summary>3. UI Logic</summary>
+      <div class="body">
+        <h3 class="lang-id">State management</h3>
+        <h3 class="lang-en">State management</h3>
+        <p class="lang-id">Tidak ada Redux. State hidup di React Context + hooks + localStorage untuk settings auto scrape.</p>
+        <p class="lang-en">No Redux. State lives in React Context + hooks + localStorage for auto-scrape settings.</p>
+        <table>
+          <thead><tr><th>Context / hook</th><th class="lang-id">Isi</th><th class="lang-en">Holds</th></tr></thead>
+          <tbody>
+            <tr><td><code>AuthContext</code></td><td colspan="2">User app Supabase</td></tr>
+            <tr><td><code>GroupMonitoringProvider</code></td><td colspan="2">Grid akun, brands, realtime reload, wiring sync + auto scrape</td></tr>
+            <tr><td><code>useAccountSyncFlow</code></td><td colspan="2">Sync / Scrape Now / Later / cancel / login handoff</td></tr>
+            <tr><td><code>monitoring-tab-context</code></td><td colspan="2">Tab Account | Operations</td></tr>
+            <tr><td><code>AutoSyncSettingsContext</code> + config auto*</td><td colspan="2">On Scheduled, jam, brand slots, Scrape Now</td></tr>
+            <tr><td>Job Queue snapshot (IPC)</td><td colspan="2">Store di main process; UI subscribe <code>jobQueue:changed</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="lang-id">Event / handler penting</h3>
+        <h3 class="lang-en">Important handlers</h3>
+        <ul>
+          <li><strong>Sync</strong> di baris akun → <code>handleSyncAccount</code> — <code>useAccountSyncFlow.ts:552-557</code></li>
+          <li><strong>Scrape Now / Later</strong> di modal → <code>confirmScrapePrompt</code> / <code>dismissScrapePrompt</code> — <code>:853-907</code></li>
+          <li><strong>Cancel scrape</strong> → <code>confirmCancelScrape</code> — <code>:925-961</code></li>
+          <li><strong>Gap CTA</strong> (Missing / Not admin / Junk) → <code>handleQuickAction</code> → Setup — <code>AccountMonitoringCells.tsx:484-556</code></li>
+          <li><strong>To prep</strong> → Setup create_group — <code>AccountBrandCard.tsx:258-267</code>, <code>:448-467</code></li>
+          <li><strong>Operations Setup / RUN / PAUSE / CANCEL</strong> — panel + table di Operations</li>
+          <li><strong>Execute</strong> Automatic account scrape — <code>AutoSyncSettingsSection.tsx:570-635</code></li>
+        </ul>
+
+        <h3 class="lang-id">Validasi yang sering kena di lapangan</h3>
+        <h3 class="lang-en">Validations you hit in the field</h3>
+        <ul>
+          <li>Create Group: eligibility + naming — <code>createGroupSetupValidation.ts</code>, <code>createGroupAccountEligibility.ts</code></li>
+          <li>Join CSV vs master — <code>validateCsvJoinAgainstMaster.ts</code></li>
+          <li>Enqueue error map — <code>mapEnqueueJobQueueError.ts</code></li>
+          <li>Busy group / slot penuh — <code>automationJobBusyGroups.ts</code>, execute slot pool</li>
+        </ul>
+      </div>
+    </details>
+
+    <!-- ========== 4 SYNC ========== -->
+    <details class="sec" id="sync">
+      <summary>4. Core — Sync</summary>
+      <div class="body">
+        <p class="lang-id">
+          <strong>Sync</strong> di kolom Session / tombol Sync = cek session device. Bukan hitung Groups Y/X.
+          Session tersimpan di disk/DB = Valid — busy/timeout probe <em>bukan</em> Logout.
+        </p>
+        <p class="lang-en">
+          <strong>Sync</strong> on the Session column / Sync button checks the device session. It does not recount Groups Y/X.
+          A session on disk/DB is Valid — probe busy/timeout is <em>not</em> Logout.
+        </p>
+
+        <h3 class="lang-id">Alur step by step</h3>
+        <h3 class="lang-en">Step-by-step flow</h3>
+        <pre class="flow">1. UI klik Sync
+2. useAccountSyncFlow.handleSyncAccount (:552-557)
+3. runSyncCheck (:396-550) → acquire execute slot kind "sync"
+4. syncFlowService.runSyncCheckFlow (:318-331)
+   → executeSyncCheck (:203-286)
+   → checkDeviceSessionForValidColumn (:60-101)  // light probe
+5a. INVALID → showLoginModal (:330-360) → PlatformLoginModal
+5b. VALID   → buildSyncValidSuccess (:160-201)
+            → modal SyncScrapeConfirmModal: [Scrape Now | Later]
+6. Scrape Now → confirmScrapePrompt (:853-867) → runScrapeInBackground
+   Later      → dismissScrapePrompt (:869-907) → session Active di UI+DB saja, tanpa scrape</pre>
+
+        <h3 class="lang-id">File yang harus dibuka saat bug Sync</h3>
+        <h3 class="lang-en">Files to open when Sync misbehaves</h3>
+        <ul>
+          <li><code>src/hooks/useAccountSyncFlow.ts</code> — orkestrasi UI</li>
+          <li><code>src/services/syncFlowService.ts</code> — Case Valid / Invalid</li>
+          <li><code>src/lib/sessionColumnFlowSpec.ts:17-44</code> — spek invalid→open_login, valid→check_device</li>
+          <li><code>electron/main/scraper/index.ts:192-219</code> — <code>scraper:validate-session</code> (strict=false = Sync light)</li>
+          <li><code>electron/main/platformLogin/whatsapp.ts:956-960</code> — <code>probeWhatsAppSessionForSync</code> (tanpa cold Chrome)</li>
+          <li>Modal: <code>AccountMonitoringSyncModals.tsx</code>, <code>SyncScrapeConfirmModal.tsx:78-91</code></li>
+        </ul>
+
+        <div class="gotcha">
+          <p class="lang-id"><strong>Jangan salah diagnosa:</strong> kalau operator sudah Scrape dan kolom Groups sudah update,
+            masalah bukan “belum Sync”. Cari di layer daily write / realtime / compare.</p>
+          <p class="lang-en"><strong>Don’t misdiagnose:</strong> if the operator already Scraped and Groups already updated,
+            the bug is not “they didn’t Sync”. Look at daily write / realtime / compare.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== 5 LOGIN ========== -->
+    <details class="sec" id="login">
+      <summary>5. Core — Modal Login (device WA / TG)</summary>
+      <div class="body">
+        <p class="lang-id">
+          Ini login <em>device</em> (QR / phone / 2FA), bukan login user dashboard di <code>/login</code>.
+          Modal: <code>PlatformLoginModal</code>. Setelah ready → persist session ke DB, lalu lanjut scrape-prompt atau auto scrape.
+        </p>
+        <p class="lang-en">
+          This is <em>device</em> login (QR / phone / 2FA), not the dashboard user login at <code>/login</code>.
+          Modal: <code>PlatformLoginModal</code>. On ready → persist session to DB, then scrape-prompt or auto scrape.
+        </p>
+
+        <h3 class="lang-id">Alur</h3>
+        <h3 class="lang-en">Flow</h3>
+        <pre class="flow">showLoginModal / Sync Invalid
+  → prepareDeviceForPlatformLogin (src/lib/prepareDeviceForLogin.ts:44-86)
+  → PlatformLoginModal + usePlatformLogin
+  → IPC platform-login:start | submit | cancel | release | try-restore
+       WA: electron/main/platformLogin/whatsapp.ts (QR :764-808, phone :810-829)
+       TG: telegramSidecar.ts → python-sidecar (poll 300ms, POLL_ERROR_MAX_STREAK=8)
+  → platform-login:ready
+  → handleLoginSuccess (useAccountSyncFlow.ts:968-1111)
+  → persistLoginSessionAfterSuccess (persistLoginSession.ts:84-93)
+  → scrape-prompt atau startPostLoginScrape</pre>
+
+        <h3>IPC register</h3>
+        <p><code>electron/main/platformLogin/index.ts:60-195</code> — <code>registerPlatformLoginIpc</code></p>
+        <ul>
+          <li><code>:61-100</code> start · <code>:102-121</code> submit · <code>:123-134</code> cancel</li>
+          <li><code>:136-157</code> release · <code>:168-194</code> try-restore</li>
+        </ul>
+
+        <div class="note">
+          <p class="lang-id"><strong>Telegram QR:</strong> scan sukses harus UI <code>ready</code>, bukan error 500/JSON parse.
+            Jangan stop poll pada error sementara. Validator: <code>npm run validate:telegram-login</code>.</p>
+          <p class="lang-en"><strong>Telegram QR:</strong> successful scan must land on UI <code>ready</code>, not 500/JSON parse.
+            Don’t stop polling on transient errors. Validator: <code>npm run validate:telegram-login</code>.</p>
+        </div>
+
+        <h3 class="lang-id">Penyimpanan session</h3>
+        <h3 class="lang-en">Session storage</h3>
+        <ul>
+          <li>WA: folder <code>wa-sessions/session-{sessionId}</code> + row DB — <code>persistWhatsAppLoginSession</code> <code>:52-81</code></li>
+          <li>TG: export session sidecar → DB — <code>persistTelegramLoginSession</code> <code>:13-50</code></li>
+          <li>Clear: <code>src/lib/clearAccountSession.ts</code> + purge disk WA via IPC</li>
+        </ul>
+      </div>
+    </details>
+
+    <!-- ========== 6 SCRAPE ========== -->
+    <details class="sec" id="scrape">
+      <summary>6. Core — Scrape &amp; Auto Scrape</summary>
+      <div class="body">
+        <p class="lang-id">
+          Scrape = ambil daftar grup dari device, tulis <code>group_scrape_daily</code> + rebuild master brand+platform
+          lewat satu RPC atomik <code>rm_commit_account_scrape</code>. Jangan pakai mock/dummy row.
+        </p>
+        <p class="lang-en">
+          Scrape pulls groups from the device, writes <code>group_scrape_daily</code> and rebuilds brand+platform master
+          via one atomic RPC <code>rm_commit_account_scrape</code>. No mock/dummy rows.
+        </p>
+
+        <h3 class="lang-id">Manual scrape (dari Sync → Scrape Now)</h3>
+        <h3 class="lang-en">Manual scrape (from Sync → Scrape Now)</h3>
+        <pre class="flow">confirmScrapePrompt
+  → runScrapeInBackground (useAccountSyncFlow.ts:619-851)
+  → scrapeFlowService.runScrapeFlow (:253-286) / executeScrapeRun (:75-234)
+  → runAccountScraper(lane='user') (src/lib/runAccountScraper.ts:54-102)
+  → IPC scraper:run (electron/main/scraper/index.ts:116-143)
+  → WA: runWhatsAppScrape / TG: telegram scrape
+  → writeScrapeDailyRows (accountScraper.ts:207-291) → RPC rm_commit_account_scrape
+  → applyResult + realtime → scheduleMonitoringReload / scheduleReportingReload</pre>
+
+        <h4 class="lang-id">WhatsApp dua fase</h4>
+        <h4 class="lang-en">WhatsApp two phases</h4>
+        <ul>
+          <li><strong>Fase 1</strong> metadata paralel dari store — <code>whatsappScrape.ts:128-152</code></li>
+          <li><strong>Fase 2</strong> invite link serial (admin only) + delay — <code>:182-216</code>,
+            <code>whatsappGroupInviteLink.ts:140-179</code>, delay <code>deviceGroupScale.ts:20-33</code>
+            (<code>WA_SCRAPE_GROUP_DELAY_MS</code> default 600 + jitter)</li>
+        </ul>
+
+        <h3 class="lang-id">Auto Scrape (Settings → Automatic account scrape)</h3>
+        <h3 class="lang-en">Auto Scrape (Settings → Automatic account scrape)</h3>
+        <p class="lang-id"><strong>Default idle:</strong> On Scheduled On · Scrape Now Off · Daily <strong>12:00 PM</strong> · brand
+          FWSG / JMMY / M24SG / SBMY / STMY / WBSG On (max 6/platform). Hydrate: <code>hydrateAutoScrapeSettingsForIdleUi</code>
+          (<code>src/config/autoScrapeDefaults.ts</code>).</p>
+        <p class="lang-en"><strong>Idle defaults:</strong> On Scheduled On · Scrape Now Off · Daily <strong>12:00 PM</strong> · brands
+          FWSG / JMMY / M24SG / SBMY / STMY / WBSG On (max 6/platform). Hydrate: <code>hydrateAutoScrapeSettingsForIdleUi</code>
+          (<code>src/config/autoScrapeDefaults.ts</code>).</p>
+        <ul>
+          <li><strong>On Scheduled</strong> — sekali sehari di jam lokal (app terbuka). Skip jika jam sudah lewat saat app buka.</li>
+          <li><strong>Scrape Now</strong> — one-shot. Off→On: semua brand <strong>False (0/6)</strong>; On Scheduled dipaksa On.
+            Status/Time UI = <strong>standby / -</strong> (sembunyikan hasil run lama). Tidak tulis <code>lastRunDate</code>.</li>
+          <li><strong>Tombol:</strong> Scrape Now Off → <strong>Cancel | Save</strong>; On → <strong>Discard | Execute</strong>.
+            Dirty = enable. Execute butuh ≥1 brand. Discard / Execute selesai → <code>resetAutoScrapeToFactoryDefaults</code>.</li>
+          <li>Scheduled sedang running → toggle Scrape Now <strong>blocked</strong>.</li>
+        </ul>
+        <pre class="flow">Settings handleSaveOrExecute (AutoSyncSettingsSection.tsx)
+  → [Save] persist jadwal/brand saja
+  → [Execute] persist draft → requestAutoScrapeNowRun
+  → useAutoAccountSync.runAutoScrapeCycle('now')
+  → runAutoAccountScrape → scraper:run-auto → autoScrapeLane
+  → finally / UI: resetAutoScrapeToFactoryDefaults()</pre>
+
+        <p class="muted">
+          Pool auto Chrome: <code>waAutoScrapeBrowserPool.ts</code> (max 6).
+          User Chrome: <code>waBrowserPool.ts</code> (max 10, env <code>RM_WA_MAX_CONCURRENT_BROWSERS</code>).
+        </p>
+
+        <div class="note">
+          <p class="lang-id"><strong>Nama file mudah tertukar:</strong>
+            <code>runAutoAccountScrape.ts</code> = orkestrasi brand/login/applyResult;
+            <code>runAutoAccountScraper.ts</code> = thin wrapper IPC lane auto.</p>
+          <p class="lang-en"><strong>Easy to mix up:</strong>
+            <code>runAutoAccountScrape.ts</code> = brand/login/applyResult orchestration;
+            <code>runAutoAccountScraper.ts</code> = thin IPC wrapper for auto lane.</p>
+        </div>
+
+        <p class="lang-id">Validator: <code>npm run validate:auto-scrape</code>, <code>validate:real-operations-data</code>.</p>
+        <p class="lang-en">Validators: <code>npm run validate:auto-scrape</code>, <code>validate:real-operations-data</code>.</p>
+      </div>
+    </details>
+
+    <!-- ========== 7 JOB QUEUE ========== -->
+    <details class="sec" id="job-queue">
+      <summary>7. Core — Job Queue</summary>
+      <div class="body">
+        <p class="lang-id">
+          Job Queue hidup di Electron main (bukan di React state). UI cuma enqueue / RUN / PAUSE / CANCEL dan render snapshot.
+          Status job: <code>queued</code> | <code>running</code> | <code>completed</code> | <code>failed</code> | <code>cancelled</code>.
+        </p>
+        <p class="lang-en">
+          The Job Queue lives in the Electron main process (not React state). The UI only enqueues / RUN / PAUSE / CANCEL and renders the snapshot.
+          Job status: <code>queued</code> | <code>running</code> | <code>completed</code> | <code>failed</code> | <code>cancelled</code>.
+        </p>
+
+        <h3 class="lang-id">Pintu masuk umum</h3>
+        <h3 class="lang-en">Common entry points</h3>
+        <ul>
+          <li>Store: <code>electron/main/automation/jobQueueStore.ts</code> — enqueue <code>:195-250</code>, cancel <code>:318-340</code>, run <code>:280-296</code>, pause <code>:298-316</code></li>
+          <li>Runner tick: <code>jobQueueRunner.ts:562-616</code> — pick FIFO → <code>runSingleJob</code> <code>:311-530</code></li>
+          <li>IPC: <code>electron/main/automation/index.ts:61-141</code> (<code>jobQueue:*</code>, <code>executeSlots:*</code>)</li>
+          <li>Renderer client: <code>src/lib/automationJobQueueClient.ts</code></li>
+          <li>Setup enqueue: <code>src/hooks/useJobQueueSetupEnqueue.ts</code></li>
+          <li>Label / gate tombol: <code>src/lib/operationsJobQueueUi.ts:303-329</code></li>
+        </ul>
+
+        <p class="muted">
+          Types harus sinkron: <code>src/types/automationJob.ts</code> ↔ <code>electron/main/automation/jobQueueTypes.ts</code>
+          (actions di <code>jobQueueTypes.ts:1-8</code>).
+        </p>
+
+        <h3 id="jq-join">7.1 Join Missing (<code>join_by_invite_link</code>)</h3>
+        <p class="lang-id">
+          Trigger: CTA Missing di Account, atau Setup Join di Operations.
+          Link invite diambil dari <code>groups_master</code> (bukan diketik manual sembarangan) lewat
+          <code>loadMissingMasterGroupsJoinSnapshot</code> — <code>loadMissingMasterGroupsForJoin.ts:21-56</code>.
+        </p>
+        <p class="lang-en">
+          Trigger: Missing CTA on Account, or Join Setup on Operations.
+          Invite links come from <code>groups_master</code> via
+          <code>loadMissingMasterGroupsJoinSnapshot</code> — <code>loadMissingMasterGroupsForJoin.ts:21-56</code>.
+        </p>
+        <pre class="flow">Setup saveJoinBatch (useJobQueueSetupEnqueue.ts:271-360)
+  → enqueue action join_by_invite_link
+  → runner → runAutomationAction
+  → WA: runJoinByInviteLink acceptInvite (waAutomation.ts:732-837)
+  → TG: tgAutomationClient join (:479-558)
+  → outcomes per group → markJobFinished</pre>
+
+        <h3 id="jq-create">7.2 Create &amp; Set Photo (<code>create_group</code> → <code>set_group_photo</code>)</h3>
+        <p class="lang-id">
+          Trigger: <strong>To prep</strong> di header brand Account, atau Setup Create di Operations.
+          Setelah create sukses, main bisa auto-enqueue Set Photo
+          (<code>maybeAutoEnqueueSetPhotoFromCreate</code> — <code>autoEnqueueSetPhotoFromCreate.ts:39-88</code>.
+          VIEW create juga bisa antre photo manual — <code>enqueueSetPhotoFromCreateJob.ts</code>.
+        </p>
+        <p class="lang-en">
+          Trigger: <strong>To prep</strong> on the Account brand header, or Create Setup on Operations.
+          After a successful create, main may auto-enqueue Set Photo
+          <code>maybeAutoEnqueueSetPhotoFromCreate</code> — <code>autoEnqueueSetPhotoFromCreate.ts:39-88</code>.
+          Create VIEW can also queue photo manually — <code>enqueueSetPhotoFromCreateJob.ts</code>.
+        </p>
+        <pre class="flow">saveCreateBatch (:412-487)
+  → create_group
+  → WA runWhatsAppCreateGroupBatch / runCreateGroup (waAutomation.ts:493-572, :864-967)
+  → TG runTelegramCreateGroupBatch
+  → (auto) set_group_photo → waSetGroupPhoto.ts:178-288 / TG set photo
+  → invite link di-export dari device (bukan hardcode)</pre>
+
+        <h3 id="jq-admin">7.3 Set Admin (<code>set_admin</code>)</h3>
+        <p class="lang-id">
+          Trigger: CTA Not admin, atau Setup Set Admin.
+          Kandidat grup: <code>loadSuperAdminGroupsForSetAdmin.ts:27-57</code>.
+          Device: WA <code>promoteParticipants</code> <code>waAutomation.ts:574-683</code>; TG rights di sidecar + worker settings.
+        </p>
+        <p class="lang-en">
+          Trigger: Not admin CTA, or Set Admin Setup.
+          Candidates: <code>loadSuperAdminGroupsForSetAdmin.ts:27-57</code>.
+          Device: WA <code>promoteParticipants</code> <code>waAutomation.ts:574-683</code>; TG rights via sidecar + worker settings.
+        </p>
+        <pre class="flow">saveSetAdminBatch (:489-560) → set_admin → promote di device → outcomes</pre>
+
+        <h3 id="jq-exit">7.4 Leave &amp; Delete Chat</h3>
+        <p class="lang-id">
+          Di UI Setup, task type sering disebut <strong>exit_delete_group</strong>, tapi enqueue utama sekarang:
+          <code>leave_group</code> dengan <code>exitDeletePhase: 'exit'</code>
+          (<code>saveExitBatch</code> — <code>useJobQueueSetupEnqueue.ts:562-653</code>).
+          Setelah leave sukses, auto-chain <code>delete_group</code>
+          (<code>autoEnqueueDeleteFromExit.ts:49-96</code>).
+          Loader grup: <code>loadAccountExitGroupsSnapshot</code> — <code>loadAccountDailyGroupsForLeaveDelete.ts:48-102</code>
+          (daily + junk).
+        </p>
+        <p class="lang-en">
+          In Setup UI the task is often labeled <strong>exit_delete_group</strong>, but the main enqueue is:
+          <code>leave_group</code> with <code>exitDeletePhase: 'exit'</code>
+          (<code>saveExitBatch</code> — <code>useJobQueueSetupEnqueue.ts:562-653</code>).
+          After a successful leave, auto-chain <code>delete_group</code>
+          (<code>autoEnqueueDeleteFromExit.ts:49-96</code>).
+          Group loader: <code>loadAccountExitGroupsSnapshot</code> — <code>loadAccountDailyGroupsForLeaveDelete.ts:48-102</code>
+          (daily + junk).
+        </p>
+        <pre class="flow">CTA Junk / Setup Exit
+  → leave_group (phase exit)
+  → WA runWaLeaveGroup (waLeaveGroup.ts:197-282)
+  → TG leave
+  → maybeAutoEnqueueDeleteFromExit
+  → delete_group → waDeleteGroupChat / TG delete
+  Legacy satu tembakan: exit_delete_group → waExitDeleteGroup.ts:31-119
+  (enqueue baru menolak legacy — jobQueueStore.ts:195-250)</pre>
+
+        <h3 class="lang-id">Concurrency &amp; error</h3>
+        <h3 class="lang-en">Concurrency &amp; errors</h3>
+        <ul>
+          <li>Execute slot per platform (sync / scraper / job) — <code>executeSlotPool.ts:96-162</code></li>
+          <li>Max concurrent automation — <code>jobQueueConcurrency.ts:6-8</code></li>
+          <li>Stop cooperative cancel/pause — <code>jobQueueStore.ts:28-48</code></li>
+          <li>Partial outcomes tetap di-attach saat cancel — <code>:454-497</code></li>
+          <li>Timeout per action — <code>jobQueueRunner.ts:46-54</code></li>
+        </ul>
+        <p class="lang-id">Validator: <code>npm run validate:operations-job-queue</code>.</p>
+        <p class="lang-en">Validator: <code>npm run validate:operations-job-queue</code>.</p>
+      </div>
+    </details>
+
+    <!-- ========== 8 CTA ========== -->
+    <details class="sec" id="cta">
+      <summary>8. CTA yang langsung ke Job Queue</summary>
+      <div class="body">
+        <p class="lang-id">
+          Section ini hanya CTA yang membuka Setup / antre job. Sync, Scrape, Settings Execute — bukan di sini
+          (lihat section Sync / Scrape).
+        </p>
+        <p class="lang-en">
+          This section only covers CTAs that open Setup / enqueue jobs. Sync, Scrape, Settings Execute are elsewhere
+          (see Sync / Scrape).
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>CTA (label UI)</th>
+              <th>Action / task</th>
+              <th class="lang-id">Dari mana</th>
+              <th class="lang-en">Where</th>
+              <th>Code</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Missing</strong> (gap)</td>
+              <td><code>join</code> / <code>join_by_invite_link</code></td>
+              <td colspan="2">Account metrik gap</td>
+              <td><code>AccountMonitoringCells.tsx:484-556</code>, <code>:659-694</code>, Setup host <code>:760-785</code></td>
+            </tr>
+            <tr>
+              <td><strong>Not admin</strong></td>
+              <td><code>set_admin</code></td>
+              <td colspan="2">Account metrik gap</td>
+              <td>sama — <code>handleQuickAction</code> map <code>notAdmin</code></td>
+            </tr>
+            <tr>
+              <td><strong>Junk</strong> / Group mismatch</td>
+              <td><code>exit_delete_group</code> UI → <code>leave_group</code> phase exit</td>
+              <td colspan="2">Account metrik gap</td>
+              <td>map <code>junk</code> → exit</td>
+            </tr>
+            <tr>
+              <td><strong>To prep</strong></td>
+              <td><code>create_group</code></td>
+              <td colspan="2">Header brand Account (bukan stock chips Ready/Recycle/Review)</td>
+              <td><code>OperationsBrandHeaderMeta.tsx:47-87</code> → <code>AccountBrandCard.tsx:258-267</code>, <code>:448-467</code></td>
+            </tr>
+            <tr>
+              <td><strong>Setup</strong> (AddBar)</td>
+              <td>join / create / set_admin / exit</td>
+              <td colspan="2">Operations Job Queue</td>
+              <td><code>OperationsJobQueueAddBar.tsx:333-366</code></td>
+            </tr>
+            <tr>
+              <td><strong>VIEW → queue photo / delete</strong></td>
+              <td><code>set_group_photo</code> / <code>delete_group</code></td>
+              <td colspan="2">Operations table / global panel</td>
+              <td><code>OperationsGlobalJobQueuePanel.tsx:35-116</code></td>
+            </tr>
+            <tr>
+              <td><strong>RUN / PAUSE / CANCEL</strong></td>
+              <td>kontrol job yang sudah di antre</td>
+              <td colspan="2">Operations Job Queue table</td>
+              <td><code>OperationsJobQueueTable.tsx:229-316</code> + gate <code>operationsJobQueueUi.ts:303-319</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 class="lang-id">Rantai UI bersama</h3>
+        <h3 class="lang-en">Shared UI chain</h3>
+        <pre class="flow">CTA klik
+  → JobQueueSetupHost.tsx (:53-189)
+  → useJobQueueSetupEnqueue
+  → OperationsJobQueueSetupModal (save per task :776-842)
+  → automationJobQueueClient.enqueue*
+  → main jobQueueStore + scheduleRunnerTick
+  → OperationsJobQueueTable refresh via jobQueue:changed</pre>
+
+        <p class="lang-id">
+          Angka gap (Missing / Junk / Not admin) dihitung in-memory dari master vs daily —
+          <code>computeAccountTicketBreakdown</code> di <code>accountMasterDailyCompare.ts:74+</code>.
+          Bukan tabel Ticket DB (migrasi 033 sudah drop).
+        </p>
+        <p class="lang-en">
+          Gap numbers (Missing / Junk / Not admin) are computed in-memory from master vs daily —
+          <code>computeAccountTicketBreakdown</code> in <code>accountMasterDailyCompare.ts:74+</code>.
+          Not the old Ticket DB tables (dropped in migration 033).
+        </p>
+      </div>
+    </details>
+
+    <!-- ========== 9 SUPPORT ========== -->
+    <details class="sec" id="support">
+      <summary>9. Logic Pendukung / Supporting</summary>
+      <div class="body">
+        <h3 class="lang-id">Helper yang sering disentuh saat bug</h3>
+        <h3 class="lang-en">Helpers you touch often when debugging</h3>
+        <ul>
+          <li><code>accountMasterDailyCompare.ts</code> — Y/X, 5 tipe ticket in-memory, dedupe group_id</li>
+          <li><code>patchAccountGridAfterDailyWrite.ts</code> / <code>hydrateAccountMetricsFromDaily.ts</code> — setelah scrape</li>
+          <li><code>GroupMonitoringProvider.tsx</code> — <code>scheduleMonitoringReload</code>, <code>scheduleReportingReload</code>, <code>refreshAccountAfterDailyWrite</code></li>
+          <li><code>useRealtimeMonitoring.ts</code> — subscribe daily/master/accounts</li>
+          <li><code>loadJoinGroupReport.ts</code> — matrix Group (modal)</li>
+          <li><code>deviceSessionId.ts</code> / <code>deviceSessionGate.ts</code> — kunci session multi-akun</li>
+          <li><code>workerPlatformSettings.ts</code> — delay / rights per aksi WA &amp; TG</li>
+          <li><code>operationsStockPolicy.ts</code> + <code>computeStockToPrepare.ts</code> — To prep / stock buckets</li>
+        </ul>
+
+        <h3 class="lang-id">Env &amp; constant penting</h3>
+        <h3 class="lang-en">Important env &amp; constants</h3>
+        <ul>
+          <li><code>VITE_SUPABASE_*</code>, <code>TELEGRAM_API_ID/HASH</code> — <code>.env.example</code>, <code>electron/main/appEnv.ts</code></li>
+          <li><code>RM_WA_MAX_CONCURRENT_BROWSERS</code> — cap pool WA user</li>
+          <li><code>WA_SCRAPE_GROUP_DELAY_MS</code> — delay fase invite</li>
+          <li><code>SYNC_SCRAPER_POLICY</code> — <code>src/config/syncScraperPolicy.ts:6-34</code></li>
+          <li>Tabel: <code>src/config/tables.ts</code></li>
+        </ul>
+
+        <h3 class="lang-id">Integrasi eksternal</h3>
+        <h3 class="lang-en">External integrations</h3>
+        <ul>
+          <li>Supabase Auth + Realtime + RPC</li>
+          <li>Chrome/Puppeteer lokal (bundled cache di <code>chrome/</code> / resources installer)</li>
+          <li>Python sidecar Telegram (binary di installer bundle)</li>
+          <li>Auto-update Electron — <code>electron/main/autoUpdate.ts</code>, UI <code>useAppUpdateStatus.ts</code></li>
+        </ul>
+      </div>
+    </details>
+
+    <!-- ========== 10 GOTCHAS ========== -->
+    <details class="sec" id="gotchas">
+      <summary>10. Known Patterns &amp; Gotchas</summary>
+      <div class="body">
+        <h3 class="lang-id">Pola yang berulang</h3>
+        <h3 class="lang-en">Recurring patterns</h3>
+        <ul>
+          <li><strong>Satu pintu cycle</strong> untuk auto scrape scheduled + now — <code>runAutoScrapeCycle</code></li>
+          <li><strong>Auto-chain job</strong> create→photo, leave(exit)→delete — jangan cari step kedua di UI Setup</li>
+          <li><strong>Lane terpisah</strong> user scrape (<code>scraper:run</code>) vs auto (<code>scraper:run-auto</code>)</li>
+          <li><strong>Realtime setelah daily write</strong> → patch grid + debounce reload Operations / matrix 500ms</li>
+          <li><strong>CTA → JobQueueSetupHost → SetupModal → enqueue</strong> dipakai Account dan Operations</li>
+        </ul>
+
+        <div class="gotcha">
+          <ul>
+            <li class="lang-id">File <code>Reporting*</code> = Group matrix modal, bukan tab Reporting lama.</li>
+            <li class="lang-en">Files named <code>Reporting*</code> = Group matrix modal, not the old Reporting tab.</li>
+            <li class="lang-id">Jangan cari <code>reconcileTickets.ts</code> / tab Ticket DB — sudah mati.</li>
+            <li class="lang-en">Don’t look for <code>reconcileTickets.ts</code> / Ticket DB tab — gone.</li>
+            <li class="lang-id">Time Scrape di UI auto scrape pakai <code>runStatus.updatedAt</code>, bukan snapshot jam jadwal stale.</li>
+            <li class="lang-en">Auto-scrape Time Scrape uses <code>runStatus.updatedAt</code>, not a stale schedule-hour snapshot.</li>
+            <li class="lang-id">Jangan buka dua Puppeteer untuk <code>sessionId</code> yang sama; jangan cabut lock di <code>forceRelease</code> sembarangan.</li>
+            <li class="lang-en">Never open two Puppeteer clients for the same <code>sessionId</code>; don’t casually drop locks in <code>forceRelease</code>.</li>
+            <li class="lang-id"><code>exit_delete_group</code> legacy vs leave+delete chain — cek payload <code>exitDeletePhase</code> dulu.</li>
+            <li class="lang-en"><code>exit_delete_group</code> legacy vs leave+delete chain — check <code>exitDeletePhase</code> on the payload first.</li>
+            <li class="lang-id">Issue/KPI hanya dari grup/admin — login/logout session bukan Issue.</li>
+            <li class="lang-en">Issues/KPIs are group/admin only — session login/logout is not an Issue.</li>
+          </ul>
+        </div>
+
+        <h3 class="lang-id">Maintenance dokumen ini</h3>
+        <h3 class="lang-en">Keeping this doc honest</h3>
+        <p class="lang-id">
+          Living document. Setiap commit yang menyentuh Sync, Modal Login, Scrape/Auto Scrape, Job Queue, CTA Job Queue,
+          atau layout shell — update file ini (deskripsi + path/line) di folder <code>Problem Solve/</code>
+          sebelum atau bersamaan dengan commit.
+        </p>
+        <p class="lang-en">
+          Living document. Any commit that touches Sync, Modal Login, Scrape/Auto Scrape, Job Queue, Job Queue CTAs,
+          or the shell layout must update this file (text + path/line) under <code>Problem Solve/</code>
+          before or with that commit.
+        </p>
+      </div>
+    </details>
+
+    <footer>
+      <p class="lang-id">Problem Solve · Resource Management · generate dari scan codebase · path line mengikuti tree saat dokumen dibuat.</p>
+      <p class="lang-en">Problem Solve · Resource Management · generated from a codebase scan · line refs match the tree at doc creation time.</p>
+    </footer>
+  </div>
+
+  <script>
+    function setLang(lang) {
+      document.body.classList.toggle('en', lang === 'en');
+      document.getElementById('btn-id').classList.toggle('active', lang === 'id');
+      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+      document.documentElement.lang = lang === 'en' ? 'en' : 'id';
+      try { localStorage.setItem('rm_problem_solve_lang', lang); } catch (_) {}
+    }
+    function expandAll(open) {
+      document.querySelectorAll('details.sec').forEach((d) => { d.open = open; });
+    }
+    try {
+      const saved = localStorage.getItem('rm_problem_solve_lang');
+      if (saved === 'en' || saved === 'id') setLang(saved);
+    } catch (_) {}
+  </script>
+</body>
+</html>

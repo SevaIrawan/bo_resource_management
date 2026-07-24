@@ -81,7 +81,7 @@ async function assertWhatsAppLoggedInPhone(
 
 /**
  * Scrape penuh WA — fase 1: metadata paralel (store); fase 2: invite link serial per grup admin.
- * `getInviteCode` tidak boleh paralel pada satu Puppeteer client (learning scraper sequential).
+ * `getInviteCode` tidak boleh paralel pada satu Puppeteer client (harus sequential).
  * Checkpoint lokal: resume setelah crash tanpa ulang semua grup.
  */
 async function scrapeWhatsAppGroupsFromStore(input: {

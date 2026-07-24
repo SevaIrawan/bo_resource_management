@@ -6,11 +6,11 @@
 | **App version** | 1.0.30 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
-| **UI languages** | English / 中文 (Admin → Language) |
+| **UI languages** | English / 中文 (**Settings** → Language) |
 
 This document is the **official guide to every feature** in the current application. For architecture and IT release notes, see [PROJECT.md](../../PROJECT.md).
 
-> **v1.0.24+:** The **Ticket** tab was removed — issues appear as **KPI cards** on the Account tab. **Operations** tab has **Overview** (stock) and **Job Queue** (automation). Section 5 below is historical reference.
+> **v1.0.30:** There is **no Ticket tab**. Issues appear on the **Account** tab (not-aligned badges: Junk / Missing / Not admin). Remediation runs through **Operations → Job Queue** (SETUP: join / set admin / exit). **Operations** is Job Queue only (no Overview). Stock chips and the Group matrix live on the Account brand header. Prefer sidebar **Settings** (`/settings`); `/admin` redirects there.
 
 ---
 
@@ -20,14 +20,15 @@ This document is the **official guide to every feature** in the current applicat
 2. [Getting started](#2-getting-started)
 3. [Navigation and layout](#3-navigation-and-layout)
 4. [Account tab — account monitoring](#4-account-tab--account-monitoring)
-5. [Ticket tab — issues and remediation](#5-ticket-tab--issues-and-remediation)
+5. [Issues on Account — types and remediation](#5-issues-on-account--types-and-remediation)
 6. [Group matrix — join/admin (Account header)](#6-group-matrix--joinadmin-account-header)
-7. [Admin page](#7-admin-page)
-8. [Data synchronization (realtime)](#8-data-synchronization-realtime)
-9. [Recommended daily workflows](#9-recommended-daily-workflows)
-10. [Glossary](#10-glossary)
-11. [FAQ](#11-faq)
-12. [Appendix — Quick feature map](#appendix--quick-feature-map)
+7. [Operations — Job Queue](#7-operations--job-queue)
+8. [Settings](#8-settings)
+9. [Data synchronization (realtime)](#9-data-synchronization-realtime)
+10. [Recommended daily workflows](#10-recommended-daily-workflows)
+11. [Glossary](#11-glossary)
+12. [FAQ](#12-faq)
+13. [Appendix — Quick feature map](#appendix--quick-feature-map)
 
 ---
 
@@ -43,7 +44,8 @@ Resource Management helps your team:
 | Session health | Check whether accounts are still **logged in** on phone/PC (session) |
 | Group alignment | Compare **groups on device** vs **brand standard** (master list) |
 | Scraper | Run a full read of groups from the device and save to the database |
-| Tickets / issues | See remediation tasks (missing groups, not admin, duplicates, junk groups, etc.) |
+| Issues | See gaps on Account (junk / missing / not admin, duplicates) — computed in memory |
+| Job Queue | Automate join, create group, set admin, exit/delete, set photo |
 | Export | Export filtered data to **Excel** for field operations |
 
 ### 1.2 Two types of “login”
@@ -57,17 +59,17 @@ Do not confuse these — they serve different purposes.
 
 The dashboard password is **not** your Telegram or WhatsApp password.
 
-### 1.3 What is **not** a ticket?
+### 1.3 What is **not** an issue?
 
-Changes to **session login/logout** in the **Session** column do **not** create tickets. Tickets only cover **group and admin** problems relative to the brand standard.
+Changes to **session login/logout** in the **Session** column do **not** create issues. Issues only cover **group and admin** problems relative to the brand standard.
 
 ### 1.4 Who should read which sections?
 
 | Role | Primary sections |
 |------|------------------|
-| Field / marketing ops | §2–§5, §8 |
-| Team lead | §4–§5 KPIs, bookmarks, export |
-| IT / support | §6, §7, §10 FAQ |
+| Field / marketing ops | §2–§5, §7, §10 |
+| Team lead | §4–§5 KPIs, Job Queue, export |
+| IT / support | §8, §9, §12 FAQ |
 
 ---
 
@@ -113,17 +115,19 @@ You land on **Group Monitoring** (main workspace) with the **Account** tab selec
 | Icon / menu | Function |
 |-------------|----------|
 | **Logo** | **Backend Operation** — **Resource Management** |
-| **Group Monitoring** | Main page — accounts & tickets |
-| **Admin** | System status & preferences |
+| **Group Monitoring** | Main page — Account + Operations |
+| **Settings** | Preferences, auto scrape, worker policy (`/settings`) |
 | **Logout (power)** | Exit dashboard only — does **not** auto-logout WA/TG on phone |
 
 **Tip:** Collapse the sidebar to icon-only mode — use **Toggle sidebar** in the header.
+
+> Older bookmarks to **Admin** (`/admin`) redirect to **Settings**.
 
 ### 3.2 Header (top)
 
 | Element | Function |
 |---------|--------|
-| Page title | Active module (e.g. Group Monitoring, Admin) |
+| Page title | Active module (e.g. Group Monitoring, Settings) |
 | **Welcome** + user name | Currently signed-in user |
 | **Logout** | Exit dashboard |
 
@@ -131,18 +135,16 @@ You land on **Group Monitoring** (main workspace) with the **Account** tab selec
 
 | Tab | Function |
 |-----|----------|
-| **Account** | Brand cards, WA/TG rows, KPI issues, **stock chips** + **Group matrix** (card header) |
+| **Account** | Brand cards, WA/TG rows, issue badges, **stock chips** + **Group matrix** (card header) |
 | **Operations** | **Job Queue** only (join / create / set admin / exit-delete / set photo) |
 
-> There is **no** separate Reporting tab. Open the join/admin matrix from the **group count badge** on the Account brand card header. Stock chips live on the same header (not an Operations Overview bookmark).
+> There is **no** Reporting tab and **no** Operations Overview. Open the join/admin matrix from the **group count badge** on the Account brand card header. Stock chips live on the same header.
 
 Switching tabs updates KPI cards and the filter toolbar below.
 
-### 3.4 KPI cards (summary numbers)
+### 3.4 KPI cards (Account tab)
 
 Numbers refresh when you change tab or when data updates from the database.
-
-#### Account tab KPIs
 
 | KPI | Meaning |
 |-----|---------|
@@ -150,19 +152,8 @@ Numbers refresh when you change tab or when data updates from the database.
 | **Accounts** | Filled account rows |
 | **Online** | Accounts with **Active** status (session valid) |
 | **Aligned** | Accounts matching brand standard for their platform |
-| **Issue** | Accounts **not aligned** |
-| **Open issues** | Count of open ticket issues (rollup) |
-
-#### Ticket tab KPIs
-
-| KPI | Meaning |
-|-----|---------|
-| **Open issues** | Issue cards shown |
-| **Missing groups** | Issues of type *Missing group* |
-| **Not admin** | Issues of type *Not admin* |
-| **Groups to handle** | Total group rows across all issues |
-| **Accounts involved** | Distinct accounts in filtered issues |
-| **Brands involved** | Distinct brands in filtered issues |
+| **Not Aligned / Issue** | Accounts **not aligned** |
+| **Open issues** | Rollup of open group/admin gaps |
 
 ---
 
@@ -193,7 +184,8 @@ Each brand (e.g. **Brand : SBMY**) has one card.
 | **Arrow** | Collapse / expand account table |
 | **Brand title** | Brand name |
 | **Account count badge** | e.g. *12 accounts* |
-| **WA x std / TG x std** | Standard (master) group count per platform |
+| **WA x Group / TG x Group** | Clickable — opens **Group matrix** for that platform |
+| **Stock chips** | Account/stock summary on the header (not an Operations bookmark) |
 | **All aligned** / **N accounts not aligned** | Health summary for this brand |
 | **+Add** | Add new account (choose WA or TG) |
 | **X (Dismiss)** | Remove brand from database (confirmation modal) |
@@ -220,9 +212,9 @@ Each brand (e.g. **Brand : SBMY**) has one card.
 | **Session** | **Valid** / **Invalid** | Invalid → login first; **X on hover** when Valid = **Clear Session** |
 | **Groups** | `Y/X` | Y = groups on device today; X = brand standard for same platform |
 | **On device** | Single number | Total groups on phone/PC (daily) |
-| **In brand** | `y/x` | Master groups joined on this account / total master |
+| **Junk / Missing / Not admin** | Gap badges | Counts for issues (see §5) — not a separate Ticket tab |
 | **Admin** | Bar + `a/X` | How many groups you are admin of vs standard |
-| **Scraper** | **Run** + time / progress | Full group read into database |
+| **Last update** | Timestamp / progress | Full scrape status — **read-only** (no Run button) |
 | **Action** | **Group link** | Open group list + invite links |
 
 **Important:** WhatsApp and Telegram totals are **separate** — do not compare `Y/X` across platforms on one row.
@@ -258,7 +250,7 @@ Sync behavior depends on **Session** column value.
 |------|----------------|
 | 1 | Click **↻** |
 | 2 | App checks WA/TG still active on **this PC** |
-| 3 | If OK: **Groups** / **Admin** numbers update |
+| 3 | If OK: **Groups** / **Admin** numbers update; may offer **Scrape now** / **Later** |
 | 4 | If failed: prompted to log in again |
 
 **Notes:**
@@ -280,9 +272,11 @@ Sync behavior depends on **Session** column value.
 | **Scrape now** | Full scrape — all groups written to database (modal after Sync) |
 | **Sync** | Session check + summary counts — not always a full scrape |
 
-There is **no separate Run button** in the grid.
+There is **no separate Run button** in the grid. **Last update** is read-only.
 
 After login, you may see: *Login OK. Device group & admin counts are updated. Save the full group list to the database now?* → choose **Scrape now** or **Later**.
+
+**Later** = session stays Active/Valid in UI + DB only — **no** scrape and **no** device group recount from a full scrape. **Cancel scrape** stops the running scrape entirely.
 
 ### 4.7 Group link modal
 
@@ -300,7 +294,7 @@ Open via **Action → Group link**. Choose a mode:
 | Admin filter | All / admin only / non-admin |
 | Pagination | Previous / Next when many groups |
 
-**Admin vs master** total matches the Groups/Admin denominator (X) and the **WA x Group** badge — device junk groups are **not** listed here (see Tickets → Junk).
+**Admin vs master** total matches the Groups/Admin denominator (X) and the **WA x Group** badge — device junk groups are **not** listed here (see Junk on Account / Leave in Operations).
 
 Empty list? **Sync** → **Scrape now** first. Message: *No links. Scrape via Sync first.*
 
@@ -312,7 +306,7 @@ Empty list? **Sync** → **Scrape now** first. Message: *No links. Scrape via Sy
 | 2 | Confirm **Remove from slot?** → **Remove** |
 | 3 | Effect | Account deactivated in DB; device session cleared on this PC (WA: local auth removed) |
 
-Use before swapping test accounts for production marketing accounts — or let IT delete from database (see §7).
+Use before swapping test accounts for production marketing accounts — or let IT delete from database (see §8).
 
 ### 4.9 Add brand card
 
@@ -337,118 +331,97 @@ Modal actions: close, switch QR ↔ phone, verify code/password, **OK** when con
 | Telegram QR timeout | *Telegram QR timed out…* | Restart app; IT checks API keys in `.env` |
 | WhatsApp QR timeout | *WhatsApp QR timed out…* | Restart; ensure WhatsApp Web reachable on PC |
 
+### 4.12 Parallelism (desktop)
+
+| Pool | Limit | Notes |
+|------|-------|-------|
+| User execute (Sync / Scrape now / Job Queue) | Up to **10** slots per platform | WA and TG pools are separate |
+| Automatic account scrape | Max **6** brands per platform | Separate auto lane — does not take user execute slots |
+
 ---
 
-## 5. Ticket tab — issues and remediation
+## 5. Issues on Account — types and remediation
 
-### 5.1 When do tickets appear?
+### 5.1 Where do issues appear?
 
-After an account has scrape/sync data, the system compares **device groups (daily snapshot)** vs **brand master**. Mismatches create tickets automatically.
+There is **no Ticket tab**, **no Process modal**, and **no** `ticket_issue_handles` / In Progress workflow.
 
-Ticket card counts use the **same engine** as the Groups/Admin columns on the Account tab — not raw database row counts.
+After scrape/sync data exists, the app compares **device groups (daily)** vs **brand master** **in memory**. Gaps show on the **Account** tab as **not aligned** state and **Junk / Missing / Not admin** badges (same engine as Groups/Admin columns).
 
-### 5.2 Issue types (filter: All ticket types)
+### 5.2 Issue types (exactly five)
 
-| Type (UI) | Short meaning | Typical field action |
-|-----------|---------------|----------------------|
-| **Missing group** | In brand master but not on this account | Join group (use export invite links) |
-| **Not admin** | In group but not admin | Request admin rights |
-| **Duplicate group ID** | Same ID, conflicting names | Audit master data |
-| **Duplicate group name** | Same name, different IDs in master | Audit master data |
-| **Device junk group** | On phone but not in master | Leave/clean junk groups on phone |
+| Type (internal) | UI meaning | Typical remediation |
+|-----------------|------------|---------------------|
+| **daily_junk_group** | **Junk** — on device, not in brand master | **Operations → Leave / exit** (Job Queue SETUP) |
+| **missing_group** | **Missing** / Need to join — in master, not on account | **Operations → Join missing** (SETUP) |
+| **not_admin** | **Not admin** — joined but not admin | **Operations → Set admin** (SETUP) |
+| **duplicate_group_id** | Same group ID, conflicting names | Audit master data (IT) |
+| **duplicate_group_name** | Same name, different IDs | Audit master data (IT) |
 
-Session login/logout does **not** create tickets.
+There is **no** `group_count_mismatch` (aggregate Y≠X) ticket type. Session login/logout does **not** create issues.
 
-### 5.3 Ticket toolbar
-
-| Tool | Function |
-|------|--------|
-| Search | *Search account / group…* |
-| Filter Brand / Platform / Type | Narrow issue list |
-| **Bookmark: In Progress** | Issues marked *In Progress* |
-| **Bookmark: Completed** | Issues marked *Complete* |
-| **Export** | Excel for all issues **matching filters** |
-
-**Issue workflow views:** In Progress · Completed
-
-### 5.4 Issue card
-
-Each card = **one issue** per: account + brand + issue type.
-
-| Section | Content |
-|---------|---------|
-| Title | Account name |
-| Badge | Issue type (color-coded) |
-| Platform | WA / TG |
-| Meta | Phone · brand |
-| Description | Summary (group counts, headlines) |
-| **Process** / **New** / status caption | Workflow — **click** to open handle form |
-| **Double-click card** | Full **detail** table (all group rows) |
-
-Hint on card: *Double-click for full detail table*
-
-### 5.5 Process modal (workflow)
-
-| Field | Function |
-|-------|----------|
-| **Task status** | To Do → In Progress → Complete / Interrupted |
-| Due dates / remarks | Stored in database (`ticket_issue_handles`) |
-| **Save** | Persist and close |
-| **Export** | Excel for this issue only |
-
-Bookmarks **In Progress** / **Completed** follow the saved task status.
-
-### 5.6 Detail modal (double-click)
-
-| Feature | Function |
-|---------|----------|
-| Full table | All groups involved in the issue |
-| **Export** | Field remediation reference for this issue |
-| Close | **Esc** or click outside — **Close** button |
-
-### 5.7 Ticket ↔ Account relationship
+### 5.3 How to remediate
 
 | Step | Action |
 |------|--------|
-| 1 | Fix groups on phone (join, admin, remove junk) |
-| 2 | On affected account: **Sync** or **Run** again |
-| 3 | Tickets close or shrink when data aligns (realtime after DB update) |
+| 1 | On Account, find **not aligned** rows and read Junk / Missing / Not admin counts |
+| 2 | Open **Operations** → Job Queue → brand → SETUP for Join / Set admin / Exit as needed |
+| 3 | After jobs finish: **Sync → Scrape now** on the account so daily data refreshes |
+| 4 | Badges shrink when daily aligns with master (realtime after DB update) |
 
-If tickets remain after phone fix: **Run** scraper to push latest device data. After scrape, ticket counts and Groups columns refresh from the latest database (not stale cache).
+If gaps remain after phone/automation fix: run **Sync → Scrape now** again so the latest device data reaches the database.
 
 ---
 
 ## 6. Group matrix — join/admin (Account header)
 
-The Reporting tab shell was **removed**. Join/admin matrix opens from the Account brand card **group count badge** (`BrandMasterGroupsModal`) — read-only.
+The Reporting shell tab was **removed**. Join/admin matrix opens from the Account brand card **group count badge** — read-only.
 
 | Control | Purpose |
 |---------|---------|
-| Entry | Account → brand card header → group count |
+| Entry | Account → brand card header → **WA/TG Group** badge |
 | **Full Group / Full Admin** | Join or admin Yes/No vs master (all accounts on that brand+platform) |
 | Search / Status | Filter by name / stock status |
 | Column filter | Yes / No / All on account headers |
 
-Updates automatically after scrape or Supabase changes (`rm-reporting-reload`).
+Updates automatically after scrape or Supabase changes. UI shows the latest matrix without relying on a separate Reporting page.
 
 ---
 
-## 7. Admin page
+## 7. Operations — Job Queue
 
-Open from sidebar: **Admin**.
+**Operations** is **Job Queue only** — there is no Overview tab. Stock summary is on the Account brand header chips (§4.2).
 
-Subtitle: *System status and application preferences*
+| Area | Function |
+|------|----------|
+| Brand cards | Expand brand → queue tables per action type |
+| **Join missing** | Enqueue joins using invite links from brand master |
+| **Create group** | Create groups on device + export invite link |
+| **Set admin** | Promote target account where owner is admin |
+| **Exit / delete** | Leave junk (and delete when enabled in Settings → Worker) |
+| **Set photo** | Brand group photo jobs (Telegram) |
+| **SETUP** modals | Pick accounts/groups, then queue — uses live device data |
 
-### 6.1 System status
+Session must be **Active** to open Job Queue setup for that account. Worker delays and leave/delete guards are configured under **Settings** (§8).
+
+---
+
+## 8. Settings
+
+Open from sidebar: **Settings** (`/settings`).
+
+Subtitle: *Application preferences*
+
+### 8.1 System status
 
 | Card | Meaning |
 |------|---------|
 | **Supabase** | **Connected** = database reachable |
-| **Active sessions** | Placeholder (not a live session count) |
+| **Active sessions** | Count of active messaging sessions for your user |
 | **Platform** | Desktop / Web |
 | **Session tables** | Count of active RM session tables |
 
-### 6.2 IT tools (desktop only)
+### 8.2 IT tools (desktop only)
 
 | Button | Function | Typical user |
 |--------|----------|--------------|
@@ -459,20 +432,28 @@ Operational users normally **do not** need the config folder if IT installed the
 
 **Auto-update:** Updates download from GitHub automatically. **Restart** when prompted — no reinstall.
 
-### 6.3 Preferences
+### 8.3 Preferences — Automatic account scrape
 
-#### Automatic account sync
+Replaces the old “Automatic account sync” + interval (minutes) controls.
 
-| Option | Function |
-|--------|----------|
-| **Enabled** | Background checks while app is open (same logic as per-account **Sync**) |
-| **Interval (minutes)** | How often to run (default often 60 minutes) |
+| Control | Function |
+|---------|----------|
+| **On Scheduled** | Default **On** — once per day at the scheduled local time (app must be open) |
+| **Daily run at** | Default **12:00 PM** (local) |
+| **Scrape Now** | Default **Off** — one-shot auto scrape; when **On**, brand checkboxes start **all unchecked**; Status shows **standby** until Execute |
+| Brand checklist | Max **6** brands per platform (WA and TG separate) |
+| Default brands (Scheduled) | **FWSG**, **JMMY**, **M24SG**, **SBMY**, **STMY**, **WBSG** |
 
-Logs activity to the database with timestamps. Does **not** replace a full **Run** scrape when no scrape data exists yet.
+| Mode | Primary buttons |
+|------|-----------------|
+| **On Scheduled** (Scrape Now Off) | **Save** / **Cancel** |
+| **Scrape Now** On | **Execute** / **Discard** |
 
-Summary on Admin card: *On · N min* or *Off*.
+After **Execute** finishes, settings **reset to defaults**: On Scheduled **On**, Scrape Now **Off**, **12:00 PM**, the six default brands.
 
-#### Language
+Auto scrape uses its own lane (max **6** brands/platform) and does **not** consume the user execute pool (up to **10**).
+
+### 8.4 Language
 
 | Choice | Effect |
 |--------|--------|
@@ -481,13 +462,17 @@ Summary on Admin card: *On · N min* or *Off*.
 
 Change applies immediately across dashboard captions.
 
+### 8.5 Worker settings (WhatsApp / Telegram)
+
+Expand cards for human delays, create-group defaults, invite-by-link throttle, set-admin delays, and leave/delete guards. Values are applied when you **enqueue** Job Queue tasks (frozen into the job payload).
+
 ---
 
-## 8. Data synchronization (realtime)
+## 9. Data synchronization (realtime)
 
-### 7.1 Database changes → open apps
+### 9.1 Database changes → open apps
 
-When IT or automation changes **Supabase** (accounts, tickets, master groups, session flags):
+When IT or automation changes **Supabase** (accounts, master groups, daily scrape, session flags):
 
 | Behavior | Detail |
 |----------|--------|
@@ -496,7 +481,9 @@ When IT or automation changes **Supabase** (accounts, tickets, master groups, se
 
 Example: IT deletes a test account → row disappears on every user’s dashboard.
 
-### 7.2 Code / UI changes → app update
+After a scrape commits daily + master, Account badges and the Group matrix reload from the latest database (not a stale Ticket cache).
+
+### 9.2 Code / UI changes → app update
 
 Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.4](../../PROJECT.md).
 
@@ -505,22 +492,22 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 | Data in Supabase | Realtime |
 | New buttons, layout, logic | New `.exe` version |
 
-### 7.3 PC vs cloud storage
+### 9.3 PC vs cloud storage
 
 | Location | Contents |
 |----------|----------|
-| **Cloud (Supabase)** | Brands, accounts, groups, tickets, session flags |
-| **PC (AppData)** | WhatsApp auth per account (**only on the PC that scanned QR**), auto-sync preference, language |
+| **Cloud (Supabase)** | Brands, accounts, groups, session flags |
+| **PC (AppData)** | WhatsApp auth per account (**only on the PC that scanned QR**), auto-scrape preference, language, worker settings |
 
 **WhatsApp multi-PC:** Session does not move between PCs. Hand off → **Clear Session** on the old PC (optional) → new operator **Sync** + scan QR on their PC.
 
-**Telegram multi-PC:** Session string is in the cloud — another PC can **Sync**/**Run** while Session is **Valid**. Hand off → **Clear Session** (required) so the new operator scans QR on their PC.
+**Telegram multi-PC:** Session string is in the cloud — another PC can **Sync** / scrape while Session is **Valid**. Hand off → **Clear Session** (required) so the new operator scans QR on their PC.
 
 ---
 
-## 9. Recommended daily workflows
+## 10. Recommended daily workflows
 
-### 8.1 Onboard a new marketing account (after test data cleanup)
+### 10.1 Onboard a new marketing account (after test data cleanup)
 
 | # | Step |
 |---|------|
@@ -528,37 +515,45 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 | 2 | Open target brand (or **Add Card View**) |
 | 3 | **+Add** → WA or TG → name + phone → **Save** |
 | 4 | **↻ Sync** → scan QR on marketing phone |
-| 5 | If prompted → **Run** scraper |
-| 6 | **Ticket** tab → handle issues → **Export** if needed |
-| 7 | Repeat per account |
+| 5 | If prompted → **Scrape now** |
+| 6 | Review Account badges (Junk / Missing / Not admin) |
+| 7 | **Operations** Job Queue SETUP to remediate → scrape again after jobs |
+| 8 | Repeat per account |
 
-### 8.2 Routine health check
+### 10.2 Routine health check
 
 | # | Step |
 |---|------|
 | 1 | **Account** tab — set brand/platform filters |
 | 2 | Review **N accounts not aligned** on brand headers |
 | 3 | **Sync** rows with **Invalid** session |
-| 4 | **Run** where counts are stale or not aligned |
-| 5 | **Ticket** tab — bookmark **In Progress** → remediate → mark **Complete** |
+| 4 | **Sync → Scrape now** where counts are stale or not aligned |
+| 5 | Remediate via **Operations** Job Queue, then scrape again |
 
-### 8.3 Replace test accounts with production accounts
+### 10.3 Replace test accounts with production accounts
 
 **Option A (recommended):** **Remove from slot** for each test account in app → IT cleans database  
 
 **Option B:** IT deletes rows in Supabase → dashboard clears in realtime → team **+Add** and platform login for new accounts
 
-### 8.4 End of shift
+### 10.4 End of shift
 
 | Task | Action |
 |------|--------|
 | Leave sessions linked | OK — dashboard logout does not unlink phone |
-| Hand off open tickets | Set **In Progress** + remarks in **Process** modal |
-| Export for next shift | Ticket or Account **Export** with filters applied |
+| Hand off open gaps | Note not-aligned accounts / Job Queue status for next shift |
+| Export for next shift | Account **Export** with filters applied |
+
+### 10.5 Overnight / batch scrape
+
+| Task | Action |
+|------|--------|
+| Scheduled | **Settings** → Automatic account scrape → **On Scheduled** On + time (default 12:00 PM) → **Save** (app must stay open) |
+| One-shot | Turn **Scrape Now** On → select up to 6 brands → **Execute** → wait → settings reset to defaults |
 
 ---
 
-## 10. Glossary
+## 11. Glossary
 
 | Term | Definition |
 |------|------------|
@@ -569,16 +564,19 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 | **Aligned** | Device groups match brand standard for that platform |
 | **Session Valid** | Active session record in DB (may still need device check today) |
 | **Sync** | ↻ button — login or live device verification |
-| **Run / Scraper** | Full read of groups from phone → database |
-| **Ticket / Issue** | Remediation task for group data |
-| **Bookmark** | Ticket filters: In Progress / Completed |
+| **Scrape now** | Full read of groups from phone → database (via Sync prompt) |
+| **Issue / gap** | In-memory mismatch (junk / missing / not admin / duplicates) on Account |
+| **Job Queue** | Operations automation (join, create, set admin, exit, photo) |
+| **Stock chips** | Account header summary — not Operations Overview |
+| **Group matrix** | Read-only join/admin matrix from brand header badge |
 | **Slicer** | Filter & tool bar above cards/table |
-| **Group Monitoring** | Main module for accounts and tickets |
+| **Group Monitoring** | Main module for Account and Operations |
+| **Settings** | Preferences page at `/settings` |
 | **Backend Operation** | Product family name shown in sidebar |
 
 ---
 
-## 11. FAQ
+## 12. FAQ
 
 **Do I need to reinstall when the app updates?**  
 No. **Restart** after the update notification (if IT published to GitHub).
@@ -586,17 +584,23 @@ No. **Restart** after the update notification (if IT published to GitHub).
 **Does deleting data in Supabase remove the installer?**  
 No. Only dashboard data changes.
 
-**Why is Session Valid but Run still asks for login?**  
+**Why is Session Valid but scrape still asks for login?**  
 This PC may have lost the device session — click **Sync** to verify.
 
 **What does Groups `12/21` mean?**  
 12 groups detected on device; 21 = brand standard for that platform (WA and TG counted separately).
 
 **Can one PC host many WhatsApp accounts?**  
-Yes — hundreds are supported, but each account needs its own QR scan; Chrome processes are limited (~4 concurrent).
+Yes — hundreds are supported, but each account needs its own QR scan. User execute concurrency is up to **10** per platform; auto scrape is max **6** brands per platform.
 
-**Tickets remain after I fixed groups on the phone?**  
-Click **Run** or **Sync** so fresh device data reaches the database.
+**Gaps remain after I fixed groups on the phone?**  
+Use **Sync → Scrape now** so fresh device data reaches the database, then check Account badges again.
+
+**Where did the Ticket tab go?**  
+Removed. Issues show on **Account**; fix via **Operations → Job Queue**.
+
+**Is there a group_count_mismatch issue type?**  
+No. Only five types: junk, missing, not admin, duplicate ID, duplicate name.
 
 **Dashboard login fails?**  
 Contact IT — account required in `users` table.
@@ -618,7 +622,10 @@ For WhatsApp, no — auth stays on your PC until they **Clear Session** (or you 
 For Telegram, another PC can use the account while Session is **Valid** (session string is in the cloud). Hand off to a new operator with **Clear Session** so they scan QR on their PC.
 
 **Where is UI language changed?**  
-**Admin** → **Preferences** → **Language** → English or 中文.
+**Settings** → **Language** → English or 中文.
+
+**Where is automatic scrape configured?**  
+**Settings** → **Automatic account scrape** (On Scheduled / Scrape Now) — not an interval-in-minutes sync.
 
 ---
 
@@ -631,23 +638,31 @@ Login (Username / Password)
         │     ├─ KPI: Brands, Accounts, Online, Aligned, Issue, Open issues
         │     ├─ Slicer: Search, Brand, Platform, Status, Card|Table, Export
         │     └─ Per Brand Card
+        │           ├─ Header: stock chips + WA/TG Group badge → Group matrix modal
         │           ├─ +Add account (WhatsApp / Telegram)
-        │           ├─ Row: Sync ↻ | Remove X (account) | Clear X (session) | Group link
-        │           └─ Scraper: Run
-        └─ [Tab Ticket]
-              ├─ KPI: Open, Missing, Not admin, Groups to handle, …
-              ├─ Slicer: Search, filters, In Progress | Completed, Export
-              ├─ 6 issue types
-              └─ Issue card → Process modal | Double-click Detail
-  └─ Admin
+        │           ├─ Row: Sync ↻ | Remove X | Clear Session X | Group link
+        │           ├─ Last update (read-only) — scrape via Sync → Scrape now
+        │           └─ Issues: Junk / Missing / Not admin (5 types, in-memory)
+        └─ [Tab Operations] — Job Queue only
+              ├─ Join missing | Create group | Set admin | Exit/delete | Set photo
+              └─ SETUP → enqueue (live device / master data)
+  └─ Settings (/settings)
         ├─ System status (Supabase, Platform, …)
         ├─ Open configuration folder / Check for app updates (IT)
-        └─ Automatic account sync + Language (EN / 中文)
+        ├─ Automatic account scrape (On Scheduled / Scrape Now)
+        ├─ Language (EN / 中文)
+        └─ Worker settings (WA / TG)
 ```
 
-### Appendix B — Issue type → export columns (detail export)
+### Appendix B — Issue type → remediation
 
-Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type, Group name, Group ID, Invite link, Note.
+| Type | Account badge | Typical Job Queue action |
+|------|---------------|--------------------------|
+| daily_junk_group | Junk | Leave / exit |
+| missing_group | Missing | Join missing |
+| not_admin | Not admin | Set admin |
+| duplicate_group_id | (audit) | Master data fix |
+| duplicate_group_name | (audit) | Master data fix |
 
 ### Appendix C — Related documents
 

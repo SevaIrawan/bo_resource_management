@@ -134,7 +134,7 @@ Logout
 </tr>
 </tbody></table>
 <blockquote>
-<p>Stock overview <strong>tidak</strong> di tab Operations. Chip stock + Avg ND / To prep hidup di <strong>header brand card</strong> (tab Account).<br>Tidak ada tab <strong>Reporting</strong> terpisah. Matrix join/admin dibuka dari <strong>badge jumlah grup</strong> di header brand card.</p>
+<p>Stock overview <strong>tidak</strong> di tab Operations. Chip stock + Avg ND / To prep hidup di <strong>header brand card</strong> (tab Account).<br>Tidak ada tab <strong>Reporting</strong> atau <strong>Ticket</strong> terpisah. UI hidup: <strong>Account | Operations</strong>; konfigurasi di sidebar <strong>Settings</strong> (<code>/settings</code>). Matrix join/admin dibuka dari <strong>badge jumlah grup</strong> di header brand card.</p>
 </blockquote>
 <p>Menu <strong>Refresh</strong> di header tab = muat ulang data tab aktif dari server.</p>
 <hr />
@@ -213,9 +213,9 @@ Logout
 <td>Bookmark di modal</td>
 </tr>
 <tr>
-<td>Auto-scrape harian</td>
-<td>Settings</td>
-<td>Scrape otomatis (jam tertentu, app harus terbuka)</td>
+<td>Auto-scrape harian / Scrape Now</td>
+<td>Settings → Automatic account scrape</td>
+<td>On Scheduled + Scrape Now (default 12:00 PM; lihat §11)</td>
 </tr>
 <tr>
 <td>Kebijakan stock &amp; worker</td>
@@ -649,7 +649,7 @@ Logout
 <p>Data ikut update setelah scrape selesai (event realtime <code>rm-reporting-reload</code>, debounce ~500 ms).</p>
 <hr />
 <h2 id="11-settings-apa-yang-perlu-di-set">11. Settings — apa yang perlu di-set</h2>
-<p>Buka <strong>Settings</strong> di sidebar.</p>
+<p>Buka <strong>Settings</strong> di sidebar (<code>/settings</code>; path lama <code>/admin</code> dialihkan ke sini).</p>
 <table>
 <thead>
 <tr>
@@ -671,7 +671,7 @@ Logout
 <tr>
 <td><strong>Automatic account scrape</strong></td>
 <td><strong>Ya, jika mau</strong></td>
-<td>On/Off + jam harian (app harus terbuka)</td>
+<td>On Scheduled + Scrape Now — lihat kontrak di bawah</td>
 </tr>
 <tr>
 <td><strong>Operations stock policy</strong></td>
@@ -695,6 +695,54 @@ Logout
 </tr>
 </tbody></table>
 <p><strong>Penting create group:</strong> nilai permission di <strong>Settings</strong> = default saat buka modal SETUP. Perubahan di modal SETUP hanya untuk <strong>job itu</strong> — tidak menulis balik ke Settings.</p>
+<h3 id="automatic-account-scrape-kontrak-penuh">Automatic account scrape (kontrak penuh)</h3>
+<p>Dua mode di kartu yang sama:</p>
+<table>
+<thead>
+<tr>
+<th>Kontrol</th>
+<th>Arti</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>On Scheduled</strong></td>
+<td>Scrape otomatis pada jam harian (app harus <strong>terbuka</strong>)</td>
+</tr>
+<tr>
+<td><strong>Scrape Now</strong></td>
+<td>Jalankan scrape sekali untuk brand yang dicentang</td>
+</tr>
+</tbody></table>
+<p><strong>Default idle (factory):</strong></p>
+<ul>
+<li>On Scheduled = <strong>On</strong></li>
+<li>Scrape Now = <strong>Off</strong></li>
+<li>Jam harian = <strong>12:00 PM</strong></li>
+<li>Brand On (per platform, max 6): <strong>FWSG, JMMY, M24SG, SBMY, STMY, WBSG</strong></li>
+</ul>
+<p><strong>Tombol menurut mode:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Tombol</th>
+<th>Perilaku</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scrape Now <strong>Off</strong></td>
+<td><strong>Save</strong> / <strong>Cancel</strong></td>
+<td>Simpan atau buang edit jadwal/brand</td>
+</tr>
+<tr>
+<td>Scrape Now <strong>On</strong></td>
+<td><strong>Execute</strong> / <strong>Discard</strong></td>
+<td>Execute mulai scrape; Discard keluar mode tanpa jalan</td>
+</tr>
+</tbody></table>
+<p><strong>Setelah Execute selesai</strong> → <strong>factory reset</strong> ke default idle di atas.</p>
+<p><strong>Saat Scrape Now On</strong> (siap execute, belum/idle cycle): Status = <strong>standby</strong>, Time = <strong>"-"</strong> (bukan hasil run lama).</p>
+<p>Scheduled yang sedang jalan mengunci Scrape Now sampai selesai. Tidak ada catch-up jika app tutup pada jam jadwal.</p>
 <hr />
 <h2 id="12-di-mana-melihat-apa">12. Di mana melihat apa</h2>
 <table>
@@ -785,7 +833,7 @@ Logout
 <p><strong>Sync atau scrape penuh dulu?</strong><br>Session Invalid → Sync dulu. Sudah Valid tapi angka salah → Sync → <strong>Scrape now</strong>.</p>
 <p><strong>Kenapa Job Queue selesai tapi grid belum berubah?</strong><br>Wajib <strong>Sync → Scrape now</strong> setelah job mengubah grup di HP.</p>
 <p><strong>Boleh Sync saat job jalan?</strong><br>Tidak di akun yang sama — tunggu job selesai.</p>
-<p><strong>Auto-scrape tidak jalan?</strong><br>App harus terbuka pada jam yang di-set. Tidak ada catch-up jika app tutup.</p>
+<p><strong>Auto-scrape tidak jalan?</strong><br>App harus terbuka pada jam <strong>On Scheduled</strong>. Cek Settings → Automatic account scrape (default 12:00 PM). Tidak ada catch-up jika app tutup. Scrape Now memakai <strong>Execute</strong> (bukan Save).</p>
 <p><strong>Siapa yang develop app?</strong><br>Tim developer internal. Tim R&amp;M hanya <strong>pakai</strong> Group Monitoring — laporkan bug ke developer, bukan dijelaskan di panduan operasional ini.</p>
 <hr />
 <p><em>Panduan ini untuk modul <strong>Group Monitoring</strong> v1.0.30 — tim operasional Depart Resource Management.</em></p>

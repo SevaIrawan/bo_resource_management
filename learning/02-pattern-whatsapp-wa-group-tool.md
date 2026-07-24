@@ -1,6 +1,4 @@
-# Pola WhatsApp — `wa-group-tool_fixed`
-
-Path contoh: `learning Script Worker/wasapp/wa-group-tool_fixed - FWSG - Cassey/`
+# Pola WhatsApp — group tool (set photo / leave / delete)
 
 ## Modul bersama
 
@@ -80,7 +78,7 @@ Skip jika `Clean` = `Deleted` atau `Not Found`.
 
 ## Mapping ke RM Admin settings
 
-| Learning WA | `WorkerLeaveDeleteSettings` |
+| Pola desain WA | `WorkerLeaveDeleteSettings` |
 |-------------|----------------------------|
 | leave-groups enabled | `leaveEnabled` |
 | delete-group-chats | `deleteEnabled` (default OFF) |

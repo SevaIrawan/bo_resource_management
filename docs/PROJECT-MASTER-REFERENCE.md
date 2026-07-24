@@ -1,6 +1,6 @@
 # Resource Management — Referensi Master Proyek
 
-**Versi dokumen:** 2026-06-30  
+**Versi dokumen:** 2026-07-24  
 **Versi aplikasi:** 1.0.30 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
@@ -46,17 +46,17 @@ Dokumen ini melengkapi (bukan mengganti):
 1. [Ringkasan produk](#1-ringkasan-produk)
 2. [Navigasi & halaman](#2-navigasi--halaman)
 3. [Brand Card & slot akun](#3-brand-card--slot-akun)
-4. [Grid 9 kolom — tampilan & data](#4-grid-9-kolom--tampilan--data)
+4. [Grid 10 kolom — tampilan & data](#4-grid-10-kolom--tampilan--data)
 5. [Clear Session](#5-clear-session)
 6. [Kolom Action — state machine](#6-kolom-action--state-machine)
 7. [Metrik Y/X (Groups & Admin)](#7-metrik-yx-groups--admin)
 8. [Alur Sync (tombol ↻)](#8-alur-sync-tombol-)
-9. [Alur Scraper / Run](#9-alur-scraper--run)
+9. [Alur Scrape (Sync → Scrape Now)](#9-alur-scrape-sync--scrape-now)
 10. [Cancel Scrape](#10-cancel-scrape)
 11. [Modal login platform](#11-modal-login-platform)
 12. [Issue KPI (engine in-memory)](#12-issue-kpi-engine-in-memory)
 13. [Group matrix (Account header)](#13-group-matrix-account-header)
-14. [Realtime & auto-sync](#14-realtime--auto-sync)
+14. [Realtime & auto-scrape](#14-realtime--auto-scrape)
 15. [Database Supabase](#15-database-supabase)
 16. [Electron & sidecar](#16-electron--sidecar)
 17. [Hak akses (Admin vs Operator)](#17-hak-akses-admin-vs-operator)
@@ -88,7 +88,7 @@ Aplikasi **desktop Electron** multi-platform untuk memantau dan mengoperasikan b
 
 **Prinsip data (kode):**
 
-- Data bisnis (brand, akun, grup, ticket, session flag) → **Supabase** (`src/config/tables.ts`).
+- Data bisnis (brand, akun, grup, session flag) → **Supabase** (`src/config/tables.ts`). Issue = in-memory (bukan tabel ticket).
 - Auth WA on-disk → `{userData}/wa-sessions/` — `electron/main/platformLogin/whatsapp.ts` (`app.getPath('userData')`).
   - Windows contoh: `%APPDATA%\Resource Management\wa-sessions\` — lihat `INSTALL-WINDOWS.md`.
   - Linux/macOS: path `userData` OS masing-masing — lihat `INSTALL-LINUX.md` / `INSTALL-MACOS.md`.
@@ -102,16 +102,16 @@ Routing: `src/App.tsx` (HashRouter)
 | Path | Halaman | Akses | Sumber |
 |------|---------|-------|--------|
 | `/login` | Login app (`loginWithCredentials` → tabel `users`) | Guest | `src/lib/auth.ts`, `src/App.tsx` |
-| `/` | Group Monitoring — tab **Account** + **Operations** | Login required | `GroupMonitoringPage.tsx` |
-| `/admin` | Admin settings | `AdminRoute` — username `admin` | `AdminRoute.tsx` |
-| `/settings` | Redirect → `/admin` jika admin, else `/` | Login required | `SettingsRedirect.tsx` |
+| `/` | Group Monitoring — tab **Account** + **Operations** only | Login required | `GroupMonitoringPage.tsx` |
+| `/settings` | Settings (language, Automatic account scrape, worker, stock policy) | `AdminRoute` — username `admin` | `SettingsPage.tsx`, `App.tsx` |
+| `/admin` | **Redirect → `/settings`** | Login required | `App.tsx` → `<Navigate to="/settings" />` |
 
-**Sync / Run / Cancel:** hanya user dengan `canOperatePlatform` (= role **admin**). Operator **bisa lihat** grid, tombol terkunci (`PermissionLockedButton`). Sumber: `userRole.ts` → `permissionsForRole()`.
+**Sync / Scrape Now / Cancel:** hanya user dengan `canOperatePlatform` (= role **admin**). Operator **bisa lihat** grid, tombol terkunci (`PermissionLockedButton`). Sumber: `userRole.ts` → `permissionsForRole()`.
 
 **Group Monitoring** — `GroupMonitoringPage.tsx` + `useMonitoringTab()`:
 
-- **Account** — brand card, grid akun, sync/scrape, KPI issue (engine `accountMasterDailyCompare`), **stock chips** + **Group matrix** di header kartu (`AccountBrandStockChips`, `BrandMasterGroupsModal`)
-- **Operations** — **Job Queue** saja (stock overview sudah di header Account) — `OperationsMonitoringPanel.tsx`
+- **Account** — brand card, grid akun, sync/scrape via **Sync → Scrape now**, KPI issue (engine `accountMasterDailyCompare`), **stock chips** + **Group matrix** di header kartu (`AccountBrandStockChips`, `BrandMasterGroupsModal`)
+- **Operations** — **Job Queue** saja (join, create→photo, set_admin, leave→delete) — `OperationsMonitoringPanel.tsx`
 
 View mode Account: **Card** (satu kartu per brand) atau **Table** (semua baris flat). State di slicer header.
 
@@ -132,7 +132,7 @@ Satu **Brand Card** = satu brand bisnis (`AccountBrandGroup`).
 - Menu **+ Add account** (WA atau TG)
 - Tombol dismiss brand (admin)
 
-**Body kartu (expanded):** tabel 9 kolom — lihat [§4](#4-grid-9-kolom--tampilan--data).
+**Body kartu (expanded):** tabel 10 kolom — lihat [§4](#4-grid-10-kolom--tampilan--data).
 
 **File:** `AccountBrandCard.tsx`, `AccountBrandCardList.tsx`, `AccountBrandTableView.tsx`
 
@@ -157,15 +157,16 @@ Satu **Brand Card** = satu brand bisnis (`AccountBrandGroup`).
 
 ---
 
-## 4. Grid 9 kolom — tampilan & data
+## 4. Grid 10 kolom — tampilan & data
 
-Definisi kolom: `AccountMonitoringTableParts.tsx` (`ACCOUNT_TABLE_COLUMN_COUNT = 9`)
+Definisi kolom: `AccountMonitoringTableParts.tsx` (`ACCOUNT_TABLE_COLUMN_COUNT = 10`)
 
 ```
-| Account | Brand | Status | Session | Groups | On device | In brand | Admin | Scraper | Action |
+Card: | Account | Role | Location | Session | On device | Junk | In brand | Admin | Last update | Action |
+Flat: | Account | Brand | Role | Location | Session | On device | Junk | In brand | Admin | Action |
 ```
 
-Lebar default (user-resizable): **Account 20%**, kolom lain **10%** masing-masing — `index.css` + `AccountMonitoringTableColGroup`.
+(Flat/Table view **tanpa** Last update.)
 
 Implementasi sel: `AccountMonitoringCells.tsx`  
 Type baris: `AccountBrandRow` di `types/accountMonitoringUi.ts`
@@ -180,43 +181,26 @@ Type baris: `AccountBrandRow` di `types/accountMonitoringUi.ts`
 | **[↻] Sync** | Memicu alur Sync — `handleSyncAccount` |
 | **[X] Remove** | Hover baris — hapus akun dari slot (permission structure) |
 
-### 4.2 Kolom Brand
+### 4.2 Kolom Brand (flat / Table view saja)
 
 - Teks `row.brandName` (truncate)
 
-### 4.3 Kolom Status (`row.status`)
+### 4.3 Kolom Role / Location / Session
 
-| Badge | Kondisi | Sumber |
-|-------|---------|--------|
-| **Active** (hijau) | `status === 'active'` | `AccountMonitoringCells.tsx` → `StatusBadge` |
-| **Logout** (merah) | `status === 'logout'` | idem |
+| Kolom | Catatan |
+|-------|---------|
+| **Role** | Peran akun di brand |
+| **Location** | Label lokasi device |
+| **Session** | VALID / INVALID; Clear Session (X) saat Valid — lihat [§5](#5-clear-session) |
 
-**Set saat load:** `loadAccountMonitoring.ts` → `accountRowFromDb()`:
+Badge Active/Logout mengikuti session saat hydrate (`loadAccountMonitoring.ts`).
 
-```ts
-const sessionStatus = hasSession ? 'valid' : 'invalid';
-const status = sessionStatus === 'valid' ? 'active' : 'logout';
-```
-
-`hasSession` = akun ada di set `platform_sessions` aktif (`fetchActiveSessionAccountIdSet`).
-
-Kolom **Session** (VALID/INVALID) terpisah; badge Status mengikuti `sessionStatus` saat hydrate awal.
-
-### 4.4 Kolom Session (`row.sessionStatus`)
-
-| Tampilan | Kondisi |
-|----------|---------|
-| Badge **VALID** | `sessionStatus === 'valid'` |
-| Badge **INVALID** | `sessionStatus === 'invalid'` |
-| Marquee **Checking Session on Device** | `actionProcess === 'session_check'` — probe device sedang jalan |
-| `—` | Baris `pending` |
-
-**Aturan UX penting (produksi):**
+**Aturan UX Session (produksi):**
 
 | Situasi | Kolom Session |
 |---------|---------------|
-| INVALID + Sync/Run → modal login | Tetap badge **INVALID** (bukan Checking Session) |
-| VALID + Sync/Run → probe device | **Checking Session** (timeout **20s**, retry busy — `deviceSessionGate.ts`) |
+| INVALID + Sync → modal login | Tetap badge **INVALID** (bukan Checking Session) |
+| VALID + Sync → probe device | **Checking Session** (timeout **20s**, retry busy — `deviceSessionGate.ts`) |
 | Device busy (Chrome/scrape lain) | Alert **SESSION_CHECK_BUSY** — **bukan** modal login |
 | Resolve session / scrape | **`messaging_accounts.id` baris grid** — `accountSessionResolve.ts`, `accountDbId.ts` |
 | Tutup modal login (X / backdrop) | **Tidak berubah** — scan dibatalkan |
@@ -228,70 +212,36 @@ Spesifikasi: `sessionColumnFlowSpec.ts`, `useAccountSyncFlow.ts` → `showLoginM
 
 | Aturan | Detail |
 |--------|--------|
-| Tampil | Hanya saat `sessionStatus === 'valid'`, hover baris atau kolom Session (`brand-account-row--clearable-session`) |
-| Sembunyi | Invalid, pending, `session_check`, sync/scrape berjalan |
-| Aksi | `clearAccountSession.ts` → cancel scrape/count → `prepareDeviceForPlatformLogin` (purge WA) → `invalidatePlatformSessionEverywhere` → patch UI Invalid |
-| Setelah clear | Sync/Run → routing `open_login` (modal QR bersih, hindari stuck *still starting*) |
-| Multi-PC | Invalidate DB → realtime badge Invalid di client lain; purge disk hanya di PC yang menekan X |
+| Tampil | Hanya saat `sessionStatus === 'valid'`, hover baris atau kolom Session |
+| Aksi | `clearAccountSession.ts` → cancel scrape/count → purge → invalidate → patch UI Invalid |
+| Setelah clear | Sync → routing `open_login` (modal QR bersih) |
 
-File: `clearAccountSession.ts`, `useAccountSyncFlow.ts` → `handleClearSession`, `AccountMonitoringCells.tsx` → `SessionClearButton`
+### 4.4–4.8 Metrik: On device, Junk, In brand, Admin
 
-### 4.5 Kolom Groups — format **Y/X**
-
-| Simbol | Field | Arti |
-|--------|-------|------|
-| **Y** | `groupsCurrent` | Jumlah grup di device / daily scrape hari ini |
-| **X** | `groupsTotal` | Standar brand (master count / brand standard) |
+| Kolom | Field / arti |
+|-------|--------------|
+| **On device** | `groupsCurrent` — total grup daily |
+| **Junk** | Grup daily di luar master |
+| **In brand** | `joinedInMaster` / `groupsTotal` (`y/x`) |
+| **Admin** | `adminCurrent` / `adminTotal` + progress bar |
 
 Engine: `accountMonitoringEngine.ts`, `accountMasterDailyCompare.ts`, `accountDisplayMetrics.ts`
 
-### 4.6 Kolom On device
+### 4.9 Kolom Last update (read-only — bukan Run)
 
-| Field | Arti |
-|-------|------|
-| `groupsCurrent` | Total grup di device / baris daily hari ini (angka tunggal, bukan Y/X) |
+Prioritas tampilan (`ScraperColumnCell` / Last update cell):
 
-### 4.7 Kolom In brand
+| # | Kondisi | Tampilan |
+|---|---------|----------|
+| 1 | Session invalid / logout | *Use Sync (↻) to log in first* |
+| 2 | Scrape berjalan | Progress bar + marquee |
+| 3 | Ada `lastSyncAt` | Timestamp saja |
+| 4 | Pending | `—` |
 
-| Field | Arti |
-|-------|------|
-| `joinedInMaster` / `groupsTotal` | Format `y/x` — berapa grup master brand yang sudah join di akun ini vs total master (X) |
+**Tidak ada tombol Run.** Scrape penuh hanya lewat **Sync → Scrape now**, auto-scrape Settings, atau login dengan intent scraper.
 
-Sumber: `loadAccountMonitoring.ts`, `accountSyncData.ts`, `mergeMonitoringGroups.ts`
-
-### 4.8 Kolom Admin — format **Y/X** + progress bar
-
-| Simbol | Field | Arti |
-|--------|-------|------|
-| **Y** | `adminCurrent` | Grup di mana akun ini admin (dari daily/master compare) |
-| **X** | `adminTotal` | Denominator standar brand |
-
-Komponen: `AdminProgress` — bar warna (merah / amber / hijau) + label `current/total`
-
-### 4.9 Kolom Scraper
-
-Prioritas tampilan (`ScraperColumnCell`):
-
-| # | Kondisi | Tampilan | Sumber |
-|---|---------|----------|--------|
-| 1 | `accountNeedsRelogin(row)` → `sessionStatus === 'invalid'` **atau** `status === 'logout'` | *Use Sync (↻) to log in first* | `platformSyncCopy.ts`, `ScraperColumnCell` |
-| 2 | `scraperLoading` **atau** `actionProcess === 'scraper'` | Progress bar + marquee | `ScraperColumnCell` |
-| 3 | `syncState === 'synced'`, `!isMisaligned`, ada `lastSyncAt` | Timestamp saja | idem |
-| 4 | `syncState === 'synced'`, `isMisaligned` | Tombol **Run** + timestamp | idem |
-| 5 | `pending` atau belum synced | `—` | idem |
-
-**Misaligned** — `accountSyncUiFlow.ts` → `isRowMisaligned()`:
-
-```ts
-result.groupsCurrent !== result.groupsTotal ||
-result.adminCurrent !== result.adminTotal
-```
-
-Session **tidak** masuk (`logic_sync_scraper.txt`, komentar di `accountSyncUiFlow.ts`).
-
-Progress real-time: IPC `scraper:progress` → `useAccountSyncFlow` → `resolveScrapeBarDisplay`
-
-Spec: `logic_sync_scraper.txt` BAGIAN 2
+Progress: IPC `scraper:progress` → `useAccountSyncFlow` → `resolveScrapeBarDisplay`  
+Spec: `logic_sync_scraper.txt`
 
 ### 4.10 Kolom Action
 
@@ -329,18 +279,16 @@ Resolver: `resolveAccountActionColumn(row)` — **prioritas dari atas ke bawah**
 |-----------|------|----------|---------|
 | 1 | `cancel-scrape` | Tombol **Cancel scrape** | `actionProcess === 'scraper'` |
 | 2 | `proc-sync` / `proc-scraper` | **PROC SYNC** / **PROC SCRAPER** | `actionProcess === 'sync'` atau `session_check` |
-| 3 | `none` | Kosong | `groupsCurrent === 0` atau `groupsTotal === 0` (0/0, 0/>0) — belum scrape (Y=0) |
-| 4 | `group-link` | Tombol **Group link** | `groupsCurrent > 0 && groupsTotal > 0` (>0/>0); session INVALID/VALID sama; bukan patokan admin |
+| 3 | `none` | Kosong | `groupsCurrent === 0` atau `groupsTotal === 0` |
+| 4 | `group-link` | Tombol **Group link** | `groupsCurrent > 0 && groupsTotal > 0` |
 
-**Slot kosong:** bukan baris akun — tombol **Add account** di `AccountEmptySlotRow`
+**Slot kosong:** tombol **Add account** di `AccountEmptySlotRow`
 
 ### 6.1 Group link → modal
 
 1. Klik **Group link**
-2. `GroupLinksPickerModal` — pilih mode:
-   - **Groups on account** — tabel **7 kolom**: No, Group Name, Group ID, Member Count, Admin Count, Is Admin, Invite Link (`fetchAccountDailyGroupLinks`)
-   - **Admin vs master** — bandingkan admin status vs master brand (X)
-3. `GroupLinksModal` — tabel + filter + export Excel → `RM-[nama akun]-YYYYMMDD.xlsx`
+2. `GroupLinksPickerModal` — mode daily 7 kolom / admin vs master / junk
+3. Export Excel → `RM-[nama akun]-YYYYMMDD.xlsx`
 
 Data: `accountGroupLinks.ts`, `dedupeScrapeDaily.ts`, `exportExcel.ts`
 
@@ -392,7 +340,6 @@ sessionStatus === 'valid'    →  check_device
   → login sukses → persist session UI+DB saja (tanpa device count)
   → modal Now/Later (scrape-prompt) ATAU resume-empty (0 grup daily)
   → Later = sessionOnly UI + markPlatformSessionSynced; Now = scrape device
-  → refreshIssues (ticket reconcile)
 ```
 
 **Tutup modal login:** cancel Chrome + `closeFlow` — session **tetap INVALID**
@@ -409,7 +356,6 @@ sessionStatus === 'valid'    →  check_device
   → sukses → applyResult sessionOnly (metrik Y/X tetap dari scrape/DB)
   → modal Now/Later ATAU resume-empty
   → Later = session UI+DB saja; Now = scrape device
-  → refreshIssues
 ```
 
 ### 7.3 Modal lanjutan sync
@@ -435,25 +381,31 @@ Later → `dismissScrapePrompt` → sessionOnly UI + `markPlatformSessionSynced`
 
 ---
 
-## 9. Alur Scraper / Run
+## 9. Alur Scrape (Sync → Scrape Now)
 
-Orchestrator: `runScrapeInBackground` (Sync → Scrape Now, login intent scraper, auto-scrape)  
+Orchestrator: `runScrapeInBackground` (Sync → **Scrape now**, login intent scraper, auto-scrape)  
 Service: `scrapeFlowService.ts` → `executeScrapeRun`  
 Runner: `runAccountScraper.ts` → IPC `scraper:run`
 
-### 8.1 INVALID + Run
+**Tidak ada tombol Run** di grid. Trigger scrape penuh:
+
+- Modal **Scrape now** setelah Sync/login
+- Settings **Automatic account scrape** (Scheduled / Scrape Now)
+- Login sukses dengan intent scraper (auto-scrape tanpa Later)
+
+### 8.1 INVALID → login lalu scrape
 
 ```
-[Run]
+[Scrape path / Sync → Scrape now]
   → resolveScrapeLoginIfNeeded → modal login (intent: scraper)
-  → login sukses → auto-scrape TANPA Now/Later
+  → login sukses → auto-scrape TANPA Now/Later (jika intent scraper)
   → writeScrapeDailyRows (RPC rm_commit_account_scrape) → applyResult
 ```
 
-### 8.2 VALID + Run
+### 8.2 VALID + Scrape now
 
 ```
-[Run]
+[Scrape now]
   → session_check (Checking Session) kecuali post-login grace
   → onSessionProbeComplete → actionProcess: scraper
   → bootScrapeUi (progress connect)
@@ -472,6 +424,8 @@ Probe gagal meski grid masih VALID → invalidate + modal login.
 Cap: `DEVICE_GROUP_TARGET_MAX = 3000` grup  
 Progress: `emitScrapeProgress` → renderer  
 Write DB: **hanya setelah scrape selesai** — `writeScrapeDailyRows` (cancel sebelum selesai = tidak ada write)
+
+Execute slots user: max **10**/platform. Auto scrape brands/Chrome: max **6**/platform (lane terpisah).
 
 ---
 
@@ -543,9 +497,9 @@ Main TG: `electron/main/platformLogin/telegramSidecar.ts` → Python `telegram_l
 
 ## 12. Issue KPI (engine in-memory)
 
-Tab Ticket DB **dihapus** (rilis 1.0.24 / migrasi 033). Issue hanya KPI di tab Account.
+Tidak ada tab Ticket, tidak ada tabel ticket DB, tidak ada `reconcileTickets` / `group_count_mismatch`. Issue = KPI Account + grid dari engine yang sama.
 
-### 12.1 Tipe issue
+### 12.1 Tipe issue (5 saja)
 
 | Type | Arti |
 |------|------|
@@ -555,7 +509,7 @@ Tab Ticket DB **dihapus** (rilis 1.0.24 / migrasi 033). Issue hanya KPI di tab A
 | `duplicate_group_id` | Duplikat ID |
 | `duplicate_group_name` | Duplikat nama |
 
-Session login/logout **bukan** ticket.
+Session login/logout **bukan** ticket/issue.
 
 ### 12.2 Engine (satu sumber kebenaran dengan grid)
 
@@ -584,7 +538,7 @@ buildTicketSummariesFromEngine.ts  →  kartu KPI Issue
 ## 13. Group matrix (Account header)
 
 **Read-only** — tidak ubah session, scraper, sync dari modal ini.  
-**Entry UI:** badge jumlah grup di header brand card → `BrandMasterGroupsModal` (bukan tab Reporting).
+**Entry UI:** badge jumlah grup di header brand card → `BrandMasterGroupsModal` (bukan tab Reporting). Stock chips: `AccountBrandStockChips` di header Account.
 
 | Komponen | File |
 |----------|------|
@@ -598,14 +552,16 @@ buildTicketSummariesFromEngine.ts  →  kartu KPI Issue
 
 ---
 
-## 14. Realtime & auto-sync
+## 14. Realtime & auto-scrape
 
 | Fitur | File |
 |-------|------|
 | Realtime subscription | `useRealtimeMonitoring.ts` |
 | Suspend probe saat sync/scrape | `AccountMonitoringBody.tsx` → `probeSuspendAccountIds` |
-| Auto sync background | `useAutoAccountSync.ts` (admin only, `canAutoSync`) |
+| Automatic account scrape | Settings — On Scheduled + Scrape Now; `useAutoAccountSync.ts`, `autoScrapeDefaults.ts` |
 | Session grace setelah login | `sessionRealtimePolicy.ts` — skip probe berulang |
+
+Defaults idle: Scheduled **On**, Scrape Now **Off**, jam **12:00 PM**, brands FWSG/JMMY/M24SG/SBMY/STMY/WBSG. Save/Cancel saat Scrape Now Off; Execute/Discard saat On; setelah Execute → factory reset. Scrape Now On → Status standby / Time "-".
 
 ---
 
@@ -625,8 +581,8 @@ Sumber nama: `src/config/tables.ts`
 | `groupScrapeDaily` | `resource_management_group_scrape_daily` |
 | `groupsMaster` | `resource_management_groups_master` |
 | `accountSnapshots` | `resource_management_account_snapshots` |
-| `tickets` | `resource_management_tickets` |
-| `ticketIssueHandles` | `resource_management_ticket_issue_handles` |
+
+**Tidak ada** `resource_management_tickets` / `ticket_issue_handles` (dihapus migrasi **033**).
 
 **Realtime publication:** `RM_REALTIME_TABLES` (migration 017)
 
@@ -744,7 +700,7 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | `useAccountSyncFlow.ts` | **Orchestrator utama** sync + scrape + cancel |
 | `usePlatformLogin.ts` | State modal login + IPC listeners |
 | `useGroupMonitoring.ts` | Filter, groups state, refresh |
-| `useRealtimeMonitoring.ts` | Supabase realtime + reconcile |
+| `useRealtimeMonitoring.ts` | Supabase realtime + monitoring reload |
 
 ### Services & lib (business logic)
 
@@ -807,8 +763,10 @@ Jalankan sebelum release: `npm run validate:pre-release`
 | `validate:multi-account-wa` | Multi-akun WA |
 | `validate:reporting-matrix` | Group matrix + filter back (`validate-reporting-matrix.mjs`) |
 | `validate:operations-stock` | Decision table stock + wire Account stock chips |
-| `validate:operations-job-queue` | Job Queue actions + concurrency |
+| `validate:operations-job-queue` | Job Queue actions + concurrency (max 10/platform) |
 | `validate:real-operations-data` | Data device nyata (bukan mock) |
+| `validate:auto-scrape` | Automatic account scrape Settings contract |
+| `validate:worker-platform-settings` | Worker WA/TG + `toTelegramWorkerConfigShape` |
 | `validate:device-group-scale` | Skala hingga 6000 grup |
 | `validate:post-login-sync` | Sync setelah login |
 | `validate:desktop` | Gabungan validator desktop |
@@ -822,16 +780,18 @@ Jalankan sebelum release: `npm run validate:pre-release`
 ```mermaid
 flowchart TD
   subgraph invalid [Session INVALID]
-    S1[Sync / Run] --> L[Modal Login]
-    L -->|Sukses| V[Session VALID + update Y/X]
+    S1[Sync] --> L[Modal Login]
+    L -->|Sukses| V[Session VALID]
+    V --> M1[Scrape now / Later]
     L -->|Tutup X| I[Tetap INVALID]
   end
 
   subgraph valid [Session VALID]
-    S2[Sync / Run] --> C[Checking Session]
-    C -->|OK| U[Update Y/X]
+    S2[Sync] --> C[Checking Session]
+    C -->|OK| M2[Scrape now / Later]
     C -->|Gagal| L2[Modal Login]
-    U --> M[Now/Later atau resume-empty]
+    M2 -->|Scrape now| SC[Scrape → update grid]
+    M2 -->|Later| SO[Session only]
   end
 ```
 
@@ -855,6 +815,7 @@ flowchart TD
 | 2026-06-06 | Dokumen master awal |
 | 2026-06-06 | Audit script `validate:master-reference`; perbaiki endpoint sidecar; hierarki kebenaran; hak akses Sync admin-only |
 | 2026-06-11 | Grid 9 kolom (On device, In brand); Clear Session; remove slot rebuild master; group link 7 kolom |
+| 2026-07-24 | v1.0.30: `/settings` primer (`/admin`→`/settings`); Last update read-only; grid 10 kolom; no ticket tables; validators auto-scrape + worker + real-ops |
 
 ---
 

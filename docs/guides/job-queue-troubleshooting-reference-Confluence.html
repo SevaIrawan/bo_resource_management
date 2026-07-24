@@ -44,8 +44,8 @@
     <tr><th>Product</th><td>Resource Management (GM App) — Electron desktop</td></tr>
     <tr><th>Version</th><td>v1.0.30</td></tr>
     <tr><th>Audience</th><td>Developers and ops maintaining WhatsApp / Telegram automation</td></tr>
-    <tr><th>Scope</th><td>Job Queue, execute slot pool, Sync / Scrape interaction</td></tr>
-    <tr><th>Out of scope</th><td>Reporting tab, Supabase schema migrations</td></tr>
+    <tr><th>Scope</th><td>Job Queue, execute slot pool, Sync / Scrape interaction — not Reporting or Supabase schema</td></tr>
+    <tr><th>Out of scope</th><td>Reporting shell / Ticket tab UI, Supabase schema migrations</td></tr>
     <tr><th>Source (repo)</th><td><code>docs/guides/job-queue-troubleshooting-reference.md</code></td></tr>
     <tr><th>Learning track</th><td>Job Queue &amp; Worker Pattern — Issue Handling &amp; Troubleshooting</td></tr>
   </table>
@@ -58,7 +58,7 @@
 
 <table>
   <tr><th>Symptom</th><th>Check first</th><th>Likely cause</th></tr>
-  <tr><td>Nothing runs; all actions queue</td><td><code>executeSlotsActive</code> vs max (4)</td><td>Ghost slot after crash <strong>or</strong> 4 real jobs running</td></tr>
+  <tr><td>Nothing runs; all actions queue</td><td><code>executeSlotsActive</code> vs max (<strong>10</strong> per platform WA/TG)</td><td>Ghost slot after crash <strong>or</strong> 10 real jobs running on that platform</td></tr>
   <tr><td>One account stuck; others OK</td><td>Row busy indicator / job table</td><td>Scrape + job conflict, settling, or active job on that account</td></tr>
   <tr><td>Job <code>failed</code> immediately</td><td>Job error / <code>errorCode</code></td><td>Invalid session, payload, or platform error</td></tr>
   <tr><td>Job <code>running</code> forever</td><td>Duration vs action timeout</td><td>Chrome hang; wait 90m stale sweep or restart app</td></tr>
@@ -80,12 +80,12 @@
 
 <h2>2. Architecture (do not misdiagnose)</h2>
 <ul>
-  <li><strong>Max 4 parallel accounts</strong> — shared pool for Sync, Scrape, and Job Queue (<code>executeSlotPool</code>).</li>
+  <li><strong>Max 10 parallel accounts per platform</strong> — WA dan TG <strong>terpisah</strong> (masing-masing hingga 10). Pool bersama untuk Sync, Scrape, dan Job Queue user (<code>executeSlotPool</code> + <code>deviceConcurrencyPolicy.ts</code>). Auto-scrape brand: lane terpisah max <strong>6</strong> per platform.</li>
   <li><strong>Per-account isolation</strong> — account A failure or block does not stop account B; <strong>one account uses at most 1 slot</strong>.</li>
-  <li><strong>Batch auto-split (v1.0.30)</strong> — large group lists split at enqueue into jobs of ≤ <code>maxPerRun</code> (default 30); chunks for the <strong>same account run sequentially</strong> (FIFO).</li>
-  <li><strong>Single slot source of truth</strong> — main process only; <code>jobQueueGuard</code> does <strong>not</strong> check global slot fill.</li>
-  <li><strong>Post-job settle</strong> — ~15s block on same account after any job (<code>SESSION_SETTLING</code>).</li>
-  <li><strong>Scrape + Job Queue</strong> — same account cannot run both (<code>JOB_QUEUE_EXECUTE_FULL</code>).</li>
+  <li><strong>Batch auto-split (v1.0.30)</strong> — large group lists split at enqueue into jobs of ≤ <code>maxPerRun</code> (default 30); chunks for the <strong>same account run sequentially</strong> (FIFO), not in parallel.</li>
+  <li><strong>Single slot source of truth</strong> — main process <code>executeSlotPool</code> only; <code>jobQueueGuard</code> does <strong>not</strong> check global slot fill.</li>
+  <li><strong>Post-job settle</strong> — 15s block on the same account after any job (<code>SESSION_SETTLING</code>, <code>POST_JOB_SETTLE_MS = 15_000</code>).</li>
+  <li><strong>Scrape ⊕ Job Queue</strong> — same account cannot run both at once (<code>JOB_QUEUE_EXECUTE_FULL</code>).</li>
 </ul>
 
 <h3>Key files</h3>
@@ -142,14 +142,14 @@
   <tr><td>Symptom</td><td>Status <code>running</code> long past expected duration</td></tr>
   <tr><td>Root cause</td><td>Chrome/Puppeteer hang; crash after <code>markJobRunning</code></td></tr>
   <tr><td>Fix</td><td>Wait auto-fail (90m <code>STALE_RUNNING_MS</code>) or restart app</td></tr>
-  <tr><td>Timeouts</td><td>join 20m · set_admin 25m · create_group 90m (+ 5m per step)</td></tr>
-  <tr><td>Verify</td><td>Job → <code>failed</code>; queue resumes</td></tr>
+  <tr><td>Timeouts</td><td>join 20m base (+ 5m/step) · set_admin 25m · create_group 90m (+ 5m/step)</td></tr>
+  <tr><td>Verify</td><td>Job → <code>failed</code> with <code>JOB_STALE_TIMEOUT</code> or <code>JOB_*_TIMEOUT</code>; queue resumes</td></tr>
 </table>
 
 <h3>E. Expected behavior (not bugs)</h3>
 <table>
   <tr><th>Behavior</th><th>Why</th><th>What to do</th></tr>
-  <tr><td>5th action queues</td><td>Max 4 slots (different accounts)</td><td>Wait; notification is correct</td></tr>
+  <tr><td>11th action queues when <strong>10</strong> already active on that platform</td><td>Max <strong>10</strong> user slots per platform (WA/TG terpisah)</td><td>Wait; notification is correct</td></tr>
   <tr><td>Multiple queued rows, same account</td><td>Auto-split batch (v1.0.30)</td><td>Normal — chunks run one after another</td></tr>
   <tr><td><code>SESSION_SETTLING</code></td><td>15s Chrome cleanup after job</td><td>Retry after ~15s</td></tr>
   <tr><td>Scrape blocks job (same account)</td><td>Per-account isolation</td><td>Finish scrape first</td></tr>
@@ -162,8 +162,8 @@
   <tr><th>Code</th><th>Meaning</th><th>Action</th></tr>
   <tr><td><code>EXECUTE_SLOTS_FULL</code></td><td>Pool full (or ghost slot)</td><td>Wait, or restart if ghost</td></tr>
   <tr><td><code>JOB_QUEUE_EXECUTE_FULL</code></td><td>Scrape or job busy on account</td><td>Wait for current task</td></tr>
-  <tr><td><code>SESSION_SETTLING</code></td><td>Post-job cooldown (~5s)</td><td>Retry shortly</td></tr>
-  <tr><td><code>JOB_STALE_TIMEOUT</code></td><td>Running &gt; 30 minutes</td><td>Re-enqueue; investigate hang</td></tr>
+  <tr><td><code>SESSION_SETTLING</code></td><td>Post-job cooldown (~15s)</td><td>Retry shortly</td></tr>
+  <tr><td><code>JOB_STALE_TIMEOUT</code></td><td>Running longer than 90m</td><td>Re-enqueue; investigate hang</td></tr>
   <tr><td><code>JOB_*_TIMEOUT</code></td><td>Action exceeded time limit</td><td>Smaller batch; check WA/TG</td></tr>
   <tr><td><code>FLOOD_WAIT</code></td><td>TG rate limit exceeds cap</td><td>Wait + reduce frequency</td></tr>
   <tr><td><code>FLOOD_WAIT_RETRY</code></td><td>Short flood; job ended failed</td><td>Re-enqueue job</td></tr>
@@ -183,10 +183,10 @@ npm run validate:desktop</pre>
 <h3>Manual smoke (T1–T7)</h3>
 <table>
   <tr><th>#</th><th>Test</th><th>Expected</th></tr>
-  <tr><td>T1</td><td>4 jobs, different accounts</td><td>4 <code>running</code></td></tr>
-  <tr><td>T2</td><td>5th job</td><td><code>queued</code>; runs when slot frees</td></tr>
+  <tr><td>T1</td><td>10 jobs, different accounts (same platform)</td><td>Up to 10 <code>running</code></td></tr>
+  <tr><td>T2</td><td>11th job while 10 active</td><td><code>queued</code>; runs when a slot frees</td></tr>
   <tr><td>T3</td><td>Scrape + job, same account</td><td>Job waits until scrape ends</td></tr>
-  <tr><td>T4</td><td>Job done → Sync within 5s</td><td><code>SESSION_SETTLING</code> then OK</td></tr>
+  <tr><td>T4</td><td>Job done → Sync within 15s</td><td><code>SESSION_SETTLING</code> then OK</td></tr>
   <tr><td>T5</td><td>Logout WA mid-job</td><td><code>failed</code>; slot released</td></tr>
   <tr><td>T6</td><td>TG with tight flood cap</td><td><code>FLOOD_WAIT</code> or retry message</td></tr>
   <tr><td>T7</td><td>Restart app</td><td><code>executeSlotsActive = 0</code></td></tr>

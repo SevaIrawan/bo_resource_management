@@ -13,6 +13,7 @@ import {
   readAutoScrapeScheduledHour,
   clampAutoScrapeScheduledHour,
 } from '@/config/autoScrapeSchedule';
+import { AUTO_SCRAPE_FACTORY_RESET_EVENT } from '@/config/autoScrapeDefaults';
 import { persistAutoSyncEnabled, readAutoSyncEnabled } from '@/config/autoSyncSettings';
 
 export interface AutoSyncSettingsContextValue {
@@ -47,8 +48,16 @@ export function AutoSyncSettingsProvider({ children }: { children: ReactNode }) 
         setScheduledHourState(readAutoScrapeScheduledHour());
       }
     };
+    const onFactoryReset = () => {
+      setEnabledState(true);
+      setScheduledHourState(DEFAULT_AUTO_SCRAPE_SCHEDULED_HOUR);
+    };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener(AUTO_SCRAPE_FACTORY_RESET_EVENT, onFactoryReset);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(AUTO_SCRAPE_FACTORY_RESET_EVENT, onFactoryReset);
+    };
   }, []);
 
   const value = useMemo(

@@ -68,6 +68,7 @@ export async function waitUntilAutoScrapeAccountReady(
 
   while (Date.now() - started < AUTO_SCRAPE_POLICY.readyMaxWaitMs) {
     if (isAborted(control)) return false;
+    if (control?.isAccountSelected && !control.isAccountSelected(account.id)) return false;
     if (shouldSkipAutoScrapeAccount(account, suspendedIds)) return false;
 
     const heavy = await isHeavyDeviceExecuteBlockedForAccount(account.id);
@@ -122,11 +123,19 @@ export async function runAutoAccountScrape(input: {
       cycleControl,
       dbAccountId,
     );
-    if (!ready) return isAborted(cycleControl) ? 'aborted' : 'skipped';
-
+    if (!ready) {
+      if (isAborted(cycleControl)) return 'aborted';
+      if (cycleControl?.isAccountSelected && !cycleControl.isAccountSelected(account.id)) {
+        return 'aborted';
+      }
+      return 'skipped';
+    }
     markStart(dbAccountId);
 
     if (isAborted(cycleControl)) return 'aborted';
+    if (cycleControl?.isAccountSelected && !cycleControl.isAccountSelected(account.id)) {
+      return 'aborted';
+    }
 
     const loginNeeded = await resolveScrapeLoginIfNeeded({ userId, account });
     if (loginNeeded) {
@@ -134,15 +143,39 @@ export async function runAutoAccountScrape(input: {
       return 'failed';
     }
 
-    await runAutoAccountScraper({
+    const scrapePromise = runAutoAccountScraper({
       account,
       sessionId: account.id,
       userId,
       dbAccountId,
     });
 
-    if (isAborted(cycleControl)) return 'aborted';
+    let cancelledBySelection = false;
+    const watchTimer = window.setInterval(() => {
+      if (isAborted(cycleControl)) {
+        cancelledBySelection = true;
+        void teardownAutoScrapeDevice({ account, dbAccountId });
+        return;
+      }
+      if (cycleControl?.isAccountSelected && !cycleControl.isAccountSelected(account.id)) {
+        cancelledBySelection = true;
+        void teardownAutoScrapeDevice({ account, dbAccountId });
+      }
+    }, AUTO_SCRAPE_POLICY.selectionWatchMs);
 
+    try {
+      await scrapePromise;
+    } catch (error) {
+      if (cancelledBySelection || isAborted(cycleControl)) return 'aborted';
+      throw error;
+    } finally {
+      window.clearInterval(watchTimer);
+    }
+
+    if (cancelledBySelection || isAborted(cycleControl)) return 'aborted';
+    if (cycleControl?.isAccountSelected && !cycleControl.isAccountSelected(account.id)) {
+      return 'aborted';
+    }
     const supabase = getSupabase();
     const brandId =
       (

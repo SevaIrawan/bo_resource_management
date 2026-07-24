@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import {
   combineScheduledHourAmPm,
@@ -31,10 +31,23 @@ import {
   type AutoScrapeBrandToggleMap,
 } from '@/config/autoScrapeBrandSettings';
 import {
+  AUTO_SCRAPE_CYCLE_RUNNING_EVENT,
+  AUTO_SCRAPE_NOW_CHANGED_EVENT,
   persistAutoScrapeNowEnabled,
+  readAutoScrapeCycleMode,
+  readAutoScrapeCycleRunning,
   readAutoScrapeNowEnabled,
   requestAutoScrapeNowRun,
+  type AutoScrapeCycleMode,
 } from '@/config/autoScrapeNowSettings';
+import {
+  AUTO_SCRAPE_FACTORY_RESET_EVENT,
+  buildScrapeNowEmptyBrandToggles,
+  countEnabledAutoScrapeBrands,
+  getAutoScrapeFactoryDefaults,
+  hydrateAutoScrapeSettingsForIdleUi,
+  resetAutoScrapeToFactoryDefaults,
+} from '@/config/autoScrapeDefaults';
 import { ACCOUNT_SNAPSHOT_SELECT, MESSAGING_ACCOUNT_SELECT } from '@/config/dbColumns';
 import { TABLES } from '@/config/tables';
 import { SyncAlertModal } from '@/components/group-monitoring/SyncAlertModal';
@@ -155,6 +168,8 @@ function PlatformBrandTable(props: {
   maxSlots: number;
   dateLocale?: string;
   defaultExpanded?: boolean;
+  /** Mode Scrape Now: jangan tampilkan status/time hasil run lama (selalu standby / -). */
+  hideRunHistory?: boolean;
   onBrandToggle: (platform: Platform, brandName: string, next: boolean) => void;
   onAccountsChange: (platform: Platform, brandName: string, accountIds: string[]) => void;
   onViewStatus: (platform: Platform, brandName: string, entry: AutoScrapeBrandStatusEntry) => void;
@@ -172,6 +187,7 @@ function PlatformBrandTable(props: {
     maxSlots,
     dateLocale,
     defaultExpanded = false,
+    hideRunHistory = false,
     onBrandToggle,
     onAccountsChange,
     onViewStatus,
@@ -246,15 +262,20 @@ function PlatformBrandTable(props: {
                   brandAccounts,
                   selection,
                 );
-                const timeIso = on
-                  ? latestSyncIso(
-                      scopedAccounts.map((row) => row.id),
-                      lastSyncByAccountId,
-                    )
-                  : null;
-                const runStatus = on
-                  ? getAutoScrapeBrandRunStatus(platform, brand.name, statusMap)
-                  : null;
+                const runStatus =
+                  on && !hideRunHistory
+                    ? getAutoScrapeBrandRunStatus(platform, brand.name, statusMap)
+                    : null;
+                // Time Scrape = waktu run auto scrape brand (bukan last_sync akun yang bisa stale).
+                // Scrape Now mode: selalu "-" (siap execute, bukan hasil run lama).
+                const timeIso =
+                  on && !hideRunHistory
+                    ? (runStatus?.updatedAt ??
+                        latestSyncIso(
+                          scopedAccounts.map((row) => row.id),
+                          lastSyncByAccountId,
+                        ))
+                    : null;
 
                 return (
                   <li key={`${platform}:${brand.id}`} className="auto-scrape-brand-table__row">
@@ -342,22 +363,25 @@ export function AutoSyncSettingsSection() {
   const [accounts, setAccounts] = useState<AccountOptionRow[]>([]);
   const [lastSyncByAccountId, setLastSyncByAccountId] = useState<LastSyncByAccountId>({});
 
+  // Hydrate sekali di init: idle = Default / hasil Save; Scrape Now nyangkut → Default.
+  const [boot] = useState(() => hydrateAutoScrapeSettingsForIdleUi());
+
   const [savedToggles, setSavedToggles] = useState<AutoScrapeBrandToggleMap>(
-    readAutoScrapeBrandToggles,
+    () => boot.toggles,
   );
-  const [savedAccountMap, setSavedAccountMap] = useState<AutoScrapeBrandAccountMap>(() =>
-    normalizeInactiveAutoScrapeAccountsToAll(
-      readAutoScrapeBrandToggles(),
-      readAutoScrapeBrandAccounts(),
-    ),
+  const [savedAccountMap, setSavedAccountMap] = useState<AutoScrapeBrandAccountMap>(
+    () => boot.accountMap,
   );
-  const [draftEnabled, setDraftEnabled] = useState(savedEnabled);
-  const [draftScheduledHour, setDraftScheduledHour] = useState(savedScheduledHour);
-  const [savedScrapeNow, setSavedScrapeNow] = useState(readAutoScrapeNowEnabled);
-  const [draftScrapeNow, setDraftScrapeNow] = useState(savedScrapeNow);
-  const [draftToggles, setDraftToggles] = useState<AutoScrapeBrandToggleMap>(savedToggles);
-  const [draftAccountMap, setDraftAccountMap] =
-    useState<AutoScrapeBrandAccountMap>(savedAccountMap);
+  const [draftEnabled, setDraftEnabled] = useState(() => boot.enabled);
+  const [draftScheduledHour, setDraftScheduledHour] = useState(() => boot.scheduledHour);
+  const [savedScrapeNow, setSavedScrapeNow] = useState(false);
+  const [draftScrapeNow, setDraftScrapeNow] = useState(false);
+  const [draftToggles, setDraftToggles] = useState<AutoScrapeBrandToggleMap>(
+    () => boot.toggles,
+  );
+  const [draftAccountMap, setDraftAccountMap] = useState<AutoScrapeBrandAccountMap>(
+    () => boot.accountMap,
+  );
 
   const [statusMap, setStatusMap] = useState<AutoScrapeBrandStatusMap>(
     readAutoScrapeBrandStatus,
@@ -365,6 +389,9 @@ export function AutoSyncSettingsSection() {
   const [slotFullHint, setSlotFullHint] = useState<string | null>(null);
   const [statusDetail, setStatusDetail] = useState<StatusDetailModalState | null>(null);
   const [executeMessage, setExecuteMessage] = useState<string | null>(null);
+  const [cycleRunning, setCycleRunning] = useState(readAutoScrapeCycleRunning);
+  const [cycleMode, setCycleMode] = useState<AutoScrapeCycleMode>(readAutoScrapeCycleMode);
+  const [executeLocked, setExecuteLocked] = useState(false);
   const maxSlots = getMaxAutoScrapeBrandSlotsPerPlatform();
   const dateLocale = locale === 'zh' ? 'zh-CN' : 'en-GB';
 
@@ -389,7 +416,42 @@ export function AutoSyncSettingsSection() {
     ],
   );
 
+  const enabledBrandCount = useMemo(
+    () => countEnabledAutoScrapeBrands(draftToggles),
+    [draftToggles],
+  );
+
+  /** Scheduled cycle sedang jalan → Scrape Now tidak boleh dinyalakan. */
+  const scrapeNowToggleBlocked = cycleRunning && cycleMode === 'scheduled';
+
+  // Cancel: hanya saat dirty. Discard (mode Scrape Now): selalu bisa keluar kecuali cycle jalan.
+  const secondaryDisabled =
+    cycleRunning || executeLocked || (!draftScrapeNow && !dirty);
+  // Save/Execute: wajib dirty; Execute Scrape Now juga wajib ≥1 brand.
+  const primaryDisabled =
+    cycleRunning ||
+    executeLocked ||
+    !dirty ||
+    (draftScrapeNow && enabledBrandCount === 0);
+
   const brandSetupEnabled = draftEnabled || draftScrapeNow;
+
+  const applyFactoryToUi = useCallback(
+    (defaults = getAutoScrapeFactoryDefaults()) => {
+      setEnabled(defaults.enabled);
+      setScheduledHour(defaults.scheduledHour);
+      setDraftEnabled(defaults.enabled);
+      setDraftScheduledHour(defaults.scheduledHour);
+      setSavedScrapeNow(defaults.scrapeNow);
+      setDraftScrapeNow(defaults.scrapeNow);
+      setSavedToggles(defaults.toggles);
+      setDraftToggles(defaults.toggles);
+      setSavedAccountMap(defaults.accountMap);
+      setDraftAccountMap(defaults.accountMap);
+      setStatusMap(readAutoScrapeBrandStatus());
+    },
+    [setEnabled, setScheduledHour],
+  );
 
   const reloadSavedBrandSettings = useCallback((opts?: { syncDraft?: boolean }) => {
     const nextToggles = readAutoScrapeBrandToggles();
@@ -434,6 +496,23 @@ export function AutoSyncSettingsSection() {
   }, [user?.id]);
 
   useEffect(() => {
+    // Sync context + pastikan UI idle = Default / Save (bukan Scrape Now On + 6 brand).
+    const next = hydrateAutoScrapeSettingsForIdleUi();
+    setEnabled(next.enabled);
+    setScheduledHour(next.scheduledHour);
+    setDraftEnabled(next.enabled);
+    setDraftScheduledHour(next.scheduledHour);
+    setSavedScrapeNow(false);
+    setDraftScrapeNow(false);
+    setSavedToggles(next.toggles);
+    setDraftToggles(next.toggles);
+    setSavedAccountMap(next.accountMap);
+    setDraftAccountMap(next.accountMap);
+    setStatusMap(readAutoScrapeBrandStatus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount hydrate only
+  }, []);
+
+  useEffect(() => {
     if (dirty) return;
     setDraftEnabled(savedEnabled);
     setDraftScheduledHour(savedScheduledHour);
@@ -449,14 +528,21 @@ export function AutoSyncSettingsSection() {
         if (!dirty) setDraftScrapeNow(nextScrapeNow);
       }
     };
-    const onStatus = () => setStatusMap(readAutoScrapeBrandStatus());
+    const onStatus = () => {
+      setStatusMap(readAutoScrapeBrandStatus());
+      const ids = accounts.map((row) => row.id);
+      if (ids.length === 0) return;
+      void loadLastSyncByAccountIds(ids)
+        .then((syncMap) => setLastSyncByAccountId(syncMap))
+        .catch(() => undefined);
+    };
     window.addEventListener('storage', onStorage);
     window.addEventListener('rm-auto-scrape-brand-status', onStatus);
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('rm-auto-scrape-brand-status', onStatus);
     };
-  }, [dirty, reloadSavedBrandSettings]);
+  }, [accounts, dirty, reloadSavedBrandSettings]);
 
   const onBrandToggle = useCallback(
     (platform: Platform, brandName: string, nextEnabled: boolean) => {
@@ -514,7 +600,60 @@ export function AutoSyncSettingsSection() {
     [accounts, brands, draftAccountMap],
   );
 
-  const handleCancel = useCallback(() => {
+  useEffect(() => {
+    const onRunning = (event: Event) => {
+      const running =
+        event instanceof CustomEvent && typeof event.detail?.running === 'boolean'
+          ? event.detail.running
+          : readAutoScrapeCycleRunning();
+      const modeNext =
+        event instanceof CustomEvent && typeof event.detail?.mode === 'string'
+          ? (event.detail.mode as AutoScrapeCycleMode)
+          : readAutoScrapeCycleMode();
+      setCycleRunning(running);
+      setCycleMode(modeNext);
+      if (!running) setExecuteLocked(false);
+    };
+    window.addEventListener(AUTO_SCRAPE_CYCLE_RUNNING_EVENT, onRunning);
+    return () => window.removeEventListener(AUTO_SCRAPE_CYCLE_RUNNING_EVENT, onRunning);
+  }, []);
+
+  useEffect(() => {
+    const onScrapeNowChanged = (event: Event) => {
+      // Hanya sync flag Scrape Now. Brand/jadwal ikut FACTORY_RESET / handler lokal.
+      const enabledNext =
+        event instanceof CustomEvent && typeof event.detail?.enabled === 'boolean'
+          ? event.detail.enabled
+          : readAutoScrapeNowEnabled();
+      setSavedScrapeNow(enabledNext);
+      setDraftScrapeNow(enabledNext);
+    };
+    const onFactoryReset = (event: Event) => {
+      const defaults =
+        event instanceof CustomEvent && event.detail
+          ? (event.detail as ReturnType<typeof getAutoScrapeFactoryDefaults>)
+          : getAutoScrapeFactoryDefaults();
+      applyFactoryToUi(defaults);
+      setExecuteLocked(false);
+      setSlotFullHint(null);
+    };
+    window.addEventListener(AUTO_SCRAPE_NOW_CHANGED_EVENT, onScrapeNowChanged);
+    window.addEventListener(AUTO_SCRAPE_FACTORY_RESET_EVENT, onFactoryReset);
+    return () => {
+      window.removeEventListener(AUTO_SCRAPE_NOW_CHANGED_EVENT, onScrapeNowChanged);
+      window.removeEventListener(AUTO_SCRAPE_FACTORY_RESET_EVENT, onFactoryReset);
+    };
+  }, [applyFactoryToUi]);
+
+  const handleCancelOrDiscard = useCallback(() => {
+    if (draftScrapeNow) {
+      // Discard dari mode Scrape Now → factory defaults + Scrape Now Off.
+      const defaults = resetAutoScrapeToFactoryDefaults();
+      applyFactoryToUi(defaults);
+      setSlotFullHint(null);
+      setExecuteMessage(null);
+      return;
+    }
     setDraftEnabled(savedEnabled);
     setDraftScheduledHour(savedScheduledHour);
     setDraftScrapeNow(savedScrapeNow);
@@ -522,43 +661,147 @@ export function AutoSyncSettingsSection() {
     setDraftAccountMap(savedAccountMap);
     setSlotFullHint(null);
     setExecuteMessage(null);
-  }, [savedAccountMap, savedEnabled, savedScheduledHour, savedScrapeNow, savedToggles]);
+  }, [
+    applyFactoryToUi,
+    draftScrapeNow,
+    savedAccountMap,
+    savedEnabled,
+    savedScheduledHour,
+    savedScrapeNow,
+    savedToggles,
+  ]);
 
-  const handleExecute = useCallback(() => {
-    if (dirty) {
+  const handleSaveOrExecute = useCallback(async () => {
+    if (executeLocked || cycleRunning) return;
+    if (!dirty) return;
+    if (draftScrapeNow && enabledBrandCount === 0) return;
+
+    setExecuteLocked(true);
+    setExecuteMessage(null);
+    try {
       const nextAccounts = normalizeInactiveAutoScrapeAccountsToAll(
         draftToggles,
         draftAccountMap,
         { persist: false },
       );
-      setEnabled(draftEnabled);
+
+      if (!draftScrapeNow) {
+        // Save — persist jadwal/brand saja, tidak scrape.
+        setEnabled(draftEnabled);
+        setScheduledHour(draftScheduledHour);
+        persistAutoScrapeNowEnabled(false);
+        persistAutoScrapeBrandToggles(draftToggles);
+        persistAutoScrapeBrandAccounts(nextAccounts);
+        setSavedToggles(draftToggles);
+        setSavedAccountMap(nextAccounts);
+        setDraftAccountMap(nextAccounts);
+        setSavedScrapeNow(false);
+        setDraftScrapeNow(false);
+        setSlotFullHint(null);
+        setExecuteMessage(t('settings.autoSync.saved'));
+        setExecuteLocked(false);
+        return;
+      }
+
+      // Execute Scrape Now — wajib On Scheduled On + brand aktif.
+      setEnabled(true);
+      setDraftEnabled(true);
       setScheduledHour(draftScheduledHour);
-      persistAutoScrapeNowEnabled(draftScrapeNow);
+      persistAutoScrapeNowEnabled(true);
       persistAutoScrapeBrandToggles(draftToggles);
       persistAutoScrapeBrandAccounts(nextAccounts);
       setSavedToggles(draftToggles);
       setSavedAccountMap(nextAccounts);
       setDraftAccountMap(nextAccounts);
-      setSavedScrapeNow(draftScrapeNow);
+      setSavedScrapeNow(true);
+      setSlotFullHint(null);
+
+      const result = await requestAutoScrapeNowRun();
+      if (!result.ok && result.reason === 'busy') {
+        setExecuteLocked(false);
+        setExecuteMessage(t('settings.autoSync.scrapeNowBusy'));
+        return;
+      }
+
+      // Selesai (ok / no_targets / disabled / not_ready / throw path) → factory defaults.
+      const defaults = resetAutoScrapeToFactoryDefaults();
+      applyFactoryToUi(defaults);
+      setExecuteLocked(false);
+      if (result.ok) {
+        setExecuteMessage(t('settings.autoSync.executedScrapeNow'));
+        return;
+      }
+      if (result.reason === 'no_targets') {
+        setExecuteMessage(t('settings.autoSync.scrapeNowNoTargets'));
+        return;
+      }
+      if (result.reason === 'disabled') {
+        setExecuteMessage(t('settings.autoSync.scrapeNowDisabled'));
+        return;
+      }
+      setExecuteMessage(t('settings.autoSync.scrapeNowNotReady'));
+    } catch {
+      const defaults = resetAutoScrapeToFactoryDefaults();
+      applyFactoryToUi(defaults);
+      setExecuteLocked(false);
+      setExecuteMessage(t('settings.autoSync.scrapeNowNotReady'));
     }
-    setSlotFullHint(null);
-    if (draftScrapeNow) {
-      requestAutoScrapeNowRun();
-      setExecuteMessage(t('settings.autoSync.executedScrapeNow'));
-      return;
-    }
-    setExecuteMessage(t('settings.autoSync.executed'));
   }, [
+    applyFactoryToUi,
+    cycleRunning,
     dirty,
     draftAccountMap,
     draftEnabled,
     draftScheduledHour,
     draftScrapeNow,
     draftToggles,
+    enabledBrandCount,
+    executeLocked,
     setEnabled,
     setScheduledHour,
     t,
   ]);
+
+  const onToggleScrapeNow = useCallback(() => {
+    setExecuteMessage(null);
+    if (draftScrapeNow) {
+      // On → Off: kembali ke Default jadwal (6 brand, Scheduled On, Scrape Now Off).
+      const defaults = getAutoScrapeFactoryDefaults();
+      setDraftScrapeNow(false);
+      setDraftEnabled(true);
+      setDraftScheduledHour(defaults.scheduledHour);
+      setDraftToggles(defaults.toggles);
+      setDraftAccountMap(defaults.accountMap);
+      return;
+    }
+    if (scrapeNowToggleBlocked) return;
+    // Off → On: SEMUA brand False (0/6). On Scheduled wajib True.
+    // Abaikan checklist jadwal — user pilih brand Scrape Now sendiri.
+    setDraftScrapeNow(true);
+    setDraftEnabled(true);
+    setDraftToggles(buildScrapeNowEmptyBrandToggles());
+    setDraftAccountMap({});
+  }, [draftScrapeNow, scrapeNowToggleBlocked]);
+
+  // Guard keras: setiap kali masuk mode Scrape Now → checklist wajib kosong.
+  const scrapeNowPrevRef = useRef(false);
+  useEffect(() => {
+    const entered = draftScrapeNow && !scrapeNowPrevRef.current;
+    scrapeNowPrevRef.current = draftScrapeNow;
+    if (!entered) return;
+    setDraftEnabled(true);
+    setDraftToggles(buildScrapeNowEmptyBrandToggles());
+    setDraftAccountMap({});
+  }, [draftScrapeNow]);
+
+  const onToggleOnScheduled = useCallback(() => {
+    setExecuteMessage(null);
+    if (draftScrapeNow && draftEnabled) {
+      // Scrape Now On → On Scheduled tidak boleh Off (wajib True).
+      return;
+    }
+    setDraftEnabled(!draftEnabled);
+  }, [draftEnabled, draftScrapeNow]);
 
   const onViewStatus = useCallback(
     (platform: Platform, brandName: string, entry: AutoScrapeBrandStatusEntry) => {
@@ -594,6 +837,7 @@ export function AutoSyncSettingsSection() {
           maxSlots={maxSlots}
           dateLocale={dateLocale}
           defaultExpanded={false}
+          hideRunHistory={draftScrapeNow}
           onBrandToggle={onBrandToggle}
           onAccountsChange={onAccountsChange}
           onViewStatus={onViewStatus}
@@ -606,6 +850,7 @@ export function AutoSyncSettingsSection() {
       brands,
       dateLocale,
       draftAccountMap,
+      draftScrapeNow,
       draftToggles,
       lastSyncByAccountId,
       maxSlots,
@@ -634,10 +879,13 @@ export function AutoSyncSettingsSection() {
                 'operations-job-queue-switch',
                 draftEnabled && 'operations-job-queue-switch--on',
               )}
-              onClick={() => {
-                setExecuteMessage(null);
-                setDraftEnabled(!draftEnabled);
-              }}
+              onClick={onToggleOnScheduled}
+              disabled={draftScrapeNow && draftEnabled}
+              title={
+                draftScrapeNow && draftEnabled
+                  ? t('settings.autoSync.onScheduledLockedByScrapeNow')
+                  : undefined
+              }
             >
               <span className="operations-job-queue-switch__thumb" aria-hidden />
             </button>
@@ -706,11 +954,15 @@ export function AutoSyncSettingsSection() {
               className={cn(
                 'operations-job-queue-switch',
                 draftScrapeNow && 'operations-job-queue-switch--on',
+                scrapeNowToggleBlocked && 'opacity-50',
               )}
-              onClick={() => {
-                setExecuteMessage(null);
-                setDraftScrapeNow(!draftScrapeNow);
-              }}
+              onClick={onToggleScrapeNow}
+              disabled={scrapeNowToggleBlocked}
+              title={
+                scrapeNowToggleBlocked
+                  ? t('settings.autoSync.scrapeNowBlockedScheduledRunning')
+                  : undefined
+              }
             >
               <span className="operations-job-queue-switch__thumb" aria-hidden />
             </button>
@@ -730,23 +982,33 @@ export function AutoSyncSettingsSection() {
           <p className="operations-stock-policy-footer__status" role="status">
             {executeMessage}
           </p>
+        ) : cycleRunning ? (
+          <p className="operations-stock-policy-footer__status" role="status">
+            {t('settings.autoSync.executeRunningHint')}
+          </p>
         ) : null}
         <div className="operations-stock-policy-actions">
           <button
             type="button"
             className="operations-stock-policy-discard-btn"
-            onClick={handleCancel}
-            disabled={!dirty}
+            onClick={handleCancelOrDiscard}
+            disabled={secondaryDisabled}
           >
-            {t('settings.autoSync.discard')}
+            {draftScrapeNow
+              ? t('settings.autoSync.discard')
+              : t('settings.autoSync.cancel')}
           </button>
           <button
             type="button"
             className="operations-stock-policy-save-btn"
-            onClick={handleExecute}
-            disabled={!dirty && !draftScrapeNow}
+            onClick={() => void handleSaveOrExecute()}
+            disabled={primaryDisabled}
           >
-            {t('settings.autoSync.execute')}
+            {cycleRunning || executeLocked
+              ? t('settings.autoSync.executeRunning')
+              : draftScrapeNow
+                ? t('settings.autoSync.execute')
+                : t('settings.autoSync.save')}
           </button>
         </div>
       </div>

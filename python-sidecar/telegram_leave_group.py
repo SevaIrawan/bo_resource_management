@@ -1,4 +1,4 @@
-"""Leave Telegram supergroup/channel — selaras learning leave_groups (TG belum ada .py)."""
+"""Leave Telegram supergroup/channel."""
 
 from __future__ import annotations
 

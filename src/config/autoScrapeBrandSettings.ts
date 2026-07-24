@@ -40,6 +40,29 @@ export type AutoScrapeBrandStatusEntry = {
 
 export type AutoScrapeBrandStatusMap = Record<string, AutoScrapeBrandStatusEntry>;
 
+/** Brand checklist default untuk mode On Scheduled (max 6 / platform). */
+export const DEFAULT_AUTO_SCRAPE_SCHEDULED_BRAND_NAMES = [
+  'FWSG',
+  'JMMY',
+  'M24SG',
+  'SBMY',
+  'STMY',
+  'WBSG',
+] as const;
+
+const DEFAULT_SCHEDULE_PLATFORMS: Platform[] = ['whatsapp', 'telegram'];
+
+/** Checklist jadwal: 6 brand On per platform; lainnya tidak dicantumkan (= Off). */
+export function buildDefaultScheduledBrandToggles(): AutoScrapeBrandToggleMap {
+  const out: AutoScrapeBrandToggleMap = {};
+  for (const platform of DEFAULT_SCHEDULE_PLATFORMS) {
+    for (const name of DEFAULT_AUTO_SCRAPE_SCHEDULED_BRAND_NAMES) {
+      out[autoScrapeBrandToggleKey(platform, name)] = true;
+    }
+  }
+  return out;
+}
+
 export function autoScrapeBrandToggleKey(platform: Platform, brandName: string): string {
   return `${platform}:${brandName.trim().toLowerCase()}`;
 }
@@ -54,16 +77,18 @@ export function getMaxAutoScrapeBrandSlotsPerPlatform(): number {
 export function readAutoScrapeBrandToggles(): AutoScrapeBrandToggleMap {
   try {
     const raw = localStorage.getItem(AUTO_SCRAPE_BRAND_TOGGLES_KEY);
-    if (!raw) return {};
+    if (!raw) return buildDefaultScheduledBrandToggles();
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return buildDefaultScheduledBrandToggles();
+    }
     const out: AutoScrapeBrandToggleMap = {};
     for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
       if (typeof value === 'boolean') out[key] = value;
     }
     return out;
   } catch {
-    return {};
+    return buildDefaultScheduledBrandToggles();
   }
 }
 

@@ -68,7 +68,7 @@ WA promote has no granular rights in whatsapp-web.js — only delay.
 
 ## Reference
 
-- TG: `learning Script Worker/telegram/Master/` + `human_delay.py`
+- TG: Telethon sidecar + `telegram_human_delay.py`
 - WA: whatsapp-web.js `GroupChat` — 3 group permission toggles only
 
 ## Wire to worker
@@ -85,4 +85,4 @@ Settings are read in the renderer at **enqueue** time via `readWhatsAppWorkerSet
 
 Runner (Electron/TG) reads **frozen job payload** — not live Settings after enqueue.
 
-Export shapes: `toTelegramLearningConfigShape()` / `toWhatsAppWorkerConfigShape()` for reference scripts.
+Export shapes: `toTelegramWorkerConfigShape()` / `toWhatsAppWorkerConfigShape()`.

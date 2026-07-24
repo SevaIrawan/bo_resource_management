@@ -26,7 +26,7 @@ export const WA_SCRAPE_GROUP_JITTER_MS = Math.max(
   Math.floor(Number(process.env.RM_WA_SCRAPE_GROUP_JITTER_MS) || 400),
 );
 
-/** Jeda antar export invite link (serial — selaras learning scraper). */
+/** Jeda antar export invite link (serial per client). */
 export function waInviteExportDelayMs(): number {
   if (WA_SCRAPE_GROUP_JITTER_MS <= 0) return WA_SCRAPE_GROUP_DELAY_MS;
   return WA_SCRAPE_GROUP_DELAY_MS + Math.floor(Math.random() * WA_SCRAPE_GROUP_JITTER_MS);

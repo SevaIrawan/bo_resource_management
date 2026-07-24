@@ -1,9 +1,9 @@
-# Map pola learning → Job Queue Resource Management
+# Map pola operasional → Job Queue Resource Management
 
-## Sudah di-port (ikuti pola learning)
+## Sudah di-port
 
-| Learning | RM action | Implementasi |
-|----------|-----------|----------------|
+| Pola / script | RM action | Implementasi |
+|---------------|-----------|----------------|
 | `create_groups.py` + `run_create_until_done` | `create_group` | TG sidecar + `waAutomation` batch `perRun` / `pause_between_runs` |
 | `set_admin.py` | `set_admin` | `payload.groups[]` + `targets` + delay |
 | `join_groups.py` (folder join member) | `join_by_invite_link` | throttle invite + batch rest |
@@ -17,7 +17,7 @@ Pola yang **harus** diikuti untuk task:
 2. Delay dari `readWhatsAppWorkerSettings()` / `readTelegramWorkerSettings()` saat enqueue
 3. Progress `onProgress(i, total, groupName)`
 4. Partial fail: `success/total` → job failed jika tidak full (runner join/set_admin)
-5. Idempotent skip — lihat learning (status kolom / sudah ada photo)
+5. Idempotent skip — status kolom / sudah ada photo
 
 ## Payload & settings (ringkas)
 
@@ -39,12 +39,12 @@ Pola yang **harus** diikuti untuk task:
 - WA: tidak ada hapus grup untuk semua — leave + optional clear chat
 - Settings: `deleteEnabled` (default false), `requireOwnerForDelete` (TG)
 
-## Post-job wajib (RM production — di luar learning scripts)
+## Post-job wajib (RM production)
 
-Learning pakai Excel/CSV state lokal. RM pakai Supabase:
+Script lapangan sering pakai Excel/CSV state lokal. RM pakai Supabase:
 
 Setelah leave/delete/create/join sukses → **scrape akun** (atau patch realtime) → grid & Issue refresh via `patchAccountGridAfterDailyWrite` + `scheduleMonitoringReload`.
 
 ## Human delay vs kode
 
-Port RM: `python-sidecar/telegram_human_delay.py` + worker settings — **subset** pola Master (jitter + FloodWait). Long-pause penuh learning boleh dilengkapi jika FloodWait sering di lapangan — jangan potong delay default tanpa bukti.
+Port RM: `python-sidecar/telegram_human_delay.py` + worker settings — **subset** jitter + FloodWait. Long-pause penuh boleh dilengkapi jika FloodWait sering di lapangan — jangan potong delay default tanpa bukti.

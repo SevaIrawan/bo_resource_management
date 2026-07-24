@@ -72,9 +72,9 @@ const checks = [
       /action === 'set_admin'[\s\S]*setAdmin\.betweenTargetsSec/.test(config),
   },
   {
-    name: 'Export learning shape includes delay + rights',
+    name: 'Export Telegram worker shape includes delay + rights',
     ok:
-      config.includes('toTelegramLearningConfigShape') &&
+      config.includes('toTelegramWorkerConfigShape') &&
       config.includes('delete_stories') &&
       config.includes('set_photo_max_retry'),
   },

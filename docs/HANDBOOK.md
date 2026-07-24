@@ -6,7 +6,7 @@
 | **Versi app** | 1.0.30 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
-| **Bahasa UI** | English / 中文 (Admin → Language) |
+| **Bahasa UI** | English / 中文 (Settings → Language) |
 
 Dokumen ini adalah **referensi internal (Bahasa Indonesia)**.  
 
@@ -22,9 +22,9 @@ Untuk arsitektur & rilis IT, lihat [PROJECT.md](../PROJECT.md).
 2. [Memulai aplikasi](#2-memulai-aplikasi)
 3. [Navigasi & tata letak](#3-navigasi--tata-letak)
 4. [Tab Account — monitoring akun](#4-tab-account--monitoring-akun)
-5. [Issue grup & admin (Ticket dihapus)](#5-issue-grup--admin-tab-ticket-dihapus-v1024)
+5. [Issue grup & admin (in-memory)](#5-issue-grup--admin-in-memory)
 6. [Group matrix — join/admin (Account header)](#6-group-matrix--joinadmin-account-header)
-7. [Halaman Admin](#7-halaman-admin)
+7. [Halaman Settings](#7-halaman-settings)
 8. [Sinkronisasi data (realtime)](#8-sinkronisasi-data-realtime)
 9. [Alur kerja harian (disarankan)](#9-alur-kerja-harian-disarankan)
 10. [Glosarium](#10-glosarium)
@@ -42,7 +42,7 @@ Aplikasi membantu tim:
 - Mengecek apakah akun masih **login** di HP/PC (session)
 - Membandingkan **grup di device** vs **standar brand** (master list)
 - Menjalankan **scraper** untuk menyimpan daftar grup ke database
-- Melihat **ticket/issue** yang harus diperbaiki (grup kurang, bukan admin, duplikat, dll.)
+- Melihat **selisih grup/admin** (issue in-memory — bukan tab Ticket) yang perlu diperbaiki
 - Mengekspor data ke **Excel** untuk operasi lapangan
 
 ### 1.2 Dua jenis “login”
@@ -54,9 +54,9 @@ Aplikasi membantu tim:
 
 Jangan dicampur: password dashboard **bukan** password Telegram/WhatsApp.
 
-### 1.3 Apa yang **bukan** ticket?
+### 1.3 Apa yang **bukan** issue?
 
-Perubahan **session login/logout** di kolom Session **tidak** masuk daftar Ticket. Ticket hanya untuk masalah **grup & admin** terhadap standar brand.
+Perubahan **session login/logout** di kolom Session **tidak** masuk issue. Issue hanya untuk masalah **grup & admin** terhadap standar brand.
 
 ---
 
@@ -87,8 +87,8 @@ Anda langsung masuk ke **Group Monitoring** (halaman utama).
 | Ikon / menu | Fungsi |
 |-------------|--------|
 | **Logo** | Brand aplikasi (NEXMAX / Backend Operation) |
-| **Group Monitoring** | Halaman utama — Account, Operations, Reporting |
-| **Admin** | Pengaturan sistem & preferensi |
+| **Group Monitoring** | Halaman utama — tabs **Account** \| **Operations** saja |
+| **Settings** | Preferensi, Automatic account scrape, worker defaults (`/settings`; `/admin` → `/settings`) |
 | **Logout (Power)** | Keluar dari dashboard (tidak logout WA/TG otomatis) |
 
 **Tips:** Sidebar bisa **diperkecil** (hanya ikon) — klik tombol toggle di header.
@@ -125,18 +125,9 @@ Angka berubah sesuai tab aktif.
 | Issue | Akun **not aligned** |
 | Open issues | Ringkasan mismatch grup/admin (engine sama dengan kolom Groups/Admin) |
 
-**Tab Operations (Job Queue):** antrian task per akun — SETUP modal untuk create group (batch + permission per job), VIEW hasil create → tab Set Photo (satu foto per brand). **v1.0.30:** batch besar auto-split 30 grup per job; VIEW join menampilkan status/remark per grup.
+**Tab Operations (Job Queue):** antrian task per akun — join → create→photo → set_admin → leave→delete. SETUP modal create group (batch + permission per job); VIEW hasil create → tab Set Photo. **v1.0.30:** batch besar auto-split 30 grup per job; VIEW join status/remark per grup. Execute slots max **10**/platform; auto scrape brands max **6**.
 
-**Tab Ticket (historis — dihapus v1.0.24):**
-
-| KPI | Arti |
-|-----|------|
-| Open issues | Jumlah kartu issue |
-| Missing groups | Issue tipe grup hilang di master |
-| Not admin | Issue belum admin |
-| Groups to handle | Total baris grup di semua issue |
-| Accounts involved | Banyak akun terlibat |
-| Brands involved | Banyak brand terlibat |
+> Tidak ada tab Ticket / Reporting di shell. Issue = KPI Account + grid (engine in-memory). Matrix = modal dari badge grup.
 
 ---
 
@@ -185,13 +176,14 @@ Setiap brand (mis. **Brand : SBMY**) punya satu kartu.
 | Kolom | Arti | Cara baca |
 |-------|------|-----------|
 | **Account** | Platform + nama + nomor | Ikon WA/TG, nama, nomor di bawah |
+| **Role** | Peran akun di brand | Label role operasi |
 | **Location** | Label lokasi device | Bukan nama brand card |
-| **Status** | **Active** = session valid; **Logout** = tidak valid | Titik hijau / merah |
 | **Session** | **VALID** / **INVALID** | INVALID = harus login platform dulu; **X (hover)** saat Valid = **Clear Session** |
 | **On device** | Angka tunggal | Total grup di HP/PC (daily) |
+| **Junk** | Angka | Grup di device di luar master |
 | **In brand** | `y/x` | Grup master brand yang sudah join di akun ini / total master |
 | **Admin** | Bar + `a/X` | Berapa grup Anda admin vs standar |
-| **Last update** | Waktu / progress scrape | Bukan tombol Run — scrape via **Sync → Scrape now** |
+| **Last update** | Waktu / progress scrape | Read-only — scrape via **Sync → Scrape now** (bukan tombol Run) |
 | **Action** | **Group link** | Buka daftar grup + link invite |
 
 ### 4.4 Tombol & ikon di baris akun
@@ -258,9 +250,9 @@ Kosong? **Sync** → **Scrape now** dulu.
 
 1. Arahkan mouse ke baris akun → ikon **X**
 2. Konfirmasi **Remove**
-3. Efek: baris akun dihapus (CASCADE daily/ticket/session), purge WA di PC ini, **master brand** dihitung ulang dari akun tersisa
+3. Efek: baris akun dihapus (CASCADE daily/session), purge WA di PC ini, **master brand** dihitung ulang dari akun tersisa
 
-Gunakan ini sebelum ganti akun test ke akun marketing — atau biarkan IT hapus dari database (lihat [§7](#7-sinkronisasi-data-realtime)).
+Gunakan ini sebelum ganti akun test ke akun marketing — atau biarkan IT hapus dari database (lihat [§8](#8-sinkronisasi-data-realtime)).
 
 ### 4.9 Tambah brand card
 
@@ -283,11 +275,11 @@ Tombol di modal: tutup, ganti QR/phone, lanjut setelah kode.
 
 ---
 
-## 5. Issue grup & admin (tab Ticket dihapus v1.0.24)
+## 5. Issue grup & admin (in-memory)
 
-> **Tab Ticket tidak ada lagi.** Issue tetap dihitung di engine yang sama dengan grid; lihat badge **not aligned**, kolom **In brand** / **Admin**, Group link (**Junk**), dan Reporting.
+> **Tidak ada tab Ticket.** Issue dihitung in-memory (`accountMasterDailyCompare` → `computeAccountTicketBreakdown`); lihat badge **not aligned**, kolom **In brand** / **Admin** / **Junk**, KPI Account, dan **Group matrix**.
 
-### 5.1 Jenis selisih (konsep sama dengan dulu)
+### 5.1 Jenis selisih (5 tipe saja)
 
 | Tipe | Arti singkat | Tindakan lapangan umum |
 |------|--------------|------------------------|
@@ -297,7 +289,7 @@ Tombol di modal: tutup, ganti QR/phone, lanjut setelah kode.
 | **Duplicate group name** | Nama sama, ID beda | Audit data master |
 | **Device junk group** | Grup di HP tidak ada di master | Bersihkan di HP / keluar grup sampah |
 
-Login/logout session **tidak** membuat ticket.
+Tidak ada `group_count_mismatch`. Login/logout session **tidak** membuat issue. Tidak ada Ticket DB / `reconcileTickets`.
 
 ### 5.2 Di mana melihat & menangani
 
@@ -305,21 +297,19 @@ Login/logout session **tidak** membuat ticket.
 |---------|----------|----------|
 | Missing group | In brand `y/x` kurang | Join / Job Queue Join missing |
 | Not admin | Admin `a/x` kurang | Job Queue Set admin |
-| Junk device | Group link → Junk | Exit job / manual |
-| Duplikat ID/nama | Modal master brand / Reporting | Audit master |
+| Junk device | Kolom Junk / Group link → Junk | Exit job / manual |
+| Duplikat ID/nama | Modal master brand / Group matrix | Audit master |
 
 ### 5.3 Setelah perbaikan
 
 - **Sync** → **Scrape now** di akun terkait
-- Grid & Reporting refresh realtime setelah scrape sukses
-
-*(Workflow tab Ticket — kartu Process, bookmark In Progress, dll. — dihapus sejak v1.0.24.)*
+- Grid & Group matrix refresh realtime setelah scrape sukses
 
 ---
 
 ## 6. Group matrix — join/admin (Account header)
 
-Tab **Reporting** shell **dihapus**. Matrix join/admin = **modal** dari badge jumlah grup di header brand card (tab Account) — hanya **baca data**.
+Tidak ada tab **Reporting**. Matrix join/admin = **modal** dari badge jumlah grup di header brand card (tab Account) — hanya **baca data**. Stock chips = header brand Account (bukan tab Operations Overview).
 
 ### 6.1 Cara buka & isi
 
@@ -336,66 +326,60 @@ Komponen: `BrandMasterGroupsModal` → `ReportingJoinMatrixTable`.
 
 ---
 
-## 7. Halaman Admin
+## 7. Halaman Settings
 
-Buka dari sidebar: **Admin**.
+Buka dari sidebar: **Settings** (`/settings`). Legacy `/admin` redirect ke `/settings`.
 
-### 6.1 System status
+### 7.1 System status & tools IT
 
-| Kartu | Arti |
-|-------|------|
+| Kartu / tombol | Arti |
+|----------------|------|
 | **Supabase** | Connected = database OK |
-| **Active sessions** | Placeholder (bukan hitungan live) |
-| **Platform** | Desktop / Web |
-| **Session tables** | Jumlah tabel RM aktif |
+| **Open configuration folder** | Buka folder AppData (`.env`, wa-sessions) — IT |
+| **Check for app updates** | Cek update GitHub manual |
 
-### 6.2 Tools IT (desktop saja)
+### 7.2 Automatic account scrape
 
-| Tombol | Fungsi | Siapa |
-|--------|--------|-------|
-| **Open configuration folder** | Buka folder AppData (`.env`, wa-sessions) | IT |
-| **Check for app updates** | Cek update GitHub manual | IT / user |
+| Kontrol | Fungsi |
+|---------|--------|
+| **On Scheduled** | Jadwal harian (default **On**, jam **12:00 PM**) |
+| **Scrape Now** | Jalankan scrape sekali untuk brand terpilih (default **Off**) |
+| Brand checklist | Default On: FWSG, JMMY, M24SG, SBMY, STMY, WBSG (max 6/platform) |
+| **Save / Cancel** | Saat Scrape Now **Off** (edit jadwal/brand) |
+| **Execute / Discard** | Saat Scrape Now **On** |
+| Setelah **Execute** | Factory reset ke default idle |
+| Scrape Now **On** (siap) | Status **standby**, Time **"-"** |
 
-User operasional **biasanya tidak perlu** folder config jika installer dari IT sudah benar.
+App harus terbuka agar jadwal jalan. Tidak menggantikan scrape manual lewat **Sync → Scrape now**.
 
-### 6.3 Preferences
+### 7.3 Language & worker
 
-#### Automatic account sync
-
-| Opsi | Fungsi |
-|------|--------|
-| Enabled | Jalan otomatis di background saat app terbuka |
-| Interval (menit) | Seberapa sering (sama seperti tekan Sync per akun) |
-
-Mencatat aktivitas ke database. Tidak menggantikan **Run** scraper penuh saat data belum pernah ada.
-
-#### Language
-
-- **English** / **中文** — mengubah teks UI (label, modal, KPI)
+- **English** / **中文** — teks UI
+- **Worker platform settings** (WA/TG) — default delay / create / invite — enqueue memakai `toTelegramWorkerConfigShape` / WA shape
 
 ---
 
 ## 8. Sinkronisasi data (realtime)
 
-### 7.1 Perubahan di database → app tim
+### 8.1 Perubahan di database → app tim
 
-Jika IT atau sistem mengubah data di **Supabase** (akun, ticket, master grup, session flag):
+Jika IT atau sistem mengubah data di **Supabase** (akun, master grup, session flag, daily):
 
 - App yang **sedang terbuka** akan ikut update (detik–menit)
 - Tidak perlu install ulang
 
 Contoh: hapus akun test di database → baris hilang di dashboard semua orang.
 
-### 7.2 Perubahan kode / layout → update app
+### 8.2 Perubahan kode / layout → update app
 
 Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4](../PROJECT.md).
 
-### 7.3 Yang tersimpan di PC vs cloud
+### 8.3 Yang tersimpan di PC vs cloud
 
 | Lokasi | Isi |
 |--------|-----|
-| **Cloud (Supabase)** | Brand, akun, grup, ticket, session flag |
-| **PC (AppData)** | Auth WhatsApp per akun (**hanya di PC yang scan QR**), preferensi auto-sync, bahasa |
+| **Cloud (Supabase)** | Brand, akun, grup, session flag (bukan tabel ticket) |
+| **PC (AppData)** | Auth WhatsApp per akun (**hanya di PC yang scan QR**), preferensi auto-scrape, bahasa |
 
 **WhatsApp multi-PC:** Session WA tidak pindah antar PC. Serah akun ke operator lain → **Clear Session** di PC lama (opsional) → operator baru **Sync** + scan QR di PC-nya.
 
@@ -405,17 +389,17 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 
 ## 9. Alur kerja harian (disarankan)
 
-### 8.1 Setup akun marketing baru (setelah data test dibersihkan)
+### 9.1 Setup akun marketing baru (setelah data test dibersihkan)
 
 1. Login dashboard
 2. Buka brand (atau buat brand card)
 3. **+Add** → pilih WA/TG → nama + nomor marketing
 4. Klik **↻ Sync** → scan QR di HP marketing
 5. Jika diminta → **Scrape now**
-6. Cek **not aligned** / Group link / Reporting
+6. Cek **not aligned** / Group link / Group matrix
 7. Ulangi untuk setiap akun
 
-### 8.2 Pemeriksaan rutin
+### 9.2 Pemeriksaan rutin
 
 1. Tab **Account** — filter brand/platform
 2. Perhatikan **not aligned** di header brand
@@ -423,7 +407,7 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 4. **Sync → Scrape now** pada akun yang perlu refresh data penuh
 5. Pantau Job Queue **Failed**
 
-### 8.3 Ganti akun test ke akun asli
+### 9.3 Ganti akun test ke akun asli
 
 **Opsi A (disarankan):** Remove tiap akun test dari app → IT bersihkan database  
 
@@ -442,8 +426,8 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 | **Aligned** | Device & master sudah cocok untuk platform itu |
 | **Session VALID** | Ada session aktif di database (belum tentu dicek device hari ini) |
 | **Sync** | Tombol ↻ — login atau cek device |
-| **Scrape / Last update** | Baca semua grup dari HP → simpan DB (via Sync → Scrape now) |
-| **Issue / selisih** | Perbedaan daily vs master (lihat grid, bukan tab Ticket) |
+| **Scrape / Last update** | Baca semua grup dari HP → simpan DB (via Sync → Scrape now); kolom read-only |
+| **Issue / selisih** | Perbedaan daily vs master (in-memory; bukan tab Ticket) |
 | **Slicer** | Bar filter & tools di atas tabel/kartu |
 
 ---
@@ -469,7 +453,7 @@ Normal untuk WA — auth ada di PC Anda. Clear Session + mereka scan QR di PC me
 12 grup terdeteksi di device; 21 = standar brand untuk platform itu (WA terpisah dari TG).
 
 **Bisakah satu PC untuk banyak akun WA?**  
-Ya, sampai ratusan akun — tapi scan QR per akun; Chrome dibatasi ~4 proses bersamaan.
+Ya, sampai ratusan akun — tapi scan QR per akun; execute slots max **10** Chrome user bersamaan per platform (+ auto scrape max **6**).
 
 **Angka tidak berubah padahal sudah diperbaiki di HP?**  
 **Sync** → **Scrape now** agar data device terbaru masuk database.
@@ -488,18 +472,16 @@ IT — cek API Telegram & migrasi database `023`.
 Login
   └─ Group Monitoring
         ├─ [Tab Account]
-        │     ├─ KPI (issue summary)
+        │     ├─ KPI (issue summary, in-memory)
         │     ├─ Filter / Search / Export / Card|Table
-        │     └─ Per Brand Card → Sync | Scrape via Sync | Group link
-        ├─ [Tab Operations]
-        │     ├─ Overview — stock buckets
-        │     └─ Job Queue — join, create, set admin, exit/delete, set photo
-        └─ [Group matrix modal]
-              └─ Matrix / Full Group / Full Admin
-  └─ Admin
-        ├─ System status + Worker settings (defaults)
-        ├─ Config folder / Check updates (IT)
-        └─ Auto-sync + Language
+        │     ├─ Stock chips (header brand)
+        │     └─ Per Brand Card → Sync | Scrape via Sync | Group link | Group matrix badge
+        └─ [Tab Operations]
+              └─ Job Queue — join, create→photo, set admin, leave→delete
+  └─ Settings (/settings; /admin → /settings)
+        ├─ Automatic account scrape (Scheduled + Scrape Now)
+        ├─ Worker settings (defaults) + Language
+        └─ Config folder / Check updates (IT)
 ```
 
 ---

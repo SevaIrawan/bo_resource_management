@@ -50,8 +50,10 @@ Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary
 
 | Page | Route | Description |
 |------|-------|-------------|
-| Group Monitoring | `/` | WA & TG scraper dashboard |
-| Admin | `/admin` | Sessions, config, system |
+| Group Monitoring | `/` | WA & TG dashboard — tabs **Account** \| **Operations** only |
+| Settings | `/settings` | Language, Automatic account scrape, stock policy, worker defaults (admin) |
+
+`/admin` **redirects to** `/settings` (bukan sebaliknya).
 
 ## Development
 
@@ -103,8 +105,12 @@ Ringkas: tim internal install `.exe` sekali → login → SYNC WA/TG. Config ter
 - Library: **xlsx** (SheetJS) — `src/lib/exportExcel.ts`
 - **Group link / akun** → `RM-[nama akun]-YYYYMMDD.xlsx` (nama akun sudah berisi prefix brand)
 - **Table view (semua akun)** → `RM-all-accounts-YYYYMMDD.xlsx`
-- **Tickets** → `RM-tickets-YYYYMMDD.xlsx`
+- Tidak ada export tickets (tab Ticket / tabel ticket DB sudah dihapus; issue = engine in-memory)
 - Python sidecar also has **openpyxl** for server-side export later.
+
+## Debug / Problem Solve
+
+Halaman HTML debug internal: [`Problem Solve/documentation.html`](./Problem%20Solve/documentation.html) — trace alur scrape/sync/job queue untuk troubleshooting (bukan panduan user).
 
 ## Supabase Setup
 
@@ -130,7 +136,7 @@ Ringkas:
 electron/          Electron main & preload
 src/
   components/      Layout & UI
-  pages/           Group Monitoring, Admin
+  pages/           Group Monitoring, Settings
   lib/             Supabase client, utils
   contexts/        Sidebar state
 supabase/

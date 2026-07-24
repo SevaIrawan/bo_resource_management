@@ -102,7 +102,7 @@
 
 | Behavior | Why | What to do |
 |----------|-----|------------|
-| 5th+ action queues when 10 already active on that platform | Max **10** user slots per platform (WA/TG terpisah) | Wait; notification is correct |
+| 11th action queues when **10** already active on that platform | Max **10** user slots per platform (WA/TG terpisah) | Wait; notification is correct |
 | Multiple queued rows, same account | Auto-split batch (v1.0.30) | Normal — chunks run one after another |
 | `SESSION_SETTLING` | 15s Chrome cleanup after job | Retry after ~15s |
 | Scrape blocks job on same account | Per-account isolation | Finish scrape first |
@@ -140,8 +140,8 @@ npm run validate:desktop
 
 | # | Test | Expected |
 |---|------|----------|
-| T1 | 4 jobs, different accounts | 4 `running` |
-| T2 | 5th job | `queued`; runs when slot frees |
+| T1 | 10 jobs, different accounts (same platform) | Up to 10 `running` |
+| T2 | 11th job while 10 active | `queued`; runs when a slot frees |
 | T3 | Scrape + job, same account | Job waits until scrape ends |
 | T4 | Job done → Sync within 15s | `SESSION_SETTLING` then OK |
 | T5 | Logout WA mid-job | `failed`; slot released |

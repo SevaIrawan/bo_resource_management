@@ -4643,9 +4643,15 @@
     cursor: not-allowed;
   }
 
+  /* Standard On/Off switch — ON = hijau terang (sama Queue / --color-wa) */
   .operations-job-queue-switch--on {
-    border-color: rgba(37, 211, 102, 0.45);
-    background: rgba(37, 211, 102, 0.28);
+    border-color: rgba(37, 211, 102, 0.85);
+    background: var(--color-wa);
+  }
+
+  .operations-job-queue-switch--on:hover:not(:disabled) {
+    border-color: #20bd5a;
+    background: #20bd5a;
   }
 
   .operations-job-queue-switch__thumb {
@@ -4655,7 +4661,7 @@
     width: 0.875rem;
     height: 0.875rem;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
+    background: #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
     transform: translateY(-50%);
     transition: transform 160ms ease;

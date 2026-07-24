@@ -24,7 +24,7 @@ Sumber: [wwebjs GroupChat](https://docs.wwebjs.dev/GroupChat.html), [wwebjs Chat
 | Prasyarat | Admin dengan **`change_info`** |
 | Error umum | `ChatAdminRequiredError`, `PhotoInvalidError`, `PhotoCropSizeSmall`, `FloodWaitError` |
 
-### Referensi desain (bukan kode learning)
+### Referensi desain
 
 - Satu asset foto per brand/batch (bukan per grup beda file kecuali requirement produk).
 - **Skip idempotent** jika grup sudah punya foto (hindari API call sia-sia).

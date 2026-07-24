@@ -250,12 +250,15 @@ export async function writeScrapeDailyRows(input: {
 
   const commitResult = await withNetworkRetry('Commit scrape daily', async () => {
     const result = await withTimeout(
-      supabase.rpc('rm_commit_account_scrape', {
-        p_account_id: input.accountId,
-        p_brand: brand,
-        p_platform: input.platform,
-        p_rows: rows,
-      }),
+      (async () => {
+        const { data, error } = await supabase.rpc('rm_commit_account_scrape', {
+          p_account_id: input.accountId,
+          p_brand: brand,
+          p_platform: input.platform,
+          p_rows: rows,
+        });
+        return { data, error };
+      })(),
       commitTimeoutMs,
       'Commit scrape daily',
     );

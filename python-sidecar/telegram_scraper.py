@@ -26,7 +26,7 @@ from telegram_human_delay import (
 from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 
 DEVICE_GROUP_TARGET_MAX = 6000
-# Selaras learning Script Worker scrape_groups.py (between_groups ~2s) + ban safety.
+# Jeda antar grup (~2s) + ban safety.
 _SCRAPE_DELAY = merge_delay(
     {
         "scrape_between_groups_sec": 1.5,
@@ -155,7 +155,7 @@ def _link_from_exported_invite(exported) -> str | None:
 async def _fetch_full_meta(client, entity) -> tuple[int, str | None]:
     """Satu GetFull* → (participants_count, exported_invite URL).
 
-    Pola learning scrape_groups.py + Lonami: GetFullChannel/GetFullChat dulu,
+    GetFullChannel/GetFullChat dulu (Lonami),
     bukan get_participants (sering ChatAdminRequired / 0 untuk member biasa).
     """
     try:
@@ -285,15 +285,12 @@ async def _resolve_invite_link(
     current: int = 0,
     total: int = 0,
 ) -> str | None:
-    """Username → t.me; admin: pakai exported_invite dari GetFull dulu, baru ExportChatInvite.
-
-    Pola learning scrape_groups._invite_link.
-    """
+    """Username → t.me; admin: pakai exported_invite dari GetFull dulu, baru ExportChatInvite."""
     if username:
         return f"https://t.me/{username}"
     if existing_invite:
         return existing_invite
-    # Selaras WA / learning: export hanya jika admin (non-admin biasanya gagal / spam API).
+    # Export hanya jika admin (non-admin biasanya gagal / spam API).
     if not is_admin:
         return None
     delay_cfg = _SCRAPE_DELAY

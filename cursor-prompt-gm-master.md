@@ -1,5 +1,5 @@
 # Cursor Prompt — GM App Master Contract
-## Sync, Run, Scrape, Multi-Account, Background Execution
+## Sync, Scrape Now, Multi-Account, Background Execution
 
 ---
 
@@ -8,8 +8,9 @@
 - Stack: Electron + TypeScript, Supabase (PostgreSQL)
 - App manages WhatsApp and Telegram accounts per brand
 - Each account row: **Sync (↻)** in Action area; **scrape penuh** via modal **Scrape now** after Sync (kolom **Last update** read-only — tidak ada tombol Run terpisah)
-- Existing Job Queue handles: **Create Group**, **Set Admin**, **Invite Member by Group Link**
+- Existing Job Queue handles: **join**, **create→photo**, **set_admin**, **leave→delete**
 - WA session is read from local storage. TG session is read from Supabase.
+- Tabs: **Account | Operations** only. Settings at `/settings` (`/admin` redirects to `/settings`).
 
 ---
 
@@ -78,7 +79,7 @@ Login Modal rules (all cases):
 
 Full scrape is started only by:
 - **Scrape now** in the modal after Sync / login (Scrape Now / Later)
-- **Auto-scrape** (Settings) on schedule
+- **Auto-scrape** (Settings → Automatic account scrape) on schedule or Scrape Now Execute
 - Login success with scraper intent (auto-scrape without Later prompt)
 
 There is **no** standalone Run button in the grid. Column **Last update** shows timestamp, progress, or *Use Sync to log in first*.
@@ -139,9 +140,10 @@ Performance — required for 3000+ groups:
 
 ### Slot Rules
 
-- Maximum **4 accounts** run simultaneously (any action type: Sync, Scrape, Job Queue)
+- Maximum **10 accounts** run simultaneously **per platform** (WA and TG separate pools; any action type: Sync, Scrape, Job Queue)
+- Auto-scrape brands / Chrome lane: max **6** per platform (separate from user execute slots)
 - Each account occupies exactly 1 slot regardless of action type
-- If all 4 slots are full → new action goes into **FIFO waiting queue**
+- If all 10 slots for that platform are full → new action goes into **FIFO waiting queue**
 - Slot is released only when task fully completes (success) or error modal is dismissed (failure)
 - Use `try/finally` to guarantee slot release even on unexpected errors
 
@@ -151,7 +153,7 @@ Performance — required for 3000+ groups:
 - User can freely read all data in UI at all times
 - User cannot trigger a new action if:
   - That account already has an active task running
-  - All 4 slots are occupied
+  - All 10 slots for that platform are occupied
 - If slots are full when user triggers → auto-queue the action + show non-blocking notification: "Queue is full. Action will run when a slot is available"
 - Do not disable the entire UI — only block execute actions per affected account
 
@@ -180,11 +182,11 @@ Performance — required for 3000+ groups:
 
 ## What Gets Updated in Each Scenario
 
-| Scenario | Session + Status | On Device / In Brand / Admin / Scraper |
+| Scenario | Session + Status | On Device / In Brand / Admin / Last update |
 |---|:---:|:---:|
 | Later (all cases) | ✅ | ❌ |
-| Scrape Now / Run — success — had login | ✅ | ✅ |
-| Scrape Now / Run — success — session already valid | ❌ | ✅ |
+| Scrape Now — success — had login | ✅ | ✅ |
+| Scrape Now — success — session already valid | ❌ | ✅ |
 | Scrape failed | ❌ | ❌ |
 
 ---

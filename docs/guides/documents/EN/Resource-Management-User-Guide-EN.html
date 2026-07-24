@@ -11,7 +11,7 @@
     <p class="doc-cover-logo">Backend Operation</p>
     <h1>Resource Management</h1>
     <p class="doc-cover-subtitle">Official User Guide</p>
-    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.30</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Admin → Language)</td></tr></table>
+    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.30</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Settings → Language)</td></tr></table>
   </header>
   
 <section class="doc-toc">
@@ -21,19 +21,20 @@
 <li><a href="#2-getting-started">2. Getting started</a></li>
 <li><a href="#3-navigation-and-layout">3. Navigation and layout</a></li>
 <li><a href="#4-account-tab-account-monitoring">4. Account tab — account monitoring</a></li>
-<li><a href="#5-ticket-tab-issues-and-remediation">5. Ticket tab — issues and remediation</a></li>
+<li><a href="#5-issues-on-account-types-and-remediation">5. Issues on Account — types and remediation</a></li>
 <li><a href="#6-group-matrix-join-admin-account-header">6. Group matrix — join/admin (Account header)</a></li>
-<li><a href="#7-admin-page">7. Admin page</a></li>
-<li><a href="#8-data-synchronization-realtime">8. Data synchronization (realtime)</a></li>
-<li><a href="#9-recommended-daily-workflows">9. Recommended daily workflows</a></li>
-<li><a href="#10-glossary">10. Glossary</a></li>
-<li><a href="#11-faq">11. FAQ</a></li>
+<li><a href="#7-operations-job-queue">7. Operations — Job Queue</a></li>
+<li><a href="#8-settings">8. Settings</a></li>
+<li><a href="#9-data-synchronization-realtime">9. Data synchronization (realtime)</a></li>
+<li><a href="#10-recommended-daily-workflows">10. Recommended daily workflows</a></li>
+<li><a href="#11-glossary">11. Glossary</a></li>
+<li><a href="#12-faq">12. FAQ</a></li>
 <li><a href="#appendix-quick-feature-map">Appendix — Quick feature map</a></li></ol>
 </section>
   <main class="doc-body">
     <p>This document is the <strong>official guide to every feature</strong> in the current application. For architecture and IT release notes, see <a href="../../PROJECT.md">PROJECT.md</a>.</p>
 <blockquote>
-<p><strong>v1.0.24+:</strong> The <strong>Ticket</strong> tab was removed — issues appear as <strong>KPI cards</strong> on the Account tab. <strong>Operations</strong> tab has <strong>Overview</strong> (stock) and <strong>Job Queue</strong> (automation). Section 5 below is historical reference.</p>
+<p><strong>v1.0.30:</strong> There is <strong>no Ticket tab</strong>. Issues appear on the <strong>Account</strong> tab (not-aligned badges: Junk / Missing / Not admin). Remediation runs through <strong>Operations → Job Queue</strong> (SETUP: join / set admin / exit). <strong>Operations</strong> is Job Queue only (no Overview). Stock chips and the Group matrix live on the Account brand header. Prefer sidebar <strong>Settings</strong> (<code>/settings</code>); <code>/admin</code> redirects there.</p>
 </blockquote>
 <hr>
 <h2 id="table-of-contents">Table of contents</h2>
@@ -42,13 +43,14 @@
 <li><a href="#2-getting-started">Getting started</a></li>
 <li><a href="#3-navigation-and-layout">Navigation and layout</a></li>
 <li><a href="#4-account-tab--account-monitoring">Account tab — account monitoring</a></li>
-<li><a href="#5-ticket-tab--issues-and-remediation">Ticket tab — issues and remediation</a></li>
+<li><a href="#5-issues-on-account--types-and-remediation">Issues on Account — types and remediation</a></li>
 <li><a href="#6-group-matrix--joinadmin-account-header">Group matrix — join/admin (Account header)</a></li>
-<li><a href="#7-admin-page">Admin page</a></li>
-<li><a href="#8-data-synchronization-realtime">Data synchronization (realtime)</a></li>
-<li><a href="#9-recommended-daily-workflows">Recommended daily workflows</a></li>
-<li><a href="#10-glossary">Glossary</a></li>
-<li><a href="#11-faq">FAQ</a></li>
+<li><a href="#7-operations--job-queue">Operations — Job Queue</a></li>
+<li><a href="#8-settings">Settings</a></li>
+<li><a href="#9-data-synchronization-realtime">Data synchronization (realtime)</a></li>
+<li><a href="#10-recommended-daily-workflows">Recommended daily workflows</a></li>
+<li><a href="#11-glossary">Glossary</a></li>
+<li><a href="#12-faq">FAQ</a></li>
 <li><a href="#appendix--quick-feature-map">Appendix — Quick feature map</a></li>
 </ol>
 <hr>
@@ -79,8 +81,12 @@
 <td>Run a full read of groups from the device and save to the database</td>
 </tr>
 <tr>
-<td>Tickets / issues</td>
-<td>See remediation tasks (missing groups, not admin, duplicates, junk groups, etc.)</td>
+<td>Issues</td>
+<td>See gaps on Account (junk / missing / not admin, duplicates) — computed in memory</td>
+</tr>
+<tr>
+<td>Job Queue</td>
+<td>Automate join, create group, set admin, exit/delete, set photo</td>
 </tr>
 <tr>
 <td>Export</td>
@@ -109,8 +115,8 @@
 </tr>
 </tbody></table>
 <p>The dashboard password is <strong>not</strong> your Telegram or WhatsApp password.</p>
-<h3 id="1-3-what-is-not-a-ticket">1.3 What is **not** a ticket?</h3>
-<p>Changes to <strong>session login/logout</strong> in the <strong>Session</strong> column do <strong>not</strong> create tickets. Tickets only cover <strong>group and admin</strong> problems relative to the brand standard.</p>
+<h3 id="1-3-what-is-not-an-issue">1.3 What is **not** an issue?</h3>
+<p>Changes to <strong>session login/logout</strong> in the <strong>Session</strong> column do <strong>not</strong> create issues. Issues only cover <strong>group and admin</strong> problems relative to the brand standard.</p>
 <h3 id="1-4-who-should-read-which-sections">1.4 Who should read which sections?</h3>
 <table>
 <thead>
@@ -121,15 +127,15 @@
 </thead>
 <tbody><tr>
 <td>Field / marketing ops</td>
-<td>§2–§5, §8</td>
+<td>§2–§5, §7, §10</td>
 </tr>
 <tr>
 <td>Team lead</td>
-<td>§4–§5 KPIs, bookmarks, export</td>
+<td>§4–§5 KPIs, Job Queue, export</td>
 </tr>
 <tr>
 <td>IT / support</td>
-<td>§6, §7, §10 FAQ</td>
+<td>§8, §9, §12 FAQ</td>
 </tr>
 </tbody></table>
 <hr>
@@ -207,11 +213,11 @@
 </tr>
 <tr>
 <td><strong>Group Monitoring</strong></td>
-<td>Main page — accounts &amp; tickets</td>
+<td>Main page — Account + Operations</td>
 </tr>
 <tr>
-<td><strong>Admin</strong></td>
-<td>System status &amp; preferences</td>
+<td><strong>Settings</strong></td>
+<td>Preferences, auto scrape, worker policy (<code>/settings</code>)</td>
 </tr>
 <tr>
 <td><strong>Logout (power)</strong></td>
@@ -219,6 +225,9 @@
 </tr>
 </tbody></table>
 <p><strong>Tip:</strong> Collapse the sidebar to icon-only mode — use <strong>Toggle sidebar</strong> in the header.</p>
+<blockquote>
+<p>Older bookmarks to <strong>Admin</strong> (<code>/admin</code>) redirect to <strong>Settings</strong>.</p>
+</blockquote>
 <h3 id="3-2-header-top">3.2 Header (top)</h3>
 <table>
 <thead>
@@ -229,7 +238,7 @@
 </thead>
 <tbody><tr>
 <td>Page title</td>
-<td>Active module (e.g. Group Monitoring, Admin)</td>
+<td>Active module (e.g. Group Monitoring, Settings)</td>
 </tr>
 <tr>
 <td><strong>Welcome</strong> + user name</td>
@@ -250,7 +259,7 @@
 </thead>
 <tbody><tr>
 <td><strong>Account</strong></td>
-<td>Brand cards, WA/TG rows, KPI issues, <strong>stock chips</strong> + <strong>Group matrix</strong> (card header)</td>
+<td>Brand cards, WA/TG rows, issue badges, <strong>stock chips</strong> + <strong>Group matrix</strong> (card header)</td>
 </tr>
 <tr>
 <td><strong>Operations</strong></td>
@@ -258,12 +267,11 @@
 </tr>
 </tbody></table>
 <blockquote>
-<p>There is <strong>no</strong> separate Reporting tab. Open the join/admin matrix from the <strong>group count badge</strong> on the Account brand card header. Stock chips live on the same header (not an Operations Overview bookmark).</p>
+<p>There is <strong>no</strong> Reporting tab and <strong>no</strong> Operations Overview. Open the join/admin matrix from the <strong>group count badge</strong> on the Account brand card header. Stock chips live on the same header.</p>
 </blockquote>
 <p>Switching tabs updates KPI cards and the filter toolbar below.</p>
-<h3 id="3-4-kpi-cards-summary-numbers">3.4 KPI cards (summary numbers)</h3>
+<h3 id="3-4-kpi-cards-account-tab">3.4 KPI cards (Account tab)</h3>
 <p>Numbers refresh when you change tab or when data updates from the database.</p>
-<h4 id="account-tab-kpis">Account tab KPIs</h4>
 <table>
 <thead>
 <tr>
@@ -288,45 +296,12 @@
 <td>Accounts matching brand standard for their platform</td>
 </tr>
 <tr>
-<td><strong>Issue</strong></td>
+<td><strong>Not Aligned / Issue</strong></td>
 <td>Accounts <strong>not aligned</strong></td>
 </tr>
 <tr>
 <td><strong>Open issues</strong></td>
-<td>Count of open ticket issues (rollup)</td>
-</tr>
-</tbody></table>
-<h4 id="ticket-tab-kpis">Ticket tab KPIs</h4>
-<table>
-<thead>
-<tr>
-<th>KPI</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Open issues</strong></td>
-<td>Issue cards shown</td>
-</tr>
-<tr>
-<td><strong>Missing groups</strong></td>
-<td>Issues of type <em>Missing group</em></td>
-</tr>
-<tr>
-<td><strong>Not admin</strong></td>
-<td>Issues of type <em>Not admin</em></td>
-</tr>
-<tr>
-<td><strong>Groups to handle</strong></td>
-<td>Total group rows across all issues</td>
-</tr>
-<tr>
-<td><strong>Accounts involved</strong></td>
-<td>Distinct accounts in filtered issues</td>
-</tr>
-<tr>
-<td><strong>Brands involved</strong></td>
-<td>Distinct brands in filtered issues</td>
+<td>Rollup of open group/admin gaps</td>
 </tr>
 </tbody></table>
 <hr>
@@ -400,8 +375,12 @@
 <td>e.g. <em>12 accounts</em></td>
 </tr>
 <tr>
-<td><strong>WA x std / TG x std</strong></td>
-<td>Standard (master) group count per platform</td>
+<td><strong>WA x Group / TG x Group</strong></td>
+<td>Clickable — opens <strong>Group matrix</strong> for that platform</td>
+</tr>
+<tr>
+<td><strong>Stock chips</strong></td>
+<td>Account/stock summary on the header (not an Operations bookmark)</td>
 </tr>
 <tr>
 <td><strong>All aligned</strong> / <strong>N accounts not aligned</strong></td>
@@ -486,9 +465,9 @@
 <td>Total groups on phone/PC (daily)</td>
 </tr>
 <tr>
-<td><strong>In brand</strong></td>
-<td><code>y/x</code></td>
-<td>Master groups joined on this account / total master</td>
+<td><strong>Junk / Missing / Not admin</strong></td>
+<td>Gap badges</td>
+<td>Counts for issues (see §5) — not a separate Ticket tab</td>
 </tr>
 <tr>
 <td><strong>Admin</strong></td>
@@ -496,9 +475,9 @@
 <td>How many groups you are admin of vs standard</td>
 </tr>
 <tr>
-<td><strong>Scraper</strong></td>
-<td><strong>Run</strong> + time / progress</td>
-<td>Full group read into database</td>
+<td><strong>Last update</strong></td>
+<td>Timestamp / progress</td>
+<td>Full scrape status — <strong>read-only</strong> (no Run button)</td>
 </tr>
 <tr>
 <td><strong>Action</strong></td>
@@ -582,7 +561,7 @@
 </tr>
 <tr>
 <td>3</td>
-<td>If OK: <strong>Groups</strong> / <strong>Admin</strong> numbers update</td>
+<td>If OK: <strong>Groups</strong> / <strong>Admin</strong> numbers update; may offer <strong>Scrape now</strong> / <strong>Later</strong></td>
 </tr>
 <tr>
 <td>4</td>
@@ -636,8 +615,9 @@
 <td>Session check + summary counts — not always a full scrape</td>
 </tr>
 </tbody></table>
-<p>There is <strong>no separate Run button</strong> in the grid.</p>
+<p>There is <strong>no separate Run button</strong> in the grid. <strong>Last update</strong> is read-only.</p>
 <p>After login, you may see: <em>Login OK. Device group &amp; admin counts are updated. Save the full group list to the database now?</em> → choose <strong>Scrape now</strong> or <strong>Later</strong>.</p>
+<p><strong>Later</strong> = session stays Active/Valid in UI + DB only — <strong>no</strong> scrape and <strong>no</strong> device group recount from a full scrape. <strong>Cancel scrape</strong> stops the running scrape entirely.</p>
 <h3 id="4-7-group-link-modal">4.7 Group link modal</h3>
 <p>Open via <strong>Action → Group link</strong>. Choose a mode:</p>
 <table>
@@ -680,7 +660,7 @@
 <td>Previous / Next when many groups</td>
 </tr>
 </tbody></table>
-<p><strong>Admin vs master</strong> total matches the Groups/Admin denominator (X) and the <strong>WA x Group</strong> badge — device junk groups are <strong>not</strong> listed here (see Tickets → Junk).</p>
+<p><strong>Admin vs master</strong> total matches the Groups/Admin denominator (X) and the <strong>WA x Group</strong> badge — device junk groups are <strong>not</strong> listed here (see Junk on Account / Leave in Operations).</p>
 <p>Empty list? <strong>Sync</strong> → <strong>Scrape now</strong> first. Message: <em>No links. Scrape via Sync first.</em></p>
 <h3 id="4-8-remove-account-from-slot">4.8 Remove account from slot</h3>
 <table>
@@ -703,7 +683,7 @@
 <td>Effect</td>
 </tr>
 </tbody></table>
-<p>Use before swapping test accounts for production marketing accounts — or let IT delete from database (see §7).</p>
+<p>Use before swapping test accounts for production marketing accounts — or let IT delete from database (see §8).</p>
 <h3 id="4-9-add-brand-card">4.9 Add brand card</h3>
 <p>At end of card list: <strong>Add Card View</strong> → enter brand name → <strong>Create card</strong>.</p>
 <h3 id="4-10-table-view">4.10 Table view</h3>
@@ -753,164 +733,68 @@
 <td>Restart; ensure WhatsApp Web reachable on PC</td>
 </tr>
 </tbody></table>
+<h3 id="4-12-parallelism-desktop">4.12 Parallelism (desktop)</h3>
+<table>
+<thead>
+<tr>
+<th>Pool</th>
+<th>Limit</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>User execute (Sync / Scrape now / Job Queue)</td>
+<td>Up to <strong>10</strong> slots per platform</td>
+<td>WA and TG pools are separate</td>
+</tr>
+<tr>
+<td>Automatic account scrape</td>
+<td>Max <strong>6</strong> brands per platform</td>
+<td>Separate auto lane — does not take user execute slots</td>
+</tr>
+</tbody></table>
 <hr>
-<h2 id="5-ticket-tab-issues-and-remediation">5. Ticket tab — issues and remediation</h2>
-<h3 id="5-1-when-do-tickets-appear">5.1 When do tickets appear?</h3>
-<p>After an account has scrape/sync data, the system compares <strong>device groups (daily snapshot)</strong> vs <strong>brand master</strong>. Mismatches create tickets automatically.</p>
-<p>Ticket card counts use the <strong>same engine</strong> as the Groups/Admin columns on the Account tab — not raw database row counts.</p>
-<h3 id="5-2-issue-types-filter-all-ticket-types">5.2 Issue types (filter: All ticket types)</h3>
+<h2 id="5-issues-on-account-types-and-remediation">5. Issues on Account — types and remediation</h2>
+<h3 id="5-1-where-do-issues-appear">5.1 Where do issues appear?</h3>
+<p>There is <strong>no Ticket tab</strong>, <strong>no Process modal</strong>, and <strong>no</strong> <code>ticket_issue_handles</code> / In Progress workflow.</p>
+<p>After scrape/sync data exists, the app compares <strong>device groups (daily)</strong> vs <strong>brand master</strong> <strong>in memory</strong>. Gaps show on the <strong>Account</strong> tab as <strong>not aligned</strong> state and <strong>Junk / Missing / Not admin</strong> badges (same engine as Groups/Admin columns).</p>
+<h3 id="5-2-issue-types-exactly-five">5.2 Issue types (exactly five)</h3>
 <table>
 <thead>
 <tr>
-<th>Type (UI)</th>
-<th>Short meaning</th>
-<th>Typical field action</th>
+<th>Type (internal)</th>
+<th>UI meaning</th>
+<th>Typical remediation</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Missing group</strong></td>
-<td>In brand master but not on this account</td>
-<td>Join group (use export invite links)</td>
+<td><strong>daily_junk_group</strong></td>
+<td><strong>Junk</strong> — on device, not in brand master</td>
+<td><strong>Operations → Leave / exit</strong> (Job Queue SETUP)</td>
 </tr>
 <tr>
-<td><strong>Not admin</strong></td>
-<td>In group but not admin</td>
-<td>Request admin rights</td>
+<td><strong>missing_group</strong></td>
+<td><strong>Missing</strong> / Need to join — in master, not on account</td>
+<td><strong>Operations → Join missing</strong> (SETUP)</td>
 </tr>
 <tr>
-<td><strong>Duplicate group ID</strong></td>
-<td>Same ID, conflicting names</td>
-<td>Audit master data</td>
+<td><strong>not_admin</strong></td>
+<td><strong>Not admin</strong> — joined but not admin</td>
+<td><strong>Operations → Set admin</strong> (SETUP)</td>
 </tr>
 <tr>
-<td><strong>Duplicate group name</strong></td>
-<td>Same name, different IDs in master</td>
-<td>Audit master data</td>
+<td><strong>duplicate_group_id</strong></td>
+<td>Same group ID, conflicting names</td>
+<td>Audit master data (IT)</td>
 </tr>
 <tr>
-<td><strong>Device junk group</strong></td>
-<td>On phone but not in master</td>
-<td>Leave/clean junk groups on phone</td>
+<td><strong>duplicate_group_name</strong></td>
+<td>Same name, different IDs</td>
+<td>Audit master data (IT)</td>
 </tr>
 </tbody></table>
-<p>Session login/logout does <strong>not</strong> create tickets.</p>
-<h3 id="5-3-ticket-toolbar">5.3 Ticket toolbar</h3>
-<table>
-<thead>
-<tr>
-<th>Tool</th>
-<th>Function</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Search</td>
-<td><em>Search account / group…</em></td>
-</tr>
-<tr>
-<td>Filter Brand / Platform / Type</td>
-<td>Narrow issue list</td>
-</tr>
-<tr>
-<td><strong>Bookmark: In Progress</strong></td>
-<td>Issues marked <em>In Progress</em></td>
-</tr>
-<tr>
-<td><strong>Bookmark: Completed</strong></td>
-<td>Issues marked <em>Complete</em></td>
-</tr>
-<tr>
-<td><strong>Export</strong></td>
-<td>Excel for all issues <strong>matching filters</strong></td>
-</tr>
-</tbody></table>
-<p><strong>Issue workflow views:</strong> In Progress · Completed</p>
-<h3 id="5-4-issue-card">5.4 Issue card</h3>
-<p>Each card = <strong>one issue</strong> per: account + brand + issue type.</p>
-<table>
-<thead>
-<tr>
-<th>Section</th>
-<th>Content</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Title</td>
-<td>Account name</td>
-</tr>
-<tr>
-<td>Badge</td>
-<td>Issue type (color-coded)</td>
-</tr>
-<tr>
-<td>Platform</td>
-<td>WA / TG</td>
-</tr>
-<tr>
-<td>Meta</td>
-<td>Phone · brand</td>
-</tr>
-<tr>
-<td>Description</td>
-<td>Summary (group counts, headlines)</td>
-</tr>
-<tr>
-<td><strong>Process</strong> / <strong>New</strong> / status caption</td>
-<td>Workflow — <strong>click</strong> to open handle form</td>
-</tr>
-<tr>
-<td><strong>Double-click card</strong></td>
-<td>Full <strong>detail</strong> table (all group rows)</td>
-</tr>
-</tbody></table>
-<p>Hint on card: <em>Double-click for full detail table</em></p>
-<h3 id="5-5-process-modal-workflow">5.5 Process modal (workflow)</h3>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Function</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Task status</strong></td>
-<td>To Do → In Progress → Complete / Interrupted</td>
-</tr>
-<tr>
-<td>Due dates / remarks</td>
-<td>Stored in database (<code>ticket_issue_handles</code>)</td>
-</tr>
-<tr>
-<td><strong>Save</strong></td>
-<td>Persist and close</td>
-</tr>
-<tr>
-<td><strong>Export</strong></td>
-<td>Excel for this issue only</td>
-</tr>
-</tbody></table>
-<p>Bookmarks <strong>In Progress</strong> / <strong>Completed</strong> follow the saved task status.</p>
-<h3 id="5-6-detail-modal-double-click">5.6 Detail modal (double-click)</h3>
-<table>
-<thead>
-<tr>
-<th>Feature</th>
-<th>Function</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Full table</td>
-<td>All groups involved in the issue</td>
-</tr>
-<tr>
-<td><strong>Export</strong></td>
-<td>Field remediation reference for this issue</td>
-</tr>
-<tr>
-<td>Close</td>
-<td><strong>Esc</strong> or click outside — <strong>Close</strong> button</td>
-</tr>
-</tbody></table>
-<h3 id="5-7-ticket-account-relationship">5.7 Ticket ↔ Account relationship</h3>
+<p>There is <strong>no</strong> <code>group_count_mismatch</code> (aggregate Y≠X) ticket type. Session login/logout does <strong>not</strong> create issues.</p>
+<h3 id="5-3-how-to-remediate">5.3 How to remediate</h3>
 <table>
 <thead>
 <tr>
@@ -920,21 +804,25 @@
 </thead>
 <tbody><tr>
 <td>1</td>
-<td>Fix groups on phone (join, admin, remove junk)</td>
+<td>On Account, find <strong>not aligned</strong> rows and read Junk / Missing / Not admin counts</td>
 </tr>
 <tr>
 <td>2</td>
-<td>On affected account: <strong>Sync</strong> or <strong>Run</strong> again</td>
+<td>Open <strong>Operations</strong> → Job Queue → brand → SETUP for Join / Set admin / Exit as needed</td>
 </tr>
 <tr>
 <td>3</td>
-<td>Tickets close or shrink when data aligns (realtime after DB update)</td>
+<td>After jobs finish: <strong>Sync → Scrape now</strong> on the account so daily data refreshes</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Badges shrink when daily aligns with master (realtime after DB update)</td>
 </tr>
 </tbody></table>
-<p>If tickets remain after phone fix: <strong>Run</strong> scraper to push latest device data. After scrape, ticket counts and Groups columns refresh from the latest database (not stale cache).</p>
+<p>If gaps remain after phone/automation fix: run <strong>Sync → Scrape now</strong> again so the latest device data reaches the database.</p>
 <hr>
 <h2 id="6-group-matrix-join-admin-account-header">6. Group matrix — join/admin (Account header)</h2>
-<p>The Reporting tab shell was <strong>removed</strong>. Join/admin matrix opens from the Account brand card <strong>group count badge</strong> (<code>BrandMasterGroupsModal</code>) — read-only.</p>
+<p>The Reporting shell tab was <strong>removed</strong>. Join/admin matrix opens from the Account brand card <strong>group count badge</strong> — read-only.</p>
 <table>
 <thead>
 <tr>
@@ -944,7 +832,7 @@
 </thead>
 <tbody><tr>
 <td>Entry</td>
-<td>Account → brand card header → group count</td>
+<td>Account → brand card header → <strong>WA/TG Group</strong> badge</td>
 </tr>
 <tr>
 <td><strong>Full Group / Full Admin</strong></td>
@@ -959,12 +847,52 @@
 <td>Yes / No / All on account headers</td>
 </tr>
 </tbody></table>
-<p>Updates automatically after scrape or Supabase changes (<code>rm-reporting-reload</code>).</p>
+<p>Updates automatically after scrape or Supabase changes. UI shows the latest matrix without relying on a separate Reporting page.</p>
 <hr>
-<h2 id="7-admin-page">7. Admin page</h2>
-<p>Open from sidebar: <strong>Admin</strong>.</p>
-<p>Subtitle: <em>System status and application preferences</em></p>
-<h3 id="6-1-system-status">6.1 System status</h3>
+<h2 id="7-operations-job-queue">7. Operations — Job Queue</h2>
+<p><strong>Operations</strong> is <strong>Job Queue only</strong> — there is no Overview tab. Stock summary is on the Account brand header chips (§4.2).</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Brand cards</td>
+<td>Expand brand → queue tables per action type</td>
+</tr>
+<tr>
+<td><strong>Join missing</strong></td>
+<td>Enqueue joins using invite links from brand master</td>
+</tr>
+<tr>
+<td><strong>Create group</strong></td>
+<td>Create groups on device + export invite link</td>
+</tr>
+<tr>
+<td><strong>Set admin</strong></td>
+<td>Promote target account where owner is admin</td>
+</tr>
+<tr>
+<td><strong>Exit / delete</strong></td>
+<td>Leave junk (and delete when enabled in Settings → Worker)</td>
+</tr>
+<tr>
+<td><strong>Set photo</strong></td>
+<td>Brand group photo jobs (Telegram)</td>
+</tr>
+<tr>
+<td><strong>SETUP</strong> modals</td>
+<td>Pick accounts/groups, then queue — uses live device data</td>
+</tr>
+</tbody></table>
+<p>Session must be <strong>Active</strong> to open Job Queue setup for that account. Worker delays and leave/delete guards are configured under <strong>Settings</strong> (§8).</p>
+<hr>
+<h2 id="8-settings">8. Settings</h2>
+<p>Open from sidebar: <strong>Settings</strong> (<code>/settings</code>).</p>
+<p>Subtitle: <em>Application preferences</em></p>
+<h3 id="8-1-system-status">8.1 System status</h3>
 <table>
 <thead>
 <tr>
@@ -978,7 +906,7 @@
 </tr>
 <tr>
 <td><strong>Active sessions</strong></td>
-<td>Placeholder (not a live session count)</td>
+<td>Count of active messaging sessions for your user</td>
 </tr>
 <tr>
 <td><strong>Platform</strong></td>
@@ -989,7 +917,7 @@
 <td>Count of active RM session tables</td>
 </tr>
 </tbody></table>
-<h3 id="6-2-it-tools-desktop-only">6.2 IT tools (desktop only)</h3>
+<h3 id="8-2-it-tools-desktop-only">8.2 IT tools (desktop only)</h3>
 <table>
 <thead>
 <tr>
@@ -1011,27 +939,55 @@
 </tbody></table>
 <p>Operational users normally <strong>do not</strong> need the config folder if IT installed the correct build.</p>
 <p><strong>Auto-update:</strong> Updates download from GitHub automatically. <strong>Restart</strong> when prompted — no reinstall.</p>
-<h3 id="6-3-preferences">6.3 Preferences</h3>
-<h4 id="automatic-account-sync">Automatic account sync</h4>
+<h3 id="8-3-preferences-automatic-account-scrape">8.3 Preferences — Automatic account scrape</h3>
+<p>Replaces the old “Automatic account sync” + interval (minutes) controls.</p>
 <table>
 <thead>
 <tr>
-<th>Option</th>
+<th>Control</th>
 <th>Function</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Enabled</strong></td>
-<td>Background checks while app is open (same logic as per-account <strong>Sync</strong>)</td>
+<td><strong>On Scheduled</strong></td>
+<td>Default <strong>On</strong> — once per day at the scheduled local time (app must be open)</td>
 </tr>
 <tr>
-<td><strong>Interval (minutes)</strong></td>
-<td>How often to run (default often 60 minutes)</td>
+<td><strong>Daily run at</strong></td>
+<td>Default <strong>12:00 PM</strong> (local)</td>
+</tr>
+<tr>
+<td><strong>Scrape Now</strong></td>
+<td>Default <strong>Off</strong> — one-shot auto scrape; when <strong>On</strong>, brand checkboxes start <strong>all unchecked</strong>; Status shows <strong>standby</strong> until Execute</td>
+</tr>
+<tr>
+<td>Brand checklist</td>
+<td>Max <strong>6</strong> brands per platform (WA and TG separate)</td>
+</tr>
+<tr>
+<td>Default brands (Scheduled)</td>
+<td><strong>FWSG</strong>, <strong>JMMY</strong>, <strong>M24SG</strong>, <strong>SBMY</strong>, <strong>STMY</strong>, <strong>WBSG</strong></td>
 </tr>
 </tbody></table>
-<p>Logs activity to the database with timestamps. Does <strong>not</strong> replace a full <strong>Run</strong> scrape when no scrape data exists yet.</p>
-<p>Summary on Admin card: <em>On · N min</em> or <em>Off</em>.</p>
-<h4 id="language">Language</h4>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Primary buttons</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>On Scheduled</strong> (Scrape Now Off)</td>
+<td><strong>Save</strong> / <strong>Cancel</strong></td>
+</tr>
+<tr>
+<td><strong>Scrape Now</strong> On</td>
+<td><strong>Execute</strong> / <strong>Discard</strong></td>
+</tr>
+</tbody></table>
+<p>After <strong>Execute</strong> finishes, settings <strong>reset to defaults</strong>: On Scheduled <strong>On</strong>, Scrape Now <strong>Off</strong>, <strong>12:00 PM</strong>, the six default brands.</p>
+<p>Auto scrape uses its own lane (max <strong>6</strong> brands/platform) and does <strong>not</strong> consume the user execute pool (up to <strong>10</strong>).</p>
+<h3 id="8-4-language">8.4 Language</h3>
 <table>
 <thead>
 <tr>
@@ -1049,10 +1005,12 @@
 </tr>
 </tbody></table>
 <p>Change applies immediately across dashboard captions.</p>
+<h3 id="8-5-worker-settings-whatsapp-telegram">8.5 Worker settings (WhatsApp / Telegram)</h3>
+<p>Expand cards for human delays, create-group defaults, invite-by-link throttle, set-admin delays, and leave/delete guards. Values are applied when you <strong>enqueue</strong> Job Queue tasks (frozen into the job payload).</p>
 <hr>
-<h2 id="8-data-synchronization-realtime">8. Data synchronization (realtime)</h2>
-<h3 id="7-1-database-changes-open-apps">7.1 Database changes → open apps</h3>
-<p>When IT or automation changes <strong>Supabase</strong> (accounts, tickets, master groups, session flags):</p>
+<h2 id="9-data-synchronization-realtime">9. Data synchronization (realtime)</h2>
+<h3 id="9-1-database-changes-open-apps">9.1 Database changes → open apps</h3>
+<p>When IT or automation changes <strong>Supabase</strong> (accounts, master groups, daily scrape, session flags):</p>
 <table>
 <thead>
 <tr>
@@ -1070,7 +1028,8 @@
 </tr>
 </tbody></table>
 <p>Example: IT deletes a test account → row disappears on every user’s dashboard.</p>
-<h3 id="7-2-code-ui-changes-app-update">7.2 Code / UI changes → app update</h3>
+<p>After a scrape commits daily + master, Account badges and the Group matrix reload from the latest database (not a stale Ticket cache).</p>
+<h3 id="9-2-code-ui-changes-app-update">9.2 Code / UI changes → app update</h3>
 <p>Requires a <strong>new app version</strong> (auto-update + <strong>Restart</strong>). See <a href="../../PROJECT.md">PROJECT.md §4.4</a>.</p>
 <table>
 <thead>
@@ -1088,7 +1047,7 @@
 <td>New <code>.exe</code> version</td>
 </tr>
 </tbody></table>
-<h3 id="7-3-pc-vs-cloud-storage">7.3 PC vs cloud storage</h3>
+<h3 id="9-3-pc-vs-cloud-storage">9.3 PC vs cloud storage</h3>
 <table>
 <thead>
 <tr>
@@ -1098,18 +1057,18 @@
 </thead>
 <tbody><tr>
 <td><strong>Cloud (Supabase)</strong></td>
-<td>Brands, accounts, groups, tickets, session flags</td>
+<td>Brands, accounts, groups, session flags</td>
 </tr>
 <tr>
 <td><strong>PC (AppData)</strong></td>
-<td>WhatsApp auth per account (<strong>only on the PC that scanned QR</strong>), auto-sync preference, language</td>
+<td>WhatsApp auth per account (<strong>only on the PC that scanned QR</strong>), auto-scrape preference, language, worker settings</td>
 </tr>
 </tbody></table>
 <p><strong>WhatsApp multi-PC:</strong> Session does not move between PCs. Hand off → <strong>Clear Session</strong> on the old PC (optional) → new operator <strong>Sync</strong> + scan QR on their PC.</p>
-<p><strong>Telegram multi-PC:</strong> Session string is in the cloud — another PC can <strong>Sync</strong>/<strong>Run</strong> while Session is <strong>Valid</strong>. Hand off → <strong>Clear Session</strong> (required) so the new operator scans QR on their PC.</p>
+<p><strong>Telegram multi-PC:</strong> Session string is in the cloud — another PC can <strong>Sync</strong> / scrape while Session is <strong>Valid</strong>. Hand off → <strong>Clear Session</strong> (required) so the new operator scans QR on their PC.</p>
 <hr>
-<h2 id="9-recommended-daily-workflows">9. Recommended daily workflows</h2>
-<h3 id="8-1-onboard-a-new-marketing-account-after-test-data-cleanup">8.1 Onboard a new marketing account (after test data cleanup)</h3>
+<h2 id="10-recommended-daily-workflows">10. Recommended daily workflows</h2>
+<h3 id="10-1-onboard-a-new-marketing-account-after-test-data-cleanup">10.1 Onboard a new marketing account (after test data cleanup)</h3>
 <table>
 <thead>
 <tr>
@@ -1135,18 +1094,22 @@
 </tr>
 <tr>
 <td>5</td>
-<td>If prompted → <strong>Run</strong> scraper</td>
+<td>If prompted → <strong>Scrape now</strong></td>
 </tr>
 <tr>
 <td>6</td>
-<td><strong>Ticket</strong> tab → handle issues → <strong>Export</strong> if needed</td>
+<td>Review Account badges (Junk / Missing / Not admin)</td>
 </tr>
 <tr>
 <td>7</td>
+<td><strong>Operations</strong> Job Queue SETUP to remediate → scrape again after jobs</td>
+</tr>
+<tr>
+<td>8</td>
 <td>Repeat per account</td>
 </tr>
 </tbody></table>
-<h3 id="8-2-routine-health-check">8.2 Routine health check</h3>
+<h3 id="10-2-routine-health-check">10.2 Routine health check</h3>
 <table>
 <thead>
 <tr>
@@ -1168,17 +1131,17 @@
 </tr>
 <tr>
 <td>4</td>
-<td><strong>Run</strong> where counts are stale or not aligned</td>
+<td><strong>Sync → Scrape now</strong> where counts are stale or not aligned</td>
 </tr>
 <tr>
 <td>5</td>
-<td><strong>Ticket</strong> tab — bookmark <strong>In Progress</strong> → remediate → mark <strong>Complete</strong></td>
+<td>Remediate via <strong>Operations</strong> Job Queue, then scrape again</td>
 </tr>
 </tbody></table>
-<h3 id="8-3-replace-test-accounts-with-production-accounts">8.3 Replace test accounts with production accounts</h3>
+<h3 id="10-3-replace-test-accounts-with-production-accounts">10.3 Replace test accounts with production accounts</h3>
 <p><strong>Option A (recommended):</strong> <strong>Remove from slot</strong> for each test account in app → IT cleans database  </p>
 <p><strong>Option B:</strong> IT deletes rows in Supabase → dashboard clears in realtime → team <strong>+Add</strong> and platform login for new accounts</p>
-<h3 id="8-4-end-of-shift">8.4 End of shift</h3>
+<h3 id="10-4-end-of-shift">10.4 End of shift</h3>
 <table>
 <thead>
 <tr>
@@ -1191,16 +1154,33 @@
 <td>OK — dashboard logout does not unlink phone</td>
 </tr>
 <tr>
-<td>Hand off open tickets</td>
-<td>Set <strong>In Progress</strong> + remarks in <strong>Process</strong> modal</td>
+<td>Hand off open gaps</td>
+<td>Note not-aligned accounts / Job Queue status for next shift</td>
 </tr>
 <tr>
 <td>Export for next shift</td>
-<td>Ticket or Account <strong>Export</strong> with filters applied</td>
+<td>Account <strong>Export</strong> with filters applied</td>
+</tr>
+</tbody></table>
+<h3 id="10-5-overnight-batch-scrape">10.5 Overnight / batch scrape</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scheduled</td>
+<td><strong>Settings</strong> → Automatic account scrape → <strong>On Scheduled</strong> On + time (default 12:00 PM) → <strong>Save</strong> (app must stay open)</td>
+</tr>
+<tr>
+<td>One-shot</td>
+<td>Turn <strong>Scrape Now</strong> On → select up to 6 brands → <strong>Execute</strong> → wait → settings reset to defaults</td>
 </tr>
 </tbody></table>
 <hr>
-<h2 id="10-glossary">10. Glossary</h2>
+<h2 id="11-glossary">11. Glossary</h2>
 <table>
 <thead>
 <tr>
@@ -1237,16 +1217,24 @@
 <td>↻ button — login or live device verification</td>
 </tr>
 <tr>
-<td><strong>Run / Scraper</strong></td>
-<td>Full read of groups from phone → database</td>
+<td><strong>Scrape now</strong></td>
+<td>Full read of groups from phone → database (via Sync prompt)</td>
 </tr>
 <tr>
-<td><strong>Ticket / Issue</strong></td>
-<td>Remediation task for group data</td>
+<td><strong>Issue / gap</strong></td>
+<td>In-memory mismatch (junk / missing / not admin / duplicates) on Account</td>
 </tr>
 <tr>
-<td><strong>Bookmark</strong></td>
-<td>Ticket filters: In Progress / Completed</td>
+<td><strong>Job Queue</strong></td>
+<td>Operations automation (join, create, set admin, exit, photo)</td>
+</tr>
+<tr>
+<td><strong>Stock chips</strong></td>
+<td>Account header summary — not Operations Overview</td>
+</tr>
+<tr>
+<td><strong>Group matrix</strong></td>
+<td>Read-only join/admin matrix from brand header badge</td>
 </tr>
 <tr>
 <td><strong>Slicer</strong></td>
@@ -1254,7 +1242,11 @@
 </tr>
 <tr>
 <td><strong>Group Monitoring</strong></td>
-<td>Main module for accounts and tickets</td>
+<td>Main module for Account and Operations</td>
+</tr>
+<tr>
+<td><strong>Settings</strong></td>
+<td>Preferences page at <code>/settings</code></td>
 </tr>
 <tr>
 <td><strong>Backend Operation</strong></td>
@@ -1262,20 +1254,23 @@
 </tr>
 </tbody></table>
 <hr>
-<h2 id="11-faq">11. FAQ</h2>
+<h2 id="12-faq">12. FAQ</h2>
 <p><strong>Do I need to reinstall when the app updates?</strong><br>No. <strong>Restart</strong> after the update notification (if IT published to GitHub).</p>
 <p><strong>Does deleting data in Supabase remove the installer?</strong><br>No. Only dashboard data changes.</p>
-<p><strong>Why is Session Valid but Run still asks for login?</strong><br>This PC may have lost the device session — click <strong>Sync</strong> to verify.</p>
+<p><strong>Why is Session Valid but scrape still asks for login?</strong><br>This PC may have lost the device session — click <strong>Sync</strong> to verify.</p>
 <p><strong>What does Groups <code>12/21</code> mean?</strong><br>12 groups detected on device; 21 = brand standard for that platform (WA and TG counted separately).</p>
-<p><strong>Can one PC host many WhatsApp accounts?</strong><br>Yes — hundreds are supported, but each account needs its own QR scan; Chrome processes are limited (~4 concurrent).</p>
-<p><strong>Tickets remain after I fixed groups on the phone?</strong><br>Click <strong>Run</strong> or <strong>Sync</strong> so fresh device data reaches the database.</p>
+<p><strong>Can one PC host many WhatsApp accounts?</strong><br>Yes — hundreds are supported, but each account needs its own QR scan. User execute concurrency is up to <strong>10</strong> per platform; auto scrape is max <strong>6</strong> brands per platform.</p>
+<p><strong>Gaps remain after I fixed groups on the phone?</strong><br>Use <strong>Sync → Scrape now</strong> so fresh device data reaches the database, then check Account badges again.</p>
+<p><strong>Where did the Ticket tab go?</strong><br>Removed. Issues show on <strong>Account</strong>; fix via <strong>Operations → Job Queue</strong>.</p>
+<p><strong>Is there a group_count_mismatch issue type?</strong><br>No. Only five types: junk, missing, not admin, duplicate ID, duplicate name.</p>
 <p><strong>Dashboard login fails?</strong><br>Contact IT — account required in <code>users</code> table.</p>
 <p><strong>Telegram QR or login errors?</strong><br>Contact IT — verify Telegram API credentials and database migration <code>023</code>.</p>
 <p><strong>What is the difference between Card view and Table view?</strong><br>Same data; Card view groups by brand, Table view is one flat list.</p>
 <p><strong>Does Dismiss (X on brand card) delete the brand?</strong><br>Yes — after confirmation it removes the brand and related data from the database.</p>
 <p><strong>Why QR error &quot;still starting from previous attempt&quot;?</strong><br>Stuck WA session on this PC — wait a few seconds, or use <strong>Clear Session</strong> (X on Session when Valid) then Sync again.</p>
 <p><strong>Can another operator Sync an account I logged in on my PC?</strong><br>For WhatsApp, no — auth stays on your PC until they <strong>Clear Session</strong> (or you do) and they scan QR on their PC.<br>For Telegram, another PC can use the account while Session is <strong>Valid</strong> (session string is in the cloud). Hand off to a new operator with <strong>Clear Session</strong> so they scan QR on their PC.</p>
-<p><strong>Where is UI language changed?</strong><br><strong>Admin</strong> → <strong>Preferences</strong> → <strong>Language</strong> → English or 中文.</p>
+<p><strong>Where is UI language changed?</strong><br><strong>Settings</strong> → <strong>Language</strong> → English or 中文.</p>
+<p><strong>Where is automatic scrape configured?</strong><br><strong>Settings</strong> → <strong>Automatic account scrape</strong> (On Scheduled / Scrape Now) — not an interval-in-minutes sync.</p>
 <hr>
 <h2 id="appendix-quick-feature-map">Appendix — Quick feature map</h2>
 <pre><code>Login (Username / Password)
@@ -1284,21 +1279,56 @@
         │     ├─ KPI: Brands, Accounts, Online, Aligned, Issue, Open issues
         │     ├─ Slicer: Search, Brand, Platform, Status, Card|Table, Export
         │     └─ Per Brand Card
+        │           ├─ Header: stock chips + WA/TG Group badge → Group matrix modal
         │           ├─ +Add account (WhatsApp / Telegram)
-        │           ├─ Row: Sync ↻ | Remove X (account) | Clear X (session) | Group link
-        │           └─ Scraper: Run
-        └─ [Tab Ticket]
-              ├─ KPI: Open, Missing, Not admin, Groups to handle, …
-              ├─ Slicer: Search, filters, In Progress | Completed, Export
-              ├─ 6 issue types
-              └─ Issue card → Process modal | Double-click Detail
-  └─ Admin
+        │           ├─ Row: Sync ↻ | Remove X | Clear Session X | Group link
+        │           ├─ Last update (read-only) — scrape via Sync → Scrape now
+        │           └─ Issues: Junk / Missing / Not admin (5 types, in-memory)
+        └─ [Tab Operations] — Job Queue only
+              ├─ Join missing | Create group | Set admin | Exit/delete | Set photo
+              └─ SETUP → enqueue (live device / master data)
+  └─ Settings (/settings)
         ├─ System status (Supabase, Platform, …)
         ├─ Open configuration folder / Check for app updates (IT)
-        └─ Automatic account sync + Language (EN / 中文)
+        ├─ Automatic account scrape (On Scheduled / Scrape Now)
+        ├─ Language (EN / 中文)
+        └─ Worker settings (WA / TG)
 </code></pre>
-<h3 id="appendix-b-issue-type-export-columns-detail-export">Appendix B — Issue type → export columns (detail export)</h3>
-<p>Typical Excel columns: Issue ID, #, Account, Brand, Platform, Phone, Issue type, Group name, Group ID, Invite link, Note.</p>
+<h3 id="appendix-b-issue-type-remediation">Appendix B — Issue type → remediation</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Account badge</th>
+<th>Typical Job Queue action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>daily_junk_group</td>
+<td>Junk</td>
+<td>Leave / exit</td>
+</tr>
+<tr>
+<td>missing_group</td>
+<td>Missing</td>
+<td>Join missing</td>
+</tr>
+<tr>
+<td>not_admin</td>
+<td>Not admin</td>
+<td>Set admin</td>
+</tr>
+<tr>
+<td>duplicate_group_id</td>
+<td>(audit)</td>
+<td>Master data fix</td>
+</tr>
+<tr>
+<td>duplicate_group_name</td>
+<td>(audit)</td>
+<td>Master data fix</td>
+</tr>
+</tbody></table>
 <h3 id="appendix-c-related-documents">Appendix C — Related documents</h3>
 <table>
 <thead>

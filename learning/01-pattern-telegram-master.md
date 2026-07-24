@@ -1,6 +1,4 @@
-# Pola Telegram — `telegram-group-tool - MASTER`
-
-Path: `learning Script Worker/telegram/Master/telegram-group-tool - MASTER/`
+# Pola Telegram — worker config & delay
 
 ## Arsitektur umum
 
@@ -31,7 +29,7 @@ admin_user2 .. admin_user5, invited_members
 | `output` | `csv_file` | semua |
 | `delay` | `between_groups_sec`, `set_photo_max_retry`, `resolve_entity_max_attempts`, `human.profile` | semua |
 
-Shape ini sudah dipetakan di RM: `toTelegramLearningConfigShape()` → `workerPlatformSettings.ts`.
+Shape ini sudah dipetakan di RM: `toTelegramWorkerConfigShape()` → `workerPlatformSettings.ts`.
 
 ## human_delay.py — pola delay
 
@@ -70,7 +68,7 @@ Port RM: `python-sidecar/telegram_human_delay.py` (subset; belum semua long-paus
 - `per_run` grup per eksekusi; `start_from` naik di config setelah selesai
 - Loop luar `run_create_until_done` jeda `pause_between_runs_minutes` (45–65 menit safe)
 
-## Urutan operasi tipikal (.bat learning)
+## Urutan operasi tipikal (batch)
 
 1. `create_groups.py` / loop until done  
 2. `set_group_photo.py`  

@@ -1,6 +1,6 @@
 # Resource Management — Dokumen Resmi Proyek
 
-**Versi dokumen:** 2026-06-30  
+**Versi dokumen:** 2026-07-24  
 **Versi aplikasi:** `1.0.30` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
@@ -9,7 +9,7 @@
 
 ## 1. Ringkasan
 
-**Resource Management** (brand UI: *Backend Operation* — `src/config/navigation.ts`) adalah aplikasi **desktop Electron (Windows, macOS, Linux)** untuk memantau dan mengoperasikan banyak akun **WhatsApp** dan **Telegram** per brand: login platform, sync grup, scraper, ticket/issue, dan export Excel.
+**Resource Management** (brand UI: *Backend Operation* — `src/config/navigation.ts`) adalah aplikasi **desktop Electron (Windows, macOS, Linux)** untuk memantau dan mengoperasikan banyak akun **WhatsApp** dan **Telegram** per brand: login platform, sync/scrape grup, Job Queue, KPI selisih grup/admin (in-memory), dan export Excel.
 
 | Aspek | Keterangan |
 |--------|------------|
@@ -43,7 +43,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Electron Renderer (React)                                   │
-│  Group Monitoring · Login · Admin · Settings (worker)          │
+│  Group Monitoring (Account | Operations) · Login · Settings  │
 │  getSupabase() ← service role via IPC (app terinstall)       │
 └──────────────────────────┬──────────────────────────────────┘
                            │ IPC
@@ -61,7 +61,7 @@
               Supabase (PostgreSQL + Realtime)
 ```
 
-**Prinsip data:** Semua data bisnis (brand, akun, grup, ticket, session flag) di **Supabase**. **WhatsApp:** auth asli hanya di folder lokal `%APPDATA%\Resource Management\wa-sessions\` per PC; DB hanya flag `platform_sessions` + `localAuthClientId`. **Telegram:** session string di DB + sidecar di PC (bisa dipakai PC lain selama DB masih valid). Handoff operator: **Clear Session** (tombol X saat Valid) → WA purge disk + TG stop sidecar + invalidate DB.
+**Prinsip data:** Semua data bisnis (brand, akun, grup, session flag) di **Supabase**. Issue/selisih grup = engine **in-memory** (bukan tabel ticket). **WhatsApp:** auth asli hanya di folder lokal `%APPDATA%\Resource Management\wa-sessions\` per PC; DB hanya flag `platform_sessions` + `localAuthClientId`. **Telegram:** session string di DB + sidecar di PC (bisa dipakai PC lain selama DB masih valid). Handoff operator: **Clear Session** (tombol X saat Valid) → WA purge disk + TG stop sidecar + invalidate DB.
 
 ---
 
@@ -147,23 +147,26 @@ Saat buka app, main process memuat `resources/org-default.env` dulu; jika AppDat
 
 ### 6.1 Group Monitoring (`/`)
 
-- Brand card + tabel akun (WA hijau / TG biru) — **9 kolom data**
-- Kolom: Account, Brand, Status, Session, Groups, **On device**, **In brand**, Admin, Scraper, Action
-- **Groups / Admin:** format `Y/X` (device vs standar brand)
+Tabs shell: **Account | Operations** saja (tidak ada tab Reporting / Ticket).
+
+- Brand card + tabel akun (WA hijau / TG biru) — **10 kolom** (Card view)
+- Kolom Card: Account, Role, Location, Session, **On device**, Junk, **In brand**, Admin, **Last update**, Action
+- **In brand / Admin:** format `y/x` (join/admin vs standar brand)
 - **On device:** total grup di device/daily (`groupsCurrent`)
-- **In brand:** join di master brand (`joinedInMaster` / `groupsTotal`)
-- **Session:** INVALID → Sync/Run langsung modal login; VALID → probe device (**20s**, retry busy) lalu SYNC / RUN. Device **busy** (Chrome/scrape lain) → alert, **bukan** modal login palsu. Resolve session selalu **`messaging_accounts.id` baris grid** (`accountSessionResolve.ts`), bukan label global.
+- **Last update:** read-only (timestamp / progress / “Use Sync…”); scrape penuh hanya lewat **Sync → Scrape now** (tidak ada tombol Run)
+- **Session:** INVALID → Sync langsung modal login; VALID → probe device (**20s**, retry busy) lalu Sync (+ prompt Scrape now/Later). Device **busy** (Chrome/scrape lain) → alert, **bukan** modal login palsu. Resolve session selalu **`messaging_accounts.id` baris grid** (`accountSessionResolve.ts`), bukan label global.
 - **Clear Session (X):** hover baris/kolom Session saat **Valid** → purge session lokal + `platform_sessions` invalid → badge Logout/Invalid; Sync berikutnya QR bersih (bukan stuck restore)
 - Multi-akun per brand (slot kosong + Add)
 - Remove akun dari slot → DELETE `messaging_accounts` (CASCADE) + purge WA lokal + **rebuild `groups_master`** dari daily akun tersisa
 - **Group link:** modal 7 kolom (daily akun) atau admin vs master; export `RM-[nama akun]-YYYYMMDD.xlsx`
-- Export: group links, semua akun, tickets (Excel)
-- Auto-sync terjadwal (`useAutoAccountSync`)
+- Export: group links, semua akun (Excel) — **bukan** tickets
+- **Stock chips** di header brand Account; auto scrape terjadwal (`useAutoAccountSync` + Settings)
 
-### 6.2 Issue & metrik (tab Account — KPI)
+### 6.2 Issue & metrik (KPI Account — bukan fitur Ticket)
 
-- **Tab Ticket dihapus** sejak **1.0.24** — tidak ada tab terpisah; issue ditampilkan sebagai **KPI cards** di tab Account (Groups/Admin mismatch per akun).
-- Engine in-memory: `accountMasterDailyCompare.ts` → `computeAccountTicketBreakdown` (5 tipe issue per akun).
+- **Bukan** modul Ticket first-class: tidak ada tab Ticket, tidak ada tabel `resource_management_ticket_*`, tidak ada `reconcileTickets` / `group_count_mismatch`.
+- Selisih ditampilkan lewat badge **not aligned**, kolom In brand/Admin/Junk, KPI Account, dan Group matrix.
+- Engine in-memory: `accountMasterDailyCompare.ts` → `computeAccountTicketBreakdown` (5 tipe per akun).
 - **Kontrak bisnis:** login/logout session **bukan** issue; hanya mismatch grup/admin vs master brand.
 - **daily_junk_group** (Group mismatch): gap daily > master — `group_id` di daily tidak ada di master.
 - **missing_group**: gap master > daily — belum join grup master.
@@ -186,9 +189,9 @@ Tab Operations langsung menampilkan **Job Queue** tanpa bookmark. Slicer shell h
 
 **Create group permission (1.0.28):**
 
-- **Admin → Worker settings** = **default saja** (localStorage, Save).
+- **Settings → Worker settings** = **default saja** (localStorage, Save).
 - **Modal SETUP** = custom **per job**; perubahan modal **tidak** menulis balik ke Settings.
-- Saat Queue: permission masuk **job payload** via `buildCreateGroupEnqueueFromJobDraft()` — runner Electron/TG hanya baca payload.
+- Saat Queue: permission masuk **job payload** via `buildCreateGroupEnqueueFromJobDraft()` — runner Electron/TG hanya baca payload. Export shape TG: `toTelegramWorkerConfigShape()` (bukan “Learning”).
 
 **Set photo (1.0.28):**
 
@@ -219,10 +222,14 @@ Tab **Reporting** UI shell sudah dihapus. Entry: klik **xxx Group** di header br
 
 Komponen: `BrandMasterGroupsModal` → `ReportingJoinMatrixTable`.
 
-### 6.5 Admin & Settings
+### 6.5 Settings (`/settings`)
 
-- Status sistem, buka folder config (untuk IT), cek update manual
+Halaman primer untuk preferensi & worker. Route `/admin` **redirect ke** `/settings`.
+
+- Language, cek update, buka folder config (IT)
+- **Automatic account scrape:** On Scheduled + Scrape Now (default Scheduled On, Scrape Now Off, jam **12:00 PM**, brand FWSG/JMMY/M24SG/SBMY/STMY/WBSG); Save/Cancel saat Scrape Now Off; Execute/Discard saat On; setelah Execute → factory reset; Scrape Now On → Status standby / Time "-"
 - **Worker platform settings** (WA/TG): delay, create-group defaults, invite throttle — lihat `docs/WORKER-PLATFORM-SETTINGS.md`
+- Validasi terkait: `npm run validate:auto-scrape`, `npm run validate:worker-platform-settings`
 
 ---
 
@@ -308,7 +315,7 @@ resources/
 src/
   components/group-monitoring/
   hooks/                useRealtimeMonitoring, useAccountSyncFlow, …
-  lib/                  Supabase, sync, tickets, scraper
+  lib/                  Supabase, sync, scrape, issue engine
   providers/            GroupMonitoringProvider
 scripts/
   build-installer.ps1
@@ -330,6 +337,9 @@ release/                Output installer (gitignore)
 | `npm run build:installer` | Installer Windows lengkap |
 | `npm run publish:github` | Build + upload Release (auto-update) |
 | `npm run validate:pre-release` | Gate lengkap sebelum publish (desktop + typecheck) |
+| `npm run validate:auto-scrape` | Kontrak Automatic account scrape (Settings) |
+| `npm run validate:worker-platform-settings` | Worker WA/TG + `toTelegramWorkerConfigShape` |
+| `npm run validate:real-operations-data` | Data device nyata scrape/operations |
 | `node scripts/validate-reporting-matrix.mjs` | Group matrix Acc=All (Account header) + filter kolom |
 | `npm run typecheck` | TypeScript check |
 

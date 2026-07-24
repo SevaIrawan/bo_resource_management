@@ -99,7 +99,7 @@ Menu **Refresh** di header tab = muat ulang data tab aktif dari server.
 | Exit & delete group | Job Queue → Exit & delete | Keluar / hapus grup di HP |
 | Matrix join/admin | Account → badge grup (header kartu) | Tabel Yes/No semua akun × grup master |
 | Full Group / Full Admin | Modal Group matrix | Bookmark di modal |
-| Auto-scrape harian | Settings | Scrape otomatis (jam tertentu, app harus terbuka) |
+| Auto-scrape harian / Scrape Now | Settings → Automatic account scrape | On Scheduled + Scrape Now (default 12:00 PM; lihat §11) |
 | Kebijakan stock & worker | Settings | Target Ready %, penamaan SOP, delay otomasi |
 
 Cek selisih grup/admin lewat kolom **In brand**, **Admin**, badge **not aligned**, **Group link** (junk), dan **Group matrix** (badge grup di header kartu).
@@ -134,18 +134,19 @@ Search · Brand · Platform (WA/TG) · Status · **Card view** / **Table view** 
 
 **Edit akun:** ikon pensil → ubah label, nomor, location.
 
-### Kolom tabel (9 kolom — Card view)
+### Kolom tabel (10 kolom — Card view)
 
 | Kolom | Isi | Cara baca |
 |-------|-----|-----------|
 | **Account** | Platform, nama, nomor | Identitas akun |
+| **Role** | Peran akun | Role operasi di brand |
 | **Location** | Label lokasi device | Bukan nama brand card |
-| **Status** | Active / Logout | Titik hijau/merah |
 | **Session** | Valid / Invalid | Invalid = wajib Sync dulu |
 | **On device** | Angka tunggal | **Total grup di HP** akun ini |
+| **Junk** | Angka | Grup di HP di luar master |
 | **In brand** | `y/x` | **y** = grup standar brand yang sudah di-join · **x** = total standar brand |
 | **Admin** | Bar + `a/x` | **a** = grup tempat akun ini admin · **x** = seharusnya admin |
-| **Last update** | Waktu / progress | Lihat [§6](#6-scrape-lengkap--kolom-last-update) |
+| **Last update** | Waktu / progress | Read-only — lihat [§6](#6-scrape-lengkap--kolom-last-update) |
 | **Action** | Group link | Lihat [§7](#7-group-link--full-group-full-admin-junk) |
 
 **Table view** (satu tabel semua brand): kolom **Brand** tambahan; **tanpa** kolom Last update. Untuk **Sync**, **Scrape now**, dan **Clear Session** — pakai **Card view**.
@@ -283,9 +284,9 @@ Tab **Operations** = **Job Queue** saja (filter **Platform** di slicer). Brand d
 | Task di UI | Fungsi |
 |------------|--------|
 | **Join missing** | Join grup master yang belum ada di akun (pakai invite link dari master) |
-| **Create & set photo** | Buat grup batch di HP; setelah selesai bisa pasang foto via VIEW |
+| **Create & set photo** | Buat grup batch di HP; setelah selesai pasang foto via VIEW (create→photo) |
 | **Set admin** | Jadikan akun target admin di grup yang eligible |
-| **Exit & delete group** | Keluar dari grup (exit); opsional delete setelah exit |
+| **Exit & delete group** | Keluar dari grup (leave) lalu antri delete jika diizinkan (leave→delete) |
 
 ### Status antrian
 
@@ -370,19 +371,48 @@ Data ikut update setelah scrape selesai (event realtime `rm-reporting-reload`, d
 
 ## 11. Settings — apa yang perlu di-set
 
-Buka **Settings** di sidebar.
+Buka **Settings** di sidebar (`/settings`; path lama `/admin` dialihkan ke sini).
 
 | Bagian | Perlu di-set? | Isi |
 |--------|---------------|-----|
 | **Language** | Opsional | English / 中文 |
 | **Check for updates** | Opsional | Update app |
-| **Automatic account scrape** | **Ya, jika mau** | On/Off + jam harian (app harus terbuka) |
+| **Automatic account scrape** | **Ya, jika mau** | On Scheduled + Scrape Now — lihat kontrak di bawah |
 | **Operations stock policy** | **Ya, per brand** | % minimum Ready, window hari Avg ND |
 | **SOP naming (prefix)** | **Ya, jika SOP berubah** | Pola penamaan Active/Ready/Recycle |
 | **WhatsApp worker** | **Ya, default otomasi** | Delay, max per run, permission create group default, join throttle |
 | **Telegram worker** | **Ya, default otomasi** | Delay, flood-wait, permission TG, set photo retry |
 
 **Penting create group:** nilai permission di **Settings** = default saat buka modal SETUP. Perubahan di modal SETUP hanya untuk **job itu** — tidak menulis balik ke Settings.
+
+### Automatic account scrape (kontrak penuh)
+
+Dua mode di kartu yang sama:
+
+| Kontrol | Arti |
+|---------|------|
+| **On Scheduled** | Scrape otomatis pada jam harian (app harus **terbuka**) |
+| **Scrape Now** | Jalankan scrape sekali untuk brand yang dicentang |
+
+**Default idle (factory):**
+
+- On Scheduled = **On**
+- Scrape Now = **Off**
+- Jam harian = **12:00 PM**
+- Brand On (per platform, max 6): **FWSG, JMMY, M24SG, SBMY, STMY, WBSG**
+
+**Tombol menurut mode:**
+
+| Mode | Tombol | Perilaku |
+|------|--------|----------|
+| Scrape Now **Off** | **Save** / **Cancel** | Simpan atau buang edit jadwal/brand |
+| Scrape Now **On** | **Execute** / **Discard** | Execute mulai scrape; Discard keluar mode tanpa jalan |
+
+**Setelah Execute selesai** → **factory reset** ke default idle di atas.
+
+**Saat Scrape Now On (siap execute, belum/idle cycle):** Status = **standby**, Time = **"-"** (bukan hasil run lama).
+
+Scheduled yang sedang jalan mengunci Scrape Now sampai selesai. Tidak ada catch-up jika app tutup pada jam jadwal.
 
 ---
 
@@ -437,7 +467,7 @@ Wajib **Sync → Scrape now** setelah job mengubah grup di HP.
 Tidak di akun yang sama — tunggu job selesai.
 
 **Auto-scrape tidak jalan?**  
-App harus terbuka pada jam yang di-set. Tidak ada catch-up jika app tutup.
+App harus terbuka pada jam **On Scheduled**. Cek Settings → Automatic account scrape (default 12:00 PM). Tidak ada catch-up jika app tutup. Scrape Now memakai **Execute** (bukan Save).
 
 **Siapa yang develop app?**  
 Tim developer internal. Tim R&M hanya **pakai** Group Monitoring — laporkan bug ke developer, bukan dijelaskan di panduan operasional ini.

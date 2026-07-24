@@ -1,4 +1,4 @@
-"""Set Telegram supergroup profile photo — selaras learning set_group_photo.py."""
+"""Set Telegram supergroup profile photo."""
 
 from __future__ import annotations
 

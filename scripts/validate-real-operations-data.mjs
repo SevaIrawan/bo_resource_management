@@ -62,7 +62,7 @@ const checks = [
     ok: tgScrape.includes('_resolve_invite_link') && tgScrape.includes('"invite_link"'),
   },
   {
-    name: 'TG scrape: GetFull-first member count + exported_invite (learning Script Worker)',
+    name: 'TG scrape: GetFull-first member count + exported_invite',
     ok: (() => {
       return (
         tgScrape.includes('_fetch_full_meta') &&

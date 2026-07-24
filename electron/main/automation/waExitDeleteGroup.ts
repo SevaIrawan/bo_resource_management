@@ -27,7 +27,7 @@ function jitterMs(baseMs: number, jitterPercent = 35): number {
   return Math.max(100, Math.floor(low + Math.random() * (high - low)));
 }
 
-/** Satu job: leave grup → delete hanya jika leave sukses (learning leave → delete). */
+/** Satu job: leave grup → delete hanya jika leave sukses. */
 export async function runWaExitDeleteGroup(
   payload: AutomationRunPayload,
   onProgress?: AutomationProgressCallback,

@@ -169,7 +169,7 @@ def extract_invite_hash(link: str) -> str | None:
 async def _export_invite_link(client, channel, delay_cfg: dict) -> str:
     """Return real invite URL only — never peer id as fake link.
 
-    Pola learning scrape/create: baca exported_invite dari GetFull dulu,
+    Baca exported_invite dari GetFull dulu,
     baru ExportChatInviteRequest (hemat API + kurang FloodWait).
     """
     try:

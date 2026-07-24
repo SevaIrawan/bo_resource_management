@@ -23,7 +23,7 @@ export interface WorkerStandardSettings {
   pauseBetweenScriptsMinHigh: number;
 }
 
-/** Telegram ChatAdminRights — map ke learning config.json admin.rights */
+/** Telegram ChatAdminRights — mirror worker settings admin.rights */
 export interface TelegramAdminRightsSettings {
   changeInfo: boolean;
   postMessages: boolean;
@@ -489,8 +489,8 @@ export function isExitDeleteEnabled(settings: PlatformWorkerSettings): boolean {
   return settings.leaveDelete.leaveEnabled && settings.leaveDelete.deleteEnabled;
 }
 
-/** Export shape compatible with learning telegram config.json (subset). */
-export function toTelegramLearningConfigShape(settings: PlatformWorkerSettings): Record<string, unknown> {
+/** Export shape for Telegram worker config (subset used by sidecar/automation). */
+export function toTelegramWorkerConfigShape(settings: PlatformWorkerSettings): Record<string, unknown> {
   const r = settings.createGroup.telegramAdminRights;
   return {
     group: {

@@ -9,8 +9,8 @@ export { readAutoSyncEnabled, persistAutoSyncEnabled, AUTO_SYNC_STORAGE_KEY };
 export const AUTO_SCRAPE_SCHEDULED_HOUR_KEY = 'rm_auto_scrape_scheduled_hour';
 export const AUTO_SCRAPE_LAST_RUN_DATE_KEY = 'rm_auto_scrape_last_run_date';
 
-/** Default: 02:00 local time, once per day while app is online. */
-export const DEFAULT_AUTO_SCRAPE_SCHEDULED_HOUR = 2;
+/** Default: 12:00 PM local time, once per day while app is online. */
+export const DEFAULT_AUTO_SCRAPE_SCHEDULED_HOUR = 12;
 
 export const MIN_AUTO_SCRAPE_SCHEDULED_HOUR = 0;
 export const MAX_AUTO_SCRAPE_SCHEDULED_HOUR = 23;

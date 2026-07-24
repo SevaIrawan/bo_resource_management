@@ -1,6 +1,6 @@
 # Panduan Group Monitoring
 
-**Versi app:** 1.0.30  
+**Versi app:** 1.0.31  
 **Untuk:** Tim **Depart Resource Management (R&M)** — semua yang menjalankan monitoring grup WhatsApp & Telegram  
 **Bahasa UI:** English / 中文 → ubah di **Settings → Language**
 
@@ -294,7 +294,7 @@ Tab **Operations** = **Job Queue** saja (filter **Platform** di slicer). Brand d
 
 Satu akun tidak bisa **Sync** bersamaan dengan job di akun yang sama. Maks **10 akun berbeda per platform** (WA dan TG terpisah) bisa jalan paralel (masing-masing 1 slot).
 
-**Batch besar (v1.0.30):** jika Anda Queue banyak grup (mis. 100), sistem **otomatis memecah** menjadi beberapa baris job (**maks 30 grup per job**, dari Settings → Invite by link). Job untuk **akun yang sama antri berurutan** — bukan paralel — sehingga Chrome stabil. Anda akan melihat beberapa baris job di tabel; tunggu semua selesai sebelum anggap task 100% done.
+**Batch besar (v1.0.31):** jika Anda Queue banyak grup (mis. 100), sistem **otomatis memecah** menjadi beberapa baris job (**maks 30 grup per job**, dari Settings → Invite by link). Job untuk **akun yang sama antri berurutan** — bukan paralel — sehingga Chrome stabil. Anda akan melihat beberapa baris job di tabel; tunggu semua selesai sebelum anggap task 100% done.
 
 Setelah **Queue** sukses, job masuk tabel dan runner mencoba jalan otomatis jika slot kosong.
 
@@ -474,4 +474,4 @@ Tim developer internal. Tim R&M hanya **pakai** Group Monitoring — laporkan bu
 
 ---
 
-*Panduan ini untuk modul **Group Monitoring** v1.0.30 — tim operasional Depart Resource Management.*
+*Panduan ini untuk modul **Group Monitoring** v1.0.31 — tim operasional Depart Resource Management.*

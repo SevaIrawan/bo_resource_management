@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.30` (lihat `package.json`)
+**Versi saat ini:** `1.0.31` (lihat `package.json`)
+
+**Rilis 1.0.31:** Automatic account scrape — default idle (On Scheduled + jam 12:00 PM + 6 brand), Scrape Now Off→On standby (brand 0/6, status/time kosong), tombol Save/Cancel vs Discard/Execute, factory reset setelah Discard/Execute selesai; hapus folder `learning/` & rujukan learning Script Worker; docs Account|Operations + Settings diselaraskan.
 
 **Rilis 1.0.30:** Job Queue stabil untuk batch besar — auto-split **30 grup per job** (join, set admin, leave, delete, set photo), antri FIFO per akun + settle 15s antar chunk; Join Missing modal drop zone + master accordion; VIEW join per-grup (status/remark) + retry failed only; humanize error join WA/TG; stale job 90 min.
 

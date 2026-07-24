@@ -1,7 +1,7 @@
 # Resource Management — Referensi Master Proyek
 
 **Versi dokumen:** 2026-07-24  
-**Versi aplikasi:** 1.0.30 (`package.json`)  
+**Versi aplikasi:** 1.0.31 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
 ## Prinsip dokumen ini
@@ -815,7 +815,7 @@ flowchart TD
 | 2026-06-06 | Dokumen master awal |
 | 2026-06-06 | Audit script `validate:master-reference`; perbaiki endpoint sidecar; hierarki kebenaran; hak akses Sync admin-only |
 | 2026-06-11 | Grid 9 kolom (On device, In brand); Clear Session; remove slot rebuild master; group link 7 kolom |
-| 2026-07-24 | v1.0.30: `/settings` primer (`/admin`→`/settings`); Last update read-only; grid 10 kolom; no ticket tables; validators auto-scrape + worker + real-ops |
+| 2026-07-24 | v1.0.31: `/settings` primer (`/admin`→`/settings`); Last update read-only; grid 10 kolom; no ticket tables; validators auto-scrape + worker + real-ops |
 
 ---
 

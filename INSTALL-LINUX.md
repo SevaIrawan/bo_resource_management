@@ -1,6 +1,6 @@
 # Install Resource Management (Linux) — Tim Internal
 
-> **Status:** Skrip build & konfigurasi electron-builder **sudah ada** (v1.0.4+). Versi produksi terbaru: **1.0.30**.  
+> **Status:** Skrip build & konfigurasi electron-builder **sudah ada** (v1.0.4+). Versi produksi terbaru: **1.0.31**.  
 > Installer Linux harus di-build di **mesin Linux** (atau GitHub Actions). Lihat [docs/RELEASE-CI.md](./docs/RELEASE-CI.md).
 
 Dokumen resmi lengkap: **[PROJECT.md](./PROJECT.md)**
@@ -19,7 +19,7 @@ npm run build:installer:linux
 
 Output (contoh):
 
-- `release/Resource.Management-1.0.30.AppImage` (nama artefak mengikuti `package.json` / CI)
+- `release/Resource.Management-1.0.31.AppImage` (nama artefak mengikuti `package.json` / CI)
 
 **Update kode:** naikkan `version` → GitHub Release dengan `latest-linux.yml` → operator **Restart** app.
 
@@ -30,8 +30,8 @@ Output (contoh):
 ### Opsi A — AppImage (disarankan, portable)
 
 ```bash
-chmod +x "Resource.Management-1.0.30.AppImage"
-./Resource.Management-1.0.30.AppImage
+chmod +x "Resource.Management-1.0.31.AppImage"
+./Resource.Management-1.0.31.AppImage
 ```
 
 Opsional: integrasi menu desktop sesuai kebijakan IT (AppImageLauncher, dll.).

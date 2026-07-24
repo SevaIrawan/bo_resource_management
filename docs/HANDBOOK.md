@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.30 |
+| **Versi app** | 1.0.31 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Settings → Language) |
@@ -125,7 +125,7 @@ Angka berubah sesuai tab aktif.
 | Issue | Akun **not aligned** |
 | Open issues | Ringkasan mismatch grup/admin (engine sama dengan kolom Groups/Admin) |
 
-**Tab Operations (Job Queue):** antrian task per akun — join → create→photo → set_admin → leave→delete. SETUP modal create group (batch + permission per job); VIEW hasil create → tab Set Photo. **v1.0.30:** batch besar auto-split 30 grup per job; VIEW join status/remark per grup. Execute slots max **10**/platform; auto scrape brands max **6**.
+**Tab Operations (Job Queue):** antrian task per akun — join → create→photo → set_admin → leave→delete. SETUP modal create group (batch + permission per job); VIEW hasil create → tab Set Photo. **v1.0.31:** batch besar auto-split 30 grup per job; VIEW join status/remark per grup. Execute slots max **10**/platform; auto scrape brands max **6**.
 
 > Tidak ada tab Ticket / Reporting di shell. Issue = KPI Account + grid (engine in-memory). Matrix = modal dari badge grup.
 
@@ -486,4 +486,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.30**.*
+*Handbook ini selaras dengan aplikasi versi **1.0.31**.*

@@ -619,6 +619,30 @@ export function jobQueueViewTableRows(
   }
 
   if (job.action === 'set_admin') {
+    const outcomes = job.payload.groupOutcomes;
+    if (outcomes?.length) {
+      return outcomes.map((row, index) => {
+        const adminStatus = row.adminStatus;
+        const status =
+          adminStatus === 'promoted'
+            ? t('operations.jobQueue.adminStatusPromoted')
+            : adminStatus === 'failed'
+              ? t('operations.jobQueue.adminStatusFailed')
+              : jobQueueViewRowStatusLabel(job, index, t);
+        return {
+          key: row.groupId || String(index),
+          no: String(index + 1),
+          groupName: row.groupName?.trim() || row.groupId || '—',
+          groupId: row.groupId || '—',
+          inviteLink: resolveInviteLink(row),
+          targetJoin: '—',
+          targetAdmin,
+          count: '—',
+          status,
+          remark: (row as { adminError?: string }).adminError ?? '',
+        };
+      });
+    }
     return groups.map((group, index) => ({
       key: group.groupId || String(index),
       no: String(index + 1),

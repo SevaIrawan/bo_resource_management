@@ -2,6 +2,7 @@ import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSide
 import { withNetworkRetry } from '../lib/networkRetry';
 import { resolveBrandPhotoWithFallback } from '../brandGroupPhoto';
 import { resolveJoinGroups, resolveLeaveDeleteGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
+import { peekJobStopRequest } from './jobQueueStore';
 import type { AutomationRunPayload, AutomationRunResult, AutomationProgressCallback } from './types';
 import {
   createGroupBatchUsesNumbering,
@@ -24,6 +25,10 @@ async function sleepBetweenGroups(payload: AutomationRunPayload, index: number, 
   const betweenSec = payload.delay?.between_groups_sec ?? 60;
   const jitterPercent = payload.delay?.jitter_percent ?? 35;
   await sleep(jitterMs(betweenSec * 1000, jitterPercent));
+}
+
+function isJobStopRequested(jobId?: string): boolean {
+  return Boolean(jobId && peekJobStopRequest(jobId));
 }
 async function postTelegramAutomation(
   sessionId: string,
@@ -126,7 +131,23 @@ export async function runTelegramAutomation(
 
     let success = 0;
     const failed: string[] = [];
+    const groupOutcomes: Array<{
+      groupId: string;
+      groupName?: string;
+      groupLink?: string;
+      adminStatus: 'promoted' | 'failed';
+      adminError?: string;
+    }> = [];
     for (let i = 0; i < groups.length; i += 1) {
+      if (isJobStopRequested(payload.jobId)) {
+        return {
+          status: success > 0 ? 'ok' : 'error',
+          action: 'set_admin',
+          message: 'Stopped by user',
+          errorCode: 'JOB_STOPPED',
+          result: { success, total: groups.length, failed, groupOutcomes },
+        };
+      }
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
       const result = await postTelegramAutomation(
@@ -142,9 +163,23 @@ export async function runTelegramAutomation(
       );
       if (result.status === 'ok') {
         success += 1;
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          adminStatus: 'promoted',
+        });
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Done');
       } else {
-        failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+        const adminError = result.message ?? 'failed';
+        failed.push(`${group.groupName ?? group.groupId}: ${adminError}`);
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          adminStatus: 'failed',
+          adminError,
+        });
       }
       await sleepBetweenGroups(payload, i, groups.length);
     }
@@ -153,7 +188,7 @@ export async function runTelegramAutomation(
       action: 'set_admin',
       message: `Promoted targets in ${success}/${groups.length} groups`,
       errorCode: success > 0 ? undefined : 'SET_ADMIN_BATCH_FAILED',
-      result: { success, total: groups.length, failed },
+      result: { success, total: groups.length, failed, groupOutcomes },
     };
   }
 
@@ -195,6 +230,15 @@ export async function runTelegramAutomation(
     }> = [];
 
     for (let i = 0; i < groups.length; i += 1) {
+      if (isJobStopRequested(payload.jobId)) {
+        return {
+          status: success > 0 ? 'ok' : 'error',
+          action: 'set_group_photo',
+          message: 'Stopped by user',
+          errorCode: 'JOB_STOPPED',
+          result: { success, total: groups.length, failed, groupOutcomes },
+        };
+      }
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
       const result = await postTelegramAutomation(
@@ -328,6 +372,15 @@ export async function runTelegramAutomation(
       exitError?: string;
     }> = [];
     for (let i = 0; i < groups.length; i += 1) {
+      if (isJobStopRequested(payload.jobId)) {
+        return {
+          status: success > 0 ? 'ok' : 'error',
+          action: 'leave_group',
+          message: 'Stopped by user',
+          errorCode: 'JOB_STOPPED',
+          result: { success, total: groups.length, failed, groupOutcomes },
+        };
+      }
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
       const result = await postTelegramAutomation(
@@ -444,6 +497,15 @@ export async function runTelegramAutomation(
       joinError?: string;
     }> = [];
     for (let i = 0; i < groups.length; i += 1) {
+      if (isJobStopRequested(payload.jobId)) {
+        return {
+          status: success > 0 ? 'ok' : 'error',
+          action: 'join_by_invite_link',
+          message: 'Stopped by user',
+          errorCode: 'JOB_STOPPED',
+          result: { success, total: groups.length, failed, groupOutcomes },
+        };
+      }
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
       const result = await postTelegramAutomation(
@@ -527,6 +589,15 @@ export async function runTelegramCreateGroupBatch(
   onProgress(0, totalTarget, prefix);
 
   for (let i = 0; i < totalTarget; i += 1) {
+    if (isJobStopRequested(payload.jobId)) {
+      return {
+        status: created > 0 ? 'ok' : 'error',
+        action: 'create_group',
+        message: 'Stopped by user',
+        errorCode: 'JOB_STOPPED',
+        result: { success: created, total: totalTarget, failed, groupOutcomes },
+      };
+    }
     const num = startFrom + i;
     const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
     onProgress(created, totalTarget, groupName);

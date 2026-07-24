@@ -13,10 +13,18 @@ import {
   waitForExecuteSlot,
 } from './executeSlotPool';
 import {
+  countCreatedGroupOutcomes,
+  filterGroupsNotDone,
+  mergeJobGroupOutcomes,
+  resolveCreateResumeSlice,
+} from './jobQueueOutcomeHelpers';
+import {
+  attachJobGroupOutcomes,
   consumeJobStopRequest,
   demoteRunningJobToPaused,
   failStaleRunningJobs,
   getAutomationJobStatus,
+  getJobQueueSnapshot,
   getRunnerState,
   markJobFinished,
   markJobRunning,
@@ -132,10 +140,33 @@ function resolveJobGroupOutcomes(
   result: AutomationRunResult,
   job: AutomationJobRecord,
 ): AutomationJobRecord['payload']['groupOutcomes'] | undefined {
-  return resultGroupOutcomes(result) ?? resolveCreateGroupOutcomesFromSingle(result, job);
+  return mergeJobGroupOutcomes(
+    job.payload.groupOutcomes,
+    resultGroupOutcomes(result) ?? resolveCreateGroupOutcomesFromSingle(result, job),
+  );
 }
 
 function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
+  const createResume =
+    job.action === 'create_group' ? resolveCreateResumeSlice(job) : null;
+
+  let groups = job.payload.groups;
+  if (groups?.length) {
+    if (job.action === 'join_by_invite_link') {
+      groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'join');
+    } else if (job.action === 'set_admin') {
+      groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'set_admin');
+    } else if (job.action === 'set_group_photo') {
+      groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'set_group_photo');
+    } else if (
+      job.action === 'leave_group' ||
+      job.action === 'delete_group' ||
+      job.action === 'exit_delete_group'
+    ) {
+      groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'leave');
+    }
+  }
+
   return {
     sessionId: job.sessionId,
     platform: job.platform,
@@ -148,9 +179,13 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
     hideChatHistory: job.payload.hideChatHistory,
     initialParticipants: job.payload.initialParticipants,
     batchIndex: job.payload.batchIndex,
-    totalToCreate: batchTotal(job),
+    totalToCreate: createResume
+      ? Math.max(0, createResume.remaining)
+      : batchTotal(job),
     perRun: Math.max(1, Math.floor(Number(job.payload.perRun) || batchTotal(job))),
-    startFrom: Math.max(1, Math.floor(Number(job.payload.startFrom) || 1)),
+    startFrom: createResume
+      ? createResume.startFrom
+      : Math.max(1, Math.floor(Number(job.payload.startFrom) || 1)),
     useGroupNumbering: job.payload.useGroupNumbering,
     groupNamePrefix: job.payload.groupNamePrefix,
     createGroupSettings: job.payload.createGroupSettings,
@@ -160,7 +195,7 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
     adminRights: job.payload.adminRights,
     inviteLink: job.payload.inviteLink,
     joinSequenceIndex: job.payload.joinSequenceIndex,
-    groups: job.payload.groups,
+    groups,
     leaveDelete: job.payload.leaveDelete,
     photoPath: job.payload.photoPath,
     brandName: job.brandName,
@@ -171,8 +206,13 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
 
 async function runCreateGroupBatchJob(job: AutomationJobRecord): Promise<AutomationRunResult> {
   const payload = jobToRunPayload(job);
-  const onProgress = (current: number, total: number, label: string) => {
-    updateJobProgress(job.id, { current, total, label });
+  const resume = resolveCreateResumeSlice(job);
+  const onProgress = (current: number, _total: number, label: string) => {
+    updateJobProgress(job.id, {
+      current: Math.min(resume.alreadyCreated + current, resume.originalTotal),
+      total: resume.originalTotal,
+      label,
+    });
   };
 
   const settled = await withJobTimeoutSettle(
@@ -198,9 +238,50 @@ async function runCreateGroupBatchJob(job: AutomationJobRecord): Promise<Automat
   return settled.value!;
 }
 
+function progressOffsetFromOutcomes(job: AutomationJobRecord): number {
+  const fromOutcomes = countDoneOutcomesForAction(job.action, job.payload.groupOutcomes);
+  if (fromOutcomes > 0) return fromOutcomes;
+  return Math.max(0, job.progress?.current ?? 0);
+}
+
+function countDoneOutcomesForAction(
+  action: AutomationJobRecord['action'],
+  outcomes: AutomationJobRecord['payload']['groupOutcomes'] | undefined,
+): number {
+  if (!outcomes?.length) return 0;
+  if (action === 'join_by_invite_link') {
+    return outcomes.filter(
+      (r) => r.joinStatus === 'joined' || r.joinStatus === 'already_member',
+    ).length;
+  }
+  if (action === 'set_admin') {
+    return outcomes.filter((r) => r.adminStatus === 'promoted').length;
+  }
+  if (action === 'set_group_photo') {
+    return outcomes.filter((r) => r.photoStatus === 'set').length;
+  }
+  if (
+    action === 'leave_group' ||
+    action === 'delete_group' ||
+    action === 'exit_delete_group'
+  ) {
+    return outcomes.filter((r) => r.exitStatus === 'left').length;
+  }
+  if (action === 'create_group') {
+    return countCreatedGroupOutcomes(outcomes);
+  }
+  return 0;
+}
+
 async function runAccountAutomationJob(job: AutomationJobRecord): Promise<AutomationRunResult> {
-  const onProgress = (current: number, total: number, label: string) => {
-    updateJobProgress(job.id, { current, total, label });
+  const offset = progressOffsetFromOutcomes(job);
+  const stepTotal = accountJobStepTotal(job);
+  const onProgress = (current: number, _total: number, label: string) => {
+    updateJobProgress(job.id, {
+      current: Math.min(offset + current, stepTotal),
+      total: stepTotal,
+      label,
+    });
   };
 
   const settled = await withJobTimeoutSettle(
@@ -260,42 +341,131 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
 
     const batch = isCreateGroupBatch(job);
     const stepTotal = accountJobStepTotal(job);
+    const createResume =
+      job.action === 'create_group' ? resolveCreateResumeSlice(job) : null;
+    const progressSeed =
+      createResume?.alreadyCreated ??
+      (job.action === 'create_group'
+        ? countCreatedGroupOutcomes(job.payload.groupOutcomes)
+        : Math.max(0, job.progress?.current ?? 0));
+
+    if (createResume && createResume.remaining <= 0 && createResume.alreadyCreated > 0) {
+      markJobFinished(job.id, 'completed', {
+        message: `${createResume.alreadyCreated}/${createResume.originalTotal} created`,
+        batchSuccess: createResume.alreadyCreated,
+        groupOutcomes: job.payload.groupOutcomes,
+      });
+      tryAutoEnqueueSetPhotoAfterCreate(job);
+      return;
+    }
+
     updateJobProgress(job.id, {
-      current: 0,
+      current: Math.min(progressSeed, stepTotal),
       total: stepTotal,
       label: job.payload.groupNamePrefix ?? job.payload.groupName ?? job.accountName,
     });
 
     const result = batch ? await runCreateGroupBatchJob(job) : await runAccountAutomationJob(job);
 
-    if (getAutomationJobStatus(job.id) !== 'running') {
+    const statusAfter = getAutomationJobStatus(job.id);
+    if (statusAfter !== 'running') {
+      // Cancel UI sudah set cancelled — persist outcomes supaya VIEW/photo tidak kehilangan grup created.
+      const cancelledOutcomes = resolveJobGroupOutcomes(result, job);
+      if (cancelledOutcomes?.length) {
+        const createdTotal =
+          job.action === 'create_group'
+            ? countCreatedGroupOutcomes(cancelledOutcomes)
+            : batchSuccessCount(result, job) + progressSeed;
+        attachJobGroupOutcomes(job.id, {
+          message: result.message ?? 'Cancelled',
+          groupOutcomes: cancelledOutcomes,
+          progressCurrent: Math.min(
+            createdTotal,
+            job.action === 'create_group' ? batchTotal(job) : stepTotal,
+          ),
+        });
+        tryAutoEnqueueSetPhotoAfterCreate(job);
+        tryAutoEnqueueDeleteAfterExit(job);
+      }
       return;
     }
 
     const stopMode = consumeJobStopRequest(job.id);
     const timedOut = Boolean(result.errorCode?.endsWith('_TIMEOUT'));
     if (timedOut) {
+      const timedOutcomes = resolveJobGroupOutcomes(result, job);
       markJobFinished(job.id, 'failed', {
         message: result.message,
         error: humanizeJobError(result.errorCode ?? 'JOB_TIMEOUT'),
-        batchSuccess: batchSuccessCount(result, job),
-        ...(resolveJobGroupOutcomes(result, job)
-          ? { groupOutcomes: resolveJobGroupOutcomes(result, job) }
-          : {}),
+        batchSuccess:
+          job.action === 'create_group'
+            ? countCreatedGroupOutcomes(timedOutcomes)
+            : batchSuccessCount(result, job),
+        ...(timedOutcomes ? { groupOutcomes: timedOutcomes } : {}),
       });
       return;
     }
     if (stopMode === 'cancel') {
+      // Race: stop request cancel tapi status belum cancelled — treat seperti cancel UI.
+      const cancelledOutcomes = resolveJobGroupOutcomes(result, job);
+      if (cancelledOutcomes?.length) {
+        attachJobGroupOutcomes(job.id, {
+          message: result.message ?? 'Cancelled',
+          groupOutcomes: cancelledOutcomes,
+          progressCurrent:
+            job.action === 'create_group'
+              ? countCreatedGroupOutcomes(cancelledOutcomes)
+              : batchSuccessCount(result, job) + progressOffsetFromOutcomes(job),
+        });
+        tryAutoEnqueueSetPhotoAfterCreate(job);
+        tryAutoEnqueueDeleteAfterExit(job);
+      }
       return;
     }
     if (stopMode === 'pause' || result.errorCode === 'JOB_STOPPED') {
-      demoteRunningJobToPaused(job.id);
+      const pausedOutcomes = resolveJobGroupOutcomes(result, job);
+      const createdTotal =
+        job.action === 'create_group'
+          ? countCreatedGroupOutcomes(pausedOutcomes)
+          : countDoneOutcomesForAction(job.action, pausedOutcomes) ||
+            batchSuccessCount(result, job) + progressOffsetFromOutcomes(job);
+
+      if (
+        job.action === 'create_group' &&
+        createdTotal >= batchTotal(job) &&
+        createdTotal > 0
+      ) {
+        markJobFinished(job.id, 'completed', {
+          message: `${createdTotal}/${batchTotal(job)} created`,
+          batchSuccess: createdTotal,
+          groupOutcomes: pausedOutcomes,
+        });
+        tryAutoEnqueueSetPhotoAfterCreate(job);
+        return;
+      }
+
+      demoteRunningJobToPaused(job.id, {
+        message: result.message ?? 'Paused',
+        groupOutcomes: pausedOutcomes,
+        progressCurrent: Math.min(
+          createdTotal,
+          job.action === 'create_group' ? batchTotal(job) : stepTotal,
+        ),
+      });
       return;
     }
 
-    const success = batchSuccessCount(result, job);
+    const groupOutcomes = resolveJobGroupOutcomes(result, job);
+    const outcomeExtras = groupOutcomes ? { groupOutcomes } : {};
+    const success =
+      job.action === 'create_group'
+        ? countCreatedGroupOutcomes(groupOutcomes)
+        : batchSuccessCount(result, job);
     const total = stepTotal;
-    const message = result.message ?? (batch ? `${success}/${total} created` : 'OK');
+    const message =
+      job.action === 'create_group'
+        ? `${success}/${total} created`
+        : (result.message ?? (batch ? `${success}/${total} created` : 'OK'));
 
     updateJobProgress(job.id, {
       current: success,
@@ -303,8 +473,6 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       label: job.payload.groupName ?? job.accountName,
     });
 
-    const groupOutcomes = resolveJobGroupOutcomes(result, job);
-    const outcomeExtras = groupOutcomes ? { groupOutcomes } : {};
     const isExitLeave =
       job.action === 'leave_group' && job.payload.exitDeletePhase === 'exit';
 
@@ -364,7 +532,9 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
 function tryAutoEnqueueSetPhotoAfterCreate(job: AutomationJobRecord): void {
   if (job.action !== 'create_group') return;
   try {
-    maybeAutoEnqueueSetPhotoFromCreate(job);
+    const fresh =
+      getJobQueueSnapshot().jobs.find((row) => row.id === job.id) ?? job;
+    maybeAutoEnqueueSetPhotoFromCreate(fresh);
   } catch (error) {
     console.error(
       '[jobQueue] auto enqueue set_group_photo failed',
@@ -377,7 +547,9 @@ function tryAutoEnqueueSetPhotoAfterCreate(job: AutomationJobRecord): void {
 function tryAutoEnqueueDeleteAfterExit(job: AutomationJobRecord): void {
   if (job.action !== 'leave_group' || job.payload.exitDeletePhase !== 'exit') return;
   try {
-    maybeAutoEnqueueDeleteFromExit(job);
+    const fresh =
+      getJobQueueSnapshot().jobs.find((row) => row.id === job.id) ?? job;
+    maybeAutoEnqueueDeleteFromExit(fresh);
   } catch (error) {
     console.error(
       '[jobQueue] auto enqueue delete_group after leave failed',

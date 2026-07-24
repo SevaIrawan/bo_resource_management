@@ -83,6 +83,7 @@ export const zh: Messages = {
       toPrepOkTooltip: 'Ready 已达最低 {{percent}}% 目标（{{ready}}/{{target}}，共 {{total}} 个 master 群）。',
       toPrepWarningTooltip:
         'Ready 低于 {{percent}}% 最低线（{{ready}}/{{target}}）。还需准备 {{gap}} 个群：创建 NEW 或将 Recycle（LG）重命名为 NEW。',
+      createGroupCtaTooltip: '打开该品牌 Create group 设置（在弹窗中选择 Master 账号）',
     },
     stock: {
       ariaSummary: '群组库存汇总',
@@ -129,14 +130,16 @@ export const zh: Messages = {
       createStartFromRequired: '启用编号时请填写起始编号。',
       createSelectAccountRequired: '排队前请先选择账号。',
       createSetupMissingFields: '排队前请完成以下必填项：',
-      createTotalToCreate: '要创建的群组总数',
+      createTotalToCreate: '创建总数',
       createUseGroupNumbering: '为每个群名称添加编号',
       createStartFrom: '起始编号',
       createSetupCardBatch: '群组批次',
       createSetupCardPermissions: '群组权限',
       createSetupCardPermissionsHint: '初始值来自设置页默认项。此处修改仅作用于本次任务。',
-      createPerRunHint:
-        '每个 Master 账号单次最多 {{perRun}} 个群（人工延迟）。一次执行最多到此上限。',
+      createPermMessagesAdminsOnly: '仅管理员发消息',
+      createPermAddMembersAdminsOnly: '仅管理员加成员',
+      createPermInfoAdminsOnly: '仅管理员改资料',
+      createPermHideChatHistory: '对新成员隐藏历史',
       createNoEligibleCreators:
         '没有可用 Master — 请将账号设为 Master，或今日已执行/已达上限',
       createNoMasterAccounts: '没有 Master 账号 — 请先在 Account 卡片将 Role 设为 Master',
@@ -183,6 +186,8 @@ export const zh: Messages = {
       exitRemarkDeleteRunning: '删除聊天进行中',
       exitRemarkDeletePartial: '删除聊天部分完成',
       createStatusCreated: '已创建',
+      adminStatusPromoted: '已设管理员',
+      adminStatusFailed: '设管理员失败',
       createViewSetPhotoHint: '请上传或选择照片，然后点击 Queue 执行设头像任务。',
       createViewSetPhotoSubtitle: '设置群头像 - {{brand}}',
       createViewTabList: '创建群结果',

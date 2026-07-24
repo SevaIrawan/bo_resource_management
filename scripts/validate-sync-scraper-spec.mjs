@@ -113,7 +113,43 @@ const implChecks = [
     ok:
       syncFlow.includes("outcome.kind === 'success'") &&
       syncFlow.includes('applyResult(groupId, account.id, outcome.result') &&
-      !/await onAccountGridRefresh\?\.\(dbAccountId\)/.test(syncFlow),
+      !/await onAccountGridRefresh\?\.\(dbAccountId\)/.test(syncFlow) &&
+      !/refreshAccountAfterDailyWrite|refreshAccountGrid\(/.test(syncFlow),
+  },
+  {
+    name: 'Scrape manual sukses: UI catch-up Matrix/Ops (bukan path auto scrape)',
+    ok:
+      syncFlow.includes('onManualScrapeUiCatchUp') &&
+      syncFlow.includes('onManualScrapeUiCatchUpRef.current?.()') &&
+      read('src/providers/GroupMonitoringProvider.tsx').includes(
+        'onManualScrapeUiCatchUp: scheduleMonitoringReload',
+      ) &&
+      !read('src/lib/runAutoAccountScraper.ts').includes('onManualScrapeUiCatchUp') &&
+      !read('src/lib/runAutoAccountScrape.ts').includes('onManualScrapeUiCatchUp'),
+  },
+  {
+    name: 'Cancel scrape: abort device sebelum release execute slot',
+    ok:
+      /scraper\?\.cancel[\s\S]*releaseExecuteSlot/.test(
+        syncFlow.slice(syncFlow.indexOf('confirmCancelScrape')),
+      ) &&
+      !/confirmCancelScrape[\s\S]*?releaseExecuteSlot[\s\S]*?scraper\?\.cancel/.test(
+        syncFlow.slice(
+          syncFlow.indexOf('confirmCancelScrape'),
+          syncFlow.indexOf('dismissScrapeCancelled'),
+        ),
+      ),
+  },
+  {
+    name: 'Realtime master flush: re-queue saat skip karena suspended',
+    ok: (() => {
+      const rt = read('src/hooks/useRealtimeMonitoring.ts');
+      return (
+        rt.includes('pendingBrandPlatform.add(key)') &&
+        rt.includes('deferredAny') &&
+        rt.includes('pendingBrandPlatformRef')
+      );
+    })(),
   },
   {
     name: 'Modal Admin vs master: fetchAccountGroupLinks master-only + dedupe',
@@ -168,9 +204,13 @@ const implChecks = [
     })(),
   },
   {
-    name: 'Kontrak: scrape error tahan slot sampai modal ditutup',
+    name: 'Kontrak: scrape error lepaskan slot; spinner tahan sampai modal ditutup',
     ok:
       syncFlow.includes('deferSlotRelease = true') &&
+      syncFlow.includes('void releaseExecuteSlot(account.id)') &&
+      /if \(!holdRowStateForLogin\)[\s\S]*?void releaseExecuteSlot\(account\.id\)[\s\S]*?if \(!deferSlotRelease\)/.test(
+        syncFlow,
+      ) &&
       syncFlow.includes('releaseExecuteSlot(target.account.id)'),
   },
   {

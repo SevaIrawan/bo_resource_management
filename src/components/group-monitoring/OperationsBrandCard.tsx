@@ -29,11 +29,13 @@ export function OperationsBrandCard({
   return (
     <article className="brand-card operations-brand-card">
       <div className="brand-card-header operations-brand-card-header">
-        <div className="brand-card-header-toggle operations-brand-card-toggle operations-brand-card-toggle--static">
+        <div className="brand-card-header-toggle operations-brand-card-toggle operations-brand-card-toggle--static brand-card-header-lead">
           <span className="brand-card-title operations-brand-col-brand">
             {t('operations.brandCard.title', { brand: group.brandName })}
           </span>
-          <OperationsBrandHeaderMeta meta={stockHeaderMeta} />
+          <div className="brand-card-header-meta">
+            <OperationsBrandHeaderMeta meta={stockHeaderMeta} />
+          </div>
         </div>
 
         <div className="operations-brand-card-metrics">

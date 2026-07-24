@@ -85,6 +85,7 @@ export const en = {
         'Ready stock meets minimum {{percent}}% target ({{ready}}/{{target}} of {{total}} master groups).',
       toPrepWarningTooltip:
         'Ready below {{percent}}% minimum ({{ready}}/{{target}}). Prepare {{gap}} group(s): create NEW or rename Recycle LG → NEW.',
+      createGroupCtaTooltip: 'Open Create group setup for this brand (pick Master account in modal)',
     },
     stock: {
       ariaSummary: 'Group stock summary',
@@ -132,15 +133,17 @@ export const en = {
       createStartFromRequired: 'Start Number is required when numbering is enabled.',
       createSelectAccountRequired: 'Select an account before queueing.',
       createSetupMissingFields: 'Complete all required settings before queueing:',
-      createTotalToCreate: 'Total groups to create',
+      createTotalToCreate: 'Total to create',
       createUseGroupNumbering: 'Number each group name',
-      createStartFrom: 'Start Number',
+      createStartFrom: 'Start from',
       createSetupCardBatch: 'Group batch',
       createSetupCardPermissions: 'Group permissions',
       createSetupCardPermissionsHint:
         'Starts from Settings defaults. Changes here apply to this job only.',
-      createPerRunHint:
-        'Max {{perRun}} groups per Master account per run (human delays). One execute = one batch up to this limit.',
+      createPermMessagesAdminsOnly: 'Admins send only',
+      createPermAddMembersAdminsOnly: 'Admins add only',
+      createPermInfoAdminsOnly: 'Admins edit info',
+      createPermHideChatHistory: 'Hide history for members',
       createNoEligibleCreators:
         'No Master accounts available — set role to Master, or all Masters already ran / hit daily limit',
       createNoMasterAccounts: 'No Master account — set Role to Master on Account card first',
@@ -192,6 +195,8 @@ export const en = {
       exitRemarkDeleteRunning: 'Delete chat in progress',
       exitRemarkDeletePartial: 'Delete chat partially done',
       createStatusCreated: 'Created',
+      adminStatusPromoted: 'Promoted',
+      adminStatusFailed: 'Failed',
       createViewSetPhotoHint:
         'Upload or select a photo, then press Queue to run the set photo task.',
       createViewSetPhotoSubtitle: 'Set group photo - {{brand}}',

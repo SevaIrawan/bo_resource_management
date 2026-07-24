@@ -187,8 +187,10 @@ const checks = [
       const store = read('electron/main/automation/jobQueueStore.ts');
       return (
         store.includes('isCreateBatch') &&
-        store.includes('job.payload.groupOutcomes = detail.groupOutcomes') &&
-        store.includes('if (detail?.groupOutcomes?.length)')
+        store.includes('mergeJobGroupOutcomes') &&
+        store.includes('if (detail?.groupOutcomes?.length)') &&
+        store.includes('attachJobGroupOutcomes') &&
+        store.includes('demoteRunningJobToPaused')
       );
     })(),
   },
@@ -780,6 +782,53 @@ const checks = [
     })(),
   },
   {
+    name: 'Pause/resume: persist outcomes + create resume slice (anti-duplikat)',
+    ok: (() => {
+      const helpers = read('electron/main/automation/jobQueueOutcomeHelpers.ts');
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const store = read('electron/main/automation/jobQueueStore.ts');
+      return (
+        helpers.includes('resolveCreateResumeSlice') &&
+        helpers.includes('filterGroupsNotDone') &&
+        helpers.includes('countCreatedGroupOutcomes') &&
+        runner.includes('resolveCreateResumeSlice') &&
+        runner.includes('attachJobGroupOutcomes') &&
+        runner.includes('demoteRunningJobToPaused(job.id') &&
+        store.includes('attachJobGroupOutcomes') &&
+        store.includes('countCreatedGroupOutcomes')
+      );
+    })(),
+  },
+  {
+    name: 'TG batch: cooperative stop + set_admin adminStatus outcomes',
+    ok: (() => {
+      const tg = read('electron/main/automation/tgAutomationClient.ts');
+      return (
+        tg.includes('peekJobStopRequest') &&
+        tg.includes('isJobStopRequested') &&
+        tg.includes("errorCode: 'JOB_STOPPED'") &&
+        tg.includes("adminStatus: 'promoted'") &&
+        tg.includes("adminStatus: 'failed'") &&
+        tg.includes('groupOutcomes')
+      );
+    })(),
+  },
+  {
+    name: 'VIEW set_admin: status dari adminStatus outcomes',
+    ok: (() => {
+      const ui = read('src/lib/operationsJobQueueUi.ts');
+      const en = read('src/i18n/locales/en.ts');
+      return (
+        ui.includes('adminStatusPromoted') &&
+        ui.includes('adminStatusFailed') &&
+        ui.includes("job.action === 'set_admin'") &&
+        ui.includes('job.payload.groupOutcomes') &&
+        en.includes('adminStatusPromoted') &&
+        en.includes('adminStatusFailed')
+      );
+    })(),
+  },
+  {
     name: 'All job actions: timeout + batch step total wired',
     ok: (() => {
       const runner = read('electron/main/automation/jobQueueRunner.ts');
@@ -793,6 +842,68 @@ const checks = [
         runner.includes('create_group:') &&
         batch.includes('leave_group') &&
         batch.includes('delete_group')
+      );
+    })(),
+  },
+  {
+    name: 'CTA To prep: klik angka → modal Create + pilih Master (bukan AddBar navigate)',
+    ok: (() => {
+      const card = read('src/components/group-monitoring/AccountBrandCard.tsx');
+      const meta = read('src/components/group-monitoring/OperationsBrandHeaderMeta.tsx');
+      const host = read('src/components/group-monitoring/JobQueueSetupHost.tsx');
+      const modal = read('src/components/group-monitoring/OperationsJobQueueSetupModal.tsx');
+      return (
+        meta.includes('stockToPrepare > 1') &&
+        meta.includes('brand-metric-hit') &&
+        meta.includes('onCreateGroup') &&
+        !meta.includes('operations-brand-create-cta') &&
+        !meta.includes('tabCreateGroup') &&
+        card.includes('createAccountCandidates') &&
+        card.includes('JobQueueSetupHost') &&
+        card.includes('taskType="create_group"') &&
+        card.includes('preferredCreateTotal') &&
+        !card.includes('dispatchJobQueueFocus') &&
+        host.includes('createAccountCandidates') &&
+        host.includes('pickCreateAccountInModal') &&
+        modal.includes('buildCreateGroupAccountSelectModel') &&
+        modal.includes('createAccountCandidates') &&
+        modal.includes('handleCreateTotalToCreateChange') &&
+        modal.includes('createTotalLimitAlertOpen') &&
+        modal.includes('createTotalInvalid') &&
+        !modal.includes('createPerRunHint')
+      );
+    })(),
+  },
+  {
+    name: 'Create Master select: satu helper AddBar + modal (anti overlap used-today)',
+    ok: (() => {
+      const elig = read('src/lib/createGroupAccountEligibility.ts');
+      const add = read('src/components/group-monitoring/OperationsJobQueueAddBar.tsx');
+      const modal = read('src/components/group-monitoring/OperationsJobQueueSetupModal.tsx');
+      return (
+        elig.includes('buildCreateGroupAccountSelectModel') &&
+        elig.includes('shouldHideCreateAccountFromSelect') &&
+        add.includes('buildCreateGroupAccountSelectModel') &&
+        modal.includes('buildCreateGroupAccountSelectModel')
+      );
+    })(),
+  },
+  {
+    name: 'Create total: hybrid limit (modal blok) — no caption createPerRunHint',
+    ok: (() => {
+      const modal = read('src/components/group-monitoring/OperationsJobQueueSetupModal.tsx');
+      const en = read('src/i18n/locales/en.ts');
+      const css = read('src/index.css');
+      const validate = read('src/lib/createGroupSetupValidation.ts');
+      return (
+        modal.includes('handleCreateTotalToCreateChange') &&
+        modal.includes('createTotalLimitAlertOpen') &&
+        modal.includes('createTotalInvalid') &&
+        !modal.includes('createPerRunHint') &&
+        !en.includes('createPerRunHint') &&
+        !css.includes('.operations-job-queue-hint') &&
+        validate.includes('createTotalInvalid') &&
+        validate.includes('total > maxPerRun')
       );
     })(),
   },

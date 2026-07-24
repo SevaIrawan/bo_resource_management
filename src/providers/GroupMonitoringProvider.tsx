@@ -302,6 +302,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     userId: user?.id ?? null,
     canOperatePlatform,
     translate: t,
+    /** Manual scrape saja — auto scrape punya lane/realtime sendiri, tanpa path ini. */
+    onManualScrapeUiCatchUp: scheduleMonitoringReload,
   });
 
   const probeSuspendIds = useMemo(() => {

@@ -7,6 +7,8 @@ import {
 
 interface OperationsBrandHeaderMetaProps {
   meta: GroupStockHeaderMeta;
+  /** To prep > 1 → klik To prep buka Create group job (brand terpilih). */
+  onCreateGroup?: () => void;
 }
 
 function MetaDivider() {
@@ -18,10 +20,14 @@ function MetaDivider() {
 }
 
 /** Avg ND + To prep — kolom lebar tetap, sejajar antar brand card. */
-export function OperationsBrandHeaderMeta({ meta }: OperationsBrandHeaderMetaProps) {
+export function OperationsBrandHeaderMeta({
+  meta,
+  onCreateGroup,
+}: OperationsBrandHeaderMetaProps) {
   const { t } = useLanguage();
   const avgDisplay = formatAvgNdDisplay(meta.avgNd);
   const needsPrep = meta.stockToPrepare > 0;
+  const toPrepClickable = Boolean(onCreateGroup) && meta.stockToPrepare > 1;
 
   const toPrepTooltip = needsPrep
     ? t('operations.brandCard.toPrepWarningTooltip', {
@@ -38,6 +44,21 @@ export function OperationsBrandHeaderMeta({ meta }: OperationsBrandHeaderMetaPro
         total: meta.totalMasterGroups,
       });
 
+  const toPrepInner = (
+    <>
+      <span className="operations-brand-meta-label">{t('operations.brandCard.toPrep')}</span>
+      <span
+        className={cn(
+          'operations-brand-meta-value',
+          needsPrep && 'operations-brand-meta-value--warning',
+          toPrepClickable && 'brand-gap-metric brand-gap-metric--link',
+        )}
+      >
+        {meta.stockToPrepare}
+      </span>
+    </>
+  );
+
   return (
     <>
       <MetaDivider />
@@ -49,24 +70,33 @@ export function OperationsBrandHeaderMeta({ meta }: OperationsBrandHeaderMetaPro
         <span className="operations-brand-meta-value">{avgDisplay}</span>
       </span>
       <MetaDivider />
-      <span
-        className={cn(
-          'operations-brand-col-metric',
-          needsPrep && 'operations-brand-col-metric--warning',
-        )}
-        title={toPrepTooltip}
-        aria-label={toPrepTooltip}
-      >
-        <span className="operations-brand-meta-label">{t('operations.brandCard.toPrep')}</span>
+      {toPrepClickable ? (
+        <button
+          type="button"
+          className={cn(
+            'operations-brand-col-metric',
+            'brand-metric-hit',
+            'operations-brand-col-metric--to-prep-hit',
+            needsPrep && 'operations-brand-col-metric--warning',
+          )}
+          title={t('operations.brandCard.createGroupCtaTooltip')}
+          aria-label={t('operations.brandCard.createGroupCtaTooltip')}
+          onClick={() => onCreateGroup?.()}
+        >
+          {toPrepInner}
+        </button>
+      ) : (
         <span
           className={cn(
-            'operations-brand-meta-value',
-            needsPrep && 'operations-brand-meta-value--warning',
+            'operations-brand-col-metric',
+            needsPrep && 'operations-brand-col-metric--warning',
           )}
+          title={toPrepTooltip}
+          aria-label={toPrepTooltip}
         >
-          {meta.stockToPrepare}
+          {toPrepInner}
         </span>
-      </span>
+      )}
     </>
   );
 }

@@ -55,6 +55,9 @@ export function useRealtimeMonitoring({
   const onMasterDataChangedRef = useRef(onMasterDataChanged);
   const onOperationsMetricsChangedRef = useRef(onOperationsMetricsChanged);
   const suspendedRef = useRef(suspendAccountIds);
+  /** Pending master keys + flush — hidup lintas effect agar unsuspend bisa retry. */
+  const pendingBrandPlatformRef = useRef(new Set<string>());
+  const flushMasterPatchesRef = useRef<(() => void) | null>(null);
 
   onGroupsChangeRef.current = onGroupsChange;
   onAccountDailyChangedRef.current = onAccountDailyChanged;
@@ -68,13 +71,19 @@ export function useRealtimeMonitoring({
     onDataChangeNoticeRef.current?.();
   };
 
+  /** Saat akun unsuspend, coba flush master yang ditunda karena skip suspend. */
+  useEffect(() => {
+    if (pendingBrandPlatformRef.current.size === 0) return;
+    flushMasterPatchesRef.current?.();
+  }, [suspendAccountIds]);
+
   useEffect(() => {
     if (!enabled || !userId) return;
 
     const supabase = getSupabase();
     if (!supabase) return;
 
-    const pendingBrandPlatform = new Set<string>();
+    const pendingBrandPlatform = pendingBrandPlatformRef.current;
     let masterFlushTimer: ReturnType<typeof setTimeout> | null = null;
     let masterFlushInFlight = false;
 
@@ -86,14 +95,25 @@ export function useRealtimeMonitoring({
         });
       });
 
+    const scheduleRetryFlush = (delayMs: number) => {
+      if (masterFlushTimer) clearTimeout(masterFlushTimer);
+      masterFlushTimer = setTimeout(() => {
+        masterFlushTimer = null;
+        void flushMasterPatches();
+      }, delayMs);
+    };
+
     const flushMasterPatches = async () => {
+      if (masterFlushInFlight) return;
       const keys = [...pendingBrandPlatform];
+      if (!keys.length) return;
       pendingBrandPlatform.clear();
-      if (!keys.length || masterFlushInFlight) return;
 
       masterFlushInFlight = true;
+      let deferredAny = false;
       try {
         let working = await readGroupsSnapshot();
+        let didPatch = false;
         for (const key of keys) {
           const sep = key.indexOf('|');
           if (sep < 0) continue;
@@ -108,30 +128,38 @@ export function useRealtimeMonitoring({
                 )
               : false,
           );
-          if (hasSuspended) continue;
+          if (hasSuspended) {
+            pendingBrandPlatform.add(key);
+            deferredAny = true;
+            continue;
+          }
           working = await patchBrandPlatformMasterInGroups(working, brand, platform);
+          didPatch = true;
         }
-        const patched = working;
-        onGroupsChangeRef.current((current) => mergeGroupsAccountMetrics(current, patched));
-        onMasterDataChangedRef.current?.();
-        notifyChange();
+        if (didPatch) {
+          const patched = working;
+          onGroupsChangeRef.current((current) => mergeGroupsAccountMetrics(current, patched));
+          onMasterDataChangedRef.current?.();
+          notifyChange();
+        }
       } finally {
         masterFlushInFlight = false;
         if (pendingBrandPlatform.size > 0) {
-          void flushMasterPatches();
+          // Suspend masih aktif → retry; delay cukup untuk unsuspend scrape selesai.
+          scheduleRetryFlush(deferredAny ? 600 : 0);
         }
       }
+    };
+
+    flushMasterPatchesRef.current = () => {
+      scheduleRetryFlush(0);
     };
 
     const scheduleBrandPlatformPatch = (brand: string, platform: Platform) => {
       const key = brandPlatformKey(brand, platform);
       if (!key || key === '|') return;
       pendingBrandPlatform.add(key);
-      if (masterFlushTimer) clearTimeout(masterFlushTimer);
-      masterFlushTimer = setTimeout(() => {
-        masterFlushTimer = null;
-        void flushMasterPatches();
-      }, 400);
+      scheduleRetryFlush(400);
     };
 
     const handleMasterChange = (row: GroupsMasterRow | undefined) => {
@@ -210,6 +238,7 @@ export function useRealtimeMonitoring({
 
     return () => {
       if (masterFlushTimer) clearTimeout(masterFlushTimer);
+      flushMasterPatchesRef.current = null;
       void supabase.removeChannel(channel);
     };
   }, [enabled, userId]);

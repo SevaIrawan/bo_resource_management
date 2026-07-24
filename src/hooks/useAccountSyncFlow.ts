@@ -78,6 +78,12 @@ interface UseAccountSyncFlowOptions {
   canOperatePlatform?: boolean;
   /** i18n dari parent — hindari hook tambahan di dalam custom hook. */
   translate: (key: string) => string;
+  /**
+   * Catch-up UI setelah scrape manual sukses (Group Matrix + Operations).
+   * Grid akun sudah di-applyResult — jangan refresh DB grid di sini (kontrak §5).
+   * Realtime daily sering di-skip saat akun suspended selama scrape.
+   */
+  onManualScrapeUiCatchUp?: () => void;
 }
 
 export type RowProcessingSpinner = 'sync' | 'scraper';
@@ -112,7 +118,10 @@ export function useAccountSyncFlow({
   userId,
   canOperatePlatform = true,
   translate: t,
+  onManualScrapeUiCatchUp,
 }: UseAccountSyncFlowOptions) {
+  const onManualScrapeUiCatchUpRef = useRef(onManualScrapeUiCatchUp);
+  onManualScrapeUiCatchUpRef.current = onManualScrapeUiCatchUp;
   const [processingByAccount, setProcessingByAccount] = useState<
     Record<string, RowProcessingSpinner>
   >({});
@@ -799,6 +808,9 @@ export function useAccountSyncFlow({
           message: `scrape:${outcome.result.groupsCurrent}/${outcome.result.groupsTotal}`,
         });
 
+        // Realtime daily/master sering di-drop saat akun suspended — catch-up Matrix/Ops.
+        onManualScrapeUiCatchUpRef.current?.();
+
         setStep('idle');
       } catch (error) {
         const message = getErrorMessage(error, 'SCRAPER_FAILED');
@@ -812,10 +824,13 @@ export function useAccountSyncFlow({
         showSyncError(message, groupId, account);
         deferSlotRelease = true;
       } finally {
-        if (!deferSlotRelease && !holdRowStateForLogin) {
+        if (!holdRowStateForLogin) {
+          // Slot selalu dilepas (anti-stuck); spinner boleh ditahan sampai modal error ditutup.
           void releaseExecuteSlot(account.id);
-          clearScrapeProgress(account.id);
-          clearRowProcessing(groupId, account.id);
+          if (!deferSlotRelease) {
+            clearScrapeProgress(account.id);
+            clearRowProcessing(groupId, account.id);
+          }
         }
       }
     },
@@ -912,10 +927,6 @@ export function useAccountSyncFlow({
 
     const { groupId, account } = target;
     scrapeCancelledAccountIdsRef.current.add(account.id);
-
-    void releaseExecuteSlot(account.id);
-    clearScrapeProgress(account.id);
-    clearRowProcessing(groupId, account.id);
     setStep('scrape-cancelled');
 
     try {
@@ -935,12 +946,17 @@ export function useAccountSyncFlow({
         accountId: dbAccountId,
       });
 
+      // Abort device dulu — baru lepaskan execute slot (hindari race Chrome masih jalan).
       await window.electronAPI?.scraper?.cancel({
         sessionId: deviceSessionId,
         platform: account.platform,
       });
     } catch {
-      // UI sudah dibersihkan; main process force-stop Chrome via scraper:cancel.
+      // Tetap bersihkan UI/slot di finally.
+    } finally {
+      void releaseExecuteSlot(account.id);
+      clearScrapeProgress(account.id);
+      clearRowProcessing(groupId, account.id);
     }
   }, [clearRowProcessing, clearScrapeProgress, target, userId]);
 

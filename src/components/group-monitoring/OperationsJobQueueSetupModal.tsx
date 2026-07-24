@@ -18,6 +18,8 @@ import {
   pickAndSaveBrandGroupPhoto,
   resolveBrandGroupPhotoPath,
 } from '@/lib/brandGroupPhotoClient';
+import { buildCreateGroupAccountSelectModel } from '@/lib/createGroupAccountEligibility';
+import { fetchJobQueueSnapshot } from '@/lib/automationJobQueueClient';
 import { parseJoinImportFile } from '@/lib/parseCsvJoinImport';
 import {
   validateCsvJoinAgainstMaster,
@@ -35,6 +37,7 @@ import {
   filterSetAdminGroupsForTargets,
   type SuperAdminGroupForSetAdmin,
 } from '@/lib/loadSuperAdminGroupsForSetAdmin';
+import type { AutomationJobRecord } from '@/types/automationJob';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
@@ -75,6 +78,11 @@ interface OperationsJobQueueSetupModalProps {
   ownerAccountCandidates?: AccountBrandRow[];
   selectedOwnerAccountId?: string;
   onOwnerAccountChange?: (accountId: string) => void;
+  /** Bila diisi — tampilkan pilih Master di modal (Account CTA To prep Create). */
+  createAccountCandidates?: AccountBrandRow[];
+  selectedCreateAccountId?: string;
+  onCreateAccountChange?: (accountId: string) => void;
+  preferredCreateTotal?: number;
   preferredSetAdminTargetId?: string;
   preferredExitGroupTab?: 'daily' | 'junk';
   preferredMasterListExpanded?: boolean;
@@ -154,6 +162,10 @@ export function OperationsJobQueueSetupModal({
   ownerAccountCandidates,
   selectedOwnerAccountId,
   onOwnerAccountChange,
+  createAccountCandidates,
+  selectedCreateAccountId,
+  onCreateAccountChange,
+  preferredCreateTotal,
   preferredSetAdminTargetId,
   preferredExitGroupTab,
   preferredMasterListExpanded,
@@ -174,6 +186,7 @@ export function OperationsJobQueueSetupModal({
 }: OperationsJobQueueSetupModalProps) {
   const { t } = useLanguage();
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [createTotalLimitAlertOpen, setCreateTotalLimitAlertOpen] = useState(false);
   const [selectedJoinGroupIds, setSelectedJoinGroupIds] = useState<Set<string>>(() => new Set());
   const [csvValidatedRows, setCsvValidatedRows] = useState<ValidatedCsvJoinRow[]>([]);
   const [csvLoading, setCsvLoading] = useState(false);
@@ -211,6 +224,7 @@ export function OperationsJobQueueSetupModal({
   const [createPhotoLoading, setCreatePhotoLoading] = useState(false);
   const [createPhotoUploading, setCreatePhotoUploading] = useState(false);
   const [createPhotoError, setCreatePhotoError] = useState<string | null>(null);
+  const [createJobsToday, setCreateJobsToday] = useState<AutomationJobRecord[]>([]);
 
   const createMaxPerRun = useMemo(() => {
     const settings =
@@ -226,10 +240,56 @@ export function OperationsJobQueueSetupModal({
     Math.min(createMaxPerRun, Math.floor(Number(createTotalToCreate)) || 1),
   );
 
+  /** Sama AddBar: load create jobs untuk disable Master yang sudah execute hari ini. */
+  useEffect(() => {
+    if (!open || taskType !== 'create_group' || !createAccountCandidates?.length) {
+      setCreateJobsToday([]);
+      return;
+    }
+    let cancelled = false;
+    async function loadCreateJobs() {
+      const snapshot = await fetchJobQueueSnapshot({ platform });
+      if (cancelled) return;
+      setCreateJobsToday(
+        (snapshot?.jobs ?? []).filter((job) => job.action === 'create_group'),
+      );
+    }
+    void loadCreateJobs();
+    const unsub = window.electronAPI?.jobQueue?.onChanged?.(() => {
+      void loadCreateJobs();
+    });
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [open, taskType, platform, createAccountCandidates?.length]);
+
+  const createAccountSelectModel = useMemo(
+    () =>
+      buildCreateGroupAccountSelectModel(
+        createAccountCandidates ?? [],
+        createJobsToday,
+        createMaxPerRun,
+        t('operations.jobQueue.createAccountUsedTodaySuffix'),
+      ),
+    [createAccountCandidates, createJobsToday, createMaxPerRun, t],
+  );
+
   const setAdminOwnerOptions = useMemo(
     () => (ownerAccountCandidates ?? []).map((row) => ({ value: row.id, label: row.accountName })),
     [ownerAccountCandidates],
   );
+
+  const createAccountOptions = createAccountSelectModel.options;
+  const createAccountDisabledIds = createAccountSelectModel.disabledIds;
+
+  useEffect(() => {
+    if (!open || !onCreateAccountChange) return;
+    if (!selectedCreateAccountId) return;
+    if (createAccountDisabledIds.includes(selectedCreateAccountId)) {
+      onCreateAccountChange('');
+    }
+  }, [open, selectedCreateAccountId, createAccountDisabledIds, onCreateAccountChange]);
 
   const setAdminOwnerDisabledIds = useMemo(
     () =>
@@ -349,6 +409,16 @@ export function OperationsJobQueueSetupModal({
     setCreateHideChatHistory(createGroup.hideChatHistoryForMembers);
   }
 
+  function handleCreateTotalToCreateChange(raw: string) {
+    setCreateTotalToCreate(raw);
+    const n = Number(raw);
+    if (!raw.trim() || !Number.isFinite(n)) return;
+    if (n > createMaxPerRun) {
+      setCreateTotalLimitAlertOpen(true);
+      setCreateTotalToCreate(String(createMaxPerRun));
+    }
+  }
+
   function collectCreateGroupValidationMessages(): string[] {
     return collectCreateGroupSetupValidationCodes({
       groupName: createGroupName,
@@ -381,19 +451,17 @@ export function OperationsJobQueueSetupModal({
     setCreateTotalToCreate('10');
     setCreateUseGroupNumbering(false);
     setCreateStartFrom('1');
+    setCreateTotalLimitAlertOpen(false);
     loadCreateGroupPermissionDefaultsFromSettings();
     setSelectedSetAdminGroupIds(new Set());
     setSelectedLeaveDeleteGroupIds(new Set());
     setExitGroupTab(preferredExitGroupTab === 'junk' ? 'junk' : 'daily');
     setExitGroupPage(1);
     setExitGroupProcessedAlertOpen(false);
-    const preferredOk =
-      preferredSetAdminTargetId &&
-      targetAccountCandidates.some((row) => row.id === preferredSetAdminTargetId);
-    setSelectedSetAdminTargetAccountId(preferredOk ? preferredSetAdminTargetId : '');
+    setSelectedSetAdminTargetAccountId('');
     setEligibleSetAdminGroups([]);
-    setCreatePhotoPath(null);
-    setCreatePhotoPreviewUrl(null);
+    // Foto brand: jangan di-clear di sini — owned oleh effect load create photo
+    // (targetAccountCandidates/array parent sering re-create → wipe preview yang sudah ada).
     setCreatePhotoError(null);
     setCsvValidatedRows([]);
     setCsvLoading(false);
@@ -410,10 +478,25 @@ export function OperationsJobQueueSetupModal({
     activeBrand,
     platform,
     preferredExitGroupTab,
-    preferredSetAdminTargetId,
     preferredMasterListExpanded,
-    targetAccountCandidates,
   ]);
+
+  useEffect(() => {
+    if (!open || taskType !== 'set_admin') return;
+    const preferredOk =
+      preferredSetAdminTargetId &&
+      targetAccountCandidates.some((row) => row.id === preferredSetAdminTargetId);
+    if (preferredOk && preferredSetAdminTargetId) {
+      setSelectedSetAdminTargetAccountId(preferredSetAdminTargetId);
+    }
+  }, [open, taskType, preferredSetAdminTargetId, targetAccountCandidates]);
+
+  useEffect(() => {
+    if (!open || taskType !== 'create_group') return;
+    if (preferredCreateTotal == null || preferredCreateTotal <= 0) return;
+    const capped = Math.min(createMaxPerRun, Math.max(1, Math.floor(preferredCreateTotal)));
+    setCreateTotalToCreate(String(capped));
+  }, [open, taskType, preferredCreateTotal, createMaxPerRun]);
 
   const processJoinImportFile = useCallback(async (file: File) => {
     setCsvLoading(true);
@@ -464,7 +547,14 @@ export function OperationsJobQueueSetupModal({
   );
 
   useEffect(() => {
-    if (!open || taskType !== 'create_group' || !activeBrand) return;
+    if (!open || taskType !== 'create_group' || !activeBrand) {
+      if (!open) {
+        setCreatePhotoPath(null);
+        setCreatePhotoPreviewUrl(null);
+        setCreatePhotoLoading(false);
+      }
+      return;
+    }
     let cancelled = false;
     setCreatePhotoLoading(true);
     setCreatePhotoError(null);
@@ -1083,6 +1173,24 @@ export function OperationsJobQueueSetupModal({
 
           {taskType === 'create_group' ? (
             <div className="operations-job-queue-setup-form operations-job-queue-setup-form--create">
+              {createAccountCandidates && onCreateAccountChange ? (
+                <div className="operations-job-queue-create-account-filter operations-job-queue-setup-form__full">
+                  <span className="operations-job-queue-create-account-filter__label">
+                    {t('operations.jobQueue.account')}
+                    <RequiredMark />
+                  </span>
+                  <DarkSelect
+                    value={selectedCreateAccountId ?? ''}
+                    onChange={onCreateAccountChange}
+                    options={createAccountOptions}
+                    disabledValues={createAccountDisabledIds}
+                    ariaLabel={t('operations.jobQueue.account')}
+                    triggerClassName="account-slicer-select operations-job-queue-select"
+                    disabled={saving}
+                    placeholder={t('operations.jobQueue.selectAccount')}
+                  />
+                </div>
+              ) : null}
               <div className="operations-job-queue-create-cards operations-job-queue-setup-form__full">
                 <div className="operations-job-queue-create-column">
                   <h4 className="operations-job-queue-create-card__title">
@@ -1113,16 +1221,10 @@ export function OperationsJobQueueSetupModal({
                         <input
                           type="number"
                           min={1}
-                          max={createMaxPerRun}
                           value={createTotalToCreate}
-                          onChange={(event) => setCreateTotalToCreate(event.target.value)}
+                          onChange={(event) => handleCreateTotalToCreateChange(event.target.value)}
                           disabled={saving}
                         />
-                        <p className="operations-job-queue-hint">
-                          {t('operations.jobQueue.createPerRunHint', {
-                            perRun: String(createMaxPerRun),
-                          })}
-                        </p>
                       </div>
                     </div>
                     <div className="operations-job-queue-create-row">
@@ -1168,7 +1270,7 @@ export function OperationsJobQueueSetupModal({
                   {platform === 'whatsapp' ? (
                     <>
                       <CreateSetupSwitchRow
-                        label={t('admin.workerWhatsApp.messagesAdminsOnly')}
+                        label={t('operations.jobQueue.createPermMessagesAdminsOnly')}
                         checked={createMessagesAdminsOnly}
                         disabled={saving}
                         onToggle={(next) =>
@@ -1176,7 +1278,7 @@ export function OperationsJobQueueSetupModal({
                         }
                       />
                       <CreateSetupSwitchRow
-                        label={t('admin.workerWhatsApp.addMembersAdminsOnly')}
+                        label={t('operations.jobQueue.createPermAddMembersAdminsOnly')}
                         checked={createAddMembersAdminsOnly}
                         disabled={saving}
                         onToggle={(next) =>
@@ -1184,7 +1286,7 @@ export function OperationsJobQueueSetupModal({
                         }
                       />
                       <CreateSetupSwitchRow
-                        label={t('admin.workerWhatsApp.infoAdminsOnly')}
+                        label={t('operations.jobQueue.createPermInfoAdminsOnly')}
                         checked={createInfoAdminsOnly}
                         disabled={saving}
                         onToggle={(next) => setCreateGroupPermissionLocal({ infoAdminsOnly: next })}
@@ -1192,7 +1294,7 @@ export function OperationsJobQueueSetupModal({
                     </>
                   ) : (
                     <CreateSetupSwitchRow
-                      label={t('admin.workerTelegram.hideChatHistoryForMembers')}
+                      label={t('operations.jobQueue.createPermHideChatHistory')}
                       checked={createHideChatHistory}
                       disabled={saving}
                       onToggle={(next) =>
@@ -1216,13 +1318,25 @@ export function OperationsJobQueueSetupModal({
                         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                       </div>
                     ) : createPhotoPreviewUrl && createPhotoPath ? (
-                      <div className="operations-job-queue-photo-preview">
-                        <img
-                          src={createPhotoPreviewUrl}
-                          alt={activeBrand}
-                          className="operations-job-queue-photo-preview__img"
-                        />
-                      </div>
+                      <>
+                        <div className="operations-job-queue-photo-preview">
+                          <img
+                            src={createPhotoPreviewUrl}
+                            alt={activeBrand}
+                            className="operations-job-queue-photo-preview__img"
+                          />
+                        </div>
+                        <div className="operations-job-queue-photo-below">
+                          <button
+                            type="button"
+                            className="operations-job-queue-photo-upload-btn"
+                            disabled={saving || createPhotoUploading || !activeBrand.trim()}
+                            onClick={() => void handleCreateBrandPhotoUpload()}
+                          >
+                            {t('admin.brandPhoto.change')}
+                          </button>
+                        </div>
+                      </>
                     ) : (
                       <div className="operations-job-queue-photo-empty">
                         <ImagePlus className="operations-job-queue-photo-empty__icon" size={24} />
@@ -1240,18 +1354,6 @@ export function OperationsJobQueueSetupModal({
                       </div>
                     )}
                   </section>
-                  {createPhotoPreviewUrl && createPhotoPath ? (
-                    <div className="operations-job-queue-photo-below">
-                      <button
-                        type="button"
-                        className="operations-job-queue-photo-upload-btn"
-                        disabled={saving || createPhotoUploading || !activeBrand.trim()}
-                        onClick={() => void handleCreateBrandPhotoUpload()}
-                      >
-                        {t('admin.brandPhoto.change')}
-                      </button>
-                    </div>
-                  ) : null}
                   {createPhotoError ? (
                     <p className="operations-job-queue-error" role="alert">
                       {createPhotoError}
@@ -1616,6 +1718,47 @@ export function OperationsJobQueueSetupModal({
           </div>
         </div>
       </BrandModalRoot>
+
+    <BrandModalRoot
+      open={createTotalLimitAlertOpen}
+      onBackdropClick={() => setCreateTotalLimitAlertOpen(false)}
+    >
+      <div
+        className="brand-modal-panel brand-modal-panel--sync"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="create-total-limit-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="brand-modal-header">
+          <h2 id="create-total-limit-title" className="brand-modal-title">
+            {t('operations.jobQueue.setupModalTitleCreate')}
+          </h2>
+          <button
+            type="button"
+            className="brand-modal-close"
+            onClick={() => setCreateTotalLimitAlertOpen(false)}
+            aria-label={t('groupMonitoring.accountCard.closeModal')}
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </header>
+        <div className="brand-modal-form">
+          <p className="sync-modal-message sync-modal-message--error">
+            {t('operations.jobQueue.createTotalInvalid', { max: String(createMaxPerRun) })}
+          </p>
+          <div className="brand-modal-actions">
+            <button
+              type="button"
+              className="brand-modal-btn brand-modal-btn--primary"
+              onClick={() => setCreateTotalLimitAlertOpen(false)}
+            >
+              {t('groupMonitoring.sync.ok')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </BrandModalRoot>
     </>
   );
 }

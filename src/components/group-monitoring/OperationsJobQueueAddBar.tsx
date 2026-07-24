@@ -15,7 +15,7 @@ import { fetchJobQueueSnapshot } from '@/lib/automationJobQueueClient';
 import {
   createGroupDayUsageForAccount,
   isEligibleCreateGroupAccount,
-  shouldHideCreateAccountFromSelect,
+  buildCreateGroupAccountSelectModel,
 } from '@/lib/createGroupAccountEligibility';
 import type { JobQueueTaskType, JobQueueTaskTypeSelection } from '@/lib/operationsJobQueueUi';
 import type { AutomationJobRecord } from '@/types/automationJob';
@@ -146,16 +146,16 @@ export function OperationsJobQueueAddBar({
     );
   }, [createJobs, createMax, createMasterCandidates]);
 
-  const createHiddenTodayIds = useMemo(() => {
-    return createMasterCandidates
-      .filter((row) =>
-        shouldHideCreateAccountFromSelect(
-          createGroupDayUsageForAccount(createJobs, row.id),
-          createMax,
-        ),
-      )
-      .map((row) => row.id);
-  }, [createJobs, createMax, createMasterCandidates]);
+  const createAccountSelectModel = useMemo(
+    () =>
+      buildCreateGroupAccountSelectModel(
+        createMasterCandidates,
+        createJobs,
+        createMax,
+        t('operations.jobQueue.createAccountUsedTodaySuffix'),
+      ),
+    [createJobs, createMasterCandidates, createMax, t],
+  );
 
   const accountSelectSource =
     taskType === 'create_group' ? createMasterCandidates : platformAccounts;
@@ -220,39 +220,28 @@ export function OperationsJobQueueAddBar({
     if (taskType !== 'create_group') {
       return accountSelectSource.map((row) => ({ value: row.id, label: row.accountName }));
     }
-    const usedSuffix = t('operations.jobQueue.createAccountUsedTodaySuffix');
-    return createMasterCandidates.map((row) => ({
-      value: row.id,
-      label: createHiddenTodayIds.includes(row.id)
-        ? `${row.accountName} ${usedSuffix}`
-        : row.accountName,
-    }));
-  }, [accountSelectSource, createHiddenTodayIds, createMasterCandidates, t, taskType]);
+    return createAccountSelectModel.options;
+  }, [accountSelectSource, createAccountSelectModel.options, taskType]);
 
   const invalidAccountIds = useMemo(() => {
     if (taskType === 'create_group') {
-      return [
-        ...createHiddenTodayIds,
-        ...accountSelectSource
-          .filter((row) => row.sessionStatus !== 'valid')
-          .map((row) => row.id),
-      ];
+      return createAccountSelectModel.disabledIds;
     }
     return accountSelectSource
       .filter((row) => row.sessionStatus !== 'valid')
       .map((row) => row.id);
-  }, [accountSelectSource, createHiddenTodayIds, taskType]);
+  }, [accountSelectSource, createAccountSelectModel.disabledIds, taskType]);
 
   const createAccountPlaceholder = useMemo(() => {
     if (taskType !== 'create_group') return t('operations.jobQueue.selectAccount');
-    if (createMasterCandidates.length === 0) {
+    if (createAccountSelectModel.noMasters) {
       return t('operations.jobQueue.createNoMasterAccounts');
     }
-    if (createEligibleAccounts.length === 0) {
+    if (createAccountSelectModel.allUsedToday) {
       return t('operations.jobQueue.createAllMastersUsedToday');
     }
     return t('operations.jobQueue.selectAccount');
-  }, [createEligibleAccounts.length, createMasterCandidates.length, t, taskType]);
+  }, [createAccountSelectModel.allUsedToday, createAccountSelectModel.noMasters, t, taskType]);
 
   const superAdminSelectOptions = useMemo(
     () => validAccounts.map((row) => ({ value: row.id, label: row.accountName })),

@@ -104,3 +104,45 @@ export function clampCreateGroupTotalToMax(
   if (!Number.isFinite(n) || n < 1) return 1;
   return Math.min(limit, n);
 }
+
+/** Satu sumber select Create Master — AddBar + modal CTA To prep (anti drift). */
+export function buildCreateGroupAccountSelectModel(
+  candidates: AccountBrandRow[],
+  jobs: AutomationJobRecord[],
+  maxPerRun: number,
+  usedTodaySuffix: string,
+): {
+  options: Array<{ value: string; label: string }>;
+  disabledIds: string[];
+  eligibleCount: number;
+  noMasters: boolean;
+  allUsedToday: boolean;
+} {
+  const limit = Math.max(1, Math.floor(maxPerRun));
+  const hiddenTodayIds = new Set(
+    candidates
+      .filter((row) =>
+        shouldHideCreateAccountFromSelect(createGroupDayUsageForAccount(jobs, row.id), limit),
+      )
+      .map((row) => row.id),
+  );
+  const invalidIds = new Set(
+    candidates
+      .filter((row) => row.sessionStatus !== 'valid' || !row.phoneNumber?.trim())
+      .map((row) => row.id),
+  );
+  const disabledIds = [...new Set([...hiddenTodayIds, ...invalidIds])];
+  const eligibleCount = candidates.filter((row) => !disabledIds.includes(row.id)).length;
+  return {
+    options: candidates.map((row) => ({
+      value: row.id,
+      label: hiddenTodayIds.has(row.id)
+        ? `${row.accountName} ${usedTodaySuffix}`
+        : row.accountName,
+    })),
+    disabledIds,
+    eligibleCount,
+    noMasters: candidates.length === 0,
+    allUsedToday: candidates.length > 0 && eligibleCount === 0,
+  };
+}

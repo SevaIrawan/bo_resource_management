@@ -38,7 +38,14 @@ function hasSetPhotoFollowUp(createJobId: string): boolean {
  */
 export function maybeAutoEnqueueSetPhotoFromCreate(createJob: AutomationJobRecord): void {
   if (createJob.action !== 'create_group') return;
-  if (createJob.status !== 'completed' && createJob.status !== 'failed') return;
+  // completed / failed / cancelled (partial create) — tetap enqueue foto untuk grup yang sudah created.
+  if (
+    createJob.status !== 'completed' &&
+    createJob.status !== 'failed' &&
+    createJob.status !== 'cancelled'
+  ) {
+    return;
+  }
 
   const photoPath = createJob.payload.photoPath?.trim() ?? '';
   const userId = createJob.payload.userId?.trim() ?? '';

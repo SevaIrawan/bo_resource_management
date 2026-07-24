@@ -8,6 +8,10 @@ import { accountJobStepTotal, isJobQueueBlockingExecutes, listBusyAccountIds } f
 import { listSettlingSessionIds, markSessionSettleAfterJob } from './jobQueueSettle';
 import { getActiveScrapeSessionCount, isScrapeActiveForSession, listActiveScrapeSessionIds } from '../scraper/scrapeCancel';
 import { getActiveAutoScrapeSessionCount, isAutoScrapeActiveForSession, listActiveAutoScrapeSessionIds } from '../scraper/autoScrapeCancel';
+import {
+  countCreatedGroupOutcomes,
+  mergeJobGroupOutcomes,
+} from './jobQueueOutcomeHelpers';
 import type {
   AutomationJobEnqueueInput,
   AutomationJobListFilter,
@@ -261,10 +265,11 @@ function requeueAutomationJob(job: AutomationJobRecord): void {
   delete job.finishedAt;
   delete job.error;
   delete job.message;
-  if (job.action === 'create_group' && (job.payload.totalToCreate ?? 1) > 1) {
-    const total = job.payload.totalToCreate ?? 1;
+  if (job.action === 'create_group') {
+    const total = Math.max(1, Math.floor(Number(job.payload.totalToCreate) || 1));
+    const already = countCreatedGroupOutcomes(job.payload.groupOutcomes);
     job.progress = {
-      current: 0,
+      current: already,
       total,
       label: job.progress?.label ?? job.payload.groupNamePrefix ?? job.payload.groupName,
     };
@@ -442,8 +447,64 @@ export function releaseClaimedJobToQueue(jobId: string): void {
   });
 }
 
-/** Pause cooperative selesai — demote running → queued+paused, progress dipertahankan. */
-export function demoteRunningJobToPaused(jobId: string): void {
+/**
+ * Persist partial outcomes setelah cancel (status sudah cancelled di UI)
+ * atau saat race status bukan running — jangan overwrite status.
+ */
+export function attachJobGroupOutcomes(
+  jobId: string,
+  detail?: {
+    message?: string;
+    groupOutcomes?: AutomationJobRecord['payload']['groupOutcomes'];
+    progressCurrent?: number;
+  },
+): void {
+  touchImmediate(() => {
+    const job = jobs.find((row) => row.id === jobId);
+    if (!job) return;
+    if (detail?.message?.trim()) {
+      job.message = detail.message.trim();
+    }
+    if (detail?.groupOutcomes?.length) {
+      job.payload.groupOutcomes = mergeJobGroupOutcomes(
+        job.payload.groupOutcomes,
+        detail.groupOutcomes,
+      );
+    }
+    if (detail?.progressCurrent != null || job.action === 'create_group') {
+      const total = Math.max(
+        1,
+        job.progress?.total ??
+          (job.action === 'create_group'
+            ? Math.floor(Number(job.payload.totalToCreate) || 1)
+            : accountJobStepTotal(job)),
+      );
+      const fromOutcomes =
+        job.action === 'create_group'
+          ? countCreatedGroupOutcomes(job.payload.groupOutcomes)
+          : undefined;
+      const current = Math.max(
+        0,
+        detail?.progressCurrent ?? fromOutcomes ?? job.progress?.current ?? 0,
+      );
+      job.progress = {
+        current: Math.min(current, total),
+        total,
+        label: job.progress?.label ?? job.payload.groupNamePrefix ?? job.payload.groupName,
+      };
+    }
+  });
+}
+
+/** Pause cooperative selesai — demote running → queued+paused; persist outcomes + progress. */
+export function demoteRunningJobToPaused(
+  jobId: string,
+  detail?: {
+    message?: string;
+    groupOutcomes?: AutomationJobRecord['payload']['groupOutcomes'];
+    progressCurrent?: number;
+  },
+): void {
   touchImmediate(() => {
     const job = jobs.find((row) => row.id === jobId);
     if (!job || job.status !== 'running') return;
@@ -451,6 +512,35 @@ export function demoteRunningJobToPaused(jobId: string): void {
     job.status = 'queued';
     job.paused = true;
     delete job.startedAt;
+    if (detail?.message?.trim()) {
+      job.message = detail.message.trim();
+    }
+    if (detail?.groupOutcomes?.length) {
+      job.payload.groupOutcomes = mergeJobGroupOutcomes(
+        job.payload.groupOutcomes,
+        detail.groupOutcomes,
+      );
+    }
+    const total = Math.max(
+      1,
+      job.progress?.total ??
+        (job.action === 'create_group'
+          ? Math.floor(Number(job.payload.totalToCreate) || 1)
+          : accountJobStepTotal(job)),
+    );
+    const fromOutcomes =
+      job.action === 'create_group'
+        ? countCreatedGroupOutcomes(job.payload.groupOutcomes)
+        : undefined;
+    const current = Math.max(
+      0,
+      detail?.progressCurrent ?? fromOutcomes ?? job.progress?.current ?? 0,
+    );
+    job.progress = {
+      current: Math.min(current, total),
+      total,
+      label: job.progress?.label ?? job.payload.groupNamePrefix ?? job.payload.groupName,
+    };
     markSessionSettleAfterJob(job.sessionId);
   });
 }
@@ -530,14 +620,20 @@ export function markJobFinished(
       job.message =
         rawMessage && rawMessage !== 'OK' ? rawMessage : `${success}/${batchTotal} created`;
       if (detail?.groupOutcomes?.length) {
-        job.payload.groupOutcomes = detail.groupOutcomes;
+        job.payload.groupOutcomes = mergeJobGroupOutcomes(
+          job.payload.groupOutcomes,
+          detail.groupOutcomes,
+        );
       }
       return;
     }
 
     job.message = detail?.message;
     if (detail?.groupOutcomes?.length) {
-      job.payload.groupOutcomes = detail.groupOutcomes;
+      job.payload.groupOutcomes = mergeJobGroupOutcomes(
+        job.payload.groupOutcomes,
+        detail.groupOutcomes,
+      );
     }
   });
 }

@@ -34,6 +34,13 @@ interface JobQueueSetupHostProps {
    * Jika diisi, superAdminAccount diabaikan sampai user pilih.
    */
   ownerAccountCandidates?: AccountBrandRow[];
+  /**
+   * Account CTA To prep / Create: user pilih Master di SETUP.
+   * Jika diisi, selectedAccounts diabaikan sampai user pilih.
+   */
+  createAccountCandidates?: AccountBrandRow[];
+  /** Prefill total create (mis. To prep gap). */
+  preferredCreateTotal?: number;
   preferredSetAdminTargetId?: string;
   preferredExitGroupTab?: 'daily' | 'junk';
   preferredMasterListExpanded?: boolean;
@@ -41,7 +48,7 @@ interface JobQueueSetupHostProps {
 
 /**
  * Shared host: load data + Setup modal + enqueue.
- * Dipakai dari Account (per-baris) dan Operations AddBar.
+ * Dipakai dari Account (per-baris / To prep) dan Operations AddBar.
  */
 export function JobQueueSetupHost({
   open,
@@ -57,13 +64,18 @@ export function JobQueueSetupHost({
   targetAccountCandidates,
   validAccounts,
   ownerAccountCandidates,
+  createAccountCandidates,
+  preferredCreateTotal,
   preferredSetAdminTargetId,
   preferredExitGroupTab,
   preferredMasterListExpanded,
 }: JobQueueSetupHostProps) {
   const { t } = useLanguage();
   const pickOwnerInModal = (ownerAccountCandidates?.length ?? 0) > 0;
+  const pickCreateAccountInModal =
+    taskType === 'create_group' && (createAccountCandidates?.length ?? 0) > 0;
   const [pickedOwnerAccountId, setPickedOwnerAccountId] = useState('');
+  const [pickedCreateAccountId, setPickedCreateAccountId] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +85,15 @@ export function JobQueueSetupHost({
     }
     setPickedOwnerAccountId(superAdminAccount?.id ?? '');
   }, [open, pickOwnerInModal, superAdminAccount?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (pickCreateAccountInModal) {
+      setPickedCreateAccountId('');
+      return;
+    }
+    setPickedCreateAccountId(selectedAccounts[0]?.id ?? '');
+  }, [open, pickCreateAccountInModal, selectedAccounts]);
 
   const resolvedSuperAdmin = useMemo(() => {
     if (pickOwnerInModal) {
@@ -90,6 +111,20 @@ export function JobQueueSetupHost({
     validAccounts,
   ]);
 
+  const resolvedCreateAccounts = useMemo((): AccountBrandRow[] => {
+    if (!pickCreateAccountInModal) return selectedAccounts;
+    const picked =
+      createAccountCandidates?.find((row) => row.id === pickedCreateAccountId) ??
+      validAccounts.find((row) => row.id === pickedCreateAccountId);
+    return picked ? [picked] : [];
+  }, [
+    createAccountCandidates,
+    pickCreateAccountInModal,
+    pickedCreateAccountId,
+    selectedAccounts,
+    validAccounts,
+  ]);
+
   const resolvedTargetCandidates = useMemo(() => {
     if (!resolvedSuperAdmin) return targetAccountCandidates;
     return targetAccountCandidates.filter((row) => row.id !== resolvedSuperAdmin.id);
@@ -100,7 +135,7 @@ export function JobQueueSetupHost({
     taskType,
     platform,
     activeBrand,
-    selectedAccounts,
+    selectedAccounts: resolvedCreateAccounts,
     superAdminAccount: resolvedSuperAdmin,
     validAccounts,
     t,
@@ -116,12 +151,22 @@ export function JobQueueSetupHost({
       taskType={taskType}
       platform={platform}
       activeBrand={activeBrand}
-      selectedAccounts={selectedAccounts}
+      selectedAccounts={resolvedCreateAccounts}
       superAdminAccount={resolvedSuperAdmin}
       targetAccountCandidates={resolvedTargetCandidates}
       ownerAccountCandidates={pickOwnerInModal ? ownerAccountCandidates : undefined}
       selectedOwnerAccountId={pickOwnerInModal ? pickedOwnerAccountId : undefined}
       onOwnerAccountChange={pickOwnerInModal ? setPickedOwnerAccountId : undefined}
+      createAccountCandidates={
+        pickCreateAccountInModal ? createAccountCandidates : undefined
+      }
+      selectedCreateAccountId={
+        pickCreateAccountInModal ? pickedCreateAccountId : undefined
+      }
+      onCreateAccountChange={
+        pickCreateAccountInModal ? setPickedCreateAccountId : undefined
+      }
+      preferredCreateTotal={preferredCreateTotal}
       preferredSetAdminTargetId={preferredSetAdminTargetId}
       preferredExitGroupTab={preferredExitGroupTab}
       preferredMasterListExpanded={preferredMasterListExpanded}

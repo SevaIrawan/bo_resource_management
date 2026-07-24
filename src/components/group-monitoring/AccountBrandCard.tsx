@@ -15,6 +15,8 @@ import { CardDismissButton } from '@/components/group-monitoring/CardDismissButt
 import { AccountBrandStockChips } from '@/components/group-monitoring/AccountBrandStockChips';
 import { OperationsBrandHeaderMeta } from '@/components/group-monitoring/OperationsBrandHeaderMeta';
 import { OperationsStockDetailModal } from '@/components/group-monitoring/OperationsStockDetailModal';
+import { JobQueueSetupHost } from '@/components/group-monitoring/JobQueueSetupHost';
+import { isMasterOpsRole } from '@/config/accountOpsRole';
 import {
   AddAccountModal,
   type AddAccountFormValues,
@@ -98,6 +100,8 @@ export function AccountBrandCard({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [comparePlatform, setComparePlatform] = useState<Platform | null>(null);
   const [stockDetailBucket, setStockDetailBucket] = useState<GroupStockBucket | null>(null);
+  const [createSetupOpen, setCreateSetupOpen] = useState(false);
+  const [createSetupFeedback, setCreateSetupFeedback] = useState<string | null>(null);
 
   const headerPlatform = resolveHeaderPlatform(activePlatformFilter);
   const accountsByPlatform = useMemo(
@@ -120,6 +124,13 @@ export function AccountBrandCard({
   const platformAccounts = useMemo(
     () => group.accounts.filter((row) => row.platform === headerPlatform),
     [group.accounts, headerPlatform],
+  );
+  const createMasterCandidates = useMemo(
+    () =>
+      platformAccounts.filter(
+        (row) => isMasterOpsRole(row.opsRole) && row.sessionStatus === 'valid',
+      ),
+    [platformAccounts],
   );
   const logoutCount = useMemo(
     () => platformAccounts.filter((row) => row.sessionStatus === 'invalid').length,
@@ -228,21 +239,35 @@ export function AccountBrandCard({
     <>
       <article className="brand-card">
         <div className="brand-card-header">
-          <button
-            type="button"
-            className="brand-card-header-toggle"
-            onClick={() => setExpanded((value) => !value)}
-            aria-expanded={expanded}
-          >
-            <ChevronDown
-              className={cn('brand-card-chevron', !expanded && 'brand-card-chevron--collapsed')}
-              aria-hidden
-            />
-            <span className="brand-card-title">
-              Brand : {group.brandName}
-            </span>
-            <OperationsBrandHeaderMeta meta={stockHeaderMeta} />
-          </button>
+          <div className="brand-card-header-lead">
+            <button
+              type="button"
+              className="brand-card-header-toggle"
+              onClick={() => setExpanded((value) => !value)}
+              aria-expanded={expanded}
+            >
+              <ChevronDown
+                className={cn('brand-card-chevron', !expanded && 'brand-card-chevron--collapsed')}
+                aria-hidden
+              />
+              <span className="brand-card-title">
+                Brand : {group.brandName}
+              </span>
+            </button>
+            <div className="brand-card-header-meta">
+              <OperationsBrandHeaderMeta
+                meta={stockHeaderMeta}
+                onCreateGroup={
+                  createMasterCandidates.length > 0
+                    ? () => {
+                        setCreateSetupFeedback(null);
+                        setCreateSetupOpen(true);
+                      }
+                    : undefined
+                }
+              />
+            </div>
+          </div>
 
           <div className="brand-card-header-actions">
             <span
@@ -418,6 +443,34 @@ export function AccountBrandCard({
           bucket={stockDetailBucket}
           onClose={() => setStockDetailBucket(null)}
         />
+      ) : null}
+
+      {createSetupOpen ? (
+        <JobQueueSetupHost
+          open={createSetupOpen}
+          onClose={() => setCreateSetupOpen(false)}
+          onExited={() => setCreateSetupOpen(false)}
+          onSaved={(message) => {
+            setCreateSetupFeedback(message);
+            setCreateSetupOpen(false);
+          }}
+          onFeedback={setCreateSetupFeedback}
+          taskType="create_group"
+          platform={headerPlatform}
+          activeBrand={group.brandName}
+          selectedAccounts={[]}
+          superAdminAccount={undefined}
+          targetAccountCandidates={[]}
+          validAccounts={platformAccounts.filter((row) => row.sessionStatus === 'valid')}
+          createAccountCandidates={createMasterCandidates}
+          preferredCreateTotal={stockHeaderMeta.stockToPrepare}
+        />
+      ) : null}
+
+      {createSetupFeedback ? (
+        <p className="brand-metric-feedback text-xs text-amber-300 px-3 pb-2" role="status">
+          {createSetupFeedback}
+        </p>
       ) : null}
     </>
   );

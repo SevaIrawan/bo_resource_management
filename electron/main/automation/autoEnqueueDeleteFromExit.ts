@@ -49,7 +49,9 @@ function hasDeleteFollowUp(exitJobId: string): boolean {
 export function maybeAutoEnqueueDeleteFromExit(exitJob: AutomationJobRecord): void {
   if (exitJob.action !== 'leave_group') return;
   if (exitJob.payload.exitDeletePhase !== 'exit') return;
-  if (exitJob.status !== 'completed' && exitJob.status !== 'failed') return;
+  if (exitJob.status !== 'completed' && exitJob.status !== 'failed' && exitJob.status !== 'cancelled') {
+    return;
+  }
   /** Settings delete off — jangan auto; VIEW manual juga blocked. */
   if (exitJob.payload.leaveDelete?.deleteEnabled === false) return;
 

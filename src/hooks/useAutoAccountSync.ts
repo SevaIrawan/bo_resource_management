@@ -19,6 +19,10 @@ import {
   readAutoScrapeLastRunDate,
   shouldTriggerAutoScrapeCycle,
 } from '@/config/autoScrapeSchedule';
+import {
+  AUTO_SCRAPE_NOW_RUN_EVENT,
+  readAutoScrapeNowEnabled,
+} from '@/config/autoScrapeNowSettings';
 import { readAutoSyncEnabled } from '@/config/autoSyncSettings';
 import { useAutoSyncSettings } from '@/contexts/AutoSyncSettingsContext';
 import { teardownAutoScrapeDevice } from '@/lib/autoScrapeDeviceTeardown';
@@ -96,8 +100,9 @@ function isBrandAccountStillSelected(
   platform: Platform,
   brandName: string,
   accountId: string,
+  opts?: { requireScheduledMaster?: boolean },
 ): boolean {
-  if (!readAutoSyncEnabled()) return false;
+  if (opts?.requireScheduledMaster !== false && !readAutoSyncEnabled()) return false;
   const toggles = readAutoScrapeBrandToggles();
   if (!isAutoScrapeBrandEnabled(platform, brandName, toggles)) return false;
   const selection = getAutoScrapeBrandAccountSelection(
@@ -145,8 +150,11 @@ async function runBrandPlatformSequential(input: {
   cycleControl: AutoScrapeCycleControl;
   suspended: Set<string>;
   onActiveChange: (event: AutoScrapeActiveEvent) => void;
+  /** `now` = jangan wajib On Scheduled master. */
+  mode?: 'scheduled' | 'now';
 }): Promise<'ok' | 'aborted'> {
   const accountRows: AutoScrapeBrandAccountResultRow[] = [];
+  const requireScheduledMaster = input.mode !== 'now';
 
   for (const account of input.accounts) {
     if (input.cycleControl.isAborted()) {
@@ -156,7 +164,9 @@ async function runBrandPlatformSequential(input: {
 
     // Settings berubah mid-cycle (Enabled/brand/Acc OFF) — lewati tanpa jeda scrape.
     if (
-      !isBrandAccountStillSelected(input.platform, input.group.brandName, account.id)
+      !isBrandAccountStillSelected(input.platform, input.group.brandName, account.id, {
+        requireScheduledMaster,
+      })
     ) {
       continue;
     }
@@ -225,6 +235,7 @@ export function useAutoAccountSync({
   /** Semua akun yang sedang auto scrape (brand paralel) — untuk suspend probe realtime. */
   const [activeAutoScrapeAccountIds, setActiveAutoScrapeAccountIds] = useState<string[]>([]);
   const runningRef = useRef(false);
+  const cycleModeRef = useRef<'idle' | 'scheduled' | 'now'>('idle');
   const groupsRef = useRef(groups);
   groupsRef.current = groups;
   const suspendRef = useRef(suspendAccountIds);
@@ -268,11 +279,59 @@ export function useAutoAccountSync({
     );
   }, [syncActiveIdsState]);
 
+  const runSelectedBrands = useCallback(
+    async (mode: 'scheduled' | 'now') => {
+      if (!userId) return;
+      const toggles = readAutoScrapeBrandToggles();
+      const accountSelections = readAutoScrapeBrandAccounts();
+      const suspended = new Set(suspendRef.current);
+      const maxBrandSlots = getMaxAutoScrapeBrandSlotsPerPlatform();
+      const selectedByPlatform = collectAutoScrapeTargets({
+        groups: groupsRef.current,
+        toggles,
+        accountSelections,
+        maxBrandSlots,
+      });
+
+      const cycleControl: AutoScrapeCycleControl = {
+        isAborted: () => {
+          if (cycleAbortRef.current) return true;
+          if (mode === 'scheduled' && !readAutoSyncEnabled()) return true;
+          if (mode === 'now' && !readAutoScrapeNowEnabled()) return true;
+          return false;
+        },
+      };
+
+      const brandTasks: Array<Promise<'ok' | 'aborted'>> = [];
+      for (const platform of ['whatsapp', 'telegram'] as const) {
+        for (const row of selectedByPlatform[platform]) {
+          brandTasks.push(
+            runBrandPlatformSequential({
+              userId,
+              group: row.group,
+              platform,
+              accounts: row.accounts,
+              onGroupsChange,
+              cycleControl,
+              suspended,
+              onActiveChange: handleActiveChange,
+              mode,
+            }),
+          );
+        }
+      }
+
+      if (brandTasks.length === 0) return;
+      await Promise.all(brandTasks);
+    },
+    [handleActiveChange, onGroupsChange, userId],
+  );
+
   const runCycle = useCallback(async () => {
     if (!userId || !window.electronAPI?.isElectron) return;
     if (runningRef.current) return;
 
-    // Gate ketat: Settings Enabled + permission monitoring (bukan hanya timer).
+    // Gate ketat: Settings On Scheduled + permission monitoring (bukan hanya timer).
     if (!readAutoSyncEnabled() || !monitoringEnabled) return;
 
     const now = new Date();
@@ -291,63 +350,50 @@ export function useAutoAccountSync({
     }
 
     cycleAbortRef.current = false;
-    const cycleControl: AutoScrapeCycleControl = {
-      isAborted: () => cycleAbortRef.current || !readAutoSyncEnabled(),
-    };
-
+    cycleModeRef.current = 'scheduled';
     runningRef.current = true;
     setIsRunning(true);
     persistAutoScrapeLastRunDate(today);
 
     try {
-      // Re-baca Settings saat start — bukan cache lama / semua brand grid.
-      const toggles = readAutoScrapeBrandToggles();
-      const accountSelections = readAutoScrapeBrandAccounts();
-      const suspended = new Set(suspendRef.current);
-      const maxBrandSlots = getMaxAutoScrapeBrandSlotsPerPlatform();
-      const selectedByPlatform = collectAutoScrapeTargets({
-        groups: groupsRef.current,
-        toggles,
-        accountSelections,
-        maxBrandSlots,
-      });
-
-      const brandTasks: Array<Promise<'ok' | 'aborted'>> = [];
-      for (const platform of ['whatsapp', 'telegram'] as const) {
-        for (const row of selectedByPlatform[platform]) {
-          brandTasks.push(
-            runBrandPlatformSequential({
-              userId,
-              group: row.group,
-              platform,
-              accounts: row.accounts,
-              onGroupsChange,
-              cycleControl,
-              suspended,
-              onActiveChange: handleActiveChange,
-            }),
-          );
-        }
-      }
-
-      if (brandTasks.length === 0) return;
-
-      const results = await Promise.all(brandTasks);
-      if (results.some((row) => row === 'aborted')) return;
+      await runSelectedBrands('scheduled');
     } finally {
       activeAutoScrapeRef.current.clear();
       syncActiveIdsState();
       runningRef.current = false;
+      cycleModeRef.current = 'idle';
       setIsRunning(false);
     }
   }, [
-    handleActiveChange,
     monitoringEnabled,
-    onGroupsChange,
+    runSelectedBrands,
     scheduledHour,
     syncActiveIdsState,
     userId,
   ]);
+
+  /** Scrape Now: skip gate jam / lastRunDate; jangan kunci jadwal harian. */
+  const runNowCycle = useCallback(async () => {
+    if (!userId || !window.electronAPI?.isElectron) return;
+    if (runningRef.current) return;
+    if (!monitoringEnabled) return;
+    if (!readAutoScrapeNowEnabled()) return;
+
+    cycleAbortRef.current = false;
+    cycleModeRef.current = 'now';
+    runningRef.current = true;
+    setIsRunning(true);
+
+    try {
+      await runSelectedBrands('now');
+    } finally {
+      activeAutoScrapeRef.current.clear();
+      syncActiveIdsState();
+      runningRef.current = false;
+      cycleModeRef.current = 'idle';
+      setIsRunning(false);
+    }
+  }, [monitoringEnabled, runSelectedBrands, syncActiveIdsState, userId]);
 
   const scheduleNextCheck = useCallback(() => {
     if (scheduleTimerRef.current !== null) window.clearTimeout(scheduleTimerRef.current);
@@ -381,14 +427,23 @@ export function useAutoAccountSync({
     };
   }, [scheduleNextCheck, teardownAllActive]);
 
-  // Enabled OFF di Settings → abort cycle yang sedang jalan + tutup device.
+  // On Scheduled OFF → abort hanya cycle jadwal (bukan Scrape Now).
   useEffect(() => {
     if (enabled) return;
+    if (cycleModeRef.current !== 'scheduled') return;
     cycleAbortRef.current = true;
     if (runningRef.current || activeAutoScrapeRef.current.size > 0) {
       void teardownAllActive();
     }
   }, [enabled, teardownAllActive]);
+
+  useEffect(() => {
+    const onScrapeNow = () => {
+      void runNowCycle();
+    };
+    window.addEventListener(AUTO_SCRAPE_NOW_RUN_EVENT, onScrapeNow);
+    return () => window.removeEventListener(AUTO_SCRAPE_NOW_RUN_EVENT, onScrapeNow);
+  }, [runNowCycle]);
 
   return { isRunning, activeAutoScrapeAccountIds };
 }

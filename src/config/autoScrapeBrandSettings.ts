@@ -128,6 +128,7 @@ export function countEnabledAutoScrapeBrandsForPlatform(
 /**
  * Set toggle brand. Jika ON dan kuota platform sudah penuh → gagal (slots_full).
  * Saat ON: Acc default `all`. Saat OFF: Acc di-reset ke `all`.
+ * `persist: false` = draft UI saja (Cancel/Execute).
  */
 export function setAutoScrapeBrandEnabled(
   platform: Platform,
@@ -135,6 +136,7 @@ export function setAutoScrapeBrandEnabled(
   enabled: boolean,
   map: AutoScrapeBrandToggleMap = readAutoScrapeBrandToggles(),
   accountMap: AutoScrapeBrandAccountMap = readAutoScrapeBrandAccounts(),
+  options?: { persist?: boolean },
 ):
   | {
       ok: true;
@@ -147,6 +149,7 @@ export function setAutoScrapeBrandEnabled(
       map: AutoScrapeBrandToggleMap;
       accountMap: AutoScrapeBrandAccountMap;
     } {
+  const shouldPersist = options?.persist !== false;
   const key = autoScrapeBrandToggleKey(platform, brandName);
   const next = { ...map };
   const nextAccounts = { ...accountMap };
@@ -154,15 +157,17 @@ export function setAutoScrapeBrandEnabled(
   if (!enabled) {
     next[key] = false;
     nextAccounts[key] = 'all';
-    persistAutoScrapeBrandToggles(next);
-    persistAutoScrapeBrandAccounts(nextAccounts);
+    if (shouldPersist) {
+      persistAutoScrapeBrandToggles(next);
+      persistAutoScrapeBrandAccounts(nextAccounts);
+    }
     return { ok: true, map: next, accountMap: nextAccounts };
   }
 
   if (next[key] === true) {
     if (nextAccounts[key] == null) {
       nextAccounts[key] = 'all';
-      persistAutoScrapeBrandAccounts(nextAccounts);
+      if (shouldPersist) persistAutoScrapeBrandAccounts(nextAccounts);
     }
     return { ok: true, map: next, accountMap: nextAccounts };
   }
@@ -174,8 +179,10 @@ export function setAutoScrapeBrandEnabled(
 
   next[key] = true;
   nextAccounts[key] = 'all';
-  persistAutoScrapeBrandToggles(next);
-  persistAutoScrapeBrandAccounts(nextAccounts);
+  if (shouldPersist) {
+    persistAutoScrapeBrandToggles(next);
+    persistAutoScrapeBrandAccounts(nextAccounts);
+  }
   return { ok: true, map: next, accountMap: nextAccounts };
 }
 
@@ -184,11 +191,58 @@ export function setAutoScrapeBrandAccounts(
   brandName: string,
   selection: AutoScrapeBrandAccountSelection,
   map: AutoScrapeBrandAccountMap = readAutoScrapeBrandAccounts(),
+  options?: { persist?: boolean },
 ): AutoScrapeBrandAccountMap {
   const key = autoScrapeBrandToggleKey(platform, brandName);
   const next = { ...map, [key]: selection };
-  persistAutoScrapeBrandAccounts(next);
+  if (options?.persist !== false) persistAutoScrapeBrandAccounts(next);
   return next;
+}
+
+/** Brand inactive → Acc wajib `all` (bersihkan pilihan custom yang nyangkut). */
+export function normalizeInactiveAutoScrapeAccountsToAll(
+  toggles: AutoScrapeBrandToggleMap = readAutoScrapeBrandToggles(),
+  accountMap: AutoScrapeBrandAccountMap = readAutoScrapeBrandAccounts(),
+  options?: { persist?: boolean },
+): AutoScrapeBrandAccountMap {
+  let changed = false;
+  const next = { ...accountMap };
+  for (const key of Object.keys(next)) {
+    if (toggles[key] === true) continue;
+    if (next[key] === 'all') continue;
+    next[key] = 'all';
+    changed = true;
+  }
+  if (changed && options?.persist !== false) persistAutoScrapeBrandAccounts(next);
+  return next;
+}
+
+export function autoScrapeBrandToggleMapsEqual(
+  a: AutoScrapeBrandToggleMap,
+  b: AutoScrapeBrandToggleMap,
+): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (Boolean(a[key]) !== Boolean(b[key])) return false;
+  }
+  return true;
+}
+
+export function autoScrapeBrandAccountMapsEqual(
+  a: AutoScrapeBrandAccountMap,
+  b: AutoScrapeBrandAccountMap,
+): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    const left = a[key] ?? 'all';
+    const right = b[key] ?? 'all';
+    if (left === 'all' && right === 'all') continue;
+    if (left === 'all' || right === 'all') return false;
+    if (left.length !== right.length) return false;
+    const rightSet = new Set(right);
+    if (!left.every((id) => rightSet.has(id))) return false;
+  }
+  return true;
 }
 
 /** Filter akun brand menurut pilihan Acc (all = semua). */

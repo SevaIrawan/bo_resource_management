@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import {
   combineScheduledHourAmPm,
   scheduledHour12Options,
@@ -8,12 +8,17 @@ import {
   type ScheduledHourPeriod,
 } from '@/config/autoScrapeSchedule';
 import {
+  autoScrapeBrandAccountMapsEqual,
+  autoScrapeBrandToggleMapsEqual,
   countEnabledAutoScrapeBrandsForPlatform,
   filterAccountsByAutoScrapeSelection,
   getAutoScrapeBrandAccountSelection,
   getAutoScrapeBrandRunStatus,
   getMaxAutoScrapeBrandSlotsPerPlatform,
   isAutoScrapeBrandEnabled,
+  normalizeInactiveAutoScrapeAccountsToAll,
+  persistAutoScrapeBrandAccounts,
+  persistAutoScrapeBrandToggles,
   readAutoScrapeBrandAccounts,
   readAutoScrapeBrandStatus,
   readAutoScrapeBrandToggles,
@@ -25,6 +30,11 @@ import {
   type AutoScrapeBrandStatusMap,
   type AutoScrapeBrandToggleMap,
 } from '@/config/autoScrapeBrandSettings';
+import {
+  persistAutoScrapeNowEnabled,
+  readAutoScrapeNowEnabled,
+  requestAutoScrapeNowRun,
+} from '@/config/autoScrapeNowSettings';
 import { ACCOUNT_SNAPSHOT_SELECT, MESSAGING_ACCOUNT_SELECT } from '@/config/dbColumns';
 import { TABLES } from '@/config/tables';
 import { SyncAlertModal } from '@/components/group-monitoring/SyncAlertModal';
@@ -38,6 +48,7 @@ import { loadUserBrands } from '@/lib/brands';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
 import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
 import { getSupabase } from '@/lib/supabase';
+import { cn } from '@/lib/utils';
 import type { Brand, Platform } from '@/types/database';
 
 type StatusDetailModalState = {
@@ -71,9 +82,6 @@ type AccountOptionRow = {
 type LastSyncByAccountId = Record<string, string | null>;
 
 const PLATFORMS: Platform[] = ['whatsapp', 'telegram'];
-
-const ROW_GRID =
-  'grid grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.75fr)] gap-2';
 
 async function loadActiveAccountsForUser(userId: string): Promise<AccountOptionRow[]> {
   const supabase = getSupabase();
@@ -146,6 +154,7 @@ function PlatformBrandTable(props: {
   statusMap: AutoScrapeBrandStatusMap;
   maxSlots: number;
   dateLocale?: string;
+  defaultExpanded?: boolean;
   onBrandToggle: (platform: Platform, brandName: string, next: boolean) => void;
   onAccountsChange: (platform: Platform, brandName: string, accountIds: string[]) => void;
   onViewStatus: (platform: Platform, brandName: string, entry: AutoScrapeBrandStatusEntry) => void;
@@ -162,148 +171,160 @@ function PlatformBrandTable(props: {
     statusMap,
     maxSlots,
     dateLocale,
+    defaultExpanded = false,
     onBrandToggle,
     onAccountsChange,
     onViewStatus,
     t,
   } = props;
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const used = countEnabledAutoScrapeBrandsForPlatform(platform, toggles);
   const title = platform === 'whatsapp' ? 'WhatsApp' : 'Telegram';
+  const panelId = `auto-scrape-platform-${platform}`;
 
   return (
     <div
-      className="min-w-0 rounded-lg border border-border-subtle bg-bg-shell/40 p-3"
+      className="min-w-0 rounded-lg border border-border-subtle bg-bg-shell/40"
       data-dark-select-clip
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-text-primary">{title}</span>
-        <span className="text-xs text-text-muted">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-bg-active/30"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <ChevronDown
+            className={cn(
+              'h-3.5 w-3.5 shrink-0 text-text-muted transition-transform',
+              !expanded && '-rotate-90',
+            )}
+            strokeWidth={2}
+            aria-hidden
+          />
+          <span className="text-xs font-medium text-text-primary">{title}</span>
+        </span>
+        <span className="shrink-0 text-xs text-text-muted">
           {t('settings.autoSync.brandSlotsUsed', {
             used: String(used),
             max: String(maxSlots),
           })}
         </span>
-      </div>
+      </button>
 
-      <div className={`${ROW_GRID} border-b border-border-subtle pb-1.5`}>
-        <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-text-muted">
-          {t('settings.autoSync.colBrand')}
-        </span>
-        <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-text-muted">
-          {t('settings.autoSync.colAcc')}
-        </span>
-        <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-text-muted">
-          {t('settings.autoSync.colTimeScrape')}
-        </span>
-        <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-text-muted">
-          {t('settings.autoSync.colStatus')}
-        </span>
-      </div>
+      {expanded ? (
+        <div id={panelId} className="auto-scrape-brand-table border-t border-border-subtle px-3 pb-3 pt-2">
+          <div className="auto-scrape-brand-table__row auto-scrape-brand-table__head">
+            <span>{t('settings.autoSync.colBrand')}</span>
+            <span>{t('settings.autoSync.colAcc')}</span>
+            <span>{t('settings.autoSync.colTimeScrape')}</span>
+            <span>{t('settings.autoSync.colStatus')}</span>
+          </div>
 
-      {brands.length === 0 ? (
-        <p className="mt-2 text-xs text-text-muted">{t('settings.autoSync.noBrands')}</p>
-      ) : (
-        <ul className="mt-1.5 space-y-1.5">
-          {brands.map((brand) => {
-            const on = isAutoScrapeBrandEnabled(platform, brand.name, toggles);
-            const brandAccounts = accounts.filter(
-              (row) => row.brandId === brand.id && row.platform === platform,
-            );
-            const options = brandAccounts.map((row) => ({
-              value: row.id,
-              label: reportingAccountDisplayName(row.label, brand.name),
-            }));
-            const selection = getAutoScrapeBrandAccountSelection(
-              platform,
-              brand.name,
-              accountMap,
-            );
-            const values =
-              selection === 'all' ? options.map((opt) => opt.value) : selection;
-            const scopedAccounts = filterAccountsByAutoScrapeSelection(
-              brandAccounts,
-              selection,
-            );
-            const timeIso = on
-              ? latestSyncIso(
-                  scopedAccounts.map((row) => row.id),
-                  lastSyncByAccountId,
-                )
-              : null;
-            const runStatus = on
-              ? getAutoScrapeBrandRunStatus(platform, brand.name, statusMap)
-              : null;
+          {brands.length === 0 ? (
+            <p className="mt-2 text-xs text-text-muted">{t('settings.autoSync.noBrands')}</p>
+          ) : (
+            <ul className="auto-scrape-brand-table__body">
+              {brands.map((brand) => {
+                const on = isAutoScrapeBrandEnabled(platform, brand.name, toggles);
+                const brandAccounts = accounts.filter(
+                  (row) => row.brandId === brand.id && row.platform === platform,
+                );
+                const options = brandAccounts.map((row) => ({
+                  value: row.id,
+                  label: reportingAccountDisplayName(row.label, brand.name),
+                }));
+                const selection = getAutoScrapeBrandAccountSelection(
+                  platform,
+                  brand.name,
+                  accountMap,
+                );
+                const values =
+                  selection === 'all' ? options.map((opt) => opt.value) : selection;
+                const scopedAccounts = filterAccountsByAutoScrapeSelection(
+                  brandAccounts,
+                  selection,
+                );
+                const timeIso = on
+                  ? latestSyncIso(
+                      scopedAccounts.map((row) => row.id),
+                      lastSyncByAccountId,
+                    )
+                  : null;
+                const runStatus = on
+                  ? getAutoScrapeBrandRunStatus(platform, brand.name, statusMap)
+                  : null;
 
-            return (
-              <li key={`${platform}:${brand.id}`} className={`${ROW_GRID} items-center`}>
-                <label className="flex min-w-0 cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0 rounded border-border-subtle"
-                    checked={on}
-                    disabled={!enabled}
-                    onChange={(e) => onBrandToggle(platform, brand.name, e.target.checked)}
-                  />
-                  <span className="truncate text-xs text-text-secondary">{brand.name}</span>
-                </label>
+                return (
+                  <li key={`${platform}:${brand.id}`} className="auto-scrape-brand-table__row">
+                    <label className="auto-scrape-brand-table__brand">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 shrink-0 rounded border-border-subtle"
+                        checked={on}
+                        disabled={!enabled}
+                        onChange={(e) => onBrandToggle(platform, brand.name, e.target.checked)}
+                      />
+                      <span className="auto-scrape-brand-table__brand-name">{brand.name}</span>
+                    </label>
 
-                {on ? (
-                  <DarkMultiSelect
-                    values={values}
-                    onChange={(next) => onAccountsChange(platform, brand.name, next)}
-                    options={options}
-                    disabled={!enabled || options.length === 0}
-                    showSelectAll
-                    selectAllLabel={t('settings.autoSync.accAll')}
-                    placeholder={t('settings.autoSync.accAll')}
-                    closeOnSelect={false}
-                    menuPlacement="auto"
-                    ariaLabel={`${brand.name} accounts`}
-                    className="min-w-0"
-                    triggerClassName="!min-h-8 !py-1 !text-xs"
-                    summaryLabel={(count) =>
-                      count >= options.length && options.length > 0
-                        ? t('settings.autoSync.accAll')
-                        : t('settings.autoSync.accSelected', { count: String(count) })
-                    }
-                  />
-                ) : (
-                  <span className="text-xs text-text-muted/50">—</span>
-                )}
+                    <DarkMultiSelect
+                      values={on ? values : []}
+                      onChange={(next) => onAccountsChange(platform, brand.name, next)}
+                      options={options}
+                      disabled={!on || !enabled || options.length === 0}
+                      showSelectAll
+                      selectAllLabel={t('settings.autoSync.accAll')}
+                      placeholder={t('settings.autoSync.accAll')}
+                      closeOnSelect={false}
+                      menuPlacement="auto"
+                      ariaLabel={`${brand.name} accounts`}
+                      triggerClassName="!min-h-8 !py-1 !text-xs"
+                      summaryLabel={(count) =>
+                        count >= options.length && options.length > 0
+                          ? t('settings.autoSync.accAll')
+                          : t('settings.autoSync.accSelected', { count: String(count) })
+                      }
+                    />
 
-                <span className="truncate text-xs text-text-muted">
-                  {on ? formatLastSyncAt(timeIso, dateLocale) : '—'}
-                </span>
-
-                {!on || !runStatus ? (
-                  <span className="text-xs text-text-muted/50">—</span>
-                ) : runStatus.allSuccessful ? (
-                  <span className="truncate text-xs text-emerald-400">
-                    {t('settings.autoSync.statusSuccessful')}
-                  </span>
-                ) : (
-                  <span className="flex min-w-0 items-center gap-1 text-xs text-amber-400">
-                    <span className="truncate">
-                      {t('settings.autoSync.statusPartial', {
-                        success: String(runStatus.successCount),
-                        total: String(runStatus.totalCount),
-                      })}
+                    <span className="auto-scrape-brand-table__cell text-text-muted">
+                      {on && timeIso ? formatLastSyncAt(timeIso, dateLocale) : '-'}
                     </span>
-                    <span className="text-text-muted">|</span>
-                    <button
-                      type="button"
-                      className="shrink-0 text-xs text-sky-400 underline-offset-2 hover:underline"
-                      onClick={() => onViewStatus(platform, brand.name, runStatus)}
-                    >
-                      {t('settings.autoSync.statusView')}
-                    </button>
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+
+                    {!on || !runStatus ? (
+                      <span className="auto-scrape-brand-table__cell text-text-muted/50">
+                        {t('settings.autoSync.statusStandby')}
+                      </span>
+                    ) : runStatus.allSuccessful ? (
+                      <span className="auto-scrape-brand-table__cell truncate text-emerald-400">
+                        {t('settings.autoSync.statusSuccessful')}
+                      </span>
+                    ) : (
+                      <span className="auto-scrape-brand-table__cell gap-1 text-amber-400">
+                        <span className="truncate">
+                          {t('settings.autoSync.statusPartial', {
+                            success: String(runStatus.successCount),
+                            total: String(runStatus.totalCount),
+                          })}
+                        </span>
+                        <span className="text-text-muted">|</span>
+                        <button
+                          type="button"
+                          className="shrink-0 text-xs text-sky-400 underline-offset-2 hover:underline"
+                          onClick={() => onViewStatus(platform, brand.name, runStatus)}
+                        >
+                          {t('settings.autoSync.statusView')}
+                        </button>
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -311,21 +332,79 @@ function PlatformBrandTable(props: {
 export function AutoSyncSettingsSection() {
   const { t, locale } = useLanguage();
   const { user } = useAuth();
-  const { enabled, setEnabled, scheduledHour, setScheduledHour } = useAutoSyncSettings();
+  const {
+    enabled: savedEnabled,
+    setEnabled,
+    scheduledHour: savedScheduledHour,
+    setScheduledHour,
+  } = useAutoSyncSettings();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [accounts, setAccounts] = useState<AccountOptionRow[]>([]);
   const [lastSyncByAccountId, setLastSyncByAccountId] = useState<LastSyncByAccountId>({});
-  const [toggles, setToggles] = useState<AutoScrapeBrandToggleMap>(readAutoScrapeBrandToggles);
-  const [accountMap, setAccountMap] = useState<AutoScrapeBrandAccountMap>(
-    readAutoScrapeBrandAccounts,
+
+  const [savedToggles, setSavedToggles] = useState<AutoScrapeBrandToggleMap>(
+    readAutoScrapeBrandToggles,
   );
+  const [savedAccountMap, setSavedAccountMap] = useState<AutoScrapeBrandAccountMap>(() =>
+    normalizeInactiveAutoScrapeAccountsToAll(
+      readAutoScrapeBrandToggles(),
+      readAutoScrapeBrandAccounts(),
+    ),
+  );
+  const [draftEnabled, setDraftEnabled] = useState(savedEnabled);
+  const [draftScheduledHour, setDraftScheduledHour] = useState(savedScheduledHour);
+  const [savedScrapeNow, setSavedScrapeNow] = useState(readAutoScrapeNowEnabled);
+  const [draftScrapeNow, setDraftScrapeNow] = useState(savedScrapeNow);
+  const [draftToggles, setDraftToggles] = useState<AutoScrapeBrandToggleMap>(savedToggles);
+  const [draftAccountMap, setDraftAccountMap] =
+    useState<AutoScrapeBrandAccountMap>(savedAccountMap);
+
   const [statusMap, setStatusMap] = useState<AutoScrapeBrandStatusMap>(
     readAutoScrapeBrandStatus,
   );
   const [slotFullHint, setSlotFullHint] = useState<string | null>(null);
   const [statusDetail, setStatusDetail] = useState<StatusDetailModalState | null>(null);
+  const [executeMessage, setExecuteMessage] = useState<string | null>(null);
   const maxSlots = getMaxAutoScrapeBrandSlotsPerPlatform();
   const dateLocale = locale === 'zh' ? 'zh-CN' : 'en-GB';
+
+  const dirty = useMemo(
+    () =>
+      draftEnabled !== savedEnabled ||
+      draftScheduledHour !== savedScheduledHour ||
+      draftScrapeNow !== savedScrapeNow ||
+      !autoScrapeBrandToggleMapsEqual(draftToggles, savedToggles) ||
+      !autoScrapeBrandAccountMapsEqual(draftAccountMap, savedAccountMap),
+    [
+      draftAccountMap,
+      draftEnabled,
+      draftScheduledHour,
+      draftScrapeNow,
+      draftToggles,
+      savedAccountMap,
+      savedEnabled,
+      savedScheduledHour,
+      savedScrapeNow,
+      savedToggles,
+    ],
+  );
+
+  const brandSetupEnabled = draftEnabled || draftScrapeNow;
+
+  const reloadSavedBrandSettings = useCallback((opts?: { syncDraft?: boolean }) => {
+    const nextToggles = readAutoScrapeBrandToggles();
+    const nextAccounts = normalizeInactiveAutoScrapeAccountsToAll(
+      nextToggles,
+      readAutoScrapeBrandAccounts(),
+    );
+    setSavedToggles(nextToggles);
+    setSavedAccountMap(nextAccounts);
+    if (opts?.syncDraft) {
+      setDraftToggles(nextToggles);
+      setDraftAccountMap(nextAccounts);
+    }
+    setStatusMap(readAutoScrapeBrandStatus());
+  }, []);
 
   useEffect(() => {
     if (!user?.id) {
@@ -355,33 +434,43 @@ export function AutoSyncSettingsSection() {
   }, [user?.id]);
 
   useEffect(() => {
-    const refresh = () => {
-      setToggles(readAutoScrapeBrandToggles());
-      setAccountMap(readAutoScrapeBrandAccounts());
-      setStatusMap(readAutoScrapeBrandStatus());
-    };
+    if (dirty) return;
+    setDraftEnabled(savedEnabled);
+    setDraftScheduledHour(savedScheduledHour);
+    setDraftScrapeNow(savedScrapeNow);
+  }, [dirty, savedEnabled, savedScheduledHour, savedScrapeNow]);
+
+  useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key === null || event.key.includes('rm_auto_scrape')) refresh();
+      if (event.key === null || event.key.includes('rm_auto_scrape')) {
+        reloadSavedBrandSettings({ syncDraft: !dirty });
+        const nextScrapeNow = readAutoScrapeNowEnabled();
+        setSavedScrapeNow(nextScrapeNow);
+        if (!dirty) setDraftScrapeNow(nextScrapeNow);
+      }
     };
+    const onStatus = () => setStatusMap(readAutoScrapeBrandStatus());
     window.addEventListener('storage', onStorage);
-    window.addEventListener('rm-auto-scrape-brand-status', refresh);
+    window.addEventListener('rm-auto-scrape-brand-status', onStatus);
     return () => {
       window.removeEventListener('storage', onStorage);
-      window.removeEventListener('rm-auto-scrape-brand-status', refresh);
+      window.removeEventListener('rm-auto-scrape-brand-status', onStatus);
     };
-  }, []);
+  }, [dirty, reloadSavedBrandSettings]);
 
   const onBrandToggle = useCallback(
     (platform: Platform, brandName: string, nextEnabled: boolean) => {
+      setExecuteMessage(null);
       const result = setAutoScrapeBrandEnabled(
         platform,
         brandName,
         nextEnabled,
-        toggles,
-        accountMap,
+        draftToggles,
+        draftAccountMap,
+        { persist: false },
       );
-      setToggles(result.map);
-      setAccountMap(result.accountMap);
+      setDraftToggles(result.map);
+      setDraftAccountMap(result.accountMap);
       if (!result.ok) {
         setSlotFullHint(
           t('settings.autoSync.brandSlotsFull', {
@@ -393,11 +482,12 @@ export function AutoSyncSettingsSection() {
       }
       setSlotFullHint(null);
     },
-    [accountMap, maxSlots, t, toggles],
+    [draftAccountMap, draftToggles, maxSlots, t],
   );
 
   const onAccountsChange = useCallback(
     (platform: Platform, brandName: string, accountIds: string[]) => {
+      setExecuteMessage(null);
       const brand = brands.find(
         (row) => row.name.trim().toLowerCase() === brandName.trim().toLowerCase(),
       );
@@ -415,10 +505,60 @@ export function AutoSyncSettingsSection() {
           accountIds.length >= allIds.length)
           ? ('all' as const)
           : accountIds;
-      setAccountMap(setAutoScrapeBrandAccounts(platform, brandName, selection, accountMap));
+      setDraftAccountMap(
+        setAutoScrapeBrandAccounts(platform, brandName, selection, draftAccountMap, {
+          persist: false,
+        }),
+      );
     },
-    [accountMap, accounts, brands],
+    [accounts, brands, draftAccountMap],
   );
+
+  const handleCancel = useCallback(() => {
+    setDraftEnabled(savedEnabled);
+    setDraftScheduledHour(savedScheduledHour);
+    setDraftScrapeNow(savedScrapeNow);
+    setDraftToggles(savedToggles);
+    setDraftAccountMap(savedAccountMap);
+    setSlotFullHint(null);
+    setExecuteMessage(null);
+  }, [savedAccountMap, savedEnabled, savedScheduledHour, savedScrapeNow, savedToggles]);
+
+  const handleExecute = useCallback(() => {
+    if (dirty) {
+      const nextAccounts = normalizeInactiveAutoScrapeAccountsToAll(
+        draftToggles,
+        draftAccountMap,
+        { persist: false },
+      );
+      setEnabled(draftEnabled);
+      setScheduledHour(draftScheduledHour);
+      persistAutoScrapeNowEnabled(draftScrapeNow);
+      persistAutoScrapeBrandToggles(draftToggles);
+      persistAutoScrapeBrandAccounts(nextAccounts);
+      setSavedToggles(draftToggles);
+      setSavedAccountMap(nextAccounts);
+      setDraftAccountMap(nextAccounts);
+      setSavedScrapeNow(draftScrapeNow);
+    }
+    setSlotFullHint(null);
+    if (draftScrapeNow) {
+      requestAutoScrapeNowRun();
+      setExecuteMessage(t('settings.autoSync.executedScrapeNow'));
+      return;
+    }
+    setExecuteMessage(t('settings.autoSync.executed'));
+  }, [
+    dirty,
+    draftAccountMap,
+    draftEnabled,
+    draftScheduledHour,
+    draftScrapeNow,
+    draftToggles,
+    setEnabled,
+    setScheduledHour,
+    t,
+  ]);
 
   const onViewStatus = useCallback(
     (platform: Platform, brandName: string, entry: AutoScrapeBrandStatusEntry) => {
@@ -436,7 +576,7 @@ export function AutoSyncSettingsSection() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [statusDetail]);
 
-  const scheduledParts = splitScheduledHourAmPm(scheduledHour);
+  const scheduledParts = splitScheduledHourAmPm(draftScheduledHour);
 
   const platformTables = useMemo(
     () =>
@@ -447,12 +587,13 @@ export function AutoSyncSettingsSection() {
           brands={brands}
           accounts={accounts}
           lastSyncByAccountId={lastSyncByAccountId}
-          enabled={enabled}
-          toggles={toggles}
-          accountMap={accountMap}
+          enabled={brandSetupEnabled}
+          toggles={draftToggles}
+          accountMap={draftAccountMap}
           statusMap={statusMap}
           maxSlots={maxSlots}
           dateLocale={dateLocale}
+          defaultExpanded={false}
           onBrandToggle={onBrandToggle}
           onAccountsChange={onAccountsChange}
           onViewStatus={onViewStatus}
@@ -460,11 +601,12 @@ export function AutoSyncSettingsSection() {
         />
       )),
     [
-      accountMap,
       accounts,
+      brandSetupEnabled,
       brands,
       dateLocale,
-      enabled,
+      draftAccountMap,
+      draftToggles,
       lastSyncByAccountId,
       maxSlots,
       onAccountsChange,
@@ -472,71 +614,142 @@ export function AutoSyncSettingsSection() {
       onViewStatus,
       statusMap,
       t,
-      toggles,
     ],
   );
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-border-subtle"
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
-          />
-          <span className="text-xs text-text-secondary">{t('settings.autoSync.enabled')}</span>
-        </label>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-text-muted shrink-0">
-            {t('settings.autoSync.scheduledHourLabel')}
-          </span>
-          <div className="auto-scrape-schedule-time" role="group" aria-label={t('settings.autoSync.scheduledHourLabel')}>
-            <DarkSelect
-              id="auto-scrape-scheduled-hour"
-              value={String(scheduledParts.hour12)}
-              onChange={(value) =>
-                setScheduledHour(
-                  combineScheduledHourAmPm(Number(value), scheduledParts.period),
-                )
-              }
-              options={scheduledHour12Options()}
-              disabled={!enabled}
-              menuPlacement="auto"
-              menuMaxRows={6}
-              ariaLabel={t('settings.autoSync.scheduledHourLabel')}
-              className="auto-scrape-schedule-time__hour"
-            />
-            <DarkSelect
-              id="auto-scrape-scheduled-period"
-              value={scheduledParts.period}
-              onChange={(value) =>
-                setScheduledHour(
-                  combineScheduledHourAmPm(
-                    scheduledParts.hour12,
-                    value as ScheduledHourPeriod,
-                  ),
-                )
-              }
-              options={scheduledHourPeriodOptions()}
-              disabled={!enabled}
-              menuPlacement="auto"
-              menuMaxRows={2}
-              ariaLabel={t('settings.autoSync.scheduledPeriodLabel')}
-              className="auto-scrape-schedule-time__period"
-            />
+      <div className="auto-scrape-mode-row">
+        <div className="auto-scrape-mode-card">
+          <div className="auto-scrape-mode-card__header">
+            <h3 className="auto-scrape-mode-card__title">
+              {t('settings.autoSync.onScheduledTitle')}
+            </h3>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={draftEnabled}
+              aria-label={t('settings.autoSync.onScheduledTitle')}
+              className={cn(
+                'operations-job-queue-switch',
+                draftEnabled && 'operations-job-queue-switch--on',
+              )}
+              onClick={() => {
+                setExecuteMessage(null);
+                setDraftEnabled(!draftEnabled);
+              }}
+            >
+              <span className="operations-job-queue-switch__thumb" aria-hidden />
+            </button>
           </div>
-          <span className="text-xs text-text-muted shrink-0">
-            {t('settings.autoSync.scheduledHourUnit')}
-          </span>
+          <div className="auto-scrape-mode-card__body">
+            <span className="text-xs text-text-muted shrink-0">
+              {t('settings.autoSync.scheduledHourLabel')}
+            </span>
+            <div
+              className="auto-scrape-schedule-time"
+              role="group"
+              aria-label={t('settings.autoSync.scheduledHourLabel')}
+            >
+              <DarkSelect
+                id="auto-scrape-scheduled-hour"
+                value={String(scheduledParts.hour12)}
+                onChange={(value) => {
+                  setExecuteMessage(null);
+                  setDraftScheduledHour(
+                    combineScheduledHourAmPm(Number(value), scheduledParts.period),
+                  );
+                }}
+                options={scheduledHour12Options()}
+                disabled={!draftEnabled}
+                menuPlacement="auto"
+                menuMaxRows={6}
+                ariaLabel={t('settings.autoSync.scheduledHourLabel')}
+                className="auto-scrape-schedule-time__hour"
+              />
+              <DarkSelect
+                id="auto-scrape-scheduled-period"
+                value={scheduledParts.period}
+                onChange={(value) => {
+                  setExecuteMessage(null);
+                  setDraftScheduledHour(
+                    combineScheduledHourAmPm(
+                      scheduledParts.hour12,
+                      value as ScheduledHourPeriod,
+                    ),
+                  );
+                }}
+                options={scheduledHourPeriodOptions()}
+                disabled={!draftEnabled}
+                menuPlacement="auto"
+                menuMaxRows={2}
+                ariaLabel={t('settings.autoSync.scheduledPeriodLabel')}
+                className="auto-scrape-schedule-time__period"
+              />
+            </div>
+            <span className="text-xs text-text-muted shrink-0">
+              {t('settings.autoSync.scheduledHourUnit')}
+            </span>
+          </div>
+        </div>
+
+        <div className="auto-scrape-mode-card">
+          <div className="auto-scrape-mode-card__header">
+            <h3 className="auto-scrape-mode-card__title">
+              {t('settings.autoSync.scrapeNowTitle')}
+            </h3>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={draftScrapeNow}
+              aria-label={t('settings.autoSync.scrapeNowTitle')}
+              className={cn(
+                'operations-job-queue-switch',
+                draftScrapeNow && 'operations-job-queue-switch--on',
+              )}
+              onClick={() => {
+                setExecuteMessage(null);
+                setDraftScrapeNow(!draftScrapeNow);
+              }}
+            >
+              <span className="operations-job-queue-switch__thumb" aria-hidden />
+            </button>
+          </div>
+          <div className="auto-scrape-mode-card__body">
+            <p className="auto-scrape-mode-card__hint">{t('settings.autoSync.scrapeNowHint')}</p>
+          </div>
         </div>
       </div>
 
       <p className="text-xs text-text-muted">{t('settings.autoSync.desc')}</p>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{platformTables}</div>
+      <div className="flex w-full flex-col gap-3">{platformTables}</div>
+
+      <div className="operations-stock-policy-footer">
+        {executeMessage ? (
+          <p className="operations-stock-policy-footer__status" role="status">
+            {executeMessage}
+          </p>
+        ) : null}
+        <div className="operations-stock-policy-actions">
+          <button
+            type="button"
+            className="operations-stock-policy-discard-btn"
+            onClick={handleCancel}
+            disabled={!dirty}
+          >
+            {t('settings.autoSync.discard')}
+          </button>
+          <button
+            type="button"
+            className="operations-stock-policy-save-btn"
+            onClick={handleExecute}
+            disabled={!dirty && !draftScrapeNow}
+          >
+            {t('settings.autoSync.execute')}
+          </button>
+        </div>
+      </div>
 
       <SyncAlertModal
         open={Boolean(slotFullHint)}

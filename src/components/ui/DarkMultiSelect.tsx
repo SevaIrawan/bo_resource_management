@@ -68,11 +68,13 @@ export function DarkMultiSelect({
 
   const triggerLabel = useMemo(() => {
     if (values.length === 0) return placeholder;
+    // Semua terpilih → pakai summary ("All") meski cuma 1 opsi
+    if (summaryLabel && allSelected) return summaryLabel(values.length);
     if (values.length === 1) {
       return options.find((opt) => opt.value === values[0])?.label ?? values[0];
     }
     return summaryLabel ? summaryLabel(values.length) : `${values.length} selected`;
-  }, [options, placeholder, summaryLabel, values]);
+  }, [allSelected, options, placeholder, summaryLabel, values]);
 
   useEffect(() => {
     if (menuPlacement === 'auto') return;

@@ -21,6 +21,9 @@ export const en = {
       title: 'Automatic account scrape',
       desc: 'Once per day at the scheduled hour (app must be open). Max 6 brands per platform.',
       enabled: 'Enabled',
+      onScheduledTitle: 'On Scheduled',
+      scrapeNowTitle: 'Scrape Now',
+      scrapeNowHint: 'Execute Brand active',
       scheduledHourLabel: 'Daily run at',
       scheduledPeriodLabel: 'AM / PM',
       scheduledHourUnit: 'local time',
@@ -30,6 +33,7 @@ export const en = {
       colStatus: 'Status',
       accAll: 'All',
       accSelected: '{{count}} selected',
+      statusStandby: 'standby',
       statusSuccessful: 'Successful',
       statusPartial: '{{success}}/{{total}}',
       statusView: 'View',
@@ -43,6 +47,10 @@ export const en = {
       brandSlotsFull:
         '{{platform}} auto scrape slots are full (max {{max}}). Turn off another brand first.',
       noBrands: 'No brands yet.',
+      discard: 'Discard',
+      execute: 'Execute',
+      executed: 'Settings applied.',
+      executedScrapeNow: 'Settings applied. Scrape Now started.',
     },
   },
   header: {

@@ -20,6 +20,7 @@ import type {
   AutomationJobRunnerState,
   AutomationJobStatus,
   PersistedQueueState,
+  Platform,
 } from './jobQueueTypes';
 
 let jobs: AutomationJobRecord[] = [];
@@ -110,6 +111,18 @@ function persist(): void {
 export function broadcastJobQueueChanged(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send('jobQueue:changed');
+  }
+}
+
+/** Renderer: scrape lane manual setelah join sukses agar daily/Missing/matrix selaras. */
+export function broadcastPostJoinScrape(payload: {
+  accountId: string;
+  sessionId: string;
+  platform: Platform;
+  brandName: string;
+}): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('jobQueue:post-join-scrape', payload);
   }
 }
 

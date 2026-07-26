@@ -212,6 +212,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('jobQueue:changed', listener);
       return () => ipcRenderer.removeListener('jobQueue:changed', listener);
     },
+    onPostJoinScrape: (
+      callback: (payload: {
+        accountId: string;
+        sessionId: string;
+        platform: Platform;
+        brandName: string;
+      }) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: {
+          accountId: string;
+          sessionId: string;
+          platform: Platform;
+          brandName: string;
+        },
+      ) => callback(payload);
+      ipcRenderer.on('jobQueue:post-join-scrape', listener);
+      return () => ipcRenderer.removeListener('jobQueue:post-join-scrape', listener);
+    },
   },
   brandGroupPhoto: {
     resolve: (brandName: string) =>

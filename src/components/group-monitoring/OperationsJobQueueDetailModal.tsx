@@ -205,6 +205,9 @@ export function OperationsJobQueueDetailModal({
           {isExitDeleteExitJob(record) ? (
             <p className="operations-job-queue-form-note">{t('operations.jobQueue.exitViewDeleteHint')}</p>
           ) : null}
+          {record.action === 'join_by_invite_link' ? (
+            <p className="operations-job-queue-form-note">{t('operations.jobQueue.joinViewScrapeHint')}</p>
+          ) : null}
           {isDeletePhaseView ? (
             <p className="operations-job-queue-form-note">{t('operations.jobQueue.deleteFromExitViewHint')}</p>
           ) : null}

@@ -19,6 +19,7 @@ const slotPool = read('electron/main/automation/executeSlotPool.ts');
 const cells = read('src/components/group-monitoring/AccountMonitoringCells.tsx');
 const migration035 = read('supabase/migrations/035_rm_fix_master_pk_and_scrape_commit.sql');
 const migration036 = read('supabase/migrations/036_rm_master_pk_brand_platform_group_id.sql');
+const migration038 = read('supabase/migrations/038_rm_master_require_brand_admin.sql');
 
 const checks = [
   {
@@ -35,6 +36,15 @@ const checks = [
       migration036.includes('DISTINCT ON (group_id)') &&
       migration036.includes('rm_build_master_row_id(v_brand, p_platform, group_id)') &&
       migration036.includes('pg_advisory_xact_lock'),
+  },
+  {
+    name: '§4 Master gate: invite valid AND is_admin=yes (038) — WA + TG',
+    ok:
+      migration038.includes("lower(trim(coalesce(is_admin, ''))) = 'yes'") &&
+      migration038.includes('rm_invite_link_is_valid(p_platform, invite_link)') &&
+      migration038.includes("p_platform NOT IN ('whatsapp', 'telegram')") &&
+      migration038.includes('WhatsApp DAN Telegram') &&
+      (migration038.match(/lower\(trim\(coalesce\(is_admin, ''\)\)\) = 'yes'/g) || []).length >= 2,
   },
   {
     name: '§3 Later / sync valid = sessionOnly (grid metrik tidak berubah)',

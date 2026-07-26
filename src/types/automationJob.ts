@@ -72,6 +72,7 @@ export interface AutomationJobPayload {
   /** Hasil per grup setelah create / join / set photo / exit / delete. */
   groupOutcomes?: Array<{
     groupId: string;
+    expectedGroupId?: string;
     groupName?: string;
     inviteLink?: string;
     groupLink?: string;

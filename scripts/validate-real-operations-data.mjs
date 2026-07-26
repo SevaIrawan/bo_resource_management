@@ -111,11 +111,42 @@ const checks = [
     })(),
   },
   {
-    name: 'TG join: already_member private invite tidak false-fail',
+    name: 'TG join: already_member resolve peer id (no empty-id success)',
     ok:
       tgAuto.includes('UserAlreadyParticipantError') &&
-      tgAuto.includes('already_member": True') &&
-      tgAuto.includes('Private invite'),
+      tgAuto.includes('_resolve_joined_peer') &&
+      tgAuto.includes('JOIN_PEER_UNRESOLVED') &&
+      tgAuto.includes('expected_group_id') &&
+      !tgAuto.includes('"group_id": ""'),
+  },
+  {
+    name: 'WA+TG join Electron: sukses hanya dengan device group_id (no master fallback)',
+    ok: (() => {
+      const wa = read('electron/main/automation/waAutomation.ts');
+      const tg = read('electron/main/automation/tgAutomationClient.ts');
+      return (
+        wa.includes('JOIN_PEER_UNRESOLVED') &&
+        wa.includes('Joined but peer id unresolved') &&
+        !wa.includes('deviceId || expectedGroupId') &&
+        tg.includes('Joined but peer id unresolved') &&
+        !tg.includes('deviceId || expectedGroupId') &&
+        wa.includes("createStatus: 'failed'") &&
+        tg.includes('created but peer id unresolved')
+      );
+    })(),
+  },
+  {
+    name: 'TG leave/delete/set_photo: peer group_id (-100…) selaras scrape',
+    ok: (() => {
+      const leave = read('python-sidecar/telegram_leave_group.py');
+      const del = read('python-sidecar/telegram_delete_group.py');
+      const photo = read('python-sidecar/telegram_set_group_photo.py');
+      return (
+        leave.includes('_peer_group_id') &&
+        del.includes('_peer_group_id') &&
+        photo.includes('_peer_group_id')
+      );
+    })(),
   },
   {
     name: 'TG join: invite_link dari parameter nyata',

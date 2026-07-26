@@ -306,6 +306,31 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     onManualScrapeUiCatchUp: scheduleMonitoringReload,
   });
 
+  const groupsRef = useRef(groups);
+  groupsRef.current = groups;
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
+
+  useEffect(() => {
+    const unsub = window.electronAPI?.jobQueue?.onPostJoinScrape?.((payload) => {
+      const accountId = payload.accountId?.trim();
+      if (!accountId) return;
+      for (const group of groupsRef.current) {
+        const account = group.accounts.find(
+          (row) =>
+            row.id === accountId ||
+            row.id === `acc-${accountId}` ||
+            (accountId.startsWith('acc-') && row.id === accountId.slice(4)),
+        );
+        if (!account) continue;
+        if (account.platform !== payload.platform) continue;
+        syncRef.current.triggerScrapeForAccount(group.id, account);
+        return;
+      }
+    });
+    return () => unsub?.();
+  }, []);
+
   const probeSuspendIds = useMemo(() => {
     const ids = new Set<string>();
     for (const accountId of Object.keys(sync.processingByAccount)) {

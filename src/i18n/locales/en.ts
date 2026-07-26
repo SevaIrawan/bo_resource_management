@@ -203,6 +203,8 @@ export const en = {
       exitGroupAlreadyProcessedOk: 'OK',
       exitViewDeleteHint:
         'Groups marked Left are deleted automatically after leave finishes. Use Queue delete only to retry if needed.',
+      joinViewScrapeHint:
+        'Joined = device only. Missing / matrix update after post-join scrape (auto-started) finishes writing daily.',
       deleteFromExitViewHint: 'Delete job — groups taken from the exit (leave) VIEW result only.',
       queueDeleteFromExit: 'Queue delete (left groups)',
       queuedExitOk:
@@ -390,7 +392,9 @@ export const en = {
       filtersAria: 'Reporting filters',
       brandLabel: 'Brand',
       platformLabel: 'Platform',
-      searchGroupNamePlaceholder: 'Search Group Name',
+      searchGroupNamePlaceholder: 'Search group name / ID / link…',
+      matrixBookmarkHintFullGroup: 'Yes = account has joined (member).',
+      matrixBookmarkHintFullAdmin: 'Yes = account is admin or owner (is_admin=yes).',
       accNameLabel: 'Acc Name',
       statusLabel: 'Status',
       statusAll: 'All',
@@ -426,6 +430,7 @@ export const en = {
       noMasterRows: 'No master groups for this brand and platform.',
       noDailyRows: 'No daily data for this account. Scrape via Sync first.',
       noAccountsForPlatform: 'No accounts for this brand and platform.',
+      noAccounts: 'No accounts for this brand and platform.',
     },
     exportFiltered: 'Export filtered accounts',
     searchPlaceholder: 'Search account name / phone number…',

@@ -18,8 +18,12 @@ export function mergeJobGroupOutcomes(
   if (!incoming?.length && !existing?.length) return undefined;
   const map = new Map<string, JobGroupOutcome>();
   const push = (row: JobGroupOutcome) => {
+    const masterId = String(row.expectedGroupId ?? '').trim();
     const id = String(row.groupId ?? '').trim();
-    const key = id || `name:${String(row.groupName ?? '').trim()}:${row.createStatus ?? row.joinStatus ?? row.adminStatus ?? ''}`;
+    const key =
+      masterId ||
+      id ||
+      `name:${String(row.groupName ?? '').trim()}:${row.createStatus ?? row.joinStatus ?? row.adminStatus ?? ''}`;
     const prev = map.get(key);
     map.set(key, prev ? { ...prev, ...row } : { ...row });
   };
@@ -55,14 +59,23 @@ export function filterGroupsNotDone(
   if (!groups.length || !outcomes?.length) return groups;
   const done = new Set<string>();
   for (const row of outcomes) {
-    const id = String(row.groupId ?? '').trim();
-    if (!id) continue;
+    const masterId = String(row.expectedGroupId ?? '').trim();
+    const deviceId = String(row.groupId ?? '').trim();
     if (kind === 'join' && (row.joinStatus === 'joined' || row.joinStatus === 'already_member')) {
-      done.add(id);
+      if (masterId) done.add(masterId);
+      if (deviceId) done.add(deviceId);
     }
-    if (kind === 'set_admin' && row.adminStatus === 'promoted') done.add(id);
-    if (kind === 'set_group_photo' && row.photoStatus === 'set') done.add(id);
-    if (kind === 'leave' && row.exitStatus === 'left') done.add(id);
+    if (kind === 'set_admin' && row.adminStatus === 'promoted') {
+      if (masterId) done.add(masterId);
+      if (deviceId) done.add(deviceId);
+    }
+    if (kind === 'set_group_photo' && row.photoStatus === 'set') {
+      if (deviceId) done.add(deviceId);
+    }
+    if (kind === 'leave' && (row.exitStatus === 'left' || row.deleteStatus === 'deleted')) {
+      if (masterId) done.add(masterId);
+      if (deviceId) done.add(deviceId);
+    }
   }
   if (done.size === 0) return groups;
   return groups.filter((g) => !done.has(String(g.groupId ?? '').trim()));

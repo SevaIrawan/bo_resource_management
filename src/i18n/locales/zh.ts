@@ -195,6 +195,8 @@ export const zh: Messages = {
       exitGroupAlreadyProcessedOk: '确定',
       exitViewDeleteHint:
         '标记为已退群的群组会在退群完成后自动排队删除聊天；仅在需要重试时使用排队删除。',
+      joinViewScrapeHint:
+        'Joined = 仅设备。Missing / 矩阵在 post-join scrape（自动启动）写完 daily 后更新。',
       deleteFromExitViewHint: '删除任务 — 群组仅来自退出（退群）VIEW 结果。',
       queueDeleteFromExit: '排队删除（已退群）',
       queuedExitOk: '已排队退群 {{count}} 个 — 退群完成后将自动排队删除聊天。',
@@ -376,7 +378,9 @@ export const zh: Messages = {
       filtersAria: '报表筛选',
       brandLabel: '品牌',
       platformLabel: '平台',
-      searchGroupNamePlaceholder: 'Search Group Name',
+      searchGroupNamePlaceholder: '搜索群名称 / ID / 链接…',
+      matrixBookmarkHintFullGroup: 'Yes = 账号已加入（成员）。',
+      matrixBookmarkHintFullAdmin: 'Yes = 账号为管理员或群主（is_admin=yes）。',
       accNameLabel: '账号名',
       statusLabel: '状态',
       statusAll: '全部',

@@ -20,6 +20,7 @@ import {
 } from './jobQueueOutcomeHelpers';
 import {
   attachJobGroupOutcomes,
+  broadcastPostJoinScrape,
   consumeJobStopRequest,
   demoteRunningJobToPaused,
   failStaleRunningJobs,
@@ -504,6 +505,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       });
       tryAutoEnqueueSetPhotoAfterCreate(job);
       tryAutoEnqueueDeleteAfterExit(job);
+      tryRequestScrapeAfterJoin(job, success);
       return;
     }
 
@@ -557,6 +559,25 @@ function tryAutoEnqueueSetPhotoAfterCreate(job: AutomationJobRecord): void {
   } catch (error) {
     console.error(
       '[jobQueue] auto enqueue set_group_photo failed',
+      job.id,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+/** Join sukses → minta renderer scrape akun (lane user) agar daily/master/Missing selaras. */
+function tryRequestScrapeAfterJoin(job: AutomationJobRecord, successCount: number): void {
+  if (job.action !== 'join_by_invite_link' || successCount <= 0) return;
+  try {
+    broadcastPostJoinScrape({
+      accountId: job.accountId,
+      sessionId: job.sessionId,
+      platform: job.platform,
+      brandName: job.brandName,
+    });
+  } catch (error) {
+    console.error(
+      '[jobQueue] post-join scrape request failed',
       job.id,
       error instanceof Error ? error.message : error,
     );

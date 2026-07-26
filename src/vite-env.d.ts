@@ -240,6 +240,14 @@ declare global {
         pauseJob: (jobId: string) => Promise<{ ok: boolean }>;
         removeJobs: (jobIds: string[]) => Promise<{ ok: boolean; removed?: number }>;
         onChanged: (callback: () => void) => () => void;
+        onPostJoinScrape: (
+          callback: (payload: {
+            accountId: string;
+            sessionId: string;
+            platform: Platform;
+            brandName: string;
+          }) => void,
+        ) => () => void;
       };
       brandGroupPhoto?: {
         resolve: (brandName: string) => Promise<{

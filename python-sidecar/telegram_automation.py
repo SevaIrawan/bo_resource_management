@@ -22,7 +22,11 @@ from telethon.tl.functions.channels import (
     JoinChannelRequest,
     TogglePreHistoryHiddenRequest,
 )
-from telethon.tl.functions.messages import ExportChatInviteRequest, ImportChatInviteRequest
+from telethon.tl.functions.messages import (
+    CheckChatInviteRequest,
+    ExportChatInviteRequest,
+    ImportChatInviteRequest,
+)
 from telethon.tl.types import Channel, ChatAdminRights, User
 
 from telegram_human_delay import (
@@ -164,6 +168,84 @@ def extract_invite_hash(link: str) -> str | None:
     if m:
         return m.group(1).strip() or None
     return None
+
+
+async def _resolve_joined_peer(
+    client,
+    *,
+    link: str,
+    invite_hash: str | None,
+    expected_group_id: str | None,
+) -> tuple[str, str]:
+    """Resolve peer id setelah join / already_member. Jangan return sukses tanpa id."""
+    expected = (expected_group_id or "").strip()
+
+    try:
+        entity = await client.get_entity(link)
+        gid = _peer_group_id(entity)
+        if gid:
+            return gid, str(getattr(entity, "title", "") or gid)
+    except Exception:  # noqa: BLE001
+        pass
+
+    if invite_hash:
+        try:
+            invite = await client(CheckChatInviteRequest(invite_hash))
+            chat = getattr(invite, "chat", None)
+            if chat is not None:
+                gid = _peer_group_id(chat)
+                if gid:
+                    return gid, str(getattr(chat, "title", "") or gid)
+        except Exception:  # noqa: BLE001
+            pass
+
+    if expected:
+        try:
+            entity = await client.get_entity(
+                int(expected) if re.fullmatch(r"-?\d+", expected) else expected
+            )
+            me = await client.get_me()
+            try:
+                await client(GetParticipantRequest(entity, me))
+                return _peer_group_id(entity), str(getattr(entity, "title", "") or expected)
+            except UserNotParticipantError:
+                pass
+            except Exception:  # noqa: BLE001
+                try:
+                    await client.get_permissions(entity, me)
+                    return _peer_group_id(entity), str(getattr(entity, "title", "") or expected)
+                except Exception:  # noqa: BLE001
+                    pass
+        except Exception:  # noqa: BLE001
+            pass
+
+    return "", ""
+
+
+def _join_ok(
+    action: str,
+    *,
+    group_id: str,
+    group_name: str,
+    invite_link: str,
+    already_member: bool,
+) -> dict:
+    gid = (group_id or "").strip()
+    if not gid:
+        return _err(
+            action,
+            "Joined but peer id unresolved — scrape/Sync required to verify",
+            error_code="JOIN_PEER_UNRESOLVED",
+        )
+    return _ok(
+        action,
+        {
+            "group_id": gid,
+            "group_name": (group_name or "").strip() or gid,
+            "invite_link": invite_link,
+            "already_member": already_member,
+        },
+    )
 
 
 async def _export_invite_link(client, channel, delay_cfg: dict) -> str:
@@ -502,6 +584,7 @@ async def run_join_by_invite_link(
     join_sequence_index: int = 1,
     session_string: str | None = None,
     expected_phone: str | None = None,
+    expected_group_id: str | None = None,
     delay: dict | None = None,
 ) -> dict:
     action = "join_by_invite_link"
@@ -510,6 +593,7 @@ async def run_join_by_invite_link(
         return _err(action, "invite_link required", error_code="INVALID_PAYLOAD")
 
     delay_cfg = merge_delay(delay)
+    expected = (expected_group_id or "").strip() or None
 
     async with tg_session_lock(session_id):
         client, prep_err = await _prepare_session(session_id, session_string, expected_phone)
@@ -527,54 +611,66 @@ async def run_join_by_invite_link(
                     chats = getattr(updates, "chats", None) or []
                     chat = chats[0] if chats else None
                     gid = _peer_group_id(chat) if chat else ""
-                    title = getattr(chat, "title", "") or gid
-                    return _ok(
+                    title = str(getattr(chat, "title", "") or gid) if chat else ""
+                    if not gid:
+                        gid, title = await _resolve_joined_peer(
+                            client,
+                            link=link,
+                            invite_hash=invite_hash,
+                            expected_group_id=expected,
+                        )
+                    return _join_ok(
                         action,
-                        {
-                            "group_id": gid,
-                            "group_name": title,
-                            "invite_link": link,
-                            "already_member": False,
-                        },
+                        group_id=gid,
+                        group_name=title,
+                        invite_link=link,
+                        already_member=False,
                     )
                 except UserAlreadyParticipantError:
-                    try:
-                        entity = await client.get_entity(link)
-                        return _ok(
-                            action,
-                            {
-                                "group_id": _peer_group_id(entity),
-                                "group_name": getattr(entity, "title", "") or _peer_group_id(entity),
-                                "invite_link": link,
-                                "already_member": True,
-                            },
-                        )
-                    except Exception:  # noqa: BLE001
-                        # Private invite: get_entity(link) sering gagal jika sudah member.
-                        return _ok(
-                            action,
-                            {
-                                "group_id": "",
-                                "group_name": "",
-                                "invite_link": link,
-                                "already_member": True,
-                            },
-                        )
+                    gid, title = await _resolve_joined_peer(
+                        client,
+                        link=link,
+                        invite_hash=invite_hash,
+                        expected_group_id=expected,
+                    )
+                    return _join_ok(
+                        action,
+                        group_id=gid,
+                        group_name=title,
+                        invite_link=link,
+                        already_member=True,
+                    )
                 except (InviteHashExpiredError, InviteHashInvalidError) as exc:
                     return _err(action, str(exc), error_code="INVITE_INVALID")
 
             entity = await client.get_entity(link)
             if isinstance(entity, Channel):
-                await client(JoinChannelRequest(entity))
-                return _ok(
-                    action,
-                    {
-                        "group_id": _peer_group_id(entity),
-                        "group_name": getattr(entity, "title", "") or _peer_group_id(entity),
-                        "invite_link": link,
-                        "already_member": False,
-                    },
-                )
+                try:
+                    await client(JoinChannelRequest(entity))
+                    return _join_ok(
+                        action,
+                        group_id=_peer_group_id(entity),
+                        group_name=str(getattr(entity, "title", "") or _peer_group_id(entity)),
+                        invite_link=link,
+                        already_member=False,
+                    )
+                except UserAlreadyParticipantError:
+                    gid, title = await _resolve_joined_peer(
+                        client,
+                        link=link,
+                        invite_hash=None,
+                        expected_group_id=expected,
+                    )
+                    if not gid:
+                        gid = _peer_group_id(entity)
+                        title = str(getattr(entity, "title", "") or gid)
+                    return _join_ok(
+                        action,
+                        group_id=gid,
+                        group_name=title,
+                        invite_link=link,
+                        already_member=True,
+                    )
             return _err(action, "Unsupported invite link format", error_code="INVITE_UNSUPPORTED")
         except FloodWaitError as exc:
             cap = max_floodwait_auto_sleep(delay_cfg)
@@ -583,14 +679,18 @@ async def run_join_by_invite_link(
             await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
             return _err(action, f"FloodWait {exc.seconds}s — retry job", error_code="FLOOD_WAIT_RETRY")
         except UserAlreadyParticipantError:
-            return _ok(
+            gid, title = await _resolve_joined_peer(
+                client,
+                link=link,
+                invite_hash=extract_invite_hash(link),
+                expected_group_id=expected,
+            )
+            return _join_ok(
                 action,
-                {
-                    "group_id": "",
-                    "group_name": "",
-                    "invite_link": link,
-                    "already_member": True,
-                },
+                group_id=gid,
+                group_name=title,
+                invite_link=link,
+                already_member=True,
             )
         except Exception as exc:  # noqa: BLE001
             return _err(action, str(exc) or "join failed")

@@ -1154,6 +1154,18 @@ export function useAccountSyncFlow({
     [runSyncCheck, target, updateGroups, userId],
   );
 
+  /** Dipanggil dari job queue post-join — scrape lane user tanpa prompt. */
+  const triggerScrapeForAccount = useCallback(
+    (groupId: string, account: AccountBrandRow) => {
+      if (processingByAccount[account.id]) return;
+      void runScrapeInBackground(
+        { groupId, account },
+        { skipDeviceCheck: true, updateSessionOnSuccess: false },
+      );
+    },
+    [processingByAccount, runScrapeInBackground],
+  );
+
   const activePlatform: Platform | null = target?.account.platform ?? null;
 
   return {
@@ -1182,6 +1194,7 @@ export function useAccountSyncFlow({
     handleLoginSuccess,
     handleLoginFatalError,
     handleSavePhoneAndSync,
+    triggerScrapeForAccount,
     reportBlockingError,
     closeFlow,
     getScrapeProgress,

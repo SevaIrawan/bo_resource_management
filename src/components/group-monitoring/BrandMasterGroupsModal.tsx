@@ -18,6 +18,7 @@ import {
   filterReportingMatrixRows,
   type ReportingMatrixColumnFilter,
 } from '@/lib/reportingMatrixColumn';
+import { filterReportingRowsByGroupSearch } from '@/lib/filterReportingGroupName';
 import { cn } from '@/lib/utils';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
@@ -63,6 +64,8 @@ export function BrandMasterGroupsModal({
   const [bookmark, setBookmark] = useState<ReportingExportBookmark>('full_group');
   const [rows, setRows] = useState<JoinGroupMatrixRow[]>([]);
   const [columnFilter, setColumnFilter] = useState<ReportingMatrixColumnFilter>(null);
+  const [groupSearchDraft, setGroupSearchDraft] = useState('');
+  const [groupSearch, setGroupSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -131,6 +134,8 @@ export function BrandMasterGroupsModal({
     }
     setBookmark('full_group');
     setColumnFilter(null);
+    setGroupSearchDraft('');
+    setGroupSearch('');
     setPage(1);
     void reload(false);
   }, [open, reload]);
@@ -143,10 +148,10 @@ export function BrandMasterGroupsModal({
   }, [open, reload]);
 
   const mode = bookmark === 'full_admin' ? 'admin' : 'join';
-  const filteredRows = useMemo(
-    () => filterReportingMatrixRows(rows, columnFilter, mode),
-    [columnFilter, mode, rows],
-  );
+  const filteredRows = useMemo(() => {
+    const bySearch = filterReportingRowsByGroupSearch(rows, groupSearch);
+    return filterReportingMatrixRows(bySearch, columnFilter, mode);
+  }, [columnFilter, groupSearch, mode, rows]);
   const matrixPage = sliceReportingPage(filteredRows, page);
 
   useEffect(() => {
@@ -156,7 +161,7 @@ export function BrandMasterGroupsModal({
 
   useEffect(() => {
     setPage(1);
-  }, [columnFilter]);
+  }, [columnFilter, groupSearch]);
 
   const platformLabel =
     platform === 'whatsapp'
@@ -180,27 +185,6 @@ export function BrandMasterGroupsModal({
             {brandName} {platformLabel}
           </h2>
           <div className="brand-modal-header-actions">
-            <div
-              className="account-slicer-view-toggle"
-              role="group"
-              aria-label={t('groupMonitoring.reporting.bookmarksLabel')}
-            >
-              {(['full_group', 'full_admin'] as ReportingExportBookmark[]).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={cn(
-                    'account-slicer-view-btn',
-                    bookmark === value && 'account-slicer-view-btn--active',
-                  )}
-                  onClick={() => setBookmark(value)}
-                >
-                  {value === 'full_group'
-                    ? t('groupMonitoring.reporting.bookmarkFullGroup')
-                    : t('groupMonitoring.reporting.bookmarkFullAdmin')}
-                </button>
-              ))}
-            </div>
             <button
               type="button"
               className="brand-modal-close"
@@ -213,6 +197,55 @@ export function BrandMasterGroupsModal({
         </header>
 
         <div className="brand-master-reporting-modal-body">
+          {!showInitialLoading && !error && reportingAccounts.length > 0 ? (
+            <div className="brand-master-reporting-toolbar">
+              <form
+                className="account-slicer-search-group brand-master-reporting-search-group"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setGroupSearch(groupSearchDraft);
+                  setPage(1);
+                }}
+              >
+                <input
+                  type="search"
+                  value={groupSearchDraft}
+                  onChange={(event) => setGroupSearchDraft(event.target.value)}
+                  placeholder={t('groupMonitoring.reporting.searchGroupNamePlaceholder')}
+                  className="account-slicer-search"
+                  aria-label={t('groupMonitoring.reporting.searchGroupNamePlaceholder')}
+                />
+                <button
+                  type="submit"
+                  className="account-slicer-search-btn account-slicer-search-btn--enter"
+                  aria-label={t('groupMonitoring.searchEnter')}
+                >
+                  {t('groupMonitoring.searchEnter')}
+                </button>
+              </form>
+              <div
+                className="account-slicer-view-toggle"
+                role="group"
+                aria-label={t('groupMonitoring.reporting.bookmarksLabel')}
+              >
+                {(['full_group', 'full_admin'] as ReportingExportBookmark[]).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={cn(
+                      'account-slicer-view-btn',
+                      bookmark === value && 'account-slicer-view-btn--active',
+                    )}
+                    onClick={() => setBookmark(value)}
+                  >
+                    {value === 'full_group'
+                      ? t('groupMonitoring.reporting.bookmarkFullGroup')
+                      : t('groupMonitoring.reporting.bookmarkFullAdmin')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {showInitialLoading ? (
             <div className="group-links-modal-loading">
               <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
@@ -234,6 +267,11 @@ export function BrandMasterGroupsModal({
               pageOffset={matrixPage.pageOffset}
               columnFilter={columnFilter}
               onColumnFilterChange={setColumnFilter}
+              groupNameSearch={groupSearch}
+              onClearGroupNameSearch={() => {
+                setGroupSearchDraft('');
+                setGroupSearch('');
+              }}
             />
           )}
         </div>

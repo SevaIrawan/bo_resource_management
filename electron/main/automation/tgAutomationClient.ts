@@ -504,6 +504,7 @@ export async function runTelegramAutomation(
     const failed: string[] = [];
     const groupOutcomes: Array<{
       groupId: string;
+      expectedGroupId?: string;
       groupName?: string;
       inviteLink?: string;
       joinStatus: 'joined' | 'already_member' | 'failed';
@@ -520,6 +521,7 @@ export async function runTelegramAutomation(
         };
       }
       const group = groups[i];
+      const expectedGroupId = group.groupId.trim();
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
       const result = await postTelegramAutomation(
         payload.sessionId,
@@ -528,24 +530,42 @@ export async function runTelegramAutomation(
           ...base,
           inviteLink: group.inviteLink,
           joinSequenceIndex: i + 1,
+          expectedGroupId: expectedGroupId || undefined,
         },
       );
       if (result.status === 'ok') {
+        const deviceId = String(result.result?.group_id ?? '').trim();
+        if (!deviceId) {
+          const errMsg = 'Joined but peer id unresolved';
+          failed.push(`${group.groupName ?? group.groupId}: ${errMsg}`);
+          groupOutcomes.push({
+            groupId: expectedGroupId || group.groupId,
+            expectedGroupId: expectedGroupId || undefined,
+            groupName: group.groupName,
+            inviteLink: group.inviteLink,
+            joinStatus: 'failed',
+            joinError: errMsg,
+          });
+          continue;
+        }
         success += 1;
         const alreadyMember = result.result?.already_member === true;
+        const deviceName = String(result.result?.group_name ?? '').trim();
         groupOutcomes.push({
-          groupId: group.groupId,
-          groupName: group.groupName,
+          groupId: deviceId,
+          expectedGroupId: expectedGroupId || undefined,
+          groupName: deviceName || group.groupName,
           inviteLink: group.inviteLink,
           joinStatus: alreadyMember ? 'already_member' : 'joined',
         });
-        onProgress?.(i + 1, groups.length, group.groupName ?? 'Joined');
+        onProgress?.(i + 1, groups.length, deviceName || group.groupName || 'Joined');
       } else {
         const rawErr = result.message ?? 'failed';
         const errMsg = humanizeTgJoinError(rawErr, group.inviteLink ?? '');
         failed.push(`${group.groupName ?? group.groupId}: ${errMsg}`);
         groupOutcomes.push({
-          groupId: group.groupId,
+          groupId: expectedGroupId || group.groupId,
+          expectedGroupId: expectedGroupId || undefined,
           groupName: group.groupName,
           inviteLink: group.inviteLink,
           joinStatus: 'failed',
@@ -646,15 +666,25 @@ export async function runTelegramCreateGroupBatch(
     }
 
     if (result.status === 'ok') {
-      created += 1;
       const detail = result.result ?? {};
-      groupOutcomes.push({
-        groupId: String(detail.group_id ?? '').trim(),
-        groupName: String(detail.group_name ?? groupName).trim() || groupName,
-        inviteLink: typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
-        createStatus: 'created',
-      });
-      onProgress(created, totalTarget, groupName);
+      const groupId = String(detail.group_id ?? '').trim();
+      if (!groupId) {
+        failed.push(`${groupName}: created but peer id unresolved`);
+        groupOutcomes.push({
+          groupId: '',
+          groupName,
+          createStatus: 'failed',
+        });
+      } else {
+        created += 1;
+        groupOutcomes.push({
+          groupId,
+          groupName: String(detail.group_name ?? groupName).trim() || groupName,
+          inviteLink: typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
+          createStatus: 'created',
+        });
+        onProgress(created, totalTarget, groupName);
+      }
     } else {
       failed.push(`${groupName}: ${result.message ?? 'failed'}`);
       groupOutcomes.push({

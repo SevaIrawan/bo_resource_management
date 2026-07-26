@@ -60,6 +60,8 @@ export interface AutomationJobPayload {
   userId?: string;
   groupOutcomes?: Array<{
     groupId: string;
+    /** Master/payload id — resume key saat device peer id beda. */
+    expectedGroupId?: string;
     groupName?: string;
     inviteLink?: string;
     groupLink?: string;

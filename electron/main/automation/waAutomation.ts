@@ -771,7 +771,19 @@ async function runJoinByInviteLink(
     if (acceptedId) {
       const resolved = await resolveGroupChatOptional(client, acceptedId);
       groupName = resolved?.name?.trim() || '';
-    } else if (payload.groupId?.trim()) {
+      onProgress?.(1, 1, groupName || 'Joined');
+      return {
+        status: 'ok',
+        action: 'join_by_invite_link',
+        result: {
+          group_id: acceptedId.replace(/@g\.us$/i, ''),
+          group_name: groupName,
+          invite_link: link,
+          already_member: false,
+        },
+      };
+    }
+    if (payload.groupId?.trim()) {
       const resolved = await resolveGroupChatOptional(client, payload.groupId.trim());
       if (resolved?.isGroup) {
         groupName = resolved.name?.trim() || '';
@@ -788,24 +800,36 @@ async function runJoinByInviteLink(
         };
       }
     }
-    onProgress?.(1, 1, groupName || 'Joined');
     return {
-      status: 'ok',
+      status: 'error',
       action: 'join_by_invite_link',
-      result: {
-        group_id: acceptedId.replace(/@g\.us$/i, ''),
-        group_name: groupName,
-        invite_link: link,
-        already_member: false,
-      },
+      message: 'Joined but peer id unresolved',
+      errorCode: 'JOIN_PEER_UNRESOLVED',
     };
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);
     if (/already/i.test(raw)) {
+      const expectedId = payload.groupId?.trim();
+      if (expectedId) {
+        const resolved = await resolveGroupChatOptional(client, expectedId);
+        if (resolved?.isGroup) {
+          return {
+            status: 'ok',
+            action: 'join_by_invite_link',
+            result: {
+              group_id: resolved.id.replace(/@g\.us$/i, ''),
+              group_name: resolved.name ?? '',
+              invite_link: link,
+              already_member: true,
+            },
+          };
+        }
+      }
       return {
-        status: 'ok',
+        status: 'error',
         action: 'join_by_invite_link',
-        result: { invite_link: link, already_member: true },
+        message: 'Already a member but group id unresolved',
+        errorCode: 'JOIN_PEER_UNRESOLVED',
       };
     }
     // Timeout / cryptic evaluate: verifikasi membership lewat groupId payload.
@@ -941,16 +965,26 @@ export async function runWhatsAppCreateGroupBatch(
         }
 
         if (result.status === 'ok') {
-          created += 1;
           const detail = result.result ?? {};
-          groupOutcomes.push({
-            groupId: String(detail.group_id ?? '').trim(),
-            groupName: String(detail.group_name ?? groupName).trim() || groupName,
-            inviteLink:
-              typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
-            createStatus: 'created',
-          });
-          onProgress(created, totalTarget, groupName);
+          const groupId = String(detail.group_id ?? '').trim();
+          if (!groupId) {
+            failed.push(`${groupName}: created but peer id unresolved`);
+            groupOutcomes.push({
+              groupId: '',
+              groupName,
+              createStatus: 'failed',
+            });
+          } else {
+            created += 1;
+            groupOutcomes.push({
+              groupId,
+              groupName: String(detail.group_name ?? groupName).trim() || groupName,
+              inviteLink:
+                typeof detail.invite_link === 'string' ? detail.invite_link : undefined,
+              createStatus: 'created',
+            });
+            onProgress(created, totalTarget, groupName);
+          }
         } else {
           failed.push(`${groupName}: ${result.message ?? 'failed'}`);
           groupOutcomes.push({
@@ -1006,6 +1040,7 @@ export async function runWhatsAppAutomation(
         const failed: string[] = [];
         const groupOutcomes: Array<{
           groupId: string;
+          expectedGroupId?: string;
           groupName?: string;
           inviteLink?: string;
           joinStatus: 'joined' | 'already_member' | 'failed';
@@ -1035,20 +1070,38 @@ export async function runWhatsAppAutomation(
             onProgress,
           );
           if (result.status === 'ok') {
+            const expectedGroupId = group.groupId.trim();
+            const deviceId = String(result.result?.group_id ?? '').trim();
+            if (!deviceId) {
+              const errMsg = 'Joined but peer id unresolved';
+              failed.push(`${group.groupName ?? group.groupId}: ${errMsg}`);
+              groupOutcomes.push({
+                groupId: expectedGroupId || group.groupId,
+                expectedGroupId: expectedGroupId || undefined,
+                groupName: group.groupName,
+                inviteLink: group.inviteLink,
+                joinStatus: 'failed',
+                joinError: errMsg,
+              });
+              continue;
+            }
             success += 1;
             const alreadyMember = result.result?.already_member === true;
+            const deviceName = String(result.result?.group_name ?? '').trim();
             groupOutcomes.push({
-              groupId: group.groupId,
-              groupName: group.groupName,
+              groupId: deviceId,
+              expectedGroupId: expectedGroupId || undefined,
+              groupName: deviceName || group.groupName,
               inviteLink: group.inviteLink,
               joinStatus: alreadyMember ? 'already_member' : 'joined',
             });
-            onProgress?.(i + 1, joinGroups.length, group.groupName ?? 'Joined');
+            onProgress?.(i + 1, joinGroups.length, deviceName || group.groupName || 'Joined');
           } else {
             const errMsg = result.message ?? 'failed';
             failed.push(`${group.groupName ?? group.groupId}: ${errMsg}`);
             groupOutcomes.push({
               groupId: group.groupId,
+              expectedGroupId: group.groupId.trim() || undefined,
               groupName: group.groupName,
               inviteLink: group.inviteLink,
               joinStatus: 'failed',

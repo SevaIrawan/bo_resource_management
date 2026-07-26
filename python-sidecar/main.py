@@ -133,6 +133,7 @@ class JoinInviteBody(BaseModel):
     joinSequenceIndex: int = 1
     sessionString: str | None = None
     expectedPhone: str | None = None
+    expectedGroupId: str | None = None
     delay: AutomationDelayBody | None = None
 
 class LeaveGroupBody(BaseModel):
@@ -281,6 +282,7 @@ async def telegram_automation_join_invite(session_id: str, body: JoinInviteBody)
         join_sequence_index=body.joinSequenceIndex,
         session_string=body.sessionString,
         expected_phone=body.expectedPhone,
+        expected_group_id=body.expectedGroupId,
         delay=_delay_dict(body.delay),
     )
 

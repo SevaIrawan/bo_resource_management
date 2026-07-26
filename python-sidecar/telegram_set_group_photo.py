@@ -9,7 +9,7 @@ from telethon.errors import FloodWaitError
 from telethon.tl.functions.channels import EditPhotoRequest
 from telethon.tl.types import InputChatUploadedPhoto
 
-from telegram_automation import _prepare_session, _resolve_group_entity
+from telegram_automation import _peer_group_id, _prepare_session, _resolve_group_entity
 from telegram_human_delay import (
     flood_wait_seconds,
     max_floodwait_auto_sleep,
@@ -62,7 +62,7 @@ async def run_set_group_photo(
         except Exception as exc:  # noqa: BLE001
             return _err(action, f"Cannot resolve group: {exc}", error_code="GROUP_NOT_FOUND")
 
-        gid = str(getattr(entity, "id", "") or group_id or "")
+        gid = _peer_group_id(entity) or str(group_id or "").strip()
 
         last_err: Exception | None = None
         for attempt in range(0, max_retry + 1):

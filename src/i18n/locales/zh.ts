@@ -208,6 +208,7 @@ export const zh: Messages = {
       exitRemarkDeleteRunning: '删除聊天进行中',
       exitRemarkDeletePartial: '删除聊天部分完成',
       createStatusCreated: '已创建',
+      createStatusFailed: '创建失败',
       adminStatusPromoted: '已设管理员',
       adminStatusFailed: '设管理员失败',
       createViewSetPhotoHint: '请上传或选择照片，然后点击 Queue 执行设头像任务。',

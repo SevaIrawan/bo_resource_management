@@ -375,12 +375,12 @@ export function GroupLinksModal({
                 </>
               ) : null}
             </div>
-            <div className="group-links-modal-footer-actions">
+            <div className="brand-modal-actions group-links-modal-footer-actions">
               {showPagination ? (
                 <>
                   <button
                     type="button"
-                    className="group-links-page-btn group-links-page-btn--icon"
+                    className="brand-modal-btn brand-modal-btn--ghost group-links-page-btn--icon"
                     disabled={currentPage <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     aria-label={t('groupMonitoring.groupLinks.prevPage')}
@@ -389,7 +389,7 @@ export function GroupLinksModal({
                   </button>
                   <button
                     type="button"
-                    className="group-links-page-btn group-links-page-btn--icon"
+                    className="brand-modal-btn brand-modal-btn--ghost group-links-page-btn--icon"
                     disabled={currentPage >= pageCount}
                     onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
                     aria-label={t('groupMonitoring.groupLinks.nextPage')}
@@ -400,17 +400,17 @@ export function GroupLinksModal({
               ) : null}
               <button
                 type="button"
-                className="group-links-export-btn"
+                className="brand-modal-btn brand-modal-btn--ghost"
                 onClick={handleExport}
                 disabled={links.length === 0}
               >
-                <Download className="h-3 w-3" strokeWidth={2} aria-hidden />
+                <Download className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                 {t('groupMonitoring.accountCard.export')}
               </button>
               {quickMode && quickLabel && onQuickAction ? (
                 <button
                   type="button"
-                  className="group-links-export-btn"
+                  className="brand-modal-btn brand-modal-btn--primary"
                   disabled={quickActionDisabled || links.length === 0}
                   onClick={() => onQuickAction(quickMode)}
                 >

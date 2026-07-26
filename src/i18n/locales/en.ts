@@ -218,6 +218,7 @@ export const en = {
       exitRemarkDeleteRunning: 'Delete chat in progress',
       exitRemarkDeletePartial: 'Delete chat partially done',
       createStatusCreated: 'Created',
+      createStatusFailed: 'Failed',
       adminStatusPromoted: 'Promoted',
       adminStatusFailed: 'Failed',
       createViewSetPhotoHint:

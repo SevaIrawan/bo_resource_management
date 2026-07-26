@@ -918,6 +918,7 @@ export async function runWhatsAppCreateGroupBatch(
         groupName?: string;
         inviteLink?: string;
         createStatus: 'created' | 'failed';
+        createError?: string;
       }> = [];
 
       onProgress(0, totalTarget, prefix);
@@ -940,9 +941,14 @@ export async function runWhatsAppCreateGroupBatch(
 
         const num = nextNum + i;
         const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
-        const batchIndex = created + 1;
+        const batchIndex = 1;
 
         onProgress(created, totalTarget, groupName);
+
+        if (i > 0) {
+          const betweenSec = payload.delay?.between_groups_sec ?? 90;
+          await sleep(jitterMs(betweenSec * 1000, payload.delay?.jitter_percent));
+        }
 
         let result: AutomationRunResult;
         try {
@@ -968,11 +974,13 @@ export async function runWhatsAppCreateGroupBatch(
           const detail = result.result ?? {};
           const groupId = String(detail.group_id ?? '').trim();
           if (!groupId) {
-            failed.push(`${groupName}: created but peer id unresolved`);
+            const createError = 'created but peer id unresolved';
+            failed.push(`${groupName}: ${createError}`);
             groupOutcomes.push({
               groupId: '',
               groupName,
               createStatus: 'failed',
+              createError,
             });
           } else {
             created += 1;
@@ -986,24 +994,31 @@ export async function runWhatsAppCreateGroupBatch(
             onProgress(created, totalTarget, groupName);
           }
         } else {
-          failed.push(`${groupName}: ${result.message ?? 'failed'}`);
+          const createError = result.message ?? 'failed';
+          failed.push(`${groupName}: ${createError}`);
           groupOutcomes.push({
             groupId: '',
             groupName,
             createStatus: 'failed',
+            createError,
           });
         }
         persistPartial();
       }
 
       return {
-        status: created > 0 ? 'ok' : 'error',
+        status: created >= totalTarget ? 'ok' : 'error',
         action: 'create_group',
         message:
           failed.length > 0
             ? `${created}/${totalTarget} created (${failed.length} failed)`
             : `${created}/${totalTarget} created`,
-        errorCode: created > 0 ? undefined : 'CREATE_GROUP_BATCH_FAILED',
+        errorCode:
+          created >= totalTarget
+            ? undefined
+            : created > 0
+              ? 'CREATE_GROUP_PARTIAL'
+              : 'CREATE_GROUP_BATCH_FAILED',
         result: { success: created, total: totalTarget, failed, groupOutcomes },
       };
     },
@@ -1110,10 +1125,15 @@ export async function runWhatsAppAutomation(
           }
         }
         return {
-          status: success > 0 ? 'ok' : 'error',
+          status: success >= joinGroups.length ? 'ok' : 'error',
           action: 'join_by_invite_link',
           message: `${success}/${joinGroups.length} joined`,
-          errorCode: success > 0 ? undefined : 'JOIN_BATCH_FAILED',
+          errorCode:
+            success >= joinGroups.length
+              ? undefined
+              : success > 0
+                ? 'JOIN_PARTIAL'
+                : 'JOIN_BATCH_FAILED',
           result: { success, total: joinGroups.length, failed, groupOutcomes },
         };
       },
@@ -1180,18 +1200,20 @@ export async function runWhatsAppAutomation(
             });
           }
           if (i < adminGroups.length - 1) {
-            const sec = randomBetweenSec(
-              payload.delay?.invite_delay_min_sec ?? 5,
-              payload.delay?.invite_delay_max_sec ?? 12,
-            );
-            await sleep(jitterMs(sec * 1000, payload.delay?.jitter_percent));
+            const betweenSec = payload.delay?.between_groups_sec ?? 60;
+            await sleep(jitterMs(betweenSec * 1000, payload.delay?.jitter_percent));
           }
         }
         return {
-          status: success > 0 ? 'ok' : 'error',
+          status: success >= adminGroups.length ? 'ok' : 'error',
           action: 'set_admin',
           message: `Promoted targets in ${success}/${adminGroups.length} groups`,
-          errorCode: success > 0 ? undefined : 'SET_ADMIN_BATCH_FAILED',
+          errorCode:
+            success >= adminGroups.length
+              ? undefined
+              : success > 0
+                ? 'SET_ADMIN_PARTIAL'
+                : 'SET_ADMIN_BATCH_FAILED',
           result: { success, total: adminGroups.length, failed, groupOutcomes },
         };
       },

@@ -34,16 +34,18 @@ async function postTelegramAutomation(
   sessionId: string,
   path: string,
   body: Record<string, unknown>,
-  options?: { retry?: boolean },
+  options?: { retry?: boolean; timeoutMs?: number },
 ): Promise<AutomationRunResult> {
   await ensureSidecarRunning();
+
+  const timeoutMs = Math.max(60_000, options?.timeoutMs ?? 600_000);
 
   const runOnce = async (): Promise<AutomationRunResult> => {
     const res = await fetch(`${SIDECAR_URL}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(600_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     const json = (await res.json()) as AutomationRunResult & { message?: string };
@@ -64,6 +66,32 @@ async function postTelegramAutomation(
   }
 
   return withNetworkRetry(`Telegram automation ${path}`, () => runOnce());
+}
+
+function formatSetAdminFailure(result: AutomationRunResult): string {
+  const detail = result.result ?? {};
+  const bits: string[] = [];
+  const skipped = Array.isArray(detail.skipped) ? detail.skipped : [];
+  const errors = Array.isArray(detail.errors) ? detail.errors : [];
+  for (const row of skipped) {
+    if (!row || typeof row !== 'object') continue;
+    const target = String((row as { target?: string }).target ?? '').trim();
+    const reason = String((row as { reason?: string }).reason ?? '').trim();
+    if (target || reason) bits.push(`${target || '?'}:${reason || 'skipped'}`);
+  }
+  for (const row of errors) {
+    if (!row || typeof row !== 'object') continue;
+    const target = String((row as { target?: string }).target ?? '').trim();
+    const error = String((row as { error?: string }).error ?? '').trim();
+    if (target || error) bits.push(`${target || '?'}:${error || 'error'}`);
+  }
+  if (bits.length) return bits.join('; ').slice(0, 400);
+  return result.message?.trim() || 'No targets promoted';
+}
+
+function batchResultStatus(success: number, total: number): 'ok' | 'error' {
+  if (total <= 0) return success > 0 ? 'ok' : 'error';
+  return success >= total ? 'ok' : 'error';
 }
 
 function humanizeTgJoinError(raw: string, link: string): string {
@@ -118,7 +146,7 @@ export async function runTelegramAutomation(
         hideChatHistory: payload.hideChatHistory === true,
         batchIndex: payload.batchIndex ?? 1,
       },
-      { retry: false },
+      { retry: false, timeoutMs: 20 * 60 * 1000 },
     );
   }
 
@@ -184,7 +212,7 @@ export async function runTelegramAutomation(
         });
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Done');
       } else {
-        const adminError = result.message ?? 'failed';
+        const adminError = formatSetAdminFailure(result);
         failed.push(`${group.groupName ?? group.groupId}: ${adminError}`);
         groupOutcomes.push({
           groupId: group.groupId,
@@ -197,10 +225,15 @@ export async function runTelegramAutomation(
       await sleepBetweenGroups(payload, i, groups.length);
     }
     return {
-      status: success > 0 ? 'ok' : 'error',
+      status: batchResultStatus(success, groups.length),
       action: 'set_admin',
       message: `Promoted targets in ${success}/${groups.length} groups`,
-      errorCode: success > 0 ? undefined : 'SET_ADMIN_BATCH_FAILED',
+      errorCode:
+        success >= groups.length
+          ? undefined
+          : success > 0
+            ? 'SET_ADMIN_PARTIAL'
+            : 'SET_ADMIN_BATCH_FAILED',
       result: { success, total: groups.length, failed, groupOutcomes },
     };
   }
@@ -240,6 +273,7 @@ export async function runTelegramAutomation(
       groupId: string;
       groupName?: string;
       photoStatus: 'set' | 'failed';
+      photoError?: string;
     }> = [];
 
     for (let i = 0; i < groups.length; i += 1) {
@@ -278,16 +312,22 @@ export async function runTelegramAutomation(
           groupId: group.groupId,
           groupName: group.groupName,
           photoStatus: 'failed',
+          photoError: result.message ?? 'failed',
         });
       }
       await sleepBetweenGroups(payload, i, groups.length);
     }
 
     return {
-      status: success > 0 ? 'ok' : 'error',
+      status: batchResultStatus(success, groups.length),
       action: 'set_group_photo',
       message: `Set photo ${success}/${groups.length} groups`,
-      errorCode: success > 0 ? undefined : 'SET_GROUP_PHOTO_BATCH_FAILED',
+      errorCode:
+        success >= groups.length
+          ? undefined
+          : success > 0
+            ? 'SET_GROUP_PHOTO_PARTIAL'
+            : 'SET_GROUP_PHOTO_BATCH_FAILED',
       result: { success, total: groups.length, failed, groupOutcomes },
     };
   }
@@ -434,10 +474,15 @@ export async function runTelegramAutomation(
         ? ` — ${failed.slice(0, 3).join('; ')}${failed.length > 3 ? ` (+${failed.length - 3} more)` : ''}`
         : '';
     return {
-      status: success > 0 ? 'ok' : 'error',
+      status: batchResultStatus(success, groups.length),
       action: 'leave_group',
       message: `${baseMessage}${detailSuffix}`,
-      errorCode: success > 0 ? undefined : 'LEAVE_GROUP_BATCH_FAILED',
+      errorCode:
+        success >= groups.length
+          ? undefined
+          : success > 0
+            ? 'LEAVE_GROUP_PARTIAL'
+            : 'LEAVE_GROUP_BATCH_FAILED',
       result: { success, total: groups.length, failed, groupOutcomes },
     };
   }
@@ -481,10 +526,15 @@ export async function runTelegramAutomation(
       await sleepBetweenGroups(payload, i, groups.length);
     }
     return {
-      status: success > 0 ? 'ok' : 'error',
+      status: batchResultStatus(success, groups.length),
       action: 'delete_group',
       message: `Deleted ${success}/${groups.length} groups`,
-      errorCode: success > 0 ? undefined : 'DELETE_GROUP_BATCH_FAILED',
+      errorCode:
+        success >= groups.length
+          ? undefined
+          : success > 0
+            ? 'DELETE_GROUP_PARTIAL'
+            : 'DELETE_GROUP_BATCH_FAILED',
       result: { success, total: groups.length, failed },
     };
   }
@@ -574,10 +624,15 @@ export async function runTelegramAutomation(
       }
     }
     return {
-      status: success > 0 ? 'ok' : 'error',
+      status: batchResultStatus(success, groups.length),
       action: 'join_by_invite_link',
       message: `${success}/${groups.length} joined`,
-      errorCode: success > 0 ? undefined : 'JOIN_BATCH_FAILED',
+      errorCode:
+        success >= groups.length
+          ? undefined
+          : success > 0
+            ? 'JOIN_PARTIAL'
+            : 'JOIN_BATCH_FAILED',
       result: { success, total: groups.length, failed, groupOutcomes },
     };
   }
@@ -618,6 +673,7 @@ export async function runTelegramCreateGroupBatch(
     groupName?: string;
     inviteLink?: string;
     createStatus: 'created' | 'failed';
+    createError?: string;
   }> = [];
   onProgress(0, totalTarget, prefix);
 
@@ -634,7 +690,7 @@ export async function runTelegramCreateGroupBatch(
     if (isJobStopRequested(payload.jobId)) {
       persistPartial();
       return {
-        status: created > 0 ? 'ok' : 'error',
+        status: batchResultStatus(created, totalTarget),
         action: 'create_group',
         message: 'Stopped by user',
         errorCode: 'JOB_STOPPED',
@@ -645,13 +701,18 @@ export async function runTelegramCreateGroupBatch(
     const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
     onProgress(created, totalTarget, groupName);
 
+    // Delay antar grup di Electron — jangan di dalam HTTP sidecar (timeout/orphan).
+    if (i > 0) {
+      await sleepBetweenGroups(payload, i - 1, totalTarget);
+    }
+
     let result: AutomationRunResult;
     try {
       result = await runTelegramAutomation({
         ...payload,
         action: 'create_group',
         groupName,
-        batchIndex: created + 1,
+        batchIndex: 1,
       });
     } catch (err) {
       // Jaringan putus setelah create di device — jangan retry create; catat failed item, lanjut batch.
@@ -669,11 +730,13 @@ export async function runTelegramCreateGroupBatch(
       const detail = result.result ?? {};
       const groupId = String(detail.group_id ?? '').trim();
       if (!groupId) {
-        failed.push(`${groupName}: created but peer id unresolved`);
+        const createError = 'created but peer id unresolved';
+        failed.push(`${groupName}: ${createError}`);
         groupOutcomes.push({
           groupId: '',
           groupName,
           createStatus: 'failed',
+          createError,
         });
       } else {
         created += 1;
@@ -686,24 +749,31 @@ export async function runTelegramCreateGroupBatch(
         onProgress(created, totalTarget, groupName);
       }
     } else {
-      failed.push(`${groupName}: ${result.message ?? 'failed'}`);
+      const createError = result.message ?? 'failed';
+      failed.push(`${groupName}: ${createError}`);
       groupOutcomes.push({
         groupId: '',
         groupName,
         createStatus: 'failed',
+        createError,
       });
     }
     persistPartial();
   }
 
   return {
-    status: created > 0 ? 'ok' : 'error',
+    status: batchResultStatus(created, totalTarget),
     action: 'create_group',
     message:
       failed.length > 0
         ? `${created}/${totalTarget} created (${failed.length} failed)`
         : `${created}/${totalTarget} created`,
-    errorCode: created > 0 ? undefined : 'CREATE_GROUP_BATCH_FAILED',
+    errorCode:
+      created >= totalTarget
+        ? undefined
+        : created > 0
+          ? 'CREATE_GROUP_PARTIAL'
+          : 'CREATE_GROUP_BATCH_FAILED',
     result: { success: created, total: totalTarget, failed, groupOutcomes },
   };
 }

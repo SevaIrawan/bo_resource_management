@@ -227,6 +227,7 @@ export async function runWaSetGroupPhoto(
         groupId: string;
         groupName?: string;
         photoStatus: 'set' | 'failed';
+        photoError?: string;
       }> = [];
 
       for (let i = 0; i < groups.length; i += 1) {
@@ -260,6 +261,7 @@ export async function runWaSetGroupPhoto(
               groupId: group.groupId,
               groupName: group.groupName,
               photoStatus: 'failed',
+              photoError: reason,
             });
           }
         } catch (error) {
@@ -271,15 +273,21 @@ export async function runWaSetGroupPhoto(
             groupId: group.groupId,
             groupName: group.groupName,
             photoStatus: 'failed',
+            photoError: message,
           });
         }
       }
 
       return {
-        status: success > 0 ? 'ok' : 'error',
+        status: success >= groups.length ? 'ok' : 'error',
         action: 'set_group_photo',
         message: `Set photo ${success}/${groups.length} group(s)`,
-        errorCode: success > 0 ? undefined : 'SET_GROUP_PHOTO_FAILED',
+        errorCode:
+          success >= groups.length
+            ? undefined
+            : success > 0
+              ? 'SET_GROUP_PHOTO_PARTIAL'
+              : 'SET_GROUP_PHOTO_FAILED',
         result: { success, total: groups.length, failed, groupOutcomes },
       };
     },

@@ -380,13 +380,13 @@ export function jobQueueViewTableColumnIds(
     return ['no', 'groupName', 'groupId', 'inviteLink', 'status', 'remark'];
   }
   if (job.action === 'create_group') {
-    return ['groupName', 'groupId', 'inviteLink', 'status'];
+    return ['groupName', 'groupId', 'inviteLink', 'status', 'remark'];
   }
   if (job.action === 'set_admin') {
-    return ['groupName', 'groupId', 'inviteLink', 'targetAdmin', 'status'];
+    return ['groupName', 'groupId', 'inviteLink', 'targetAdmin', 'status', 'remark'];
   }
   if (job.action === 'set_group_photo') {
-    return ['groupName', 'groupId', 'inviteLink', 'status'];
+    return ['groupName', 'groupId', 'inviteLink', 'status', 'remark'];
   }
   if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
     return ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
@@ -431,17 +431,23 @@ function resolveInviteLink(group: {
 }
 
 export function jobQueueCreateGroupResultColumnIds(): JobQueueViewTableColumnId[] {
-  return ['groupName', 'groupId', 'inviteLink'];
+  return ['groupName', 'groupId', 'inviteLink', 'status', 'remark'];
 }
 
 function resolveCreateGroupResultOutcomes(
   job: AutomationJobRecord,
 ): NonNullable<AutomationJobRecord['payload']['groupOutcomes']> {
   const outcomes = job.payload.groupOutcomes ?? [];
-  return outcomes.filter((row) => row.createStatus !== 'failed');
+  return outcomes.filter((row) => row.createStatus === 'created' && String(row.groupId ?? '').trim());
 }
 
-/** Tab Result create group — hanya grup created, tanpa kolom Status. */
+function resolveCreateGroupAllOutcomes(
+  job: AutomationJobRecord,
+): NonNullable<AutomationJobRecord['payload']['groupOutcomes']> {
+  return job.payload.groupOutcomes ?? [];
+}
+
+/** Tab Result create group — hanya grup created (untuk Queue Set Photo). */
 export function jobQueueCreateGroupResultTableRows(
   job: AutomationJobRecord,
 ): JobQueueViewTableRow[] {
@@ -533,21 +539,26 @@ export function jobQueueViewTableRows(
     return resolveJoinViewTableRows(job, t);
   }
   if (job.action === 'create_group') {
-    const createdOutcomes = resolveCreateGroupResultOutcomes(job);
+    const allOutcomes = resolveCreateGroupAllOutcomes(job);
 
-    if (createdOutcomes.length > 0) {
-      return createdOutcomes.map((row, index) => ({
-        key: row.groupId || String(index),
-        no: String(index + 1),
-        groupName: row.groupName?.trim() || row.groupId || '—',
-        groupId: row.groupId || '—',
-        inviteLink: resolveInviteLink(row),
-        targetJoin: '—',
-        targetAdmin: '—',
-        count: '—',
-        status: t('operations.jobQueue.createStatusCreated'),
-        remark: '',
-      }));
+    if (allOutcomes.length > 0) {
+      return allOutcomes.map((row, index) => {
+        const created = row.createStatus === 'created' && String(row.groupId ?? '').trim();
+        return {
+          key: row.groupId || `${row.groupName ?? 'row'}-${index}`,
+          no: String(index + 1),
+          groupName: row.groupName?.trim() || row.groupId || '—',
+          groupId: row.groupId || '—',
+          inviteLink: resolveInviteLink(row),
+          targetJoin: '—',
+          targetAdmin: '—',
+          count: '—',
+          status: created
+            ? t('operations.jobQueue.createStatusCreated')
+            : t('operations.jobQueue.createStatusFailed'),
+          remark: created ? '' : String((row as { createError?: string }).createError ?? ''),
+        };
+      });
     }
 
     const total = Math.max(1, Math.floor(Number(job.payload.totalToCreate) || 1));
@@ -682,7 +693,10 @@ export function jobQueueViewTableRows(
           : row.photoStatus === 'failed'
             ? t('operations.jobQueue.photoStatusFailed')
             : jobQueueViewRowStatusLabel(job, index, t),
-      remark: '',
+      remark:
+        row.photoStatus === 'failed'
+          ? String((row as { photoError?: string }).photoError ?? '')
+          : '',
     }));
   }
 

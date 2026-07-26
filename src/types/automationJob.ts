@@ -77,11 +77,13 @@ export interface AutomationJobPayload {
     inviteLink?: string;
     groupLink?: string;
     createStatus?: 'created' | 'failed';
+    createError?: string;
     joinStatus?: 'joined' | 'already_member' | 'failed';
     joinError?: string;
     adminStatus?: 'promoted' | 'failed';
     adminError?: string;
     photoStatus?: 'set' | 'failed';
+    photoError?: string;
     exitStatus?: 'left' | 'failed' | 'pending';
     exitError?: string;
     deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';

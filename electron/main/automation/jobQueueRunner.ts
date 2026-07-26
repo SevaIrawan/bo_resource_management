@@ -106,6 +106,9 @@ function humanizeJobError(raw: string): string {
   if (msg.length <= 3 || /^r(:\s*r)?$/i.test(msg)) {
     return 'WhatsApp store flake (getChatById) — retry the job';
   }
+  if (msg === 'PARTIAL_BATCH') {
+    return 'Partial batch — not all groups succeeded';
+  }
   return msg;
 }
 
@@ -480,26 +483,30 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
     const isExitLeave =
       job.action === 'leave_group' && job.payload.exitDeletePhase === 'exit';
 
-    if (result.status === 'ok') {
-      // Partial batch (create/join/admin/…) tetap completed jika device ada yang sukses.
-      // success === 0 + status ok tidak diharapkan; tetap completed dengan message.
+    /** Partial batch (create/join/admin/photo/…) jangan Completed hijau — harus Failed + X/Y. */
+    const isPartialBatch = total > 0 && success < total;
+    const finishCompleted = result.status === 'ok' && !isPartialBatch;
+
+    const successMessage =
+      job.action === 'join_by_invite_link'
+        ? `Success ${success} group(s)`
+        : job.action === 'set_admin'
+          ? `Success ${success}/${total} group(s)`
+          : job.action === 'leave_group'
+            ? isExitLeave
+              ? `Left ${success}/${total} group(s)`
+              : `Success ${success} group(s)`
+            : job.action === 'delete_group'
+              ? `Deleted ${success}/${total} group(s)`
+              : job.action === 'set_group_photo'
+                ? `Set photo ${success}/${total} group(s)`
+                : job.action === 'exit_delete_group'
+                  ? `Exited ${success} group(s)`
+                  : message;
+
+    if (finishCompleted) {
       markJobFinished(job.id, 'completed', {
-        message:
-          job.action === 'join_by_invite_link'
-            ? `Success ${success} group(s)`
-            : job.action === 'set_admin'
-              ? `Success ${success} group(s)`
-              : job.action === 'leave_group'
-                ? isExitLeave
-                  ? `Left ${success}/${total} group(s)`
-                  : `Success ${success} group(s)`
-                : job.action === 'delete_group'
-                  ? `Deleted ${success}/${total} group(s)`
-                  : job.action === 'set_group_photo'
-                    ? `Set photo ${success}/${total} group(s)`
-                    : job.action === 'exit_delete_group'
-                      ? `Exited ${success} group(s)`
-                      : message,
+        message: successMessage,
         batchSuccess: success,
         ...outcomeExtras,
       });
@@ -510,9 +517,12 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
     }
 
     markJobFinished(job.id, 'failed', {
-      message,
+      message: successMessage,
       batchSuccess: success,
-      error: humanizeJobError(result.errorCode ?? message ?? 'AUTOMATION_ERROR'),
+      error: humanizeJobError(
+        result.errorCode ??
+          (isPartialBatch ? 'PARTIAL_BATCH' : message ?? 'AUTOMATION_ERROR'),
+      ),
       ...outcomeExtras,
     });
     tryAutoEnqueueSetPhotoAfterCreate(job);

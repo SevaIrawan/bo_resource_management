@@ -45,6 +45,8 @@
   --layout-gap: 1.25rem;
   /** Tinggi standar control UI (search Enter, select, modal btn, toggle). */
   --control-height: 2rem;
+  /** Pasangan tombol aksi modal (Export + CTA) — lebar sama, compact. */
+  --brand-modal-action-width: 9.25rem;
   --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
@@ -3616,29 +3618,32 @@
     justify-content: flex-end;
     gap: 0.375rem;
     flex-shrink: 0;
+    flex-wrap: nowrap;
+    padding-top: 0;
   }
 
-  .group-links-modal-footer-actions .group-links-export-btn,
-  .group-links-modal-footer-actions .group-links-page-btn {
+  .group-links-modal-footer-actions .brand-modal-btn {
     height: var(--control-height);
     min-height: var(--control-height);
-    padding-block: 0;
-    padding-inline: 0.75rem;
-    font-family: var(--font-sans);
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1;
-    box-sizing: border-box;
+    max-height: var(--control-height);
+    white-space: nowrap;
   }
 
-  /* Export + CTA metrik: lebar sama (teks terpanjang = Join missing / Set admin / Leave). */
-  .group-links-modal-footer-actions .group-links-export-btn {
-    width: 5.5rem;
-    min-width: 5.5rem;
-    max-width: 5.5rem;
+  /* Export + CTA — ukuran sama dengan standar pasangan brand-modal. */
+  .group-links-modal-footer-actions .brand-modal-btn:not(.group-links-page-btn--icon) {
+    width: var(--brand-modal-action-width);
+    min-width: var(--brand-modal-action-width);
+    max-width: var(--brand-modal-action-width);
+    padding-inline: 0.5rem;
   }
 
   .group-links-modal-footer-actions .group-links-page-btn--icon {
+    width: var(--control-height);
+    min-width: var(--control-height);
+    max-width: var(--control-height);
+    height: var(--control-height);
+    min-height: var(--control-height);
+    max-height: var(--control-height);
     padding-inline: 0;
   }
 
@@ -4864,8 +4869,9 @@
   .brand-modal-panel.brand-modal-panel--job-queue-detail
     .brand-modal-actions:has(> .brand-modal-btn:nth-child(2):last-child)
     .brand-modal-btn {
-    width: 9.25rem;
-    max-width: 9.25rem;
+    width: var(--brand-modal-action-width);
+    min-width: var(--brand-modal-action-width);
+    max-width: var(--brand-modal-action-width);
   }
 
   .brand-modal-panel--job-queue-create-view .brand-modal-header {
@@ -5002,8 +5008,9 @@
   .brand-modal-panel.brand-modal-panel--job-queue-detail.brand-modal-panel--job-queue-create-view
     .brand-modal-actions:has(> .brand-modal-btn:nth-child(2):last-child)
     .brand-modal-btn {
-    width: 5.75rem;
-    max-width: 5.75rem;
+    width: var(--brand-modal-action-width);
+    min-width: var(--brand-modal-action-width);
+    max-width: var(--brand-modal-action-width);
   }
 
   .brand-modal-panel.brand-modal-panel--job-queue-detail.brand-modal-panel--job-queue-create-view
@@ -5014,8 +5021,9 @@
   }
 
   .brand-modal-actions--split .brand-modal-btn {
-    width: 5.75rem;
-    max-width: 5.75rem;
+    width: var(--brand-modal-action-width);
+    min-width: var(--brand-modal-action-width);
+    max-width: var(--brand-modal-action-width);
   }
 
   .operations-job-queue-form-note--warn {
@@ -6159,26 +6167,27 @@
 
   .brand-modal-actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
     align-items: center;
     gap: 0.375rem;
     padding-top: 0.25rem;
   }
 
-  /* Dua tombol — lebar sama, compact, rata kanan (bukan stretch full footer) */
+  /* Pasangan tombol — lebar & tinggi sama (compact). */
   .brand-modal-actions:has(> .brand-modal-btn:nth-child(2):last-child) .brand-modal-btn {
     flex: 0 0 auto;
-    width: 5.75rem;
-    max-width: 5.75rem;
-    padding-inline: 0.4375rem;
+    width: var(--brand-modal-action-width);
+    min-width: var(--brand-modal-action-width);
+    max-width: var(--brand-modal-action-width);
+    padding-inline: 0.5rem;
   }
 
   .brand-modal-actions:has(> .brand-modal-btn:only-child) .brand-modal-btn {
     flex: 0 0 auto;
-    width: auto;
-    min-width: 6.5rem;
-    max-width: none;
+    width: var(--brand-modal-action-width);
+    min-width: var(--brand-modal-action-width);
+    max-width: var(--brand-modal-action-width);
   }
 
   .brand-modal-btn {
@@ -6189,17 +6198,26 @@
     box-sizing: border-box;
     height: var(--control-height);
     min-height: var(--control-height);
+    max-height: var(--control-height);
     border-radius: 0.375rem;
-    padding: 0 0.75rem;
+    padding: 0 0.5rem;
+    font-family: var(--font-sans);
     font-size: 0.75rem;
     font-weight: 600;
     line-height: 1;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     cursor: pointer;
     transition:
       background-color 160ms ease,
       border-color 160ms ease,
       color 160ms ease;
+  }
+
+  .brand-modal-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   .brand-modal-btn--ghost {
@@ -6208,7 +6226,7 @@
     color: var(--color-text-secondary);
   }
 
-  .brand-modal-btn--ghost:hover {
+  .brand-modal-btn--ghost:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.06);
     color: var(--color-text-primary);
   }
@@ -6219,7 +6237,7 @@
     color: #fff;
   }
 
-  .brand-modal-btn--primary:hover {
+  .brand-modal-btn--primary:hover:not(:disabled) {
     background: #20bd5a;
   }
 

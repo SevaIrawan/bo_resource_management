@@ -2,7 +2,7 @@ import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSide
 import { withNetworkRetry } from '../lib/networkRetry';
 import { resolveBrandPhotoWithFallback } from '../brandGroupPhoto';
 import { resolveJoinGroups, resolveLeaveDeleteGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
-import { peekJobStopRequest } from './jobQueueStore';
+import { attachJobGroupOutcomes, peekJobStopRequest } from './jobQueueStore';
 import type { AutomationRunPayload, AutomationRunResult, AutomationProgressCallback } from './types';
 import {
   createGroupBatchUsesNumbering,
@@ -34,10 +34,11 @@ async function postTelegramAutomation(
   sessionId: string,
   path: string,
   body: Record<string, unknown>,
+  options?: { retry?: boolean },
 ): Promise<AutomationRunResult> {
   await ensureSidecarRunning();
 
-  return withNetworkRetry(`Telegram automation ${path}`, async () => {
+  const runOnce = async (): Promise<AutomationRunResult> => {
     const res = await fetch(`${SIDECAR_URL}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,7 +56,14 @@ async function postTelegramAutomation(
       };
     }
     return json;
-  });
+  };
+
+  // Create group TIDAK idempotent — retry POST setelah sidecar sukses → duplikat nama di device.
+  if (options?.retry === false) {
+    return runOnce();
+  }
+
+  return withNetworkRetry(`Telegram automation ${path}`, () => runOnce());
 }
 
 function humanizeTgJoinError(raw: string, link: string): string {
@@ -100,13 +108,18 @@ export async function runTelegramAutomation(
         errorCode: 'INVALID_PAYLOAD',
       };
     }
-    return postTelegramAutomation(payload.sessionId, `/telegram/automation/create-group/${sid}`, {
-      ...base,
-      groupName: payload.groupName.trim(),
-      description: payload.description ?? '',
-      hideChatHistory: payload.hideChatHistory === true,
-      batchIndex: payload.batchIndex ?? 1,
-    });
+    return postTelegramAutomation(
+      payload.sessionId,
+      `/telegram/automation/create-group/${sid}`,
+      {
+        ...base,
+        groupName: payload.groupName.trim(),
+        description: payload.description ?? '',
+        hideChatHistory: payload.hideChatHistory === true,
+        batchIndex: payload.batchIndex ?? 1,
+      },
+      { retry: false },
+    );
   }
 
   if (payload.action === 'set_admin') {
@@ -588,8 +601,18 @@ export async function runTelegramCreateGroupBatch(
   }> = [];
   onProgress(0, totalTarget, prefix);
 
+  const persistPartial = () => {
+    if (!payload.jobId) return;
+    attachJobGroupOutcomes(payload.jobId, {
+      groupOutcomes: [...groupOutcomes],
+      progressCurrent: created,
+      message: `${created}/${totalTarget} created`,
+    });
+  };
+
   for (let i = 0; i < totalTarget; i += 1) {
     if (isJobStopRequested(payload.jobId)) {
+      persistPartial();
       return {
         status: created > 0 ? 'ok' : 'error',
         action: 'create_group',
@@ -602,12 +625,25 @@ export async function runTelegramCreateGroupBatch(
     const groupName = resolveCreateBatchGroupName(prefix, num, totalTarget, useNumbering);
     onProgress(created, totalTarget, groupName);
 
-    const result = await runTelegramAutomation({
-      ...payload,
-      action: 'create_group',
-      groupName,
-      batchIndex: created + 1,
-    });
+    let result: AutomationRunResult;
+    try {
+      result = await runTelegramAutomation({
+        ...payload,
+        action: 'create_group',
+        groupName,
+        batchIndex: created + 1,
+      });
+    } catch (err) {
+      // Jaringan putus setelah create di device — jangan retry create; catat failed item, lanjut batch.
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[tg-automation] create "${groupName}" threw (no retry):`, msg);
+      result = {
+        status: 'error',
+        action: 'create_group',
+        message: msg,
+        errorCode: 'CREATE_GROUP_TRANSPORT',
+      };
+    }
 
     if (result.status === 'ok') {
       created += 1;
@@ -627,6 +663,7 @@ export async function runTelegramCreateGroupBatch(
         createStatus: 'failed',
       });
     }
+    persistPartial();
   }
 
   return {

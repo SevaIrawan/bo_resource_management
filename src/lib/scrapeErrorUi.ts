@@ -10,6 +10,11 @@ import {
 export type ScrapeErrorModalCode =
   | 'SCRAPER_CANCELLED'
   | 'SCRAPER_WA_DISCONNECTED'
+  | 'SCRAPER_WA_CONNECT_FAILED'
+  | 'SCRAPER_WA_SESSION_UNLINKED'
+  | 'SCRAPER_TG_CONNECT_FAILED'
+  | 'SCRAPER_INCOMPLETE'
+  | 'SCRAPER_TRUNCATED_CAP'
   | 'SCRAPER_CONNECTION_LOST'
   | 'SCRAPER_NETWORK_ERROR'
   | 'SCRAPER_IDLE_STUCK'
@@ -18,6 +23,10 @@ export type ScrapeErrorModalCode =
 
 export const SCRAPE_CONNECTION_MODAL_CODES: ReadonlySet<ScrapeErrorModalCode> = new Set([
   'SCRAPER_WA_DISCONNECTED',
+  'SCRAPER_WA_CONNECT_FAILED',
+  'SCRAPER_TG_CONNECT_FAILED',
+  'SCRAPER_INCOMPLETE',
+  'SCRAPER_TRUNCATED_CAP',
   'SCRAPER_CONNECTION_LOST',
   'SCRAPER_NETWORK_ERROR',
   'SCRAPER_IDLE_STUCK',
@@ -34,11 +43,11 @@ export function isScrapeConnectionModalCode(
   );
 }
 
-/** Bersihkan bungkus IPC Electron `Error invoking remote method 'scraper:run'`. */
+/** Bersihkan bungkus IPC Electron `Error invoking remote method 'scraper:run'|'scraper:run-auto'`. */
 export function normalizeScrapeErrorMessage(message: string): string {
   const trimmed = message.trim();
   const invokeMatch = trimmed.match(
-    /Error invoking remote method 'scraper:run':\s*(?:Error:\s*)?([\s\S]+)/i,
+    /Error invoking remote method 'scraper:run(?:-auto)?':\s*(?:Error:\s*)?([\s\S]+)/i,
   );
   if (invokeMatch?.[1]) return invokeMatch[1].trim();
   return trimmed;
@@ -75,18 +84,87 @@ export function isDeviceSessionDeadMessage(message: string | undefined): boolean
 
 export function scrapeFailureNeedsLoginModal(message: string): boolean {
   if (isDeviceBusyMessage(message)) return false;
+  if (isWaChromeConnectFailedMessage(message)) return false;
+  if (isTgSidecarConnectFailedMessage(message)) return false;
   const lower = normalizeScrapeErrorMessage(message).toLowerCase();
 
   return (
+    lower === 'scraper_wa_session_unlinked' ||
+    lower.startsWith('scraper_wa_session_unlinked') ||
     lower.includes('wa_not_connected') ||
     lower.includes('auth_failure') ||
+    lower === 'logout' ||
+    lower.includes('logout') ||
     lower.includes('logged out') ||
     lower.includes('log out') ||
+    lower.includes('unpaired') ||
     lower.includes('unlink') ||
     lower.includes('session invalid') ||
     lower.includes('device_not_connected') ||
+    lower.includes('login session not found') ||
+    lower.includes('complete login first') ||
+    (lower.includes('log in first') && !lower.includes('session_warm_pending')) ||
+    lower.includes('session is not authorized') ||
     (lower.includes('wa_client_not_ready') && lower.includes('lost'))
   );
+}
+
+/**
+ * Sidecar TG / fetch ke localhost gagal atau AbortSignal timeout —
+ * bukan logout akun; coba lagi / restart app.
+ */
+export function isTgSidecarConnectFailedMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  const normalized = normalizeScrapeErrorMessage(message);
+  const lower = normalized.toLowerCase();
+  if (lower === 'scraper_tg_connect_failed' || lower.startsWith('scraper_tg_connect_failed')) {
+    return true;
+  }
+  if (lower.includes('typeerror') && lower.includes('fetch failed')) return true;
+  if (lower === 'fetch failed' || lower.includes('fetch failed')) return true;
+  if (lower.includes('failed to fetch')) return true;
+  if (lower.includes('econnrefused') || lower.includes('econnreset')) return true;
+  if (lower.includes('operation was aborted due to timeout')) return true;
+  if (lower.startsWith('timeouterror') || lower.includes('timeouterror:')) return true;
+  if (lower.includes('aborted due to timeout')) return true;
+  if (lower.includes('telegram scrape http')) return true;
+  if (lower.includes('failed to restore telegram session')) return true;
+  if (lower.includes('failed to export telegram session')) return true;
+  if (lower.includes('sidecar') && (lower.includes('fail') || lower.includes('timeout'))) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Chrome/WA Web gagal connect/retry setelah session sudah Valid —
+ * bukan unlink di HP; bukan suruh scan QR.
+ */
+export function isWaChromeConnectFailedMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  const normalized = normalizeScrapeErrorMessage(message);
+  const lower = normalized.toLowerCase();
+  if (lower === 'scraper_wa_connect_failed' || lower.startsWith('scraper_wa_connect_failed')) {
+    return true;
+  }
+  if (lower.includes('whatsapp session timed out') && lower.includes('linked devices')) {
+    return true;
+  }
+  if (lower.includes('session timed out') && lower.includes('qr or phone')) {
+    return true;
+  }
+  if (lower.includes('wa session check failed')) return true;
+  if (lower.includes('browser is already running')) return true;
+  if (lower.includes('still starting from a previous attempt')) return true;
+  if (lower.includes('failed to launch') && lower.includes('chrome')) return true;
+  if (lower.includes('failed to launch the browser')) return true;
+  if (lower.includes('callfunctionon timed out') || lower.includes('protocolerror')) {
+    return true;
+  }
+  if (lower.includes('detached frame') || lower.includes('execution context was destroyed')) {
+    return true;
+  }
+  return false;
 }
 
 /** Hanya batal eksplisit operator — bukan putus koneksi browser/WA. */
@@ -165,6 +243,35 @@ export function resolveScrapeErrorModalCode(message: string): ScrapeErrorModalCo
 
   if (isScrapeUserCancelledMessage(normalized)) return 'SCRAPER_CANCELLED';
 
+  if (
+    lower === 'scraper_wa_session_unlinked' ||
+    lower.startsWith('scraper_wa_session_unlinked') ||
+    lower === 'logout' ||
+    lower === 'unpaired'
+  ) {
+    return 'SCRAPER_WA_SESSION_UNLINKED';
+  }
+
+  if (isTgSidecarConnectFailedMessage(normalized)) return 'SCRAPER_TG_CONNECT_FAILED';
+
+  if (isWaChromeConnectFailedMessage(normalized)) return 'SCRAPER_WA_CONNECT_FAILED';
+
+  if (
+    lower.startsWith('scraper_incomplete') ||
+    lower.includes('wa_store_undercount') ||
+    lower.includes('inbox not fully synced')
+  ) {
+    return 'SCRAPER_INCOMPLETE';
+  }
+
+  if (
+    lower.startsWith('scraper_truncated_cap') ||
+    lower.includes('truncated_6000') ||
+    /truncated_\d+/.test(lower)
+  ) {
+    return 'SCRAPER_TRUNCATED_CAP';
+  }
+
   if (lower.startsWith('scraper_idle_stuck') || isScrapeIdleStuckMessage(normalized)) {
     return 'SCRAPER_IDLE_STUCK';
   }
@@ -190,16 +297,26 @@ export function resolveScrapeErrorModalCode(message: string): ScrapeErrorModalCo
   return null;
 }
 
-/**
- * Teks modal scrape — pesan asli dari engine/IPC (fakta), bukan paragraf generik hardcode.
- * Hanya rapikan prefix internal; jangan ganti dengan template.
- */
+/** Teks modal — jangan tampilkan LOGOUT mentah; kode pendek → i18n. */
 export function formatScrapeErrorForModal(message: string): string {
   const normalized = normalizeScrapeErrorMessage(message).trim();
   if (!normalized) return '';
 
   if (normalized.startsWith('SCRAPER_IDLE_STUCK:')) {
     return normalized.slice('SCRAPER_IDLE_STUCK:'.length).trim();
+  }
+  if (normalized.startsWith('SCRAPER_INCOMPLETE:')) {
+    return normalized.slice('SCRAPER_INCOMPLETE:'.length).trim();
+  }
+
+  const upper = normalized.toUpperCase();
+  if (
+    upper === 'LOGOUT' ||
+    upper === 'LOG OUT' ||
+    upper === 'UNPAIRED' ||
+    upper === 'SCRAPER_WA_SESSION_UNLINKED'
+  ) {
+    return 'SCRAPER_WA_SESSION_UNLINKED';
   }
 
   return normalized;
@@ -216,15 +333,38 @@ export function resolveScrapeAlertMessage(
   t: (key: string, vars?: Record<string, string | number>) => string,
   platform?: Platform,
 ): string {
+  const mapped = resolveScrapeErrorModalCode(code);
+  if (mapped) {
+    return resolveScrapeAlertMessageForCode(mapped, t, platform);
+  }
+
   const factual = formatScrapeErrorForModal(code);
   if (factual && !isScrapeErrorCodeOnly(factual)) {
     return factual;
   }
 
+  return resolveScrapeAlertMessageForCode(code as ScrapeErrorModalCode, t, platform);
+}
+
+function resolveScrapeAlertMessageForCode(
+  code: ScrapeErrorModalCode | string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  platform?: Platform,
+): string {
   const platformName =
     platform === 'whatsapp' ? 'WhatsApp' : platform === 'telegram' ? 'Telegram' : '';
 
   switch (code as ScrapeErrorModalCode) {
+    case 'SCRAPER_WA_CONNECT_FAILED':
+      return t('groupMonitoring.sync.scraperWaConnectFailed');
+    case 'SCRAPER_TG_CONNECT_FAILED':
+      return t('groupMonitoring.sync.scraperTgConnectFailed');
+    case 'SCRAPER_WA_SESSION_UNLINKED':
+      return t('groupMonitoring.sync.scraperWaSessionUnlinked');
+    case 'SCRAPER_INCOMPLETE':
+      return t('groupMonitoring.sync.scraperIncomplete');
+    case 'SCRAPER_TRUNCATED_CAP':
+      return t('groupMonitoring.sync.scraperTruncatedCap');
     case 'SCRAPER_WA_DISCONNECTED':
       return platform === 'telegram'
         ? t('groupMonitoring.sync.scraperConnectionLostTg')
@@ -260,15 +400,15 @@ export function resolveSyncFlowAlertMessage(
 ): string {
   if (!code) return '';
 
-  const factual = formatScrapeErrorForModal(code);
-  if (factual && !isScrapeErrorCodeOnly(factual)) {
-    return factual;
-  }
-
   const modalCode =
     resolveScrapeErrorModalCode(code) ?? (isScrapeConnectionModalCode(code) ? code : null);
   if (modalCode) {
     return resolveScrapeAlertMessage(modalCode, t, platform);
+  }
+
+  const factual = formatScrapeErrorForModal(code);
+  if (factual && !isScrapeErrorCodeOnly(factual)) {
+    return factual;
   }
 
   if (code === 'SUPABASE_NOT_CONFIGURED') {

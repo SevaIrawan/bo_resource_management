@@ -1,5 +1,7 @@
 import type { Client } from 'whatsapp-web.js';
 import { DEVICE_GROUP_TARGET_MAX, WA_STORE_GROUP_LIST_CAP } from './deviceGroupScale';
+import { touchScrapeWatchdog } from './scrapeWatchdog';
+import { emitScrapeProgress } from './scrapeProgress';
 
 const WA_STORE_WAIT_MS = 120_000;
 const WA_STORE_POLL_MS = 250;
@@ -77,31 +79,78 @@ export async function countWhatsAppGroupsOnDevice(
     const getters = window.require('WAWebContactGetters');
     let total = 0;
     for (const chat of chats) {
-      const isGroup = getters.getIsGroup(chat) || Boolean(chat.groupMetadata);
+      const serialized = String(
+        chat?.id?._serialized ?? (typeof chat?.id === 'string' ? chat.id : '') ?? '',
+      );
+      const isGroup =
+        (typeof getters.getIsGroup === 'function' && getters.getIsGroup(chat)) ||
+        Boolean(chat.groupMetadata) ||
+        serialized.endsWith('@g.us');
       if (isGroup) total += 1;
     }
     return total;
   });
 }
 
-/** Setelah cold-boot — tunggu jumlah grup di store stabil (WA Web selesai sync inbox). */
+/** Setelah cold-boot — tunggu jumlah grup di store stabil (WA Web selesai sync inbox).
+ *  Kontrak akun besar (1900–6000): count 0 bukan siap; naik terus = belum siap;
+ *  baru scrape setelah count > 0 dan tidak naik selama N round (N naik ikut ukuran akun).
+ */
 export async function waitForWhatsAppInboxStable(
   client: Client,
-  options?: { maxMs?: number; pollMs?: number; stableRounds?: number },
-): Promise<void> {
+  options?: {
+    maxMs?: number;
+    pollMs?: number;
+    stableRounds?: number;
+    sessionId?: string;
+    /** Minimal grup yang harus muncul sebelum dianggap sync mulai (default 1). */
+    minGroups?: number;
+  },
+): Promise<number> {
   assertWhatsAppScrapeClient(client);
   const maxMs = options?.maxMs ?? 120_000;
   const pollMs = options?.pollMs ?? 5_000;
-  const stableRounds = options?.stableRounds ?? 2;
+  const minGroups = Math.max(1, options?.minGroups ?? 1);
+  const sessionId = options?.sessionId;
   const deadline = Date.now() + maxMs;
   let lastCount = -1;
   let stable = 0;
+  let peakCount = 0;
 
   while (Date.now() < deadline) {
     const count = await countWhatsAppGroupsOnDevice(client);
-    if (count === lastCount) {
+    peakCount = Math.max(peakCount, count);
+    const needRounds =
+      options?.stableRounds ??
+      (count >= 2000 ? 8 : count >= 500 ? 6 : count >= 100 ? 4 : 3);
+
+    if (sessionId) {
+      touchScrapeWatchdog(sessionId);
+      emitScrapeProgress({
+        sessionId,
+        phase: 'connect',
+        label: `Waiting for inbox sync (${count} groups so far · peak ${peakCount})…`,
+      });
+    }
+
+    // Count 0 = belum sync. Count naik = masih sync. Hanya stabil + count>0 = siap.
+    if (count >= minGroups && count === lastCount) {
       stable += 1;
-      if (stable >= stableRounds) return;
+      if (stable >= needRounds) {
+        // Konfirmasi ekstra untuk akun besar — 1 poll lagi supaya grup terlambat ikut masuk.
+        if (count >= 500) {
+          await new Promise<void>((resolve) => setTimeout(resolve, pollMs));
+          const confirm = await countWhatsAppGroupsOnDevice(client);
+          peakCount = Math.max(peakCount, confirm);
+          if (confirm > count) {
+            stable = 0;
+            lastCount = confirm;
+            continue;
+          }
+          return Math.max(count, confirm);
+        }
+        return count;
+      }
     } else {
       stable = 0;
       lastCount = count;
@@ -110,6 +159,25 @@ export async function waitForWhatsAppInboxStable(
       setTimeout(resolve, pollMs);
     });
   }
+
+  const finalCount = await countWhatsAppGroupsOnDevice(client).catch(() =>
+    Math.max(lastCount, peakCount),
+  );
+  peakCount = Math.max(peakCount, finalCount);
+
+  if (finalCount >= minGroups) {
+    // Jangan scrape kalau peak jauh lebih tinggi dari final (store mundur / belum lengkap).
+    if (peakCount > 50 && finalCount < Math.floor(peakCount * 0.85)) {
+      throw new Error(
+        `SCRAPER_INCOMPLETE: WhatsApp inbox unstable before scrape (final=${finalCount}, peak=${peakCount}). Wait a few minutes, then Scrape Now again.`,
+      );
+    }
+    return finalCount;
+  }
+
+  throw new Error(
+    `SCRAPER_INCOMPLETE: WhatsApp inbox still empty after sync wait (last count=${finalCount}, peak=${peakCount}). Wait a few minutes, then Scrape Now again.`,
+  );
 }
 
 /** Daftar JID grup dari store WA Web — tanpa `client.getChats()`. */
@@ -125,9 +193,14 @@ export async function listWhatsAppGroupIds(
     const getters = window.require('WAWebContactGetters');
     const out: string[] = [];
     for (const chat of chats) {
-      const isGroup = getters.getIsGroup(chat) || Boolean(chat.groupMetadata);
+      const serialized = String(
+        chat?.id?._serialized ?? (typeof chat?.id === 'string' ? chat.id : '') ?? '',
+      ).trim();
+      const isGroup =
+        (typeof getters.getIsGroup === 'function' && getters.getIsGroup(chat)) ||
+        Boolean(chat.groupMetadata) ||
+        serialized.endsWith('@g.us');
       if (!isGroup) continue;
-      const serialized = chat.id?._serialized;
       if (serialized) out.push(serialized);
     }
     return out;

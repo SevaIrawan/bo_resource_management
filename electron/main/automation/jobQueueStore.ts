@@ -550,9 +550,9 @@ export function getAutomationJobStatus(jobId: string): AutomationJobStatus | nul
   return jobs.find((row) => row.id === jobId)?.status ?? null;
 }
 
-/** Jobs stuck in running (browser hang) — fail so queue can continue. */
-export function failStaleRunningJobs(maxAgeMs: number): number {
-  let failed = 0;
+/** Jobs stuck in running (browser hang) — fail so queue can continue. Keep outcomes. */
+export function failStaleRunningJobs(maxAgeMs: number): AutomationJobRecord[] {
+  const failedJobs: AutomationJobRecord[] = [];
   touchImmediate(() => {
     for (const job of jobs) {
       if (job.status !== 'running' || !job.startedAt) continue;
@@ -562,12 +562,30 @@ export function failStaleRunningJobs(maxAgeMs: number): number {
       job.status = 'failed';
       job.finishedAt = new Date().toISOString();
       job.error = 'JOB_STALE_TIMEOUT';
-      job.message = 'Job exceeded maximum runtime — cancelled automatically';
+      const created =
+        job.action === 'create_group'
+          ? countCreatedGroupOutcomes(job.payload.groupOutcomes)
+          : 0;
+      job.message =
+        created > 0
+          ? `${created} group(s) created before stale timeout`
+          : 'Job exceeded maximum runtime — cancelled automatically';
+      if (created > 0) {
+        const total = Math.max(
+          1,
+          job.progress?.total ?? Math.floor(Number(job.payload.totalToCreate) || 1),
+        );
+        job.progress = {
+          current: Math.min(created, total),
+          total,
+          label: job.progress?.label ?? job.payload.groupNamePrefix ?? job.payload.groupName,
+        };
+      }
       markSessionSettleAfterJob(job.sessionId);
-      failed += 1;
+      failedJobs.push({ ...job, payload: { ...job.payload } });
     }
   });
-  return failed;
+  return failedJobs;
 }
 
 export function updateJobProgress(

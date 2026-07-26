@@ -40,8 +40,8 @@ function reloginCodeForAccount(
 }
 
 /**
- * Sync / Run: DB valid → probe (Sync=light, Scrape=strict) → lanjut / login.
- * Sync tidak pernah surface busy/timeout sebagai blocker (session tersimpan = Valid).
+ * Sync / Scrape: DB valid → probe langsung ke device → lanjut / busy / login.
+ * Valid hanya jika device menjawab linked — bukan disk / tebak session tersimpan.
  */
 export async function checkUserActionDeviceSession(input: {
   sessionId: string;
@@ -77,13 +77,6 @@ export async function checkUserActionDeviceSession(input: {
   }
 
   if (!gate.shouldInvalidate) {
-    if (input.mode === 'sync') {
-      const hasStored = await hasStoredPlatformSession(input.dbAccountId, input.platform);
-      if (hasStored) {
-        await markPlatformSessionSynced(input.dbAccountId);
-        return { ok: true };
-      }
-    }
     return {
       ok: false,
       kind: 'device_busy',

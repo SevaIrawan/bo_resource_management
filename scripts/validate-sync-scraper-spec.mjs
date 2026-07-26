@@ -18,11 +18,11 @@ const syncFlowService = read('src/services/syncFlowService.ts');
 
 const specChecks = [
   ['group + admin disebut di spec', /group.*admin|admin.*group/i.test(spec)],
-  ['resume-empty untuk 0 grup', /resume-empty|0 grup/i.test(spec)],
+  ['Session UI → Scrape Now | Later setelah device Valid', /Scrape Now \| Later|SESSION UI/i.test(spec)],
   ['Now/Later bila ada data scrape', /Now.*Later|Scraper Now/i.test(spec)],
   ['WA auto-regenerate QR', /WA.*auto|auto-regenerate|qrUpdated/i.test(spec)],
   ['TG error tanpa auto-loop', /TG.*error|Telegram.*error/i.test(spec) && /auto-loop|refresh manual/i.test(spec)],
-  ['probe device meski grid valid', /meski.*valid|grid masih/i.test(spec)],
+  ['probe device gagal meski grid Valid → Login', /meski.*[Vv]alid|grid masih/i.test(spec)],
   ['sync pending tampil —', /pending.*—|sync_state/i.test(spec)],
   ['timestamp tanpa (Terbaru)', /timestamp|MATCH/i.test(spec) && !/\(Terbaru\)/.test(spec)],
   ['satu engine grid/modal group link', /accountMasterDailyCompare|fetchAccountGroupLinks/i.test(spec)],
@@ -36,16 +36,16 @@ const implChecks = [
       syncFlow.includes('resolvePostLoginModalStep'),
   },
   {
-    name: 'postSyncModalStep resume-empty vs scrape-prompt',
+    name: 'postSyncModalStep selalu scrape-prompt setelah device Valid (kontrak Session UI)',
     ok:
-      uiFlow.includes('shouldShowResumeOnlyEmpty') &&
+      uiFlow.includes("return 'scrape-prompt'") &&
       syncFlow.includes('resolvePostLoginModalStep'),
   },
   {
-    name: 'resume-empty hanya jika daily hari ini + semua count 0',
+    name: 'Sync Valid = Check Session ke device (bukan disk-only)',
     ok:
-      uiFlow.includes('if (!input.hasDailyToday) return false') &&
-      syncFlowService.includes('sync valid = probe session saja'),
+      syncFlowService.includes('Check Session langsung ke device') ||
+      syncFlowService.includes('checkDeviceSessionForValidColumn'),
   },
   {
     name: 'RUN intent scraper auto-scrape tanpa prompt',

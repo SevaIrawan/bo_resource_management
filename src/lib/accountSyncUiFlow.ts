@@ -12,13 +12,8 @@ export function isRowMisaligned(result: AccountSyncResult): boolean {
 }
 
 /**
- * Popup resume-empty (OK saja) — hanya bila ada **bukti** semua sumber = 0.
- *
- * Sync valid (GM) = probe session saja, **tidak** baca jumlah grup di HP.
- * Tanpa daily hari ini → tidak boleh resume-empty (grup di device belum diverifikasi).
- *
- * Now/Later jika: daily hari ini ada, atau Y/X grid > 0, atau master brand X > 0,
- * atau belum ada daily (user boleh scrape untuk baca device).
+ * Legacy helper — tidak dipakai `postSyncModalStep` (selalu Now|Later).
+ * Tetap ada untuk audit/tes historis; jangan pakai untuk routing Sync baru.
  */
 export function shouldShowResumeOnlyEmpty(input: {
   result: AccountSyncResult;
@@ -34,10 +29,15 @@ export function shouldShowResumeOnlyEmpty(input: {
 
 export type PostSyncModalStep = 'scrape-prompt' | 'resume-empty';
 
-export function postSyncModalStep(input: {
+/**
+ * Setelah Check Session device Valid → selalu Scrape Now | Later (kontrak Session UI).
+ * `resume-empty` tidak dipakai.
+ */
+export function postSyncModalStep(_input: {
   result: AccountSyncResult;
   deviceGroupCount: number;
   hasDailyToday: boolean;
 }): PostSyncModalStep {
-  return shouldShowResumeOnlyEmpty(input) ? 'resume-empty' : 'scrape-prompt';
+  void _input;
+  return 'scrape-prompt';
 }

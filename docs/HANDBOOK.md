@@ -120,14 +120,12 @@ Angka berubah sesuai tab aktif.
 |-----|------|
 | Brands | Jumlah brand card |
 | Accounts | Jumlah akun terisi |
-| Online | Akun dengan session **VALID** |
-| Aligned | Akun sudah sync & selaras dengan standar |
-| Issue | Akun **not aligned** |
-| Open issues | Ringkasan mismatch grup/admin (engine sama dengan kolom Groups/Admin) |
+| Online | Akun dengan session **Active** |
+| Aligned | Akun Remark **Aligned** (tanpa gap Junk/Missing/Not admin) |
 
-**Tab Operations (Job Queue):** antrian task per akun — join → create→photo → set_admin → leave→delete. SETUP modal create group (batch + permission per job); VIEW hasil create → tab Set Photo. **v1.0.31:** batch besar auto-split 30 grup per job; VIEW join status/remark per grup. Execute slots max **10**/platform; auto scrape brands max **6**.
+**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. **v1.0.31:** batch besar auto-split 30 grup per job; VIEW join status/remark per grup. Execute slots max **10**/platform; auto scrape brands max **6**.
 
-> Tidak ada tab Ticket / Reporting di shell. Issue = KPI Account + grid (engine in-memory). Matrix = modal dari badge grup.
+> Tidak ada tab Ticket / Reporting di shell. Issue = KPI Account + gap kolom + Remark. Matrix = modal dari badge grup.
 
 ---
 
@@ -141,7 +139,7 @@ Angka berubah sesuai tab aktif.
 | **Search** | Di samping kotak | Tombol cari (Enter juga bisa) |
 | **Filter Brand** | Kanan | Tampilkan satu brand atau **All brands** |
 | **Filter Platform** | Kanan | WhatsApp / Telegram / All |
-| **Filter Status** | Kanan | Active / Logout / All |
+| **Filter Status** | Kanan | Session Active / Logout **atau** Status Aligned / Not Aligned (ikuti slicer UI) |
 | **Card view / Table view** | Kanan | Tampilan kartu per brand atau satu tabel gabungan |
 | **Export (ikon unduh)** | Kanan | Excel semua akun yang **lolos filter** |
 
@@ -156,7 +154,9 @@ Setiap brand (mis. **Brand : SBMY**) punya satu kartu.
 | **Panah** | Lipat / buka tabel akun |
 | **Judul brand** | Nama brand |
 | **Badge jumlah akun** | Total akun di card ini |
-| **WA x std / TG x std** | Jumlah grup **standar** master per platform |
+| **WA n Group / TG n Group** (klik) | Buka **Group matrix** |
+| **Avg ND** / **To prep** | Meta stock; To prep klikable hanya jika **> 1** |
+| Chips **Ready** / **Recycle** / **Review** | Klik → daftar grup bucket |
 | **All aligned** / **N accounts not aligned** | Ringkasan kesehatan data |
 | **+Add** | Tambah akun baru (pilih WA atau TG) |
 | **X (Dismiss)** | Hapus brand dari database (modal konfirmasi) — bukan sekadar sembunyikan UI |
@@ -176,42 +176,41 @@ Setiap brand (mis. **Brand : SBMY**) punya satu kartu.
 | Kolom | Arti | Cara baca |
 |-------|------|-----------|
 | **Account** | Platform + nama + nomor | Ikon WA/TG, nama, nomor di bawah |
-| **Role** | Peran akun di brand | Label role operasi |
+| **Role** | Master / GCS | Create group butuh **Master** |
 | **Location** | Label lokasi device | Bukan nama brand card |
-| **Session** | **VALID** / **INVALID** | INVALID = harus login platform dulu; **X (hover)** saat Valid = **Clear Session** |
-| **On device** | Angka tunggal | Total grup di HP/PC (daily) |
-| **Junk** | Angka | Grup di device di luar master |
-| **In brand** | `y/x` | Grup master brand yang sudah join di akun ini / total master |
-| **Admin** | Bar + `a/X` | Berapa grup Anda admin vs standar |
-| **Last update** | Waktu / progress scrape | Read-only — scrape via **Sync → Scrape now** (bukan tombol Run) |
-| **Action** | **Group link** | Buka daftar grup + link invite |
+| **Session** | **Active** / **Logout** | Logout = Sync + QR; **X (hover)** saat Active = **Clear Session** |
+| **On device** | Angka | Total grup di HP (klik jika > 0 → list On Device) |
+| **Junk** | Angka gap | Di luar master (klik → list + **Leave**) |
+| **Missing** | Angka gap | Belum join master (klik → list + **Join missing**) |
+| **Not admin** | Angka gap | Sudah join belum admin (klik → list + **Set admin**) |
+| **Last update** | Waktu / progress scrape | Read-only — scrape via **Sync → Scrape now** |
+| **Remark** | Aligned / Not Aligned | Atau Cancel scrape saat scrape jalan |
 
 ### 4.4 Tombol & ikon di baris akun
 
 | Kontrol | Fungsi |
 |---------|--------|
-| **↻ (Sync)** | Cek session device (timeout ~20 detik) + update angka; busy → alert, bukan modal login |
+| **↻ (Sync)** | Cek session device (timeout ~20 detik) + pintu Scrape now/Later; busy → alert, bukan modal login |
 | **X (hover, kanan nama)** | **Remove from slot** — hapus akun dari slot + rebuild master brand (konfirmasi modal) |
-| **X (hover, kolom Session, hanya Valid)** | **Clear Session** — logout di PC ini + database; Sync berikutnya buka QR bersih |
-| **Group link** | Modal daftar grup — mode daily 7 kolom atau admin vs master — perlu data scrape |
+| **X (hover, kolom Session, hanya Active)** | **Clear Session** — logout di PC ini + database; Sync berikutnya buka QR bersih |
+| Klik angka gap | Buka daftar grup (On Device / Not in Master / Missing / Not admin) — **bukan** tombol Group link |
 
 ### 4.5 Alur **Sync (↻)** — sangat penting
 
 Sync mengikuti nilai kolom **Session**:
 
-#### Session = **INVALID**
+#### Session = **Logout**
 
 1. Klik **↻**
 2. Modal login terbuka (QR default, atau login nomor HP)
 3. Scan QR di HP marketing (WA: Linked devices; TG: Link Desktop Device)
-4. Setelah sukses: session tersimpan, angka grup diperbarui
-5. Mungkin muncul prompt **Scrape now / Later** untuk simpan daftar grup lengkap ke DB
+4. Setelah sukses: session **Active**, mungkin prompt **Scrape now / Later**
 
-#### Session = **VALID**
+#### Session = **Active**
 
 1. Klik **↻**
 2. App mengecek apakah WA/TG masih aktif di device **PC ini**
-3. Jika OK: angka On device / In brand / Admin diperbarui
+3. Jika OK: lanjut (prompt scrape bila perlu)
 4. Jika gagal: diminta login ulang
 
 > **Catatan:** Login platform hanya lewat desktop app (bukan browser web saja).
@@ -220,32 +219,24 @@ Sync mengikuti nilai kolom **Session**:
 
 | Kondisi | Tampilan | Tindakan |
 |---------|----------|----------|
-| Session invalid | “Use Sync (↻) to log in first” | Sync dulu |
+| Session Logout | “Use Sync (↻) to log in first” | Sync dulu |
 | Standby | Waktu **last update** | Scrape penuh lewat **Sync → Scrape now** bila perlu |
-| Sedang jalan | Progress / “Reading groups…” + **Cancel scrape** | Tunggu (bisa beberapa menit untuk banyak grup) |
+| Sedang jalan | Progress / “Reading groups…” + **Cancel scrape** di Remark | Tunggu (bisa beberapa menit untuk banyak grup) |
 
-**Scrape penuh** = baca semua grup ke DB (**Scrape now** atau auto-scrape Settings). **Sync** = cek session + hitung ringkas. **Tidak ada tombol Run** di kolom ini.
+**Scrape penuh** = baca semua grup ke DB (**Scrape now** atau auto-scrape Settings). **Sync** = cek session + pintu scrape. **Tidak ada tombol Run** di kolom ini.
 
-### 4.7 Modal **Group link**
+### 4.7 Daftar grup dari kolom Account
 
-Buka dari **Action → Group link**. Pilih mode:
+Buka dengan **klik angka** kolom (bukan tombol Group link):
 
-| Mode | Isi daftar |
-|------|------------|
-| **Groups on this account** | Semua grup di device akun (Y) — hasil scrape daily |
-| **Admin vs master list** | Hanya grup **master brand** (X) + status admin dari akun ini |
+| Daftar | Cara buka |
+|--------|-----------|
+| **On Device** | Klik **On device** (jika > 0) |
+| **Not in Master** | Klik **Junk** (jika > 0) |
+| **Missing** | Klik **Missing** (jika > 0) |
+| **Not admin** | Klik **Not admin** (jika > 0) |
 
-| Fitur | Fungsi |
-|-------|--------|
-| Tabel grup (mode daily) | No, Group Name, Group ID, Member Count, Admin Count, Is Admin, Invite Link |
-| Export Excel | `RM-[nama akun]-YYYYMMDD.xlsx` |
-| Filter Admin | All / hanya admin / non-admin |
-| Pagination | Navigasi halaman jika grup banyak |
-
-Total di mode **Admin vs master** sama dengan denominator kolom In brand/Admin (`y/x`) dan badge **WA x Group** di header card — junk device ada di mode **Junk groups** (Group link), bukan di master list.
-
-Kosong? **Sync** → **Scrape now** dulu.
-
+Dari list gap: tombol **Join missing** / **Set admin** / **Leave** membuka SETUP Job Queue. Kosong? **Sync** → **Scrape now** dulu.
 ### 4.8 Lepas akun dari slot (Remove)
 
 1. Arahkan mouse ke baris akun → ikon **X**
@@ -277,7 +268,7 @@ Tombol di modal: tutup, ganti QR/phone, lanjut setelah kode.
 
 ## 5. Issue grup & admin (in-memory)
 
-> **Tidak ada tab Ticket.** Issue dihitung in-memory (`accountMasterDailyCompare` → `computeAccountTicketBreakdown`); lihat badge **not aligned**, kolom **In brand** / **Admin** / **Junk**, KPI Account, dan **Group matrix**.
+> **Tidak ada tab Ticket.** Issue dihitung in-memory (`accountMasterDailyCompare` → `computeAccountTicketBreakdown`); lihat badge **not aligned**, kolom **Junk** / **Missing** / **Not admin**, **Remark**, KPI Account, dan **Group matrix**.
 
 ### 5.1 Jenis selisih (5 tipe saja)
 
@@ -295,9 +286,9 @@ Tidak ada `group_count_mismatch`. Login/logout session **tidak** membuat issue. 
 
 | Selisih | Lihat di | Tindakan |
 |---------|----------|----------|
-| Missing group | In brand `y/x` kurang | Join / Job Queue Join missing |
-| Not admin | Admin `a/x` kurang | Job Queue Set admin |
-| Junk device | Kolom Junk / Group link → Junk | Exit job / manual |
+| Missing group | Kolom **Missing** | Klik → **Join missing** → Queue |
+| Not admin | Kolom **Not admin** | Klik → **Set admin** → Queue |
+| Junk device | Kolom **Junk** | Klik → **Leave** → Queue |
 | Duplikat ID/nama | Modal master brand / Group matrix | Audit master |
 
 ### 5.3 Setelah perbaikan
@@ -383,7 +374,7 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 
 **WhatsApp multi-PC:** Session WA tidak pindah antar PC. Serah akun ke operator lain → **Clear Session** di PC lama (opsional) → operator baru **Sync** + scan QR di PC-nya.
 
-**Telegram multi-PC:** Session string tersimpan di cloud — PC lain bisa Sync/scrape selama badge masih **Valid**. Serah akun ke operator lain → **Clear Session** (wajib) supaya mereka scan QR sendiri.
+**Telegram multi-PC:** Session string tersimpan di cloud — PC lain bisa Sync/scrape selama Session masih **Active**. Serah akun ke operator lain → **Clear Session** (wajib) supaya mereka scan QR sendiri.
 
 ---
 
@@ -396,14 +387,14 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 3. **+Add** → pilih WA/TG → nama + nomor marketing
 4. Klik **↻ Sync** → scan QR di HP marketing
 5. Jika diminta → **Scrape now**
-6. Cek **not aligned** / Group link / Group matrix
+6. Cek Remark **Not Aligned** / gap kolom / Group matrix
 7. Ulangi untuk setiap akun
 
 ### 9.2 Pemeriksaan rutin
 
 1. Tab **Account** — filter brand/platform
 2. Perhatikan **not aligned** di header brand
-3. **Sync** akun yang Session INVALID
+3. **Sync** akun yang Session **Logout**
 4. **Sync → Scrape now** pada akun yang perlu refresh data penuh
 5. Pantau Job Queue **Failed**
 
@@ -423,9 +414,10 @@ Hanya lewat **versi baru** (auto-update + **Restart**). Lihat [PROJECT.md §4.4]
 | **Account / slot** | Satu baris akun WA atau TG di bawah brand |
 | **Master / std** | Daftar grup standar brand (`groups_master`) |
 | **Daily** | Snapshot grup dari device hari ini |
-| **Aligned** | Device & master sudah cocok untuk platform itu |
-| **Session VALID** | Ada session aktif di database (belum tentu dicek device hari ini) |
-| **Sync** | Tombol ↻ — login atau cek device |
+| **Aligned** | Remark Aligned — tanpa gap Junk/Missing/Not admin |
+| **Session Active** | Session terhubung di PC ini (label UI; bukan “Valid”) |
+| **Session Logout** | Belum login / putus — Sync + QR |
+| **Sync** | Tombol ↻ — login atau cek device + pintu Scrape now |
 | **Scrape / Last update** | Baca semua grup dari HP → simpan DB (via Sync → Scrape now); kolom read-only |
 | **Issue / selisih** | Perbedaan daily vs master (in-memory; bukan tab Ticket) |
 | **Slicer** | Bar filter & tools di atas tabel/kartu |
@@ -440,17 +432,17 @@ Tidak. Restart saja setelah notifikasi update (jika IT sudah publish ke GitHub).
 **Apakah hapus data di Supabase menghapus installer?**  
 Tidak. Hanya data di dashboard.
 
-**Kenapa Session VALID tapi scrape minta login?**  
+**Kenapa Session Active tapi scrape minta login?**  
 Device di PC ini mungkin sudah logout — klik Sync untuk cek ulang, atau **Clear Session** lalu Sync lagi.
 
 **Kenapa QR error "still starting from previous attempt"?**  
-Session WA stuck di PC ini — tunggu beberapa detik, atau **Clear Session** (X di kolom Session saat Valid) lalu Sync.
+Session WA stuck di PC ini — tunggu beberapa detik, atau **Clear Session** (X di kolom Session saat Active) lalu Sync.
 
 **Operator lain tidak bisa Sync akun yang saya login?**  
 Normal untuk WA — auth ada di PC Anda. Clear Session + mereka scan QR di PC mereka.
 
-**Kenapa In brand 12/21?**  
-12 grup terdeteksi di device; 21 = standar brand untuk platform itu (WA terpisah dari TG).
+**Kenapa Missing / Not admin / Junk > 0?**  
+Gap daily vs master. Klik angka kolom → perbaiki lewat Join missing / Set admin / Leave → lalu **Sync → Scrape now**.
 
 **Bisakah satu PC untuk banyak akun WA?**  
 Ya, sampai ratusan akun — tapi scan QR per akun; execute slots max **10** Chrome user bersamaan per platform (+ auto scrape max **6**).
@@ -472,12 +464,12 @@ IT — cek API Telegram & migrasi database `023`.
 Login
   └─ Group Monitoring
         ├─ [Tab Account]
-        │     ├─ KPI (issue summary, in-memory)
+        │     ├─ KPI (Brands / Accounts / Online / Aligned)
         │     ├─ Filter / Search / Export / Card|Table
-        │     ├─ Stock chips (header brand)
-        │     └─ Per Brand Card → Sync | Scrape via Sync | Group link | Group matrix badge
+        │     ├─ Stock chips Ready/Recycle/Review (header brand)
+        │     └─ Per Brand Card → Sync | Scrape via Sync | klik gap | Group matrix badge
         └─ [Tab Operations]
-              └─ Job Queue — join, create→photo, set admin, leave→delete
+              └─ Job Queue — Join missing, Create group, Set admin, Leave group
   └─ Settings (/settings; /admin → /settings)
         ├─ Automatic account scrape (Scheduled + Scrape Now)
         ├─ Worker settings (defaults) + Language

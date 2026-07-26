@@ -90,9 +90,29 @@ async def _create_client() -> TelegramClient:
     return client
 
 
+async def _ensure_client_connected(client: TelegramClient) -> None:
+    """Reconnect jika drop setelah scrape panjang — hindari 'Cannot send request while disconnected'."""
+    try:
+        if client.is_connected():
+            return
+    except Exception:  # noqa: BLE001
+        pass
+    await asyncio.wait_for(client.connect(), timeout=30)
+
+
+async def _force_reconnect(client: TelegramClient) -> None:
+    """Socket sering 'hidup' palsu setelah scrape panjang — putus dulu lalu connect ulang."""
+    try:
+        await client.disconnect()
+    except Exception:  # noqa: BLE001
+        pass
+    await asyncio.wait_for(client.connect(), timeout=30)
+
+
 async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]:
     """Pastikan session masih valid di server Telegram (bukan cache lokal saja)."""
     try:
+        await _ensure_client_connected(client)
         me = await asyncio.wait_for(client.get_me(), timeout=20)
         if me is None:
             return False, "Telegram session is not valid. Link device again."
@@ -100,7 +120,20 @@ async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]
     except SessionPasswordNeededError:
         return False, "2FA"
     except Exception as exc:  # noqa: BLE001
-        return False, str(exc) or "Telegram session expired. Link device again."
+        msg = str(exc) or "Telegram session expired. Link device again."
+        lower = msg.lower()
+        if "disconnected" in lower or "not connected" in lower or "connection" in lower:
+            try:
+                await _force_reconnect(client)
+                me = await asyncio.wait_for(client.get_me(), timeout=20)
+                if me is None:
+                    return False, "Telegram session is not valid. Link device again."
+                return True, None
+            except SessionPasswordNeededError:
+                return False, "2FA"
+            except Exception as retry_exc:  # noqa: BLE001
+                return False, str(retry_exc) or msg
+        return False, msg
 
 
 async def _apply_login_ready(session: TgLoginSession) -> None:
@@ -401,25 +434,55 @@ async def export_telegram_session(session_id: str) -> dict:
 
 
 async def _export_telegram_session_locked(session_id: str) -> dict:
+    """
+    Export StringSession dari memori.
+    Setelah scrape panjang socket sering drop — reconnect best-effort, tapi
+    serialize session TIDAK bergantung get_me (auth key sudah di StringSession).
+    """
     session = SESSIONS.get(session_id)
     if not session:
         return {"status": "error", "message": "Login session not found. Scan QR again."}
 
-    ok, err = await _verify_client_live(session.client)
-    if not ok:
+    live_ok = False
+    live_err: str | None = None
+    try:
+        await _ensure_client_connected(session.client)
+        live_ok, live_err = await _verify_client_live(session.client)
+        if not live_ok and live_err:
+            lower = live_err.lower()
+            if "disconnected" in lower or "not connected" in lower or "connection" in lower:
+                await _force_reconnect(session.client)
+                live_ok, live_err = await _verify_client_live(session.client)
+    except Exception as exc:  # noqa: BLE001
+        live_ok = False
+        live_err = str(exc) or "Telegram reconnect failed"
+
+    try:
+        session_string = session.client.session.save()
+    except Exception as exc:  # noqa: BLE001
         session.status = "error"
-        session.error = err
+        session.error = str(exc) or live_err or "Failed to serialize Telegram session"
         return {
             "status": "error",
-            "message": err or "Login session not ready",
+            "message": session.error,
         }
 
+    if not session_string or not str(session_string).strip():
+        session.status = "error"
+        session.error = live_err or "Empty Telegram session string"
+        return {
+            "status": "error",
+            "message": session.error,
+        }
+
+    # StringSession lokal valid → export OK meski get_me gagal (finishing scrape).
     session.status = "ready"
-    session_string = session.client.session.save()
+    session.error = None
     return {
         "status": "ok",
-        "sessionString": session_string,
+        "sessionString": str(session_string).strip(),
         "loginMethod": session.mode,
+        **({"warn": live_err} if not live_ok and live_err else {}),
     }
 
 async def restore_telegram_session(session_id: str, session_string: str) -> dict:

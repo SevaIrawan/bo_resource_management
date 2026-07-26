@@ -48,7 +48,7 @@ Dokumen ini melengkapi (bukan mengganti):
 3. [Brand Card & slot akun](#3-brand-card--slot-akun)
 4. [Grid 10 kolom — tampilan & data](#4-grid-10-kolom--tampilan--data)
 5. [Clear Session](#5-clear-session)
-6. [Kolom Action — state machine](#6-kolom-action--state-machine)
+6. [Kolom Remark — state machine](#6-kolom-remark--state-machine)
 7. [Metrik Y/X (Groups & Admin)](#7-metrik-yx-groups--admin)
 8. [Alur Sync (tombol ↻)](#8-alur-sync-tombol-)
 9. [Alur Scrape (Sync → Scrape Now)](#9-alur-scrape-sync--scrape-now)
@@ -162,8 +162,8 @@ Satu **Brand Card** = satu brand bisnis (`AccountBrandGroup`).
 Definisi kolom: `AccountMonitoringTableParts.tsx` (`ACCOUNT_TABLE_COLUMN_COUNT = 10`)
 
 ```
-Card: | Account | Role | Location | Session | On device | Junk | In brand | Admin | Last update | Action |
-Flat: | Account | Brand | Role | Location | Session | On device | Junk | In brand | Admin | Action |
+Card: | Account | Role | Location | Session | On device | Junk | Missing | Not admin | Last update | Remark |
+Flat: | Account | Brand | Role | Location | Session | On device | Junk | Missing | Not admin | Remark |
 ```
 
 (Flat/Table view **tanpa** Last update.)
@@ -189,9 +189,9 @@ Type baris: `AccountBrandRow` di `types/accountMonitoringUi.ts`
 
 | Kolom | Catatan |
 |-------|---------|
-| **Role** | Peran akun di brand |
+| **Role** | Master / GCS |
 | **Location** | Label lokasi device |
-| **Session** | VALID / INVALID; Clear Session (X) saat Valid — lihat [§5](#5-clear-session) |
+| **Session** | Label UI **Active** / **Logout** (`sessionStatus` valid/invalid di kode); Clear Session (X) saat Active — lihat [§5](#5-clear-session) |
 
 Badge Active/Logout mengikuti session saat hydrate (`loadAccountMonitoring.ts`).
 
@@ -199,12 +199,12 @@ Badge Active/Logout mengikuti session saat hydrate (`loadAccountMonitoring.ts`).
 
 | Situasi | Kolom Session |
 |---------|---------------|
-| INVALID + Sync → modal login | Tetap badge **INVALID** (bukan Checking Session) |
-| VALID + Sync → probe device | **Checking Session** (timeout **20s**, retry busy — `deviceSessionGate.ts`) |
+| Logout + Sync → modal login | Tetap badge **Logout** (bukan Checking Session) |
+| Active + Sync → probe device | **Checking Session** (timeout **20s**, retry busy — `deviceSessionGate.ts`) |
 | Device busy (Chrome/scrape lain) | Alert **SESSION_CHECK_BUSY** — **bukan** modal login |
 | Resolve session / scrape | **`messaging_accounts.id` baris grid** — `accountSessionResolve.ts`, `accountDbId.ts` |
 | Tutup modal login (X / backdrop) | **Tidak berubah** — scan dibatalkan |
-| Login sukses | Langsung **VALID** (via `applyResult`) |
+| Login sukses | Langsung **Active** (via `applyResult`) |
 
 Spesifikasi: `sessionColumnFlowSpec.ts`, `useAccountSyncFlow.ts` → `showLoginModal`
 
@@ -213,19 +213,19 @@ Spesifikasi: `sessionColumnFlowSpec.ts`, `useAccountSyncFlow.ts` → `showLoginM
 | Aturan | Detail |
 |--------|--------|
 | Tampil | Hanya saat `sessionStatus === 'valid'`, hover baris atau kolom Session |
-| Aksi | `clearAccountSession.ts` → cancel scrape/count → purge → invalidate → patch UI Invalid |
+| Aksi | `clearAccountSession.ts` → cancel scrape/count → purge → invalidate → patch UI Logout |
 | Setelah clear | Sync → routing `open_login` (modal QR bersih) |
 
-### 4.4–4.8 Metrik: On device, Junk, In brand, Admin
+### 4.4–4.8 Metrik: On device, Junk, Missing, Not admin
 
-| Kolom | Field / arti |
-|-------|--------------|
-| **On device** | `groupsCurrent` — total grup daily |
-| **Junk** | Grup daily di luar master |
-| **In brand** | `joinedInMaster` / `groupsTotal` (`y/x`) |
-| **Admin** | `adminCurrent` / `adminTotal` + progress bar |
+| Kolom | Field / arti (UI) |
+|-------|-------------------|
+| **On device** | `groupsCurrent` — total grup daily (klik → list On Device) |
+| **Junk** | Gap daily di luar master (klik → list + Leave) |
+| **Missing** | Gap master belum join (klik → list + Join missing) |
+| **Not admin** | Gap sudah join belum admin (klik → list + Set admin) |
 
-Engine: `accountMonitoringEngine.ts`, `accountMasterDailyCompare.ts`, `accountDisplayMetrics.ts`
+Engine: `accountMonitoringEngine.ts`, `accountMasterDailyCompare.ts`, `accountGapMetrics.ts`, `accountDisplayMetrics.ts`
 
 ### 4.9 Kolom Last update (read-only — bukan Run)
 
@@ -233,7 +233,7 @@ Prioritas tampilan (`ScraperColumnCell` / Last update cell):
 
 | # | Kondisi | Tampilan |
 |---|---------|----------|
-| 1 | Session invalid / logout | *Use Sync (↻) to log in first* |
+| 1 | Session logout | *Use Sync (↻) to log in first* |
 | 2 | Scrape berjalan | Progress bar + marquee |
 | 3 | Ada `lastSyncAt` | Timestamp saja |
 | 4 | Pending | `—` |
@@ -243,9 +243,9 @@ Prioritas tampilan (`ScraperColumnCell` / Last update cell):
 Progress: IPC `scraper:progress` → `useAccountSyncFlow` → `resolveScrapeBarDisplay`  
 Spec: `logic_sync_scraper.txt`
 
-### 4.10 Kolom Action
+### 4.10 Kolom Remark (header `colAction`)
 
-Lihat [§6](#6-kolom-action--state-machine) — logic terpusat di `accountActionColumn.ts`
+Lihat [§6](#6-kolom-remark--state-machine) — logic terpusat di `accountActionColumn.ts`
 
 ---
 
@@ -271,30 +271,34 @@ Lihat [§6](#6-kolom-action--state-machine) — logic terpusat di `accountAction
 
 ---
 
-## 6. Kolom Action — state machine
+## 6. Kolom Remark — state machine
 
-Resolver: `resolveAccountActionColumn(row)` — **prioritas dari atas ke bawah**
+Resolver: 
+esolveAccountActionColumn(row) — **prioritas dari atas ke bawah**
 
-| Prioritas | Kind | Tampilan | Kondisi |
-|-----------|------|----------|---------|
-| 1 | `cancel-scrape` | Tombol **Cancel scrape** | `actionProcess === 'scraper'` |
-| 2 | `proc-sync` / `proc-scraper` | **PROC SYNC** / **PROC SCRAPER** | `actionProcess === 'sync'` atau `session_check` |
-| 3 | `none` | Kosong | `groupsCurrent === 0` atau `groupsTotal === 0` |
-| 4 | `group-link` | Tombol **Group link** | `groupsCurrent > 0 && groupsTotal > 0` |
+| Prioritas | Kind | Tampilan UI | Kondisi |
+|-----------|------|-------------|---------|
+| 1 | cancel-scrape | Tombol **Cancel scrape** | ctionProcess === 'scraper' |
+| 2 | proc-sync | **PROC SYNC** | ctionProcess === 'sync' / session_check |
+| 3 | 
+one | Kosong | Belum ada data scrape+master (groupsCurrent/groupsTotal ≤ 0) |
+| 4 | ligned | **Aligned** | Gap Junk/Missing/Not admin bersih |
+| 5 | 
+ot-aligned | **Not Aligned** | Ada gap |
 
-**Slot kosong:** tombol **Add account** di `AccountEmptySlotRow`
+**Slot kosong:** tombol **Add account** di AccountEmptySlotRow
 
-### 6.1 Group link → modal
+### 6.1 Daftar grup dari klik kolom (bukan tombol Group link)
 
-1. Klik **Group link**
-2. `GroupLinksPickerModal` — mode daily 7 kolom / admin vs master / junk
-3. Export Excel → `RM-[nama akun]-YYYYMMDD.xlsx`
+1. Klik angka **On device** / **Junk** / **Missing** / **Not admin** (jika > 0)
+2. GroupLinksModal — mode ccount / junk / missing / 
+otAdmin
+3. Dari list gap: tombol cepat Join missing / Set admin / Leave → SETUP Job Queue
+4. Export Excel → RM-[nama akun]-YYYYMMDD.xlsx
 
-Data: `accountGroupLinks.ts`, `dedupeScrapeDaily.ts`, `exportExcel.ts`
+Data: ccountGroupLinks.ts, dedupeScrapeDaily.ts, exportExcel.ts
 
----
-
-## 7. Metrik Y/X (Groups & Admin)
+## 7. Metrik internal Y/X (engine; UI = gap counts)
 
 ### 6.1 Definisi
 
@@ -350,12 +354,12 @@ sessionStatus === 'valid'    →  check_device
 [↻ Sync]
   → actionProcess: session_check (Checking Session)
   → backfill session DB jika perlu
-  → checkDeviceSessionForValidColumn (Sync light: disk/getState; tanpa cold Chrome)
-  → gagal jelas (no disk / unpaired) → invalidate + modal login
-  → busy/timeout + session tersimpan → tetap Valid (bukan error Sync)
+  → checkDeviceSessionForValidColumn (Sync: probe ke device; bukan disk-only)
+  → gagal linked / unpaired → invalidate + modal login
+  → busy device → alert busy (bukan Scrape Now)
   → sukses → applyResult sessionOnly (metrik Y/X tetap dari scrape/DB)
   → modal Now/Later ATAU resume-empty
-  → Later = session UI+DB saja; Now = scrape device
+  → Later = session UI+DB saja; Now = scrape device (probe lagi dulu)
 ```
 
 ### 7.3 Modal lanjutan sync
@@ -366,7 +370,7 @@ sessionStatus === 'valid'    →  check_device
 | `resume-empty` | Info 0 grup | Daily hari ini ada + semua count 0 |
 | `sync-error` | Alert error | Gagal sync jarang (auth / desktop); busy≠Logout pada Sync Active |
 
-Now → `runScrapeInBackground({ skipDeviceCheck: true })`
+Now → execute scrape (`skipDeviceCheck: true` setelah Sync Check Session device; `readyTimeoutMs: 0`)
 Later → `dismissScrapePrompt` → sessionOnly UI + `markPlatformSessionSynced`
 
 ### 7.4 Gate & lock
@@ -803,7 +807,7 @@ flowchart TD
   Q1 -->|Ya| CR[Cancel scrape]
   Q1 -->|Tidak| Q2{groupsCurrent=0 AND adminCurrent=0?}
   Q2 -->|Ya| N[None kosong]
-  Q2 -->|Tidak| GL[Group link]
+  Q2 -->|Tidak| GL[Klik gap kolom]
 ```
 
 ---
@@ -814,7 +818,8 @@ flowchart TD
 |---------|-----------|
 | 2026-06-06 | Dokumen master awal |
 | 2026-06-06 | Audit script `validate:master-reference`; perbaiki endpoint sidecar; hierarki kebenaran; hak akses Sync admin-only |
-| 2026-06-11 | Grid 9 kolom (On device, In brand); Clear Session; remove slot rebuild master; group link 7 kolom |
+| 2026-06-11 | Grid On device / Junk; Clear Session; remove slot rebuild master |
+| 2026-07-24 | Grid UI: Missing / Not admin / Remark (Active/Logout); daftar via klik gap |
 | 2026-07-24 | v1.0.31: `/settings` primer (`/admin`→`/settings`); Last update read-only; grid 10 kolom; no ticket tables; validators auto-scrape + worker + real-ops |
 
 ---

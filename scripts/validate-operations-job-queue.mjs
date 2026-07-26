@@ -203,9 +203,14 @@ const checks = [
       return (
         wa.includes("createStatus: 'created'") &&
         wa.includes('groupOutcomes') &&
+        wa.includes('persistPartial') &&
+        wa.includes('attachJobGroupOutcomes') &&
         tg.includes("createStatus: 'created'") &&
         tg.includes('groupOutcomes') &&
-        runner.includes('resolveCreateGroupOutcomesFromSingle')
+        tg.includes('persistPartial') &&
+        tg.includes('{ retry: false }') &&
+        runner.includes('resolveCreateGroupOutcomesFromSingle') &&
+        runner.includes('group(s) created before error')
       );
     })(),
   },

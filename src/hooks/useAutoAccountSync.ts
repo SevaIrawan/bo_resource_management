@@ -142,6 +142,7 @@ function mapAccountResultToOutcome(
   result: AutoScrapeAccountResult,
 ): AutoScrapeBrandAccountResultRow['outcome'] | null {
   if (result === 'success') return 'success';
+  if (result === 'truncated') return 'truncated';
   if (result === 'failed') return 'failed';
   if (result === 'skipped') return 'session_invalid';
   return null;

@@ -22,7 +22,7 @@ const FLOW = {
     run: ['login_modal_qr_phone', 'close_login_modal', 'update_groups_admin'],
   },
   valid: {
-    sync: ['check_device_session', 'detect_groups_admin', 'scrape_prompt_or_resume_empty'],
+    sync: ['check_device_session', 'session_only_patch', 'scrape_prompt_now_or_later'],
     run: ['check_device_session', 'execute_scraper'],
   },
 };
@@ -61,7 +61,7 @@ const uiChecks = [
   ['VALID+RUN/SYNC: device dead → login meski grid valid', true],
   ['Login modal uses attemptRestore=false (fast QR)', true],
   ['After login: close login modal → update group+admin → prompt', true],
-  ['0 grup → resume-empty; else Now/Later', true],
+  ['Device Valid → selalu Now|Later (scrape-prompt; resume-empty tidak dipakai)', true],
   ['Grid refresh hanya setelah scrape (bukan sync probe)', true],
   ['Scraper Now: gate dulu, baru setRowProcessing', true],
   ['Daily write → reporting + operations reload', true],
@@ -86,9 +86,48 @@ const fileChecks = [
     pass: (src) => src.includes('scheduleMonitoringReload()'),
   },
   {
-    label: 'Scrape skip warm bila trustedSession',
+    label: 'Scrape Now after Sync: execute scrape (Sync sudah Check Session device)',
+    file: 'src/hooks/useAccountSyncFlow.ts',
+    pass: (src) => {
+      const idx = src.indexOf('const confirmScrapePrompt');
+      const block = idx >= 0 ? src.slice(idx, idx + 700) : '';
+      return (
+        block.includes('skipDeviceCheck: true') &&
+        block.includes('trustedSession: false') &&
+        !block.includes('trustedSession: true')
+      );
+    },
+  },
+  {
+    label: 'Scrape skipProbe hanya dari skipDeviceCheck (bukan login grace)',
     file: 'src/services/scrapeFlowService.ts',
-    pass: (src) => /!input\.skipDeviceCheck && !input\.trustedSession/.test(src),
+    pass: (src) => {
+      const idx = src.indexOf('export async function executeScrapeRun');
+      const block = idx >= 0 ? src.slice(idx, idx + 900) : '';
+      return (
+        block.includes('const skipProbe = input.skipDeviceCheck === true') &&
+        !block.includes('isAccountInLoginGrace')
+      );
+    },
+  },
+  {
+    label: 'WA scrape readyTimeoutMs 0 (tanpa wall-clock akun besar)',
+    file: 'electron/main/scraper/whatsappScrape.ts',
+    pass: (src) => src.includes('readyTimeoutMs: 0'),
+  },
+  {
+    label: 'postSyncModalStep selalu scrape-prompt (resume-empty tidak dipakai)',
+    file: 'src/lib/accountSyncUiFlow.ts',
+    pass: (src) => {
+      const idx = src.indexOf('export function postSyncModalStep');
+      const block = idx >= 0 ? src.slice(idx, idx + 350) : '';
+      return block.includes("return 'scrape-prompt'") && !/return 'resume-empty'/.test(block);
+    },
+  },
+  {
+    label: 'SESSION_COLUMN_FLOW valid sync = scrape_prompt_now_or_later',
+    file: 'src/lib/sessionColumnFlowSpec.ts',
+    pass: (src) => src.includes("'scrape_prompt_now_or_later'"),
   },
 ];
 

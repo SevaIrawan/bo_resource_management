@@ -149,7 +149,7 @@ check('session check fixed 20s not group-scaled', () => {
   const policy = read('src/config/syncScraperPolicy.ts');
   const gate = read('src/lib/deviceSessionGate.ts');
   const validate = read('electron/main/scraper/validateSession.ts');
-  if (!policy.includes('sessionCheck') || !policy.includes('timeoutMs: 20_000')) {
+  if (!policy.includes('sessionCheck') || !policy.includes('timeoutMs: 90_000')) {
     return fail('sessionCheck timeout missing in policy');
   }
   if (!gate.includes('sessionCheckTimeoutMs')) return fail('gate must use sessionCheckTimeoutMs');
@@ -162,35 +162,59 @@ check('session check fixed 20s not group-scaled', () => {
   if (!validate.includes('probeWhatsAppSessionLinked')) {
     return fail('WA session probe must use probeWhatsAppSessionLinked');
   }
-  if (!validate.includes('probeWhatsAppSessionForSync')) {
-    return fail('Sync Active must use probeWhatsAppSessionForSync (no cold Chrome)');
-  }
   const wa = read('electron/main/platformLogin/whatsapp.ts');
-  if (!wa.includes('probeWhatsAppSessionForSyncInner') || !wa.includes('WA_DISK_AUTH_SYNC_LIGHT')) {
-    return fail('Sync WA probe must trust disk without initialize');
+  if (!wa.includes('probeWhatsAppSessionLinkedInner')) {
+    return fail('WA device probe (probeWhatsAppSessionLinkedInner) missing');
+  }
+  if (wa.includes('WA_DISK_AUTH_SYNC_LIGHT')) {
+    return fail('disk-only Sync Valid (WA_DISK_AUTH_SYNC_LIGHT) must not return');
   }
   if (wa.includes('waitForWhatsAppStoreReady') && /probeWhatsAppSessionLinkedInner/.test(wa)) {
-    const probeBlock = wa.slice(
-      wa.indexOf('probeWhatsAppSessionLinkedInner'),
-      wa.indexOf('export function probeWhatsAppSessionForSync') > 0
-        ? wa.indexOf('/** Sync Active: tanpa cold Chrome. */')
-        : wa.indexOf('export function getWhatsAppSessionClient'),
-    );
+    const linkedStart = wa.indexOf('async function probeWhatsAppSessionLinkedInner');
+    const linkedEnd = wa.indexOf('export function probeWhatsAppSessionForSync', linkedStart);
+    const probeBlock =
+      linkedStart >= 0
+        ? wa.slice(linkedStart, linkedEnd > linkedStart ? linkedEnd : linkedStart + 2500)
+        : '';
     if (probeBlock.includes('waitForWhatsAppStoreReady')) {
       return fail('session probe must not wait for WA store');
     }
   }
-  if (!read('electron/main/scraper/deviceGroupScale.ts').includes('SESSION_CHECK_TIMEOUT_MS = 20_000')) {
+  if (!read('electron/main/scraper/deviceGroupScale.ts').includes('SESSION_CHECK_TIMEOUT_MS')) {
     return fail('SESSION_CHECK_TIMEOUT_MS missing');
   }
-  if (!gate.includes("mode === 'sync'") || !gate.includes('strict: false')) {
-    return fail('Sync gate must use light probe (strict:false)');
+  if (!gate.includes('strict: true')) {
+    return fail('Sync/Scrape gate must probe device (strict:true)');
+  }
+  if (gate.includes('WA_DISK_AUTH') || gate.includes('hasStored) return { ok: true }')) {
+    return fail('gate must not treat stored disk as Valid');
   }
   const syncFlow = read('src/services/syncFlowService.ts');
   if (syncFlow.includes('backfillPlatformSessionIfNeeded')) {
     return fail('Sync Active must not warm/restore via backfillPlatformSessionIfNeeded');
   }
-  return ok('session check: Sync light (disk/getState); scrape strict ≤20s');
+  const scrapeNow = read('src/hooks/useAccountSyncFlow.ts');
+  const confirmIdx = scrapeNow.indexOf('const confirmScrapePrompt');
+  const confirmBlock =
+    confirmIdx >= 0 ? scrapeNow.slice(confirmIdx, confirmIdx + 700) : '';
+  if (!confirmBlock.includes('skipDeviceCheck: true')) {
+    return fail('Scrape Now after Sync Valid must execute scrape (skipDeviceCheck; Sync already checked device)');
+  }
+  if (confirmBlock.includes('trustedSession: true')) {
+    return fail('Scrape Now must not trustedSession (unlink mid-scrape → login)');
+  }
+  const waScrape = read('electron/main/scraper/whatsappScrape.ts');
+  if (!waScrape.includes('readyTimeoutMs: 0')) {
+    return fail('WA scrape must use readyTimeoutMs:0 (no wall-clock for large accounts)');
+  }
+  if (!waScrape.includes('SCRAPER_INCOMPLETE')) {
+    return fail('WA scrape must fail clearly when store incomplete (not silent success)');
+  }
+  const concurrency = read('src/config/deviceConcurrencyPolicy.ts');
+  if (!concurrency.includes('HARD_MAX_USER_EXECUTE_SLOTS_PER_PLATFORM = 10')) {
+    return fail('User Chrome/execute parallel max must be 10');
+  }
+  return ok('session check: Sync device; Scrape Now complete-or-clear-error; Chrome max 10');
 });
 
 check('scraper cancel IPC', () => {

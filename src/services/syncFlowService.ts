@@ -1,6 +1,6 @@
 /**
  * Sync / session-column routing — acuan logic_sync_scraper.txt + sessionColumnFlowSpec.
- * Sync Active = check Session ringan → Now/Later (tanpa count/detect device).
+ * Sync Active = Check Session ke device → Now/Later (tanpa count/detect daftar grup).
  */
 import { SYNC_SCRAPER_POLICY } from '@/config/syncScraperPolicy';
 import { todayScrapeDate } from '@/lib/accountMonitoringEngine';
@@ -147,6 +147,11 @@ export type SyncCheckOutcome =
       deviceMessage: string;
     }
   | {
+      kind: 'busy';
+      dbAccountId: string;
+      message: string;
+    }
+  | {
       kind: 'success';
       dbAccountId: string;
       result: AccountSyncResult;
@@ -244,7 +249,7 @@ export async function executeSyncCheck(input: {
     });
   }
 
-  /** Sync Active: check Session light — tanpa count/detect/cold Chrome. */
+  /** Sync: Check Session langsung ke device — Valid hanya jika device linked. */
   const deviceCheck = await checkDeviceSessionForValidColumn({
     sessionId: account.id,
     platform: account.platform,
@@ -253,7 +258,15 @@ export async function executeSyncCheck(input: {
     hasDailyToday: hasDaily,
   });
 
-  if (!deviceCheck.ok && !deviceCheck.busy) {
+  if (!deviceCheck.ok && deviceCheck.busy) {
+    return {
+      kind: 'busy',
+      dbAccountId,
+      message: deviceCheck.message,
+    };
+  }
+
+  if (!deviceCheck.ok) {
     const invalidResult = await buildLogoutRowAfterDeviceFailure({
       dbAccountId,
       brand: account.brandName,
@@ -273,7 +286,7 @@ export async function executeSyncCheck(input: {
     };
   }
 
-  /** Kontrak Case 3: sync valid = probe session saja; grid metrik hanya dari scrape / DB. */
+  /** Probe device OK — metrik Y/X grid tetap dari scrape / DB (bukan count di Sync). */
   input.onSessionProbeComplete?.();
 
   return buildSyncValidSuccess({

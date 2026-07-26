@@ -16,7 +16,6 @@ import { runAccountScraper } from '@/lib/runAccountScraper';
 import {
   markAccountLoginGrace,
   markAccountScrapeGrace,
-  isAccountInLoginGrace,
 } from '@/lib/sessionRealtimePolicy';
 import { invalidateUserSessionOnDeviceFailure } from '@/lib/userActionSession';
 import {
@@ -52,6 +51,8 @@ export type ScrapeRunOutcome =
       brandX: number;
       /** true = login/sync barusan — update Session+Status; false = session sudah valid sebelum scrape. */
       updateSession: boolean;
+      /** Cap 6000 / hint device — data sudah ditulis; UI wajib notif (bukan sukses diam). */
+      warningCode?: 'SCRAPER_TRUNCATED_CAP';
     };
 
 export async function resolveScrapeLoginIfNeeded(input: {
@@ -91,8 +92,7 @@ export async function executeScrapeRun(input: {
     accountId: dbAccountId,
   });
 
-  const skipProbe =
-    input.skipDeviceCheck === true || isAccountInLoginGrace(account.id);
+  const skipProbe = input.skipDeviceCheck === true;
 
   if (!skipProbe) {
     const deviceCheck = await checkDeviceSessionForValidColumn({
@@ -151,7 +151,7 @@ export async function executeScrapeRun(input: {
   input.onSessionProbeComplete?.();
 
   try {
-    await runAccountScraper({
+    const scrapeCounts = await runAccountScraper({
       account,
       sessionId: account.id,
       userId,
@@ -189,6 +189,9 @@ export async function executeScrapeRun(input: {
     markAccountScrapeGrace(account.id);
     markAccountLoginGrace(account.id);
 
+    const hint = scrapeCounts.hint ?? '';
+    const truncated = /TRUNCATED_\d+/i.test(hint);
+
     return {
       kind: 'success',
       dbAccountId,
@@ -198,6 +201,7 @@ export async function executeScrapeRun(input: {
       scrapedAt: new Date().toISOString(),
       brandX,
       updateSession: input.updateSessionOnSuccess === true,
+      warningCode: truncated ? 'SCRAPER_TRUNCATED_CAP' : undefined,
     };
   } catch (error) {
     const raw = getErrorMessage(error, 'SCRAPER_FAILED');

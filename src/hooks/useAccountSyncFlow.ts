@@ -12,11 +12,7 @@ import {
 import { resolveDeviceSessionId } from '@/lib/deviceSessionId';
 import { patchAccountSessionInGroups } from '@/lib/accountSessionPatch';
 import { recordSyncActivity } from '@/lib/syncActivityLog';
-import {
-  markAccountLoginGrace,
-  markAccountScrapeGrace,
-  isAccountInLoginGrace,
-} from '@/lib/sessionRealtimePolicy';
+import { markAccountLoginGrace, markAccountScrapeGrace } from '@/lib/sessionRealtimePolicy';
 import { recordSessionActivityStatus } from '@/lib/recordSessionActivity';
 import { markPlatformSessionSynced } from '@/lib/platformSessions';
 import { getErrorMessage } from '@/lib/errorMessage';
@@ -467,6 +463,12 @@ export function useAccountSyncFlow({
           return;
         }
 
+        if (outcome.kind === 'busy') {
+          stopLoading();
+          showSyncError(outcome.message || SESSION_SETTLING_CODE, groupId, account);
+          return;
+        }
+
         if (outcome.kind === 'invalidated-login') {
           updateGroups((prev) => patchAccountSessionInGroups(prev, account.id, 'invalid'));
           await recordSyncActivity({
@@ -697,8 +699,7 @@ export function useAccountSyncFlow({
           return;
         }
 
-        const skipProbe =
-          options?.skipDeviceCheck === true || isAccountInLoginGrace(account.id);
+        const skipProbe = options?.skipDeviceCheck === true;
 
         setRowProcessing(
           groupId,
@@ -811,6 +812,12 @@ export function useAccountSyncFlow({
         // Realtime daily/master sering di-drop saat akun suspended — catch-up Matrix/Ops.
         onManualScrapeUiCatchUpRef.current?.();
 
+        if (outcome.warningCode) {
+          deferSlotRelease = true;
+          showSyncError(outcome.warningCode, groupId, account);
+          return;
+        }
+
         setStep('idle');
       } catch (error) {
         const message = getErrorMessage(error, 'SCRAPER_FAILED');
@@ -854,14 +861,19 @@ export function useAccountSyncFlow({
     if (!target) return;
     const { groupId, account } = target;
 
-    markAccountLoginGrace(account.id);
+    /** Lindungi dari event invalid realtime saat scrape — bukan skip probe. */
     markAccountScrapeGrace(account.id);
     setStep('idle');
     setSyncMessage(null);
     setRowProcessing(groupId, account.id, 'scraper', 'scraper');
+    /**
+     * Sync barusan Check Session ke device → Valid.
+     * Scrape Now = execute scrape real (bukan probe singkat lagi).
+     * trustedSession false: unlink → Login; connect fail → notif jelas.
+     */
     void runScrapeInBackground(target, {
       skipDeviceCheck: true,
-      trustedSession: true,
+      trustedSession: false,
       updateSessionOnSuccess: false,
     });
   }, [runScrapeInBackground, setRowProcessing, target]);

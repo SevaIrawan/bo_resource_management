@@ -16,11 +16,13 @@ import {
   formatScrapeEtaLabel,
   runPooled,
   scrapeGroupsBudgetMs,
+  scrapeIdleTimeoutMs,
   scrapeInvitePhaseBudgetMs,
   scrapeTotalPlanMs,
-  SCRAPE_IDLE_TIMEOUT_MS,
-  waInboxStableTimeoutMs,
+  WA_SCRAPE_CHECKPOINT_EVERY,
   WA_SCRAPE_METADATA_CONCURRENCY,
+  waInboxStableRounds,
+  waInboxStableTimeoutMs,
   waInviteExportDelayMs,
 } from './deviceGroupScale';
 import { touchScrapeWatchdog, withScrapeWatchdog } from './scrapeWatchdog';
@@ -113,6 +115,8 @@ async function scrapeWhatsAppGroupsFromStore(input: {
   const doneSet = new Set(checkpoint?.doneGroupIds ?? []);
   const pendingIds = scanIds.filter((id) => !doneSet.has(id));
   const resumedFromCheckpoint = Boolean(checkpoint && doneSet.size > 0);
+  const liveRows: ScrapedGroupRow[] = [...(checkpoint?.rows ?? [])];
+  const liveDone = new Set(doneSet);
 
   const planMs = scrapeTotalPlanMs(total, Math.max(0, Math.floor(total * 0.35)));
   emitScrapeProgress({
@@ -137,8 +141,20 @@ async function scrapeWhatsAppGroupsFromStore(input: {
       return null;
     }
 
-    const doneCount = doneSet.size + index + 1;
-    if (doneCount % 25 === 0 || index === pendingIds.length - 1) {
+    liveDone.add(groupId);
+    liveRows.push({ ...core, invite_link: null });
+    const doneCount = liveDone.size;
+    if (doneCount % WA_SCRAPE_CHECKPOINT_EVERY === 0 || index === pendingIds.length - 1) {
+      saveScrapeCheckpoint({
+        sessionId: input.sessionId,
+        platform: 'whatsapp',
+        updatedAt: new Date().toISOString(),
+        rows: mergeCheckpointRows(checkpoint?.rows ?? [], liveRows),
+        doneGroupIds: [...liveDone],
+      });
+    }
+
+    if (doneCount % 10 === 0 || index === pendingIds.length - 1) {
       emitScrapeProgress({
         sessionId: input.sessionId,
         phase: 'group',
@@ -163,8 +179,9 @@ async function scrapeWhatsAppGroupsFromStore(input: {
   const adminNeedInvite = rows.filter(
     (row) => row.is_admin === 'yes' && !row.invite_link,
   );
+  const idleMs = scrapeIdleTimeoutMs(total);
   console.info(
-    `[wa-scrape] sessionId=${input.sessionId} deviceGroups=${groupIds.length} scan=${total} pendingMeta=${pendingIds.length} adminInvite=${adminNeedInvite.length} planMs=${scrapeTotalPlanMs(total, adminNeedInvite.length)} metadataMs=${scrapeGroupsBudgetMs(total)} idleMs=${SCRAPE_IDLE_TIMEOUT_MS} resumed=${resumedFromCheckpoint}`,
+    `[wa-scrape] sessionId=${input.sessionId} deviceGroups=${groupIds.length} scan=${total} pendingMeta=${pendingIds.length} adminInvite=${adminNeedInvite.length} planMs=${scrapeTotalPlanMs(total, adminNeedInvite.length)} metadataMs=${scrapeGroupsBudgetMs(total)} idleMs=${idleMs} resumed=${resumedFromCheckpoint}`,
   );
 
   saveScrapeCheckpoint({
@@ -204,7 +221,7 @@ async function scrapeWhatsAppGroupsFromStore(input: {
       await sleep(waInviteExportDelayMs());
     }
 
-    if (adminInviteDone % 10 === 0 || adminInviteDone === adminNeedInvite.length) {
+    if (adminInviteDone % WA_SCRAPE_CHECKPOINT_EVERY === 0 || adminInviteDone === adminNeedInvite.length) {
       saveScrapeCheckpoint({
         sessionId: input.sessionId,
         platform: 'whatsapp',
@@ -242,6 +259,21 @@ async function scrapeWhatsAppGroupsFromStore(input: {
   };
 }
 
+/**
+ * Opsi client yang SAMA untuk manual & auto scrape WA.
+ * Auto hanya beda: freshBoot + browserPool 'auto' (isolasi Chrome dari user lane).
+ * readyTimeoutMs:0 = tanpa wall-clock putus diam di tengah (kontrak 5000+ grup).
+ */
+function waScrapeSharedClientOpts(): {
+  storeWaitMs: number;
+  readyTimeoutMs: 0;
+} {
+  return {
+    storeWaitMs: Math.max(300_000, scrapeIdleTimeoutMs(DEVICE_GROUP_TARGET_MAX)),
+    readyTimeoutMs: 0,
+  };
+}
+
 export async function runWhatsAppScrape(
   sessionId: string,
   expectedPhone?: string,
@@ -252,6 +284,7 @@ export async function runWhatsAppScrape(
   loggedInAs?: string;
   elapsedMs?: number;
   hint?: string;
+  deviceGroupCount?: number;
 }> {
   return runWhatsAppScrapeLane({
     sessionId,
@@ -263,7 +296,7 @@ export async function runWhatsAppScrape(
     throwIfCancelled: throwIfScrapeCancelled,
     onStale: (sid) => abortActiveScrape(sid, 'whatsapp'),
     watchdogLabel: 'WhatsApp scrape',
-    clientOpts: { storeWaitMs: 120_000 },
+    clientOpts: waScrapeSharedClientOpts(),
   });
 }
 
@@ -278,6 +311,7 @@ export async function runWhatsAppScrapeAutoLane(
   loggedInAs?: string;
   elapsedMs?: number;
   hint?: string;
+  deviceGroupCount?: number;
 }> {
   return runWhatsAppScrapeLane({
     sessionId,
@@ -290,7 +324,11 @@ export async function runWhatsAppScrapeAutoLane(
     throwIfCancelled: throwIfAutoScrapeCancelled,
     onStale: (sid) => abortActiveAutoScrape(sid, 'whatsapp'),
     watchdogLabel: 'WhatsApp auto scrape',
-    clientOpts: { storeWaitMs: 120_000, freshBoot: true, browserPool: 'auto' },
+    clientOpts: {
+      ...waScrapeSharedClientOpts(),
+      freshBoot: true,
+      browserPool: 'auto',
+    },
   });
 }
 
@@ -309,6 +347,8 @@ type WaScrapeLaneOpts = {
     storeWaitMs: number;
     freshBoot?: boolean;
     browserPool?: 'user' | 'auto';
+    /** 0 = tanpa wall-clock ready (scrape akun besar). */
+    readyTimeoutMs?: number;
   };
 };
 
@@ -319,6 +359,7 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
   loggedInAs?: string;
   elapsedMs?: number;
   hint?: string;
+  deviceGroupCount?: number;
 }> {
   const { sessionId, expectedPhone } = opts;
   emitScrapeProgress({ sessionId, phase: 'start' });
@@ -350,12 +391,37 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
               phase: 'connect',
               label: 'Syncing WhatsApp inbox from server…',
             });
-            await waitForWhatsAppStoreReady(client, 120_000);
+            const storeWaitMs = Math.max(
+              opts.clientOpts.storeWaitMs ?? 300_000,
+              scrapeIdleTimeoutMs(DEVICE_GROUP_TARGET_MAX),
+            );
+            await waitForWhatsAppStoreReady(client, storeWaitMs);
+            // freshBoot (auto) sering mulai count=0 — pakai cap store untuk timeout/rounds,
+            // sama seperti manual akun besar (kontrak 5000+).
             const inboxGroupEstimate = await countWhatsAppGroupsOnDevice(client);
-            await waitForWhatsAppInboxStable(client, {
-              maxMs: waInboxStableTimeoutMs(inboxGroupEstimate),
+            const scaleEstimate = Math.max(inboxGroupEstimate, DEVICE_GROUP_TARGET_MAX);
+            emitScrapeProgress({
+              sessionId,
+              phase: 'connect',
+              label: `Waiting for inbox sync (${inboxGroupEstimate} groups so far)…`,
+            });
+            const syncedCount = await waitForWhatsAppInboxStable(client, {
+              maxMs: Math.max(
+                waInboxStableTimeoutMs(scaleEstimate),
+                scrapeIdleTimeoutMs(scaleEstimate),
+              ),
+              stableRounds: waInboxStableRounds(scaleEstimate),
+              pollMs: 5_000,
+              sessionId,
+              minGroups: 1,
             });
             opts.throwIfCancelled(sessionId);
+
+            if (syncedCount <= 0) {
+              throw new Error(
+                'SCRAPER_INCOMPLETE: WhatsApp inbox still empty after sync wait. Wait a few minutes, then Scrape Now again.',
+              );
+            }
 
             const { rows, skipped, inviteExported, deviceGroupCount, truncated, resumedFromCheckpoint } =
               await scrapeWhatsAppGroupsFromStore({
@@ -364,33 +430,48 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
                 throwIfCancelled: opts.throwIfCancelled,
               });
 
-            assertWhatsAppScrapeHasRows(rows);
-            clearScrapeCheckpoint(sessionId);
+            // Sync bilang N, list scrape jauh lebih kecil → store belum lengkap (akun 1900–5000+).
+            if (
+              !truncated &&
+              syncedCount > 50 &&
+              deviceGroupCount < Math.floor(syncedCount * 0.85)
+            ) {
+              throw new Error(
+                `SCRAPER_INCOMPLETE: inbox sync peaked at ${syncedCount} but scrape listed ${deviceGroupCount} groups. Wait for WhatsApp Web sync, then Scrape Now again.`,
+              );
+            }
 
-            const elapsedMs = Date.now() - startedAt;
-            const adminCount = rows.filter((row) => row.is_admin === 'yes').length;
+            assertWhatsAppScrapeHasRows(rows, Math.max(deviceGroupCount, syncedCount));
+
             const undercount =
               !truncated &&
               deviceGroupCount > 50 &&
               rows.length < Math.floor(deviceGroupCount * 0.85);
 
+            if (undercount) {
+              throw new Error(
+                `SCRAPER_INCOMPLETE: scraped ${rows.length}/${deviceGroupCount} groups — WhatsApp Web store still incomplete. Wait a few minutes, then Scrape Now again.`,
+              );
+            }
+
+            clearScrapeCheckpoint(sessionId);
+
+            const elapsedMs = Date.now() - startedAt;
+            const adminCount = rows.filter((row) => row.is_admin === 'yes').length;
+
             const hintParts: string[] = [];
             if (resumedFromCheckpoint) hintParts.push('RESUMED_CHECKPOINT');
             if (truncated) hintParts.push(`TRUNCATED_${DEVICE_GROUP_TARGET_MAX}`);
-            if (undercount) hintParts.push('WA_STORE_UNDERCOUNT');
             if (adminCount > 0 && inviteExported < adminCount) {
               hintParts.push('WA_INVITE_EXPORT_PARTIAL');
             }
 
-            const underPrefix = opts.undercountDoneLabel ?? opts.doneLabel;
             emitScrapeProgress({
               sessionId,
               phase: 'done',
               current: rows.length,
               total: rows.length,
-              label: undercount
-                ? `${underPrefix}: ${rows.length}/${deviceGroupCount} groups (store may still be syncing) · ${inviteExported}/${adminCount} invites (${loggedInAs}, ${Math.round(elapsedMs / 1000)}s)`
-                : `${opts.doneLabel}: ${rows.length} groups, ${inviteExported}/${adminCount} invite links (${loggedInAs}, ${Math.round(elapsedMs / 1000)}s)`,
+              label: `${opts.doneLabel}: ${rows.length} groups, ${inviteExported}/${adminCount} invite links (${loggedInAs}, ${Math.round(elapsedMs / 1000)}s)`,
             });
 
             console.info(
@@ -404,11 +485,13 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
               loggedInAs,
               elapsedMs,
               hint: hintParts.length ? hintParts.join('|') : undefined,
+              deviceGroupCount,
             };
           },
           {
             label: opts.watchdogLabel,
-            idleMs: SCRAPE_IDLE_TIMEOUT_MS,
+            // Skala idle untuk akun besar (hingga cap store) — count device baru ada di dalam fn.
+            idleMs: scrapeIdleTimeoutMs(DEVICE_GROUP_TARGET_MAX),
             onStale: opts.onStale,
           },
         ),
@@ -418,8 +501,26 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
     if (opts.isCancelled(sessionId)) {
       throw opts.cancelError();
     }
-    const message = error instanceof Error ? error.message : 'WhatsApp scrape failed';
-    emitScrapeProgress({ sessionId, phase: 'error', label: message });
-    throw error;
+    const raw = error instanceof Error ? error.message : 'WhatsApp scrape failed';
+    const lower = raw.toLowerCase();
+    let message = raw;
+    if (
+      lower.includes('callfunctionon timed out') ||
+      lower.includes('protocolerror') ||
+      lower.includes('detached frame') ||
+      lower.includes('execution context was destroyed') ||
+      lower.includes('target closed') ||
+      lower.includes('session closed')
+    ) {
+      message = 'SCRAPER_WA_CONNECT_FAILED';
+    } else if (lower === 'logout' || lower === 'unpaired') {
+      message = 'SCRAPER_WA_SESSION_UNLINKED';
+    }
+    emitScrapeProgress({
+      sessionId,
+      phase: 'error',
+      label: message,
+    });
+    throw message === raw ? error : new Error(message);
   }
 }

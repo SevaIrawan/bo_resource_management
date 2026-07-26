@@ -136,7 +136,7 @@ function attachSessionIntegrityHandlers(
     win.webContents.send('platform-session:invalid', {
       sessionId,
       platform: 'whatsapp',
-      message: String(message),
+      message: formatWhatsAppDisconnectMessage(String(message ?? 'auth_failure')),
     });
   });
 
@@ -218,15 +218,16 @@ function attachCommonHandlers(
 
   client.on('auth_failure', (message) => {
     if (!win.isDestroyed()) {
+      const formatted = formatWhatsAppDisconnectMessage(String(message ?? 'auth_failure'));
       win.webContents.send('platform-session:invalid', {
         sessionId,
         platform: 'whatsapp',
-        message: String(message),
+        message: formatted,
       });
       win.webContents.send('platform-login:error', {
         sessionId,
         platform: 'whatsapp',
-        message: String(message),
+        message: formatted,
       });
     }
   });
@@ -254,12 +255,24 @@ function attachCommonHandlers(
   });
 }
 
-function formatWhatsAppDisconnectMessage(reason: string): string {
+function isWhatsAppLogoutReason(reason: string): boolean {
   const upper = reason.trim().toUpperCase();
-  if (upper === 'LOGOUT' || upper.includes('LOG OUT')) {
-    return 'WhatsApp was unlinked on your phone. A new QR code will load — scan again or use phone linking.';
+  return (
+    upper === 'LOGOUT' ||
+    upper.includes('LOG OUT') ||
+    upper === 'UNPAIRED' ||
+    upper.includes('UNPAIRED')
+  );
+}
+
+/** Kode stabil untuk i18n — jangan kirim reason mentah (LOGOUT) ke UI. */
+function formatWhatsAppDisconnectMessage(reason: string): string {
+  if (isWhatsAppLogoutReason(reason)) {
+    return 'SCRAPER_WA_SESSION_UNLINKED';
   }
-  return reason;
+  const trimmed = reason.trim();
+  if (!trimmed) return 'SCRAPER_WA_CONNECT_FAILED';
+  return trimmed;
 }
 
 async function closeWhatsAppPuppeteer(client: InstanceType<typeof Client>): Promise<void> {
@@ -317,13 +330,13 @@ function waitForClientReady(
   timeoutMs = waQrScanWaitMs(0),
 ): Promise<InstanceType<typeof Client>> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(
-        new Error(
-          'WhatsApp session timed out. Use QR or phone linking in Linked Devices.',
-        ),
-      );
-    }, timeoutMs);
+    /** timeoutMs <= 0: tanpa wall-clock (scrape akun besar hingga ~5000+ grup). */
+    const timeout =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            reject(new Error('SCRAPER_WA_CONNECT_FAILED'));
+          }, timeoutMs)
+        : null;
 
     const onReady = () => {
       cleanup();
@@ -335,16 +348,24 @@ function waitForClientReady(
 
     const onAuthFailure = (message: unknown) => {
       cleanup();
-      reject(new Error(String(message)));
+      /** Sebelum ready: treat sebagai gagal connect (bukan raw LOGOUT). */
+      reject(new Error('SCRAPER_WA_CONNECT_FAILED'));
+      void message;
     };
 
     const onDisconnected = (reason: unknown) => {
       cleanup();
-      reject(new Error(String(reason ?? 'WhatsApp disconnected')));
+      const raw = String(reason ?? 'WhatsApp disconnected');
+      /** LOGOUT sebelum ready sering flake WA Web — bukan Valid→Scrape→LOGOUT mentah. */
+      if (isWhatsAppLogoutReason(raw)) {
+        reject(new Error('SCRAPER_WA_CONNECT_FAILED'));
+        return;
+      }
+      reject(new Error(formatWhatsAppDisconnectMessage(raw)));
     };
 
     function cleanup() {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
       client.off('ready', onReady);
       client.off('auth_failure', onAuthFailure);
       client.off('disconnected', onDisconnected);
@@ -878,40 +899,8 @@ async function releaseProbeSessionUnlessConnected(sessionId: string): Promise<vo
 }
 
 /**
- * Sync Active — check Session **ringan**:
- * - Client sudah di memori → `getState()` saja
- * - Belum di memori → cek LocalAuth di disk saja
- * **Tidak** `client.initialize()` / cold Chrome / Puppeteer (hindari timeout/busy/crash).
- */
-async function probeWhatsAppSessionForSyncInner(
-  sessionId: string,
-): Promise<{ valid: boolean; message: string }> {
-  const existing = sessions.get(sessionId);
-  if (existing) {
-    try {
-      const state = await existing.client.getState();
-      const immediate = waStateProbeResult(state);
-      if (classifyWaSocketState(state) === 'unlinked') {
-        return immediate;
-      }
-      if (immediate.valid) return immediate;
-      if (hasWhatsAppDiskAuth(sessionId)) {
-        return { valid: true, message: 'WA_DISK_AUTH_SYNC_LIGHT' };
-      }
-      return immediate;
-    } catch {
-      /* fall through to disk */
-    }
-  }
-
-  if (hasWhatsAppDiskAuth(sessionId)) {
-    return { valid: true, message: 'WA_DISK_AUTH_SYNC_LIGHT' };
-  }
-  return { valid: false, message: 'WA_NOT_CONNECTED' };
-}
-
-/**
- * Scrape / strict — boleh cold-boot Chrome; tidak baca daftar grup; tidak `waitForWhatsAppStoreReady`.
+ * Check Session WA = ke device (getState / cold boot bila perlu).
+ * Disk LocalAuth saja ≠ Valid — dipakai Sync dan Scrape.
  */
 async function probeWhatsAppSessionLinkedInner(
   sessionId: string,
@@ -952,11 +941,11 @@ async function probeWhatsAppSessionLinkedInner(
   }
 }
 
-/** Sync Active: tanpa cold Chrome. */
+/** Alias — sama probe ke device (bukan disk-only). */
 export function probeWhatsAppSessionForSync(
   sessionId: string,
 ): Promise<{ valid: boolean; message: string }> {
-  return runWhatsAppLoginOperation(sessionId, () => probeWhatsAppSessionForSyncInner(sessionId));
+  return probeWhatsAppSessionLinked(sessionId);
 }
 
 export function probeWhatsAppSessionLinked(

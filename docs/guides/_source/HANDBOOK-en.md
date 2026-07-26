@@ -207,26 +207,24 @@ Each brand (e.g. **Brand : SBMY**) has one card.
 | Column | Meaning | How to read |
 |--------|---------|-------------|
 | **Account** | Platform + name + phone | WA/TG icon, name, number below |
-| **Brand** | Brand name | Same for all rows in the card |
-| **Status** | **Active** = valid session; **Logout** = invalid | Green / red indicator |
-| **Session** | **Valid** / **Invalid** | Invalid → login first; **X on hover** when Valid = **Clear Session** |
-| **Groups** | `Y/X` | Y = groups on device today; X = brand standard for same platform |
-| **On device** | Single number | Total groups on phone/PC (daily) |
-| **Junk / Missing / Not admin** | Gap badges | Counts for issues (see §5) — not a separate Ticket tab |
-| **Admin** | Bar + `a/X` | How many groups you are admin of vs standard |
+| **Role** | Master / GCS | Create group needs **Master** |
+| **Location** | Device location label | Not the brand card name |
+| **Session** | **Active** / **Logout** | Logout → Sync + QR; **X on hover** when Active = **Clear Session** |
+| **On device** | Number | Total groups on phone (click if > 0 → On Device list) |
+| **Junk** | Gap count | Outside master (click → list + **Leave**) |
+| **Missing** | Gap count | Not yet joined (click → list + **Join missing**) |
+| **Not admin** | Gap count | Joined but not admin (click → list + **Set admin**) |
 | **Last update** | Timestamp / progress | Full scrape status — **read-only** (no Run button) |
-| **Action** | **Group link** | Open group list + invite links |
-
-**Important:** WhatsApp and Telegram totals are **separate** — do not compare `Y/X` across platforms on one row.
+| **Remark** | Aligned / Not Aligned | Or Cancel scrape while scraping |
 
 ### 4.4 Row controls
 
 | Control | Function |
 |---------|--------|
-| **↻ (Sync)** | Primary flow: platform login or live session check + count update |
+| **↻ (Sync)** | Platform login or live session check + Scrape now / Later gate |
 | **X (hover, right of name)** | **Remove from slot** — delete account row + rebuild brand master (confirmation) |
-| **X (hover, Session column, Valid only)** | **Clear Session** — log out on this PC + database; next Sync opens clean QR |
-| **Group link** | Modal: daily 7-column table or admin vs master — needs scrape data |
+| **X (hover, Session column, Active only)** | **Clear Session** — log out on this PC + database; next Sync opens clean QR |
+| Click gap number | Opens group list (On Device / Not in Master / Missing / Not admin) — **no Group link button** |
 
 Tooltip: **Sync account**.
 
@@ -234,23 +232,22 @@ Tooltip: **Sync account**.
 
 Sync behavior depends on **Session** column value.
 
-#### Session = **Invalid**
+#### Session = **Logout**
 
 | Step | What happens |
 |------|----------------|
 | 1 | Click **↻** |
 | 2 | Platform login modal opens (QR default, or phone login) |
 | 3 | Scan QR on marketing phone (WA: Linked devices; TG: Link Desktop Device) |
-| 4 | On success: session saved, group counts refresh |
-| 5 | App may prompt **Scrape now** to save full group list to DB |
+| 4 | On success: Session **Active**; app may prompt **Scrape now** / **Later** |
 
-#### Session = **Valid**
+#### Session = **Active**
 
 | Step | What happens |
 |------|----------------|
 | 1 | Click **↻** |
 | 2 | App checks WA/TG still active on **this PC** |
-| 3 | If OK: **Groups** / **Admin** numbers update; may offer **Scrape now** / **Later** |
+| 3 | If OK: may offer **Scrape now** / **Later** |
 | 4 | If failed: prompted to log in again |
 
 **Notes:**
@@ -263,40 +260,33 @@ Sync behavior depends on **Session** column value.
 
 | Condition | Display | Action |
 |-----------|---------|--------|
-| Session invalid | *Use Sync (↻) to log in first* | Sync first |
+| Session Logout | *Use Sync (↻) to log in first* | Sync first |
 | Standby | **Last update** timestamp | Full scrape via **Sync → Scrape now** when needed |
-| Running | *Reading groups…* / progress + **Cancel scrape** | Wait (can take minutes for large group lists) |
+| Running | *Reading groups…* / progress + **Cancel scrape** in Remark | Wait (can take minutes for large group lists) |
 
 | Term | Meaning |
 |------|---------|
 | **Scrape now** | Full scrape — all groups written to database (modal after Sync) |
-| **Sync** | Session check + summary counts — not always a full scrape |
+| **Sync** | Session check + scrape gate — not always a full scrape |
 
 There is **no separate Run button** in the grid. **Last update** is read-only.
 
-After login, you may see: *Login OK. Device group & admin counts are updated. Save the full group list to the database now?* → choose **Scrape now** or **Later**.
+After login, you may see a prompt to save the full group list → choose **Scrape now** or **Later**.
 
-**Later** = session stays Active/Valid in UI + DB only — **no** scrape and **no** device group recount from a full scrape. **Cancel scrape** stops the running scrape entirely.
+**Later** = session stays Active in UI + DB only — **no** scrape. **Cancel scrape** stops the running scrape entirely.
 
-### 4.7 Group link modal
+### 4.7 Group lists from Account columns
 
-Open via **Action → Group link**. Choose a mode:
+Open by **clicking the column number** (not a Group link button):
 
-| Mode | List contents |
-|------|----------------|
-| **Groups on this account** | All groups on the device (Y) — daily scrape snapshot |
-| **Admin vs master list** | **Brand master** groups only (X) + this account’s admin/join status |
+| List | How to open |
+|------|-------------|
+| **On Device** | Click **On device** (when > 0) |
+| **Not in Master** | Click **Junk** (when > 0) |
+| **Missing** | Click **Missing** (when > 0) |
+| **Not admin** | Click **Not admin** (when > 0) |
 
-| Feature | Function |
-|---------|----------|
-| Table (daily mode) | No, Group Name, Group ID, Member Count, Admin Count, Is Admin, Invite Link |
-| Excel export | `RM-[account name]-YYYYMMDD.xlsx` |
-| Admin filter | All / admin only / non-admin |
-| Pagination | Previous / Next when many groups |
-
-**Admin vs master** total matches the Groups/Admin denominator (X) and the **WA x Group** badge — device junk groups are **not** listed here (see Junk on Account / Leave in Operations).
-
-Empty list? **Sync** → **Scrape now** first. Message: *No links. Scrape via Sync first.*
+From gap lists: **Join missing** / **Set admin** / **Leave** open Job Queue SETUP. Empty? **Sync** → **Scrape now** first.
 
 ### 4.8 Remove account from slot
 
@@ -346,7 +336,7 @@ Modal actions: close, switch QR ↔ phone, verify code/password, **OK** when con
 
 There is **no Ticket tab**, **no Process modal**, and **no** `ticket_issue_handles` / In Progress workflow.
 
-After scrape/sync data exists, the app compares **device groups (daily)** vs **brand master** **in memory**. Gaps show on the **Account** tab as **not aligned** state and **Junk / Missing / Not admin** badges (same engine as Groups/Admin columns).
+After scrape/sync data exists, the app compares **device groups (daily)** vs **brand master** **in memory**. Gaps show on the **Account** tab as **Not Aligned** Remark and **Junk / Missing / Not admin** counts.
 
 ### 5.2 Issue types (exactly five)
 
@@ -501,7 +491,7 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 
 **WhatsApp multi-PC:** Session does not move between PCs. Hand off → **Clear Session** on the old PC (optional) → new operator **Sync** + scan QR on their PC.
 
-**Telegram multi-PC:** Session string is in the cloud — another PC can **Sync** / scrape while Session is **Valid**. Hand off → **Clear Session** (required) so the new operator scans QR on their PC.
+**Telegram multi-PC:** Session string is in the cloud — another PC can **Sync** / scrape while Session is **Active**. Hand off → **Clear Session** (required) so the new operator scans QR on their PC.
 
 ---
 
@@ -526,7 +516,7 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 |---|------|
 | 1 | **Account** tab — set brand/platform filters |
 | 2 | Review **N accounts not aligned** on brand headers |
-| 3 | **Sync** rows with **Invalid** session |
+| 3 | **Sync** rows with **Logout** session |
 | 4 | **Sync → Scrape now** where counts are stale or not aligned |
 | 5 | Remediate via **Operations** Job Queue, then scrape again |
 
@@ -562,7 +552,7 @@ Requires a **new app version** (auto-update + **Restart**). See [PROJECT.md §4.
 | **Master / std** | Brand standard group list (`groups_master`) |
 | **Daily** | Today’s device group snapshot |
 | **Aligned** | Device groups match brand standard for that platform |
-| **Session Valid** | Active session record in DB (may still need device check today) |
+| **Session Active** | Connected session on this PC (UI label; not “Valid”) |
 | **Sync** | ↻ button — login or live device verification |
 | **Scrape now** | Full read of groups from phone → database (via Sync prompt) |
 | **Issue / gap** | In-memory mismatch (junk / missing / not admin / duplicates) on Account |
@@ -584,7 +574,7 @@ No. **Restart** after the update notification (if IT published to GitHub).
 **Does deleting data in Supabase remove the installer?**  
 No. Only dashboard data changes.
 
-**Why is Session Valid but scrape still asks for login?**  
+**Why is Session Active but scrape still asks for login?**  
 This PC may have lost the device session — click **Sync** to verify.
 
 **What does Groups `12/21` mean?**  
@@ -615,11 +605,11 @@ Same data; Card view groups by brand, Table view is one flat list.
 Yes — after confirmation it removes the brand and related data from the database.
 
 **Why QR error "still starting from previous attempt"?**  
-Stuck WA session on this PC — wait a few seconds, or use **Clear Session** (X on Session when Valid) then Sync again.
+Stuck WA session on this PC — wait a few seconds, or use **Clear Session** (X on Session when Active) then Sync again.
 
 **Can another operator Sync an account I logged in on my PC?**  
 For WhatsApp, no — auth stays on your PC until they **Clear Session** (or you do) and they scan QR on their PC.  
-For Telegram, another PC can use the account while Session is **Valid** (session string is in the cloud). Hand off to a new operator with **Clear Session** so they scan QR on their PC.
+For Telegram, another PC can use the account while Session is **Active** (session string is in the cloud). Hand off to a new operator with **Clear Session** so they scan QR on their PC.
 
 **Where is UI language changed?**  
 **Settings** → **Language** → English or 中文.
@@ -640,7 +630,7 @@ Login (Username / Password)
         │     └─ Per Brand Card
         │           ├─ Header: stock chips + WA/TG Group badge → Group matrix modal
         │           ├─ +Add account (WhatsApp / Telegram)
-        │           ├─ Row: Sync ↻ | Remove X | Clear Session X | Group link
+        │           ├─ Row: Sync ↻ | Remove X | Clear Session X | click gap columns
         │           ├─ Last update (read-only) — scrape via Sync → Scrape now
         │           └─ Issues: Junk / Missing / Not admin (5 types, in-memory)
         └─ [Tab Operations] — Job Queue only

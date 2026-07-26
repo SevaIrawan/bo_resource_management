@@ -32,7 +32,7 @@ import { getSupabase } from '@/lib/supabase';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Dispatch, SetStateAction } from 'react';
 
-export type AutoScrapeAccountResult = 'success' | 'skipped' | 'failed' | 'aborted';
+export type AutoScrapeAccountResult = 'success' | 'truncated' | 'skipped' | 'failed' | 'aborted';
 
 /** Auto Scrape (Settings) — skip akun yang tidak memenuhi syarat scrape otomatis. */
 export function shouldSkipAutoScrapeAccount(
@@ -164,68 +164,70 @@ export async function runAutoAccountScrape(input: {
     }, AUTO_SCRAPE_POLICY.selectionWatchMs);
 
     try {
-      await scrapePromise;
+      const scrapeCounts = await scrapePromise;
+      if (cancelledBySelection || isAborted(cycleControl)) return 'aborted';
+      if (cycleControl?.isAccountSelected && !cycleControl.isAccountSelected(account.id)) {
+        return 'aborted';
+      }
+      const supabase = getSupabase();
+      const brandId =
+        (
+          await supabase
+            ?.from(TABLES.messagingAccounts)
+            .select('brand_id')
+            .eq('id', dbAccountId)
+            .maybeSingle()
+        )?.data?.brand_id as string | undefined;
+
+      let brandX = 0;
+      if (brandId) {
+        brandX = await resolveBrandStandardTotal(brandId, account.platform, 0, account.brandName);
+      }
+
+      const { result: built, master } = await buildMetricsFromScrapeDaily({
+        accountId: dbAccountId,
+        brand: account.brandName,
+        platform: account.platform,
+        sessionValid: true,
+        forceFresh: true,
+      });
+
+      markAccountScrapeGrace(account.id);
+
+      await applyScrapeMetricsToGroups(onGroupsChange, group.id, account.id, built, {
+        masterTotal: master.joinedInMaster,
+        lastSyncAt: new Date().toISOString(),
+        preserveActionProcess: true,
+        preserveSession: true,
+      });
+
+      if (brandX > 0) {
+        onGroupsChange((prev) =>
+          patchBrandStandardCountForPlatform(prev, group.id, account.platform, account.id, brandX),
+        );
+      }
+
+      const truncated = /TRUNCATED_\d+/i.test(scrapeCounts.hint ?? '');
+      await recordSyncActivity({
+        accountId: dbAccountId,
+        platform: account.platform,
+        syncSource: 'auto',
+        sessionStatus: 'valid',
+        deviceGroups: built.groupsCurrent,
+        brandGroups: built.groupsTotal,
+        adminGroups: built.adminCurrent,
+        message: truncated
+          ? `auto_scrape:${built.groupsCurrent}/${built.groupsTotal}:SCRAPER_TRUNCATED_CAP`
+          : `auto_scrape:${built.groupsCurrent}/${built.groupsTotal}`,
+      });
+
+      return truncated ? 'truncated' : 'success';
     } catch (error) {
       if (cancelledBySelection || isAborted(cycleControl)) return 'aborted';
       throw error;
     } finally {
       window.clearInterval(watchTimer);
     }
-
-    if (cancelledBySelection || isAborted(cycleControl)) return 'aborted';
-    if (cycleControl?.isAccountSelected && !cycleControl.isAccountSelected(account.id)) {
-      return 'aborted';
-    }
-    const supabase = getSupabase();
-    const brandId =
-      (
-        await supabase
-          ?.from(TABLES.messagingAccounts)
-          .select('brand_id')
-          .eq('id', dbAccountId)
-          .maybeSingle()
-      )?.data?.brand_id as string | undefined;
-
-    let brandX = 0;
-    if (brandId) {
-      brandX = await resolveBrandStandardTotal(brandId, account.platform, 0, account.brandName);
-    }
-
-    const { result: built, master } = await buildMetricsFromScrapeDaily({
-      accountId: dbAccountId,
-      brand: account.brandName,
-      platform: account.platform,
-      sessionValid: true,
-      forceFresh: true,
-    });
-
-    markAccountScrapeGrace(account.id);
-
-    await applyScrapeMetricsToGroups(onGroupsChange, group.id, account.id, built, {
-      masterTotal: master.joinedInMaster,
-      lastSyncAt: new Date().toISOString(),
-      preserveActionProcess: true,
-      preserveSession: true,
-    });
-
-    if (brandX > 0) {
-      onGroupsChange((prev) =>
-        patchBrandStandardCountForPlatform(prev, group.id, account.platform, account.id, brandX),
-      );
-    }
-
-    await recordSyncActivity({
-      accountId: dbAccountId,
-      platform: account.platform,
-      syncSource: 'auto',
-      sessionStatus: 'valid',
-      deviceGroups: built.groupsCurrent,
-      brandGroups: built.groupsTotal,
-      adminGroups: built.adminCurrent,
-      message: `auto_scrape:${built.groupsCurrent}/${built.groupsTotal}`,
-    });
-
-    return 'success';
   } catch (error) {
     const message = normalizeScrapeErrorMessage(
       error instanceof Error ? error.message : 'Auto scrape failed',

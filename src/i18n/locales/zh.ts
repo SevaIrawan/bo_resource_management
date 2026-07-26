@@ -40,6 +40,7 @@ export const zh: Messages = {
       statusPartial: '{{success}}/{{total}}',
       statusView: '查看',
       outcomeSuccess: '成功',
+      outcomeTruncated: '部分完成（上限 6000）',
       outcomeFailed: '失败',
       outcomeSessionInvalid: '会话无效',
       statusDetailTitle: '{{brand}} · {{platform}}',
@@ -662,6 +663,16 @@ export const zh: Messages = {
         '登录成功，但未能及时读取设备群组数 — 请运行抓取以刷新。是否立即抓取并写入数据库？',
       scrapeProgressHint: '后台抓取中，表格数字会更新。',
       scraperFailed: '抓取失败，请重试。',
+      scraperWaConnectFailed:
+        'WhatsApp 连接失败。请 5 分钟后再试，或清除会话（Clear Session）后重试。',
+      scraperTgConnectFailed:
+        'Telegram 连接失败（sidecar 或网络）。请 5 分钟后再试，或重启应用后再次 Sync。',
+      scraperWaSessionUnlinked:
+        '手机端 WhatsApp 会话已取消关联。请再次 Sync，扫码或用手机号重新登录。',
+      scraperIncomplete:
+        '抓取在读取完本账号全部群组前已停止。请等待应用/设备同步完成几分钟后，再次 Scrape Now。',
+      scraperTruncatedCap:
+        '本次仅保存前 6000 个群（账号群数更多）。已写入数据真实但不完整 — 如需全量请拆分账号或联系支持。',
       scraperConnectionLostWa:
         '与 WhatsApp 服务器的连接已中断。请检查本机网络及手机 WhatsApp 是否正常，然后重新运行抓取。',
       scraperConnectionLostTg:
@@ -670,14 +681,15 @@ export const zh: Messages = {
         '与 {{platform}} 的连接已中断。请检查网络后重试。',
       scraperNetworkError: '抓取时发生网络错误。请检查网络连接后重试。',
       scraperIdleStuckWa:
-        '抓取已停止：数分钟内无进展。WhatsApp 可能已断开或仍在同步。请检查手机连接后重试。',
+        '抓取已停止：在读完全部群组前数分钟无进展。请检查本机与手机 WhatsApp，等待几分钟后再次 Scrape Now。',
       scraperIdleStuckTg:
-        '抓取已停止：数分钟内无进展。Telegram 可能已断开或仍在同步。请检查连接后重试。',
+        '抓取已停止：在读完全部群组前数分钟无进展。请检查 Telegram 连接，等待几分钟后再次 Scrape Now。',
       scraperWaSyncPending:
         'WhatsApp Web 仍在从服务器同步。请等待手机聊天加载完成后再运行抓取。',
       scraperLegacyTimeout:
         '抓取超时（旧版应用）。请更新应用，检查 WhatsApp/Telegram 连接后重试。',
-      scraperNoGroups: '未找到群组。',
+      scraperNoGroups:
+        '未能从 WhatsApp Web 读取到群组。若手机账号有群，请等待收件箱同步后再 Scrape Now。',
       scraperDesktopRequired: '抓取需使用桌面客户端。',
       authRequired: '请先登录仪表板。',
       syncConnectedSummary:

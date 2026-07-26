@@ -4,7 +4,7 @@ import {
   runTelegramScrape,
   runTelegramScrapeAutoLane,
 } from './telegramScrape';
-import { validateTelegramSession, validateTelegramSessionForSync, validateWhatsAppSession } from './validateSession';
+import { validateTelegramSession, validateWhatsAppSession } from './validateSession';
 import { normalizeScrapeResult } from './scrapeOutput';
 import { assertScrapeHasGroups } from './scrapeGroupValidation';
 import { runWhatsAppScrape, runWhatsAppScrapeAutoLane } from './whatsappScrape';
@@ -94,7 +94,11 @@ async function executeAutoScrapeRun(payload: ScrapeRunPayload) {
         : await runWhatsAppScrapeAutoLane(payload.sessionId, payload.expectedPhone);
 
     const groups = normalizeScrapeResult(raw.groups);
-    assertScrapeHasGroups(payload.platform, groups, raw as { hint?: string; telegramUser?: string });
+    assertScrapeHasGroups(payload.platform, groups, raw as {
+      hint?: string;
+      telegramUser?: string;
+      deviceGroupCount?: number;
+    });
 
     return { ...raw, groups, count: groups.length };
   } catch (error) {
@@ -128,7 +132,11 @@ export function registerScraperIpc() {
           : await runWhatsAppScrape(payload.sessionId, payload.expectedPhone);
 
       const groups = normalizeScrapeResult(raw.groups);
-      assertScrapeHasGroups(payload.platform, groups, raw as { hint?: string; telegramUser?: string });
+      assertScrapeHasGroups(payload.platform, groups, raw as {
+        hint?: string;
+        telegramUser?: string;
+        deviceGroupCount?: number;
+      });
 
       return { ...raw, groups, count: groups.length };
     } catch (error) {
@@ -190,26 +198,19 @@ export function registerScraperIpc() {
   );
 
   ipcMain.handle('scraper:validate-session', async (_event, payload: ValidateSessionPayload) => {
-    /** Sync Active: strict=false — tanpa busy gate, tanpa cold Chrome / TG restore. */
-    const syncLight = payload.strict === false;
-    if (payload.strict) {
-      const jobs = getJobQueueSnapshot().jobs;
-      const busy = accountExecuteBusyProbeResult(
-        payload.sessionId,
-        payload.accountId ?? payload.sessionId,
-        jobs,
-      );
-      if (busy) return busy;
-    }
+    /** Check Session = ke device. Busy execute/job → bukan Valid palsu. */
+    const jobs = getJobQueueSnapshot().jobs;
+    const busy = accountExecuteBusyProbeResult(
+      payload.sessionId,
+      payload.accountId ?? payload.sessionId,
+      jobs,
+    );
+    if (busy) return busy;
     try {
       if (payload.platform === 'telegram') {
-        return syncLight
-          ? await validateTelegramSessionForSync(payload.sessionId, payload.storedSessionString)
-          : await validateTelegramSession(payload.sessionId, payload.storedSessionString);
+        return await validateTelegramSession(payload.sessionId, payload.storedSessionString);
       }
-      return validateWhatsAppSession(payload.sessionId, {
-        strict: syncLight ? false : true,
-      });
+      return validateWhatsAppSession(payload.sessionId, { strict: true });
     } catch (error) {
       return {
         valid: false,

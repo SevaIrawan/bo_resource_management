@@ -403,6 +403,9 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
             : batchSuccessCount(result, job),
         ...(timedOutcomes ? { groupOutcomes: timedOutcomes } : {}),
       });
+      // Partial create tetap bisa lanjut Set Photo — jangan buang grup yang sudah di device.
+      tryAutoEnqueueSetPhotoAfterCreate(job);
+      tryAutoEnqueueDeleteAfterExit(job);
       return;
     }
     if (stopMode === 'cancel') {
@@ -514,11 +517,27 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
     tryAutoEnqueueDeleteAfterExit(job);
   } catch (error) {
     if (getAutomationJobStatus(job.id) === 'running') {
+      // Outcomes mid-batch sudah di-attach ke job.payload — jangan buang saat exception.
+      const fresh =
+        getJobQueueSnapshot().jobs.find((row) => row.id === job.id) ?? job;
+      const partialOutcomes = fresh.payload.groupOutcomes;
+      const created =
+        job.action === 'create_group'
+          ? countCreatedGroupOutcomes(partialOutcomes)
+          : 0;
       markJobFinished(job.id, 'failed', {
         error: humanizeJobError(
           error instanceof Error ? error.message : 'AUTOMATION_EXCEPTION',
         ),
+        batchSuccess: created > 0 ? created : undefined,
+        ...(partialOutcomes?.length ? { groupOutcomes: partialOutcomes } : {}),
+        message:
+          created > 0
+            ? `${created} group(s) created before error`
+            : undefined,
       });
+      tryAutoEnqueueSetPhotoAfterCreate(job);
+      tryAutoEnqueueDeleteAfterExit(job);
     }
   } finally {
     markSessionSettleAfterJob(job.sessionId);
@@ -569,7 +588,12 @@ async function runnerTick(): Promise<void> {
   try {
     if (getRunnerState() === 'paused') return;
 
-    if (failStaleRunningJobs(STALE_RUNNING_MS) > 0) {
+    const staleFailed = failStaleRunningJobs(STALE_RUNNING_MS);
+    if (staleFailed.length > 0) {
+      for (const stale of staleFailed) {
+        tryAutoEnqueueSetPhotoAfterCreate(stale);
+        tryAutoEnqueueDeleteAfterExit(stale);
+      }
       scheduleRunnerTick(0);
     }
 

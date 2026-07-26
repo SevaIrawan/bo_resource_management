@@ -9,7 +9,7 @@ import { withNetworkRetry } from '../lib/networkRetry';
 const SIDECAR_URL = 'http://127.0.0.1:8765';
 export { SIDECAR_URL };
 const SIDECAR_PORT = 8765;
-const SIDECAR_VERSION = 3;
+const SIDECAR_VERSION = 4;
 const pollTimers = new Map<string, ReturnType<typeof setInterval>>();
 const pollErrorStreak = new Map<string, number>();
 const POLL_ERROR_MAX_STREAK = 8;
@@ -95,15 +95,26 @@ async function waitForHealth(timeoutMs = 25_000) {
   throw new Error('Telegram sidecar failed to start');
 }
 
-async function readSidecarVersion(): Promise<number | null> {
+async function readSidecarHealth(): Promise<{
+  version: number | null;
+  activeScrapes: number;
+} | null> {
   try {
     const res = await fetch(`${SIDECAR_URL}/health`, { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return null;
-    const json = await parseSidecarJson<{ version?: number }>(res);
-    return typeof json.version === 'number' ? json.version : null;
+    const json = await parseSidecarJson<{ version?: number; activeScrapes?: number }>(res);
+    return {
+      version: typeof json.version === 'number' ? json.version : null,
+      activeScrapes: Math.max(0, Math.floor(Number(json.activeScrapes) || 0)),
+    };
   } catch {
     return null;
   }
+}
+
+async function readSidecarVersion(): Promise<number | null> {
+  const health = await readSidecarHealth();
+  return health?.version ?? null;
 }
 
 function killProcessOnPort(port: number): Promise<void> {
@@ -128,8 +139,16 @@ export async function ensureSidecarRunning() {
     try {
       try {
         await waitForHealth(1200);
-        const version = await readSidecarVersion();
-        if (version === SIDECAR_VERSION) return;
+        const health = await readSidecarHealth();
+        if (health?.version === SIDECAR_VERSION) return;
+
+        // Jangan bunuh sidecar saat scrape async masih jalan — putus mid-scrape.
+        if (health && health.activeScrapes > 0) {
+          console.warn(
+            `[telegram-sidecar] version=${health.version}≠${SIDECAR_VERSION} but ${health.activeScrapes} scrape(s) active — skip restart`,
+          );
+          return;
+        }
 
         // Stale sidecar from an older build — restart so new routes are available.
         await killProcessOnPort(SIDECAR_PORT);

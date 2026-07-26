@@ -131,7 +131,9 @@ declare global {
           groups: ScrapedGroupRow[];
           count: number;
           loggedInAs?: string;
+          telegramUser?: string;
           elapsedMs?: number;
+          hint?: string;
         }>;
         runAuto: (payload: {
           sessionId: string;
@@ -144,7 +146,9 @@ declare global {
           groups: ScrapedGroupRow[];
           count: number;
           loggedInAs?: string;
+          telegramUser?: string;
           elapsedMs?: number;
+          hint?: string;
         }>;
         cancelAuto: (payload: {
           sessionId: string;

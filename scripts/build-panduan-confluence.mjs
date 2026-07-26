@@ -100,15 +100,11 @@ function wrapHtml({ version, introHtml, tocHtml, bodyHtml }) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Panduan Group Monitoring v${version} — Confluence Paste</title>
+  <title>Panduan Group Monitoring v${version}</title>
   <style>${CONFLUENCE_STYLES}
   </style>
 </head>
 <body>
-
-<p class="paste-hint"><strong>Cara paste ke Confluence:</strong> Buka file ini di browser → pilih semua isi halaman (Ctrl+A) → salin (Ctrl+C) → tempel di editor Confluence. Atau salin hanya bagian di bawah garis horizontal pertama jika tidak ingin menyertakan petunjuk ini.</p>
-
-<hr />
 
 <h1>Panduan Group Monitoring</h1>
 

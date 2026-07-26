@@ -4,8 +4,13 @@ export const WA_STORE_GROUP_LIST_CAP = 6000;
 /** Alias legacy — sama dengan WA_STORE_GROUP_LIST_CAP. */
 export const DEVICE_GROUP_TARGET_MAX = WA_STORE_GROUP_LIST_CAP;
 
-/** Cek session valid/invalid — cold WA Chrome + TG restore; tidak baca daftar grup; tidak skala Y/X. */
-export const SESSION_CHECK_TIMEOUT_MS = 20_000;
+/** Cek session valid/invalid — cold WA Chrome + TG restore; tidak baca daftar grup.
+ * 90s: akun besar (hingga ~5000 grup) butuh waktu cold boot sampai CONNECTED.
+ */
+export const SESSION_CHECK_TIMEOUT_MS = Math.max(
+  20_000,
+  Math.floor(Number(process.env.RM_SESSION_CHECK_TIMEOUT_MS) || 90_000),
+);
 
 /** Scrape metadata — evaluate berat; jangan 12 paralel di satu Puppeteer page. */
 export const WA_SCRAPE_METADATA_CONCURRENCY = Math.max(
@@ -44,11 +49,29 @@ const SCRAPE_PER_GROUP_MS = Math.max(
 /** Selaras INVITE_CODE_TIMEOUT_MS di whatsappGroupInviteLink.ts */
 const WA_INVITE_FETCH_TIMEOUT_MS = 20_000;
 
-/** Gagal jika tidak ada progress scrape selama interval ini (ms). Override: RM_SCRAPE_IDLE_MS */
+/** Gagal jika tidak ada progress scrape selama interval ini (ms).
+ * Default 15 menit — akun ~5000 grup + invite serial; override: RM_SCRAPE_IDLE_MS.
+ */
 export const SCRAPE_IDLE_TIMEOUT_MS = Math.max(
-  120_000,
-  Math.floor(Number(process.env.RM_SCRAPE_IDLE_MS) || 600_000),
+  300_000,
+  Math.floor(Number(process.env.RM_SCRAPE_IDLE_MS) || 900_000),
 );
+
+/** Checkpoint lokal WA tiap N grup (metadata + invite) — resume setelah disconnect. */
+export const WA_SCRAPE_CHECKPOINT_EVERY = Math.max(
+  5,
+  Math.floor(Number(process.env.RM_WA_SCRAPE_CHECKPOINT_EVERY) || 25),
+);
+
+/**
+ * Idle watchdog diskalakan dari ukuran akun (~5000 grup → hingga 45 menit tanpa progress).
+ * FloodWait / sync inbox lambat tidak memutus worker yang masih hidup.
+ */
+export function scrapeIdleTimeoutMs(groupCount = 0): number {
+  const n = clampGroupCount(groupCount);
+  const scaled = SCRAPE_IDLE_TIMEOUT_MS + n * 216;
+  return Math.min(2_700_000, Math.max(SCRAPE_IDLE_TIMEOUT_MS, scaled));
+}
 
 export function clampGroupCount(count: number): number {
   return Math.max(0, Math.min(Math.floor(count) || 0, WA_STORE_GROUP_LIST_CAP));
@@ -99,9 +122,18 @@ export function formatScrapeEtaLabel(planMs: number): string {
   return `≈${hours}h left`;
 }
 
-/** Tunggu inbox WA stabil — skala dari hitungan grup di store. */
+/** Tunggu inbox WA stabil — skala dari hitungan grup di store (akun ~5000 → hingga 45 mnt). */
 export function waInboxStableTimeoutMs(groupCount: number): number {
-  return scaledMs(120_000, 80, 900_000, groupCount);
+  return scaledMs(180_000, 120, 2_700_000, groupCount);
+}
+
+/** Berapa round count harus sama sebelum scrape — akun besar butuh lebih lama. */
+export function waInboxStableRounds(groupCount: number): number {
+  const n = clampGroupCount(groupCount);
+  if (n >= 2000) return 8;
+  if (n >= 500) return 6;
+  if (n >= 100) return 4;
+  return 3;
 }
 
 export function waQrBootstrapDeadlineMs(estimate = 0): number {

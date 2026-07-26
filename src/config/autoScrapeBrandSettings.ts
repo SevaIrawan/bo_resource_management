@@ -16,11 +16,12 @@ export type AutoScrapeBrandAccountMap = Record<string, AutoScrapeBrandAccountSel
 
 /**
  * Hasil per akun:
- * - success = auto scrape selesai
+ * - success = auto scrape selesai penuh
+ * - truncated = selesai tapi cap 6000 (data tertulis, bukan sukses diam)
  * - failed = dijalankan tapi gagal
  * - session_invalid = tidak dijalankan (skip / session tidak valid) — bukan gagal scrape
  */
-export type AutoScrapeAccountOutcome = 'success' | 'failed' | 'session_invalid';
+export type AutoScrapeAccountOutcome = 'success' | 'truncated' | 'failed' | 'session_invalid';
 
 export type AutoScrapeBrandAccountResultRow = {
   accountId: string;
@@ -30,7 +31,7 @@ export type AutoScrapeBrandAccountResultRow = {
 };
 
 export type AutoScrapeBrandStatusEntry = {
-  /** Semua akun Acc = success (tidak ada failed / session_invalid). */
+  /** Semua akun Acc = success penuh (tidak ada truncated / failed / session_invalid). */
   allSuccessful: boolean;
   successCount: number;
   totalCount: number;
@@ -282,7 +283,14 @@ export function filterAccountsByAutoScrapeSelection<T extends { id: string }>(
 }
 
 function parseAccountOutcome(value: unknown): AutoScrapeAccountOutcome | null {
-  if (value === 'success' || value === 'failed' || value === 'session_invalid') return value;
+  if (
+    value === 'success' ||
+    value === 'truncated' ||
+    value === 'failed' ||
+    value === 'session_invalid'
+  ) {
+    return value;
+  }
   // Legacy labels from earlier draft
   if (value === 'skipped') return 'session_invalid';
   return null;

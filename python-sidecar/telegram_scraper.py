@@ -37,6 +37,13 @@ _SCRAPE_DELAY = merge_delay(
 
 _scrape_progress: dict[str, dict] = {}
 _scrape_cancel_requests: set[str] = set()
+# Hasil scrape terakhir / checkpoint parsial — pulih jika HTTP Electron putus mid-scrape.
+_scrape_results: dict[str, dict] = {}
+_scrape_tasks: dict[str, asyncio.Task] = {}
+
+
+class ScrapeCancelled(Exception):
+    """Operator cancel — termasuk mid FloodWait / long await."""
 
 
 def request_scrape_cancel(session_id: str) -> None:
@@ -51,14 +58,38 @@ def is_scrape_cancelled(session_id: str) -> bool:
     return session_id in _scrape_cancel_requests
 
 
-def _cancelled_payload(session_id: str) -> dict:
+def _cancelled_payload(session_id: str, groups: list | None = None) -> dict:
     clear_scrape_cancel(session_id)
     clear_scrape_progress(session_id)
-    return {"status": "cancelled", "message": "SCRAPER_CANCELLED", "groups": [], "count": 0}
+    rows = list(groups or [])
+    payload = {
+        "status": "cancelled",
+        "message": "SCRAPER_CANCELLED",
+        "groups": rows,
+        "count": len(rows),
+    }
+    if rows:
+        # Cancel mid-way — simpan parsial agar Electron bisa commit, bukan buang 500+ grup.
+        payload["hint"] = "PARTIAL_BEFORE_CANCEL"
+        set_scrape_result(session_id, {**payload, "status": "ok", "partial": True})
+    return payload
 
 
 def clear_scrape_progress(session_id: str) -> None:
     _scrape_progress.pop(session_id, None)
+
+
+def set_scrape_result(session_id: str, payload: dict) -> None:
+    _scrape_results[session_id] = dict(payload)
+
+
+def get_scrape_result(session_id: str) -> dict | None:
+    row = _scrape_results.get(session_id)
+    return dict(row) if row else None
+
+
+def clear_scrape_result(session_id: str) -> None:
+    _scrape_results.pop(session_id, None)
 
 
 def set_scrape_progress(
@@ -110,6 +141,44 @@ async def _sleep_flood_with_heartbeat(
         chunk = min(15.0, remaining)
         await asyncio.sleep(chunk)
         remaining -= chunk
+    if is_scrape_cancelled(session_id):
+        raise ScrapeCancelled()
+
+
+async def _await_with_progress_heartbeat(
+    session_id: str,
+    awaitable,
+    *,
+    phase: str = "discover",
+    label: str = "Working…",
+):
+    """Jalankan awaitable sambil emit progress tiap 15s — cegah idle watchdog putus diam."""
+    stop = asyncio.Event()
+
+    async def _heartbeat() -> None:
+        elapsed = 0
+        while not stop.is_set():
+            if is_scrape_cancelled(session_id):
+                return
+            set_scrape_progress(
+                session_id,
+                phase=phase,
+                label=f"{label} ({elapsed}s)",
+            )
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=15.0)
+            except asyncio.TimeoutError:
+                elapsed += 15
+
+    task = asyncio.create_task(_heartbeat())
+    try:
+        return await awaitable
+    finally:
+        stop.set()
+        try:
+            await task
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _admin_label(is_admin: bool) -> str:
@@ -321,8 +390,12 @@ async def _resolve_invite_link(
                 )
             else:
                 await asyncio.sleep(wait_s)
+            if session_id and is_scrape_cancelled(session_id):
+                raise ScrapeCancelled()
             if attempt >= retries:
                 return None
+        except ScrapeCancelled:
+            raise
         except Exception:  # noqa: BLE001
             return None
     return None
@@ -355,6 +428,8 @@ async def _count_with_flood_retry(
             )
         else:
             await asyncio.sleep(wait_s)
+        if session_id and is_scrape_cancelled(session_id):
+            raise ScrapeCancelled()
         return await coro_factory()
 
 
@@ -414,8 +489,15 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
     try:
         set_scrape_progress(session_id, phase="discover", label="Discovering groups on Telegram")
 
-        # Refresh dialog list from Telegram servers before membership scrape.
-        await client.get_dialogs()
+        # Refresh dialog list — akun besar bisa lama; heartbeat agar idle watchdog Electron tidak putus diam.
+        await _await_with_progress_heartbeat(
+            session_id,
+            client.get_dialogs(),
+            phase="discover",
+            label="Refreshing dialog list from Telegram",
+        )
+        if is_scrape_cancelled(session_id):
+            return _cancelled_payload(session_id)
 
         targets: list = []
         total_on_account = 0
@@ -425,10 +507,19 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             if not _is_group_dialog(dialog):
                 continue
             total_on_account += 1
+            if total_on_account == 1 or total_on_account % 50 == 0:
+                set_scrape_progress(
+                    session_id,
+                    phase="discover",
+                    current=total_on_account,
+                    total=0,
+                    label=f"Listing groups on device ({total_on_account})…",
+                )
             if len(targets) < DEVICE_GROUP_TARGET_MAX:
                 targets.append(dialog)
 
-        if total_on_account > DEVICE_GROUP_TARGET_MAX:
+        truncated = total_on_account > DEVICE_GROUP_TARGET_MAX
+        if truncated:
             print(
                 f"[tg-scrape] sessionId={session_id} {total_on_account} groups; "
                 f"scraping first {DEVICE_GROUP_TARGET_MAX}",
@@ -453,7 +544,7 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
         groups: list[dict] = []
         for index, dialog in enumerate(targets):
             if is_scrape_cancelled(session_id):
-                return _cancelled_payload(session_id)
+                return _cancelled_payload(session_id, groups)
 
             if index > 0:
                 await asyncio.sleep(
@@ -488,6 +579,8 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                     current=index,
                     total=total,
                 )
+            except ScrapeCancelled:
+                return _cancelled_payload(session_id, groups)
             except FloodWaitError:
                 is_admin_flag = False
             except Exception:  # noqa: BLE001
@@ -501,22 +594,27 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                     current=index,
                     total=total,
                 )
+            except ScrapeCancelled:
+                return _cancelled_payload(session_id, groups)
             except FloodWaitError:
                 owner_count, admin_count = 0, 0
             except Exception:  # noqa: BLE001
                 owner_count, admin_count = 0, 0
 
             username = getattr(entity, "username", None)
-            invite_link = await _resolve_invite_link(
-                client,
-                entity,
-                username,
-                is_admin=bool(is_admin_flag),
-                existing_invite=existing_invite,
-                session_id=session_id,
-                current=index,
-                total=total,
-            )
+            try:
+                invite_link = await _resolve_invite_link(
+                    client,
+                    entity,
+                    username,
+                    is_admin=bool(is_admin_flag),
+                    existing_invite=existing_invite,
+                    session_id=session_id,
+                    current=index,
+                    total=total,
+                )
+            except ScrapeCancelled:
+                return _cancelled_payload(session_id, groups)
 
             current = index + 1
             set_scrape_progress(
@@ -539,6 +637,20 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                 }
             )
 
+            # Checkpoint parsial — pulih jika proses/HTTP putus mid-scrape.
+            if current % 25 == 0 or current == total:
+                set_scrape_result(
+                    session_id,
+                    {
+                        "status": "running",
+                        "groups": list(groups),
+                        "count": len(groups),
+                        "partial": True,
+                        "hint": "PARTIAL_CHECKPOINT",
+                        "telegramUser": me_label,
+                    },
+                )
+
         elapsed_sec = time.monotonic() - started_at
 
         admin_count = sum(1 for group in groups if group["is_admin"] == "yes")
@@ -551,15 +663,104 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             "telegramUser": me_label,
             "elapsedMs": int(elapsed_sec * 1000),
         }
+        hint_parts: list[str] = []
+        if truncated:
+            hint_parts.append(f"TRUNCATED_{DEVICE_GROUP_TARGET_MAX}")
+            payload["message"] = (
+                f"Telegram @{me_label}: account has {total_on_account} groups; "
+                f"scraped first {DEVICE_GROUP_TARGET_MAX} only (cap)."
+            )
+            payload["deviceGroupCount"] = total_on_account
         if len(groups) == 0:
-            payload["hint"] = "ZERO_GROUPS_ON_ACCOUNT"
+            hint_parts.append("ZERO_GROUPS_ON_ACCOUNT")
             payload["message"] = (
                 f"Telegram @{me_label} tidak punya grup terdeteksi. "
                 "Login ulang jika ini bukan akun yang dimaksud."
             )
+        if hint_parts:
+            payload["hint"] = "|".join(hint_parts)
+        # Sertakan session string di hasil scrape — Electron persist tanpa IPC export terpisah
+        # (path finishing yang sering disconnect setelah scrape panjang).
+        try:
+            tg_sess = SESSIONS.get(session_id)
+            if tg_sess is not None:
+                saved = tg_sess.client.session.save()
+                if saved and str(saved).strip():
+                    payload["sessionString"] = str(saved).strip()
+                    payload["loginMethod"] = getattr(tg_sess, "mode", "qr")
+        except Exception:  # noqa: BLE001
+            pass
+        set_scrape_result(session_id, {k: v for k, v in payload.items() if k != "valid"})
         return payload
     finally:
         clear_scrape_progress(session_id)
+
+
+def is_telegram_scrape_running(session_id: str) -> bool:
+    task = _scrape_tasks.get(session_id)
+    return bool(task is not None and not task.done())
+
+
+def count_active_telegram_scrapes() -> int:
+    return sum(1 for task in _scrape_tasks.values() if task is not None and not task.done())
+
+
+def any_telegram_scrape_running() -> bool:
+    return count_active_telegram_scrapes() > 0
+
+
+async def start_telegram_scrape_job(
+    session_id: str,
+    session_string: str | None = None,
+    expected_phone: str | None = None,
+) -> dict:
+    """
+    Mulai scrape di background task — HTTP request pendek.
+    Jangan await scrape di request HTTP panjang (putus di ~500+ grup → fetch failed).
+    """
+    existing = _scrape_tasks.get(session_id)
+    if existing is not None and not existing.done():
+        return {"status": "started", "alreadyRunning": True}
+
+    clear_scrape_cancel(session_id)
+    clear_scrape_result(session_id)
+    set_scrape_progress(session_id, phase="start", label="Starting Telegram scrape")
+
+    async def _run() -> None:
+        try:
+            result = await scrape_telegram_groups(session_id, session_string, expected_phone)
+            set_scrape_result(session_id, result)
+        except Exception as exc:  # noqa: BLE001
+            prev = get_scrape_result(session_id)
+            groups = list((prev or {}).get("groups") or [])
+            if groups:
+                set_scrape_result(
+                    session_id,
+                    {
+                        "status": "ok",
+                        "groups": groups,
+                        "count": len(groups),
+                        "partial": True,
+                        "hint": "PARTIAL_AFTER_ERROR",
+                        "message": str(exc) or "Telegram scrape interrupted",
+                        "telegramUser": (prev or {}).get("telegramUser"),
+                    },
+                )
+            else:
+                set_scrape_result(
+                    session_id,
+                    {
+                        "status": "error",
+                        "message": str(exc) or "Telegram scrape failed",
+                        "groups": [],
+                        "count": 0,
+                    },
+                )
+        finally:
+            _scrape_tasks.pop(session_id, None)
+
+    _scrape_tasks[session_id] = asyncio.create_task(_run())
+    return {"status": "started"}
 
 
 async def scrape_telegram_groups(
@@ -577,6 +778,8 @@ async def scrape_telegram_groups(
 
     result = await _collect_groups(session_id, expected_phone)
     if result.get("status") == "error":
+        return result
+    if result.get("status") == "cancelled":
         return result
     payload = dict(result)
     payload.pop("valid", None)

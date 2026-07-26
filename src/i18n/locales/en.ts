@@ -38,6 +38,7 @@ export const en = {
       statusPartial: '{{success}}/{{total}}',
       statusView: 'View',
       outcomeSuccess: 'Success',
+      outcomeTruncated: 'Partial (6000 cap)',
       outcomeFailed: 'Failed',
       outcomeSessionInvalid: 'Session invalid',
       statusDetailTitle: '{{brand}} · {{platform}}',
@@ -686,6 +687,16 @@ export const en = {
       scrapeProgressHint: 'Scraping in background. Counts update in the table.',
       syncFailed: 'Sync failed. Try again.',
       scraperFailed: 'Scraper failed. Try again.',
+      scraperWaConnectFailed:
+        'WhatsApp connection failed. Please try again after 5 minutes, or Clear Session and try again.',
+      scraperTgConnectFailed:
+        'Telegram connection failed (sidecar or network). Please try again after 5 minutes, or restart the app and Sync again.',
+      scraperWaSessionUnlinked:
+        'WhatsApp session was unlinked on the phone. Sync again and scan QR or use phone linking.',
+      scraperIncomplete:
+        'Scrape stopped before all groups on this account were read. Wait a few minutes for the app/device to finish syncing, then Scrape Now again.',
+      scraperTruncatedCap:
+        'Scrape saved the first 6000 groups only (account has more). Data written is real but incomplete vs full account list — split accounts or contact support if you need the full set.',
       scraperConnectionLostWa:
         'WhatsApp connection to the server was lost or interrupted. Check internet on this PC and that WhatsApp works on your phone, then run the scraper again.',
       scraperConnectionLostTg:
@@ -695,14 +706,15 @@ export const en = {
       scraperNetworkError:
         'Network error while scraping. Check your internet connection and try again.',
       scraperIdleStuckWa:
-        'Scrape stopped: no progress for several minutes. WhatsApp may be disconnected or still syncing. Check connection on your phone and try again.',
+        'Scrape stopped: no progress for several minutes before all groups were read. Check WhatsApp on this PC and your phone, wait a few minutes, then Scrape Now again.',
       scraperIdleStuckTg:
-        'Scrape stopped: no progress for several minutes. Telegram may be disconnected or still syncing. Check connection and try again.',
+        'Scrape stopped: no progress for several minutes before all groups were read. Check Telegram connection, wait a few minutes, then Scrape Now again.',
       scraperWaSyncPending:
         'WhatsApp Web is still syncing from the server. Wait until chats load on the phone, then run the scraper again.',
       scraperLegacyTimeout:
         'Scrape timed out (older app build). Update the app, check WhatsApp/Telegram connection, then try again.',
-      scraperNoGroups: 'No groups found.',
+      scraperNoGroups:
+        'No groups were read from WhatsApp Web. If this account has groups on the phone, wait for inbox sync and Scrape Now again.',
       scraperDesktopRequired: 'Scraper needs the desktop app.',
       authRequired: 'Log in to the dashboard first.',
       syncConnectedSummary:

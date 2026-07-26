@@ -75,12 +75,14 @@ function outcomeLabel(
   t: (key: string, params?: Record<string, string>) => string,
 ): string {
   if (outcome === 'success') return t('settings.autoSync.outcomeSuccess');
+  if (outcome === 'truncated') return t('settings.autoSync.outcomeTruncated');
   if (outcome === 'failed') return t('settings.autoSync.outcomeFailed');
   return t('settings.autoSync.outcomeSessionInvalid');
 }
 
 function outcomeClass(outcome: AutoScrapeAccountOutcome): string {
   if (outcome === 'success') return 'text-emerald-400';
+  if (outcome === 'truncated') return 'text-amber-300';
   if (outcome === 'failed') return 'text-rose-400';
   return 'text-amber-400';
 }

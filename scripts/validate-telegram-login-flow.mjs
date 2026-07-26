@@ -34,8 +34,16 @@ const statusFn = fnBlock(tgPy, 'get_telegram_status');
 
 const checks = [
   {
-    name: 'Sidecar API version 3 (restart sidecar lama)',
-    ok: sidecarTs.includes('SIDECAR_VERSION = 3') && mainPy.includes('"version": 3'),
+    name: 'Sidecar API version 4 (restart sidecar lama)',
+    ok: sidecarTs.includes('SIDECAR_VERSION = 4') && mainPy.includes('"version": 4'),
+  },
+  {
+    name: 'Export session reconnect jika disconnected',
+    ok:
+      tgPy.includes('_ensure_client_connected') &&
+      tgPy.includes('_force_reconnect') &&
+      tgPy.includes('serialize session TIDAK bergantung get_me') &&
+      tgPy.includes('Cannot send request while disconnected'),
   },
   {
     name: 'Finalize QR tidak cancel wait_task',

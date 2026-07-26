@@ -32,7 +32,18 @@ async function persistTelegramSession(
   accountId: string,
   sessionId: string,
   label: string,
+  fromScrape?: { sessionString?: string; loginMethod?: string },
 ): Promise<void> {
+  const embedded = fromScrape?.sessionString?.trim();
+  if (embedded) {
+    await saveTelegramPlatformSession({
+      accountId,
+      sessionString: embedded,
+      loginMethod: (fromScrape?.loginMethod as LoginMethod | undefined) ?? 'qr',
+    });
+    return;
+  }
+
   const exporter = window.electronAPI?.scraper?.exportTelegramSession;
   if (!exporter) return;
 
@@ -48,6 +59,8 @@ export interface ScrapeRunCounts {
   deviceGroupCount: number;
   deviceAdminCount: number;
   masterCount: number;
+  /** Hint dari device scrape (mis. TRUNCATED_6000) — sukses tapi tidak diam. */
+  hint?: string;
 }
 
 /** Satu pintu scrape renderer — user (`scraper:run`) atau auto (`scraper:run-auto`). */
@@ -114,11 +127,36 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
     const masterCount = scrapeWrite.masterCount;
 
     if (input.account.platform === 'telegram') {
-      await persistTelegramSession(
-        accountId,
-        deviceSessionId,
-        `Export Telegram session after ${logPrefix.toLowerCase()}`,
-      );
+      // Prefer sessionString dari hasil scrape (tanpa IPC export).
+      // Fallback export IPC + soft-fail — jangan gagalkan scrape UI setelah write DB.
+      const scrapeSession = result as {
+        sessionString?: string;
+        loginMethod?: string;
+      };
+      try {
+        await persistTelegramSession(
+          accountId,
+          deviceSessionId,
+          `Export Telegram session after ${logPrefix.toLowerCase()}`,
+          {
+            sessionString: scrapeSession.sessionString,
+            loginMethod: scrapeSession.loginMethod,
+          },
+        );
+      } catch (exportErr) {
+        const exportMsg =
+          exportErr instanceof Error ? exportErr.message : String(exportErr);
+        console.warn(
+          `[${logPrefix}] Telegram session export after DB write failed (scrape data kept):`,
+          exportMsg,
+        );
+        await logPlatformSessionEvent({
+          accountId,
+          platform: 'telegram',
+          eventType: 'login_success',
+          message: `${logPrefix}: groups written; session export warning: ${exportMsg}`,
+        }).catch(() => undefined);
+      }
     }
 
     await markPlatformSessionSynced(accountId);
@@ -133,17 +171,19 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
       loggedInAs?: string;
       telegramUser?: string;
       elapsedMs?: number;
+      hint?: string;
     };
     const identity = scrapeMeta.loggedInAs ?? scrapeMeta.telegramUser;
     const metaSuffix = identity
       ? ` (${identity}${scrapeMeta.elapsedMs ? `, ${Math.round(scrapeMeta.elapsedMs / 1000)}s` : ''})`
       : '';
+    const hintSuffix = scrapeMeta.hint ? ` [${scrapeMeta.hint}]` : '';
 
     await logPlatformSessionEvent({
       accountId,
       platform: input.account.platform,
       eventType: 'login_success',
-      message: `${logPrefix}: ${deviceGroupCount} groups, admin ${deviceAdminCount}, master ${masterCount}${metaSuffix}`,
+      message: `${logPrefix}: ${deviceGroupCount} groups, admin ${deviceAdminCount}, master ${masterCount}${metaSuffix}${hintSuffix}`,
     });
     const supabase = getSupabase();
     if (supabase) {
@@ -162,7 +202,12 @@ export async function runAccountScraper(input: RunAccountScraperInput): Promise<
       }
     }
 
-    return { deviceGroupCount, deviceAdminCount, masterCount };
+    return {
+      deviceGroupCount,
+      deviceAdminCount,
+      masterCount,
+      hint: scrapeMeta.hint,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : `${logPrefix} failed`;
     const cancelled = isScrapeUserCancelledMessage(message);

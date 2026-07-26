@@ -1,25 +1,11 @@
 import { ensureSidecarRunning, SIDECAR_URL } from '../platformLogin/telegramSidecar';
 import {
   forceReleaseWhatsAppForLogin,
-  probeWhatsAppSessionForSync,
   probeWhatsAppSessionLinked,
 } from '../platformLogin/whatsapp';
 import { SESSION_CHECK_TIMEOUT_MS } from './deviceGroupScale';
 
-/**
- * Sync Active TG — ringan: string session di DB = Valid.
- * **Tidak** restore / connect / get_me (hindari timeout/busy).
- */
-export async function validateTelegramSessionForSync(
-  _sessionId: string,
-  storedSessionString?: string | null,
-): Promise<{ valid: boolean; message?: string }> {
-  if (storedSessionString?.trim()) {
-    return { valid: true, message: 'TG_STORED_SESSION_SYNC_LIGHT' };
-  }
-  return { valid: false, message: 'Login session not found. Log in first.' };
-}
-
+/** TG: Check Session ke sidecar/device — bukan “string di DB = Valid”. */
 export async function validateTelegramSession(
   sessionId: string,
   storedSessionString?: string | null,
@@ -53,31 +39,41 @@ export async function validateTelegramSession(
 
     return { valid: Boolean(json.valid), message: json.message };
   } catch (error) {
+    const raw = error instanceof Error ? error.message : 'Telegram validate failed';
+    const lower = raw.toLowerCase();
+    const name = error instanceof Error ? error.name.toLowerCase() : '';
+    const transport =
+      name === 'timeouterror' ||
+      lower.includes('fetch failed') ||
+      lower.includes('failed to fetch') ||
+      lower.includes('aborted due to timeout') ||
+      lower.includes('operation was aborted') ||
+      lower.includes('econnrefused') ||
+      lower.includes('econnreset') ||
+      lower.includes('etimedout');
     return {
       valid: false,
-      message: error instanceof Error ? error.message : 'Telegram validate failed',
+      message: transport ? 'SCRAPER_TG_CONNECT_FAILED' : raw,
     };
   }
 }
 
-/** WA: Sync = light (no cold Chrome); scrape/strict = boleh initialize. */
+/**
+ * WA: Check Session langsung ke device (getState / cold boot bila perlu).
+ * Bukan LocalAuth disk-only — file di disk ≠ linked di HP.
+ */
 export async function validateWhatsAppSession(
   sessionId: string,
-  options?: { strict?: boolean },
+  _options?: { strict?: boolean },
 ): Promise<{
   valid: boolean;
   message?: string;
 }> {
-  const light = options?.strict === false;
+  void _options;
   try {
-    return light
-      ? await probeWhatsAppSessionForSync(sessionId)
-      : await probeWhatsAppSessionLinked(sessionId);
+    return await probeWhatsAppSessionLinked(sessionId);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'WhatsApp validate failed';
-    if (light) {
-      return { valid: false, message };
-    }
     await forceReleaseWhatsAppForLogin(sessionId, { urgent: true, fast: true }).catch(
       () => undefined,
     );

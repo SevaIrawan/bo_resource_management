@@ -1,17 +1,22 @@
-BAGIAN 1: ALUR UTAMA (SYNC & SCRAPE)
+BAGIAN 1: ALUR UTAMA (SYNC & SCRAPE) — acuan = SESSION UI
 Setiap update metrik mencakup GROUP (Y/X) dan ADMIN (Y/X).
 Daftar grup di device dibaca di Electron/sidecar (bukan isi pesan). Pencocokan master↔daily di Postgres RPC.
+Scrape = data device nyata (bukan palsu/mock). Akun hingga ~5000+ grup per akun.
 
-A. SYNC — cek kolom session (Case 3):
-VALID: tanpa modal login → **check Session ringan** (WA: getState in-memory atau LocalAuth di disk; TG: session string DB; **tanpa** cold Chrome / Puppeteer / restore / hitung grup) → patch session valid → [Now|Later] atau resume-empty. Metrik Y/X hanya dari scrape / DB. Busy/timeout probe **bukan** alasan gagal Sync (session tersimpan → Valid).
-INVALID: modal login realtime → sukses: save session UI+DB saja (tanpa hitung grup di device) → [Now|Later].
-**Later** = update session Active/Valid di UI lokal + DB saja; **tidak** scrape, **tidak** count device.
-Login FAIL: WA auto-QR; TG error + pesan (tanpa auto-loop). Tutup modal = batalkan, session tetap INVALID.
-Busy/timeout (job queue / Chrome lain): **bukan** Logout / modal login pada Sync Active.
+A. SESSION UI = VALID → Sync:
+   1. Check Session **real ke device** (bukan disk/fake).
+   2. Device VALID → modal **Scrape Now | Later**
+      - **Scrape Now** → execute scrape real; **tanpa** wall-clock timeout / scala yang memutus scrape akun besar (~5000 grup). Hanya idle watchdog (macet tanpa progress) + cancel operator.
+      - **Later** → tutup modal → update kolom Session (UI + local + DB) Valid; **tidak** scrape.
+   3. Device INVALID → modal **Login** (probe device gagal meski grid masih Valid)
+   Bukan: Sync langsung hantar scrape / LOGOUT tanpa Check Session device.
 
-B. SCRAPE (hanya lewat Sync → Scrape Now; kolom Last update read-only):
-VALID (+ probe device; gagal → login meski grid valid): langsung scraper.
-INVALID: login → sukses → auto-scrape tanpa Now/Later.
+B. SESSION UI = INVALID → Sync:
+   → modal **Login** langsung (tanpa Check Session).
+
+C. Login sukses: save session UI+DB saja (tanpa hitung grup) → [Now|Later] atau intent scraper → auto-scrape.
+Login FAIL: WA auto-QR; TG error + pesan. Tutup modal = batalkan, session tetap INVALID.
+Busy (job queue / Chrome lain): alert busy — **bukan** Valid palsu, **bukan** Scrape Now.
 
 BAGIAN 2: KOLOM LAST UPDATE (real-time)
 STANDBY: INVALID → "Use Sync (↻) to log in first"; VALID+MATCH → timestamp saja; VALID+NOT MATCH → timestamp; pending → "—".
@@ -23,11 +28,15 @@ BAGIAN 3: MODAL LOGIN & QR
 Panel lebar (min ~36rem), kotak QR besar (~14rem), skeleton saat generate, overlay expired/gagal + tombol Refresh QR.
 WA: auto-regenerate QR. TG: error dulu, refresh manual.
 
-BAGIAN 4: PERFORMA (hingga 6000 grup)
-- Sync / Later: **tanpa** device count — session UI+DB saja (hindari busy/timeout akun banyak grup).
-- Scrape Now: idle watchdog + dua fase WA; tidak wall-clock tetap per sync detect lama.
-- Agregasi master↔daily: accountMasterDailyCompare.ts (in-memory) + RPC rm_commit_account_scrape saat tulis scrape.
-- Issue/kartu: buildTicketSummariesFromEngine.ts dari engine yang sama dengan grid; patch grid setelah scrape via patchAccountGridAfterDailyWrite.
+BAGIAN 4: PERFORMA (hingga 5000–6000 grup per akun)
+- Sync: Check Session ke device saja (bukan hitung daftar grup).
+- Later: session UI+local+DB saja.
+- Scrape Now: execute scrape real sampai data akun lengkap; tanpa wall-clock ready timeout; parallel Chrome user max **10**.
+- Scrape berhenti sebelum selesai → notif jelas (idle / connect fail / incomplete store / unlink) — bukan diam.
+- Incomplete store (kurang dari ~85% count device) → **bukan** sukses; error SCRAPER_INCOMPLETE + coba lagi.
+- Idle watchdog + dua fase WA (metadata + invite serial).
+- Agregasi master↔daily: accountMasterDailyCompare.ts + RPC rm_commit_account_scrape.
+- Issue/kartu: buildTicketSummariesFromEngine.ts; patch grid via patchAccountGridAfterDailyWrite.
 
 BAGIAN 5: CLEAR SESSION (tombol X di kolom Session Valid, hover baris)
 Purge session lokal (WA: wa-sessions) + platform_sessions is_active=false + UI Invalid.
@@ -43,9 +52,9 @@ BAGIAN 6: METRIK GRID, ISSUE & MODAL GROUP LINK (satu engine)
 - Export group link: RM-[nama akun]-YYYYMMDD.xlsx.
 
 BAGIAN 7: SESSION PROBE & RESOLVE AKUN (1.0.17)
-- Probe device VALID+Sync/Scrape: timeout 20s, retry busy — bukan skala grup; busy → alert SESSION_CHECK_BUSY (bukan modal login).
+- Probe device Sync/Scrape: timeout 20s, retry busy — Valid hanya jika device linked; busy → alert (bukan modal Scrape Now / bukan Valid palsu dari disk).
 - Device key = messaging_accounts.id baris grid (accountSessionResolve.ts); bukan label global.
-- shouldInvalidate DB hanya session mati (UNPAIRED/logout), bukan timeout/busy.
+- shouldInvalidate DB hanya session mati (UNPAIRED/logout), bukan busy sementara.
 
 BAGIAN 8: DATA FRESH & REALTIME (1.0.17+)
 - Scrape: RPC rm_commit_account_scrape atomik (DELETE daily → INSERT → rebuild master).

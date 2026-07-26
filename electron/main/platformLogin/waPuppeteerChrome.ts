@@ -88,8 +88,9 @@ export function waClientPuppeteerOptions(): {
     executablePath: resolveWaChromeExecutable(),
     args,
     protocolTimeout: Math.max(
-      180_000,
-      Math.floor(Number(process.env.RM_WA_PROTOCOL_TIMEOUT_MS) || 600_000),
+      300_000,
+      // Default 20 menit per CDP — scrape 5k + evaluate berat; override: RM_WA_PROTOCOL_TIMEOUT_MS
+      Math.floor(Number(process.env.RM_WA_PROTOCOL_TIMEOUT_MS) || 1_200_000),
     ),
   };
 }

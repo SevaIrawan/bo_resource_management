@@ -1,5 +1,4 @@
 import { sessionCheckTimeoutMs } from '@/config/syncScraperPolicy';
-import { hasStoredPlatformSession } from '@/lib/sessionAvailability';
 import { probePlatformSession } from '@/lib/sessionProbe';
 import { isDeviceBusyMessage, isDeviceSessionDeadMessage } from '@/lib/scrapeErrorUi';
 import { OperationTimeoutError, withTimeout } from '@/lib/withTimeout';
@@ -20,8 +19,6 @@ export type DeviceSessionGateResult =
 
 const PROBE_RETRY_DELAY_MS = 1_500;
 const PROBE_MAX_ATTEMPTS = 3;
-/** Sync light: getState / disk saja — jangan tunggu cold Chrome. */
-const SYNC_LIGHT_TIMEOUT_MS = 8_000;
 
 function probeFailureResult(msg: string): DeviceSessionGateResult {
   const dead = isDeviceSessionDeadMessage(msg);
@@ -34,7 +31,8 @@ function probeFailureResult(msg: string): DeviceSessionGateResult {
   };
 }
 
-async function probeSessionLinked(input: {
+/** Sync & Scrape: probe langsung ke device (bukan disk / tebak session tersimpan). */
+async function probeSessionOnDevice(input: {
   sessionId: string;
   platform: Platform;
   accountId: string;
@@ -75,60 +73,15 @@ async function probeSessionLinked(input: {
   return { valid: false, message: lastMessage };
 }
 
-/**
- * Sync Active: probe ringan (strict=false) — tanpa cold Chrome / TG restore.
- * Busy / timeout / warm-pending → Valid jika session tersimpan (bukan Logout).
- */
-async function gateSyncSession(
-  input: {
-    sessionId: string;
-    platform: Platform;
-    accountId: string;
-  },
-  hasStored: boolean,
-): Promise<DeviceSessionGateResult> {
-  let lastMessage = 'device_not_connected';
-  try {
-    const probe = await withTimeout(
-      probePlatformSession({
-        ...input,
-        strict: false,
-      }),
-      SYNC_LIGHT_TIMEOUT_MS,
-      'Session check',
-    );
-    if (probe.valid) return { ok: true };
-    lastMessage = probe.message ?? lastMessage;
-
-    if (isDeviceBusyMessage(lastMessage) && hasStored) {
-      return { ok: true };
-    }
-
-    return probeFailureResult(lastMessage);
-  } catch (error) {
-    if (error instanceof OperationTimeoutError) {
-      if (hasStored) return { ok: true };
-      return probeFailureResult('Session check timed out');
-    }
-    throw error;
-  }
-}
-
-/**
- * Scrape: probe strict — 1 akun; busy/timeout tidak invalidate DB.
- */
-async function gateScrapeSession(
-  input: {
-    sessionId: string;
-    platform: Platform;
-    accountId: string;
-  },
-): Promise<DeviceSessionGateResult> {
-  const probe = await probeSessionLinked(input);
+async function gateDeviceProbe(input: {
+  sessionId: string;
+  platform: Platform;
+  accountId: string;
+}): Promise<DeviceSessionGateResult> {
+  const probe = await probeSessionOnDevice(input);
   if (probe.valid) {
     return { ok: true };
   }
-
   return probeFailureResult(probe.message ?? 'device_not_connected');
 }
 
@@ -142,12 +95,12 @@ export async function gateDeviceSession(
   },
   mode: DeviceSessionGateMode = 'scrape',
 ): Promise<DeviceSessionGateResult> {
-  const hasStored = await hasStoredPlatformSession(input.accountId, input.platform);
+  void mode;
   void input.uiSessionStatus;
   void input.hasDaily;
-
-  if (mode === 'sync') {
-    return gateSyncSession(input, hasStored);
-  }
-  return gateScrapeSession(input);
+  return gateDeviceProbe({
+    sessionId: input.sessionId,
+    platform: input.platform,
+    accountId: input.accountId,
+  });
 }

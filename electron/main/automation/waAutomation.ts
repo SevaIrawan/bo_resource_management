@@ -4,7 +4,7 @@ import { fetchWhatsAppGroupInviteLink } from '../scraper/whatsappGroupInviteLink
 import { waitForWhatsAppStoreReady } from '../scraper/whatsappGroupDiscovery';
 import { withPromiseTimeout } from './promiseTimeout';
 import { resolveJoinGroups, resolveSetAdminGroups } from './jobQueueBatchHelpers';
-import { peekJobStopRequest } from './jobQueueStore';
+import { attachJobGroupOutcomes, peekJobStopRequest } from './jobQueueStore';
 import { runWaDeleteGroupChat } from './waDeleteGroupChat';
 import { runWaExitDeleteGroup } from './waExitDeleteGroup';
 import { runWaLeaveGroup } from './waLeaveGroup';
@@ -898,9 +898,19 @@ export async function runWhatsAppCreateGroupBatch(
 
       onProgress(0, totalTarget, prefix);
 
+      const persistPartial = () => {
+        if (!payload.jobId) return;
+        attachJobGroupOutcomes(payload.jobId, {
+          groupOutcomes: [...groupOutcomes],
+          progressCurrent: created,
+          message: `${created}/${totalTarget} created`,
+        });
+      };
+
       const sliceSize = totalTarget;
       for (let i = 0; i < sliceSize; i += 1) {
         if (isJobStopRequested(payload.jobId)) {
+          persistPartial();
           return buildBatchStopResult({ created, totalTarget, failed, groupOutcomes });
         }
 
@@ -949,6 +959,7 @@ export async function runWhatsAppCreateGroupBatch(
             createStatus: 'failed',
           });
         }
+        persistPartial();
       }
 
       return {

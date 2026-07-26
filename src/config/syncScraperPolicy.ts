@@ -6,6 +6,10 @@
 export const SYNC_SCRAPER_POLICY = {
   deviceGroupTargetMax: 6000,
 
+  /** Idle watchdog floor (ms) — selaras SCRAPE_IDLE_TIMEOUT_MS; skala via scrapeIdleTimeoutMs. */
+  scrapeIdleTimeoutMs: 900_000,
+  scrapeIdleTimeoutMaxMs: 2_700_000,
+
   login: {
     persistTimeoutMs: 180_000,
     postLoginGraceMs: 120_000,
@@ -27,9 +31,9 @@ export const SYNC_SCRAPER_POLICY = {
     timeoutMs: 180_000,
   },
 
-  /** Scrape probe strict — cold WA Chrome + TG restore; tidak skala grup. */
+  /** Sync/Scrape Check Session ke device — selaras electron SESSION_CHECK_TIMEOUT_MS. */
   sessionCheck: {
-    timeoutMs: 20_000,
+    timeoutMs: 90_000,
   },
 } as const;
 

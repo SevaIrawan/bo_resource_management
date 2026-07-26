@@ -21,9 +21,12 @@ from telegram_login import (
     submit_telegram_code,
 )
 from telegram_scraper import (
+    count_active_telegram_scrapes,
     get_scrape_progress,
+    get_scrape_result,
+    is_telegram_scrape_running,
     request_scrape_cancel,
-    scrape_telegram_groups,
+    start_telegram_scrape_job,
     validate_telegram_session,
 )
 from telegram_automation import run_create_group, run_join_by_invite_link, run_set_admin
@@ -164,7 +167,12 @@ def _delay_dict(body: AutomationDelayBody | None) -> dict | None:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "version": 3, "features": ["login", "scrape", "count", "validate", "automation"]}
+    return {
+        "ok": True,
+        "version": 4,
+        "activeScrapes": count_active_telegram_scrapes(),
+        "features": ["login", "scrape", "count", "validate", "automation", "scrape_async"],
+    }
 
 @app.post("/telegram/login/qr/start")
 async def telegram_qr_start(body: SessionBody) -> dict:
@@ -203,13 +211,23 @@ async def telegram_login_cancel(session_id: str) -> dict:
 
 @app.post("/telegram/scrape/{session_id}")
 async def telegram_scrape(session_id: str, body: ScrapeBody | None = None) -> dict:
+    """Start scrape di background — jangan tahan HTTP sampai 1000+ grup selesai."""
     session_string = body.sessionString if body else None
     expected_phone = body.expectedPhone if body else None
-    return await scrape_telegram_groups(session_id, session_string, expected_phone)
+    return await start_telegram_scrape_job(session_id, session_string, expected_phone)
 
 @app.get("/telegram/scrape/progress/{session_id}")
 async def telegram_scrape_progress(session_id: str) -> dict:
     return get_scrape_progress(session_id)
+
+@app.get("/telegram/scrape/result/{session_id}")
+async def telegram_scrape_result(session_id: str) -> dict:
+    if is_telegram_scrape_running(session_id):
+        return {"status": "running"}
+    result = get_scrape_result(session_id)
+    if not result:
+        return {"status": "idle", "message": "No scrape result yet"}
+    return result
 
 @app.post("/telegram/scrape/cancel/{session_id}")
 async def telegram_scrape_cancel(session_id: str) -> dict:

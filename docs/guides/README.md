@@ -10,6 +10,7 @@
 You can also open the `.html` file in a browser — it looks like a Confluence page.
 
 - **Panduan operasional R&M (ID, v1.0.31):** [PANDUAN-PENGGUNA-SIMPLE.md](../PANDUAN-PENGGUNA-SIMPLE.md) · [Confluence paste HTML](./Panduan-Group-Monitoring-v1.0.31-Confluence.html) — generate: `node scripts/build-panduan-confluence.mjs`
+- **User Guide (EN, v1.0.31, Confluence paste):** [User-Guide-Group-Monitoring-v1.0.31-Confluence.html](./User-Guide-Group-Monitoring-v1.0.31-Confluence.html) — Account | Operations, CTA → Job Queue, auto scrape contract
 
 ---
 

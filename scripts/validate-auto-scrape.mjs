@@ -92,6 +92,16 @@ const checks = [
     })(),
   },
   {
+    name: 'Auto TRUNCATED tidak diam — outcome truncated + Settings label',
+    ok:
+      runAuto.includes("return truncated ? 'truncated' : 'success'") &&
+      runAuto.includes('SCRAPER_TRUNCATED_CAP') &&
+      brandSettings.includes("'truncated'") &&
+      hook.includes("result === 'truncated'") &&
+      settingsUi.includes('outcomeTruncated') &&
+      read('src/lib/scrapeErrorUi.ts').includes('scraper:run(?:-auto)?'),
+  },
+  {
     name: 'Mid-cycle brand/Acc OFF → watch + cancel-auto',
     ok:
       policy.includes('selectionWatchMs') &&
@@ -115,6 +125,27 @@ const checks = [
       settingsUi.includes('handleSaveOrExecute') &&
       settingsUi.includes('handleCancelOrDiscard') &&
       settingsUi.includes('persistAutoScrapeNowEnabled'),
+  },
+  {
+    name: 'WA auto scrape body = manual (shared lane, 5k sync, no ready wall-clock)',
+    ok: (() => {
+      const wa = read('electron/main/scraper/whatsappScrape.ts');
+      const userLane = wa.slice(0, wa.indexOf('runWhatsAppScrapeAutoLane'));
+      return (
+        wa.includes('waScrapeSharedClientOpts') &&
+        wa.includes('runWhatsAppScrapeLane') &&
+        wa.includes('waitForWhatsAppInboxStable') &&
+        wa.includes('syncedCount') &&
+        wa.includes('scaleEstimate') &&
+        wa.includes('scrapeIdleTimeoutMs(DEVICE_GROUP_TARGET_MAX)') &&
+        wa.includes('readyTimeoutMs: 0') &&
+        !userLane.includes('freshBoot: true') &&
+        wa.includes("browserPool: 'auto'") &&
+        wa.includes('freshBoot: true') &&
+        wa.includes('WA_SCRAPE_CHECKPOINT_EVERY') &&
+        !wa.includes('withScrapeTimeout')
+      );
+    })(),
   },
   {
     name: 'Schedule gate helper tetap ada (once/day, no catch-up)',

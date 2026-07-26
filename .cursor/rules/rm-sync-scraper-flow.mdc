@@ -3,14 +3,14 @@ description: Sync, Scrape, login QR — alur kolom session & Last update
 alwaysApply: true
 ---
 
-# Sync & Scrape (logic_sync_scraper.txt)
+# Sync & Scrape — acuan SESSION UI (logic_sync_scraper.txt)
 
-- Metrik: GROUP (Y/X) + ADMIN (Y/X). Grup dari device **saat scrape**, bukan isi pesan.
-- **VALID** Sync (Case 3): check Session **ringan** (disk/DB / getState; tanpa cold Chrome) → patch session valid → [Now|Later]. **Tidak** hitung Y/X; **tidak** busy/timeout sebagai gagal Sync bila session tersimpan.
-- **INVALID**: login realtime → sukses → persist session UI+DB saja → [Now|Later] (scrape intent → auto-scrape tanpa prompt).
-- Probe busy/timeout pada Sync → **bukan** Logout (session tersimpan = Valid).
-- **Scrape manual**: hanya lewat Sync → Scrape Now; kolom **Last update** read-only (tanpa tombol Run).
-- **Later** = session Active/Valid di UI lokal + DB saja; **tidak** scrape, **tidak** count device. **Cancel scrape** = stop total.
+- Metrik: GROUP (Y/X) + ADMIN (Y/X). Grup dari device **saat scrape**, bukan isi pesan. Scrape = data real (bukan palsu). Hingga ~5000+ grup/akun.
+- **Session UI VALID → Sync**: Check Session **ke device** → Valid → modal Now|Later; Invalid device → Login. Busy → alert (bukan Scrape Now).
+- **Session UI INVALID → Sync**: modal Login langsung.
+- **Scrape Now**: execute scrape real; **tanpa** wall-clock ready timeout yang memutus akun besar; idle watchdog saja jika macet.
+- **Later**: tutup modal → update Session UI + local + DB; **tidak** scrape.
+- Bukan: Sync langsung scrape / LOGOUT tanpa Check Session device.
 
 # Kolom Last update
 

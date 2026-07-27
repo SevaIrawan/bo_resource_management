@@ -417,6 +417,7 @@ export const zh: Messages = {
       noMasterRows: '该品牌与平台下无主表群数据。',
       noDailyRows: '该账号暂无 daily 数据。请先运行抓取。',
       noAccountsForPlatform: '该品牌与平台下无账号。',
+      noAccounts: '该品牌与平台下无账号。',
     },
     exportFiltered: '导出筛选账号',
     searchPlaceholder: '搜索账号名 / 电话号码…',

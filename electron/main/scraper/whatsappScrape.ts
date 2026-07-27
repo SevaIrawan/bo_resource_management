@@ -93,8 +93,14 @@ async function scrapeWhatsAppGroupsFromStore(input: {
 }): Promise<{
   rows: ScrapedGroupRow[];
   skipped: number;
+  /** Bukan membership real (leave/delete / bukan member) — jangan hitung incomplete. */
+  absentFromAccount: number;
+  /** Metadata/store belum siap — boleh picu incomplete. */
+  incompleteStore: number;
   inviteExported: number;
   deviceGroupCount: number;
+  /** Grup real di akun = rows + incompleteStore (bukan stub absent). */
+  realGroupCount: number;
   truncated: boolean;
   resumedFromCheckpoint: boolean;
 }> {
@@ -103,7 +109,10 @@ async function scrapeWhatsAppGroupsFromStore(input: {
   const scanIds = groupIds.slice(0, DEVICE_GROUP_TARGET_MAX);
   const total = scanIds.length;
   let skipped = 0;
+  let absentFromAccount = 0;
+  let incompleteStore = 0;
   const truncated = groupIds.length > DEVICE_GROUP_TARGET_MAX;
+  const absentIds = new Set<string>();
 
   if (truncated) {
     console.warn(
@@ -112,21 +121,29 @@ async function scrapeWhatsAppGroupsFromStore(input: {
   }
 
   const checkpoint = loadScrapeCheckpoint(input.sessionId, 'whatsapp');
-  const doneSet = new Set(checkpoint?.doneGroupIds ?? []);
-  const pendingIds = scanIds.filter((id) => !doneSet.has(id));
-  const resumedFromCheckpoint = Boolean(checkpoint && doneSet.size > 0);
-  const liveRows: ScrapedGroupRow[] = [...(checkpoint?.rows ?? [])];
-  const liveDone = new Set(doneSet);
+  /**
+   * Membership selalu di-scan ulang dari list saat ini.
+   * Checkpoint lama setelah Job Queue leave/delete = data palsu jika di-resume doneSet.
+   * Checkpoint hanya dipakai untuk invite_link yang sudah di-export di run sebelumnya.
+   */
+  const inviteFromCheckpoint = new Map<string, string>();
+  for (const row of checkpoint?.rows ?? []) {
+    const id = String(row.group_id ?? '').trim();
+    const link = row.invite_link?.trim();
+    if (id && link) inviteFromCheckpoint.set(id, link);
+  }
+  const pendingIds = scanIds;
+  const resumedFromCheckpoint = Boolean(checkpoint && (checkpoint.rows?.length ?? 0) > 0);
+  const liveRows: ScrapedGroupRow[] = [];
+  const liveDone = new Set<string>();
 
   const planMs = scrapeTotalPlanMs(total, Math.max(0, Math.floor(total * 0.35)));
   emitScrapeProgress({
     sessionId: input.sessionId,
     phase: 'discover',
-    current: doneSet.size,
+    current: 0,
     total,
-    label: resumedFromCheckpoint
-      ? `Resume: ${doneSet.size}/${total} done · ${pendingIds.length} left · ${formatScrapeEtaLabel(planMs)}`
-      : `${total} groups on device · ${formatScrapeEtaLabel(planMs)}`,
+    label: `${total} groups on account · ${formatScrapeEtaLabel(planMs)}`,
   });
 
   const pooled = await runPooled(pendingIds, WA_SCRAPE_METADATA_CONCURRENCY, async (groupId, index) => {
@@ -137,19 +154,33 @@ async function scrapeWhatsAppGroupsFromStore(input: {
 
     if ('skip' in core) {
       skipped += 1;
-      console.warn(`[wa-scrape] skip group ${groupId}: ${core.reason}`);
+      const reason = String(core.reason ?? '');
+      if (
+        reason === 'empty_participants' ||
+        reason === 'not_member' ||
+        reason === 'not_group'
+      ) {
+        // Bukan data real di akun (sering sisa model setelah Job Queue leave/delete).
+        absentFromAccount += 1;
+        absentIds.add(groupId);
+        console.info(`[wa-scrape] absent (not on account) ${groupId}: ${reason}`);
+      } else {
+        incompleteStore += 1;
+        console.warn(`[wa-scrape] incomplete store ${groupId}: ${reason}`);
+      }
       return null;
     }
 
     liveDone.add(groupId);
-    liveRows.push({ ...core, invite_link: null });
+    const priorInvite = inviteFromCheckpoint.get(groupId) ?? null;
+    liveRows.push({ ...core, invite_link: priorInvite });
     const doneCount = liveDone.size;
     if (doneCount % WA_SCRAPE_CHECKPOINT_EVERY === 0 || index === pendingIds.length - 1) {
       saveScrapeCheckpoint({
         sessionId: input.sessionId,
         platform: 'whatsapp',
         updatedAt: new Date().toISOString(),
-        rows: mergeCheckpointRows(checkpoint?.rows ?? [], liveRows),
+        rows: [...liveRows],
         doneGroupIds: [...liveDone],
       });
     }
@@ -171,17 +202,19 @@ async function scrapeWhatsAppGroupsFromStore(input: {
     (row): row is { groupId: string; core: WhatsAppGroupScrapeCore } => row !== null,
   );
 
-  let rows: ScrapedGroupRow[] = mergeCheckpointRows(
-    checkpoint?.rows ?? [],
-    newCoreRows.map(({ core }) => ({ ...core, invite_link: null })),
-  );
+  /** Hanya baris membership real dari scan ini — bukan merge checkpoint membership lama. */
+  let rows: ScrapedGroupRow[] = newCoreRows.map(({ groupId, core }) => ({
+    ...core,
+    invite_link: inviteFromCheckpoint.get(groupId) ?? null,
+  }));
 
   const adminNeedInvite = rows.filter(
     (row) => row.is_admin === 'yes' && !row.invite_link,
   );
+  const realGroupCount = rows.length + incompleteStore;
   const idleMs = scrapeIdleTimeoutMs(total);
   console.info(
-    `[wa-scrape] sessionId=${input.sessionId} deviceGroups=${groupIds.length} scan=${total} pendingMeta=${pendingIds.length} adminInvite=${adminNeedInvite.length} planMs=${scrapeTotalPlanMs(total, adminNeedInvite.length)} metadataMs=${scrapeGroupsBudgetMs(total)} idleMs=${idleMs} resumed=${resumedFromCheckpoint}`,
+    `[wa-scrape] sessionId=${input.sessionId} listed=${groupIds.length} real=${realGroupCount} rows=${rows.length} absent=${absentFromAccount} incompleteStore=${incompleteStore} pendingMeta=${pendingIds.length} adminInvite=${adminNeedInvite.length} planMs=${scrapeTotalPlanMs(total, adminNeedInvite.length)} metadataMs=${scrapeGroupsBudgetMs(total)} idleMs=${idleMs} resumedInvites=${resumedFromCheckpoint}`,
   );
 
   saveScrapeCheckpoint({
@@ -252,8 +285,11 @@ async function scrapeWhatsAppGroupsFromStore(input: {
   return {
     rows,
     skipped,
+    absentFromAccount,
+    incompleteStore,
     inviteExported,
     deviceGroupCount: groupIds.length,
+    realGroupCount,
     truncated,
     resumedFromCheckpoint,
   };
@@ -423,8 +459,17 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
               );
             }
 
-            const { rows, skipped, inviteExported, deviceGroupCount, truncated, resumedFromCheckpoint } =
-              await scrapeWhatsAppGroupsFromStore({
+            const {
+              rows,
+              skipped,
+              absentFromAccount,
+              incompleteStore,
+              inviteExported,
+              deviceGroupCount,
+              realGroupCount,
+              truncated,
+              resumedFromCheckpoint,
+            } = await scrapeWhatsAppGroupsFromStore({
                 client,
                 sessionId,
                 throwIfCancelled: opts.throwIfCancelled,
@@ -441,16 +486,21 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
               );
             }
 
-            assertWhatsAppScrapeHasRows(rows, Math.max(deviceGroupCount, syncedCount));
+            assertWhatsAppScrapeHasRows(rows, realGroupCount);
 
+            /**
+             * Incomplete hanya jika metadata/store gagal baca grup yang masih “hidup”.
+             * Stub setelah Job Queue leave/delete (absent) bukan undercount — itu bukan data real.
+             */
             const undercount =
               !truncated &&
-              deviceGroupCount > 50 &&
-              rows.length < Math.floor(deviceGroupCount * 0.85);
+              realGroupCount > 50 &&
+              incompleteStore > 0 &&
+              rows.length < Math.floor(realGroupCount * 0.85);
 
             if (undercount) {
               throw new Error(
-                `SCRAPER_INCOMPLETE: scraped ${rows.length}/${deviceGroupCount} groups — WhatsApp Web store still incomplete. Wait a few minutes, then Scrape Now again.`,
+                `SCRAPER_INCOMPLETE: scraped ${rows.length}/${realGroupCount} live groups (${absentFromAccount} absent after leave/delete, ${incompleteStore} store incomplete). Wait a few minutes, then Scrape Now again.`,
               );
             }
 
@@ -462,6 +512,7 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
             const hintParts: string[] = [];
             if (resumedFromCheckpoint) hintParts.push('RESUMED_CHECKPOINT');
             if (truncated) hintParts.push(`TRUNCATED_${DEVICE_GROUP_TARGET_MAX}`);
+            if (absentFromAccount > 0) hintParts.push(`ABSENT_${absentFromAccount}`);
             if (adminCount > 0 && inviteExported < adminCount) {
               hintParts.push('WA_INVITE_EXPORT_PARTIAL');
             }
@@ -475,7 +526,7 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
             });
 
             console.info(
-              `[${opts.logTag}] done sessionId=${sessionId} groups=${rows.length} device=${deviceGroupCount} skipped=${skipped} inviteExported=${inviteExported}/${adminCount} elapsedMs=${elapsedMs} hints=${hintParts.join(',') || 'none'}`,
+              `[${opts.logTag}] done sessionId=${sessionId} groups=${rows.length} listed=${deviceGroupCount} absent=${absentFromAccount} incompleteStore=${incompleteStore} skipped=${skipped} inviteExported=${inviteExported}/${adminCount} elapsedMs=${elapsedMs} hints=${hintParts.join(',') || 'none'}`,
             );
 
             return {

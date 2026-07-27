@@ -42,7 +42,7 @@
   <div class="panel-title">Document information</div>
   <table>
     <tr><th>Product</th><td>Resource Management (GM App) — Electron desktop</td></tr>
-    <tr><th>Version</th><td>v1.0.31</td></tr>
+    <tr><th>Version</th><td>v1.0.32</td></tr>
     <tr><th>Audience</th><td>Developers and ops maintaining WhatsApp / Telegram automation</td></tr>
     <tr><th>Scope</th><td>Job Queue, execute slot pool, Sync / Scrape interaction — not Reporting or Supabase schema</td></tr>
     <tr><th>Out of scope</th><td>Reporting shell / Ticket tab UI, Supabase schema migrations</td></tr>
@@ -64,7 +64,7 @@
   <tr><td>Job <code>running</code> forever</td><td>Duration vs action timeout</td><td>Chrome hang; wait 90m stale sweep or restart app</td></tr>
   <tr><td>TG jobs fail in batch</td><td><code>FLOOD_WAIT</code> in error</td><td>Telegram rate limit exceeded</td></tr>
   <tr><td>Sync blocked right after job</td><td>Within ~15s of job end</td><td><code>SESSION_SETTLING</code> — <strong>expected</strong></td></tr>
-  <tr><td>Many rows for one account</td><td>Queue count vs groups selected</td><td><strong>Expected (v1.0.31):</strong> auto-split ≤30 groups per job</td></tr>
+  <tr><td>Many rows for one account</td><td>Queue count vs groups selected</td><td><strong>Expected:</strong> auto-split ≤30 groups per job</td></tr>
 </table>
 
 <div class="panel warning">
@@ -82,7 +82,7 @@
 <ul>
   <li><strong>Max 10 parallel accounts per platform</strong> — WA dan TG <strong>terpisah</strong> (masing-masing hingga 10). Pool bersama untuk Sync, Scrape, dan Job Queue user (<code>executeSlotPool</code> + <code>deviceConcurrencyPolicy.ts</code>). Auto-scrape brand: lane terpisah max <strong>6</strong> per platform.</li>
   <li><strong>Per-account isolation</strong> — account A failure or block does not stop account B; <strong>one account uses at most 1 slot</strong>.</li>
-  <li><strong>Batch auto-split (v1.0.31)</strong> — large group lists split at enqueue into jobs of ≤ <code>maxPerRun</code> (default 30); chunks for the <strong>same account run sequentially</strong> (FIFO), not in parallel.</li>
+  <li><strong>Batch auto-split</strong> — large group lists split at enqueue into jobs of ≤ <code>maxPerRun</code> (default 30); chunks for the <strong>same account run sequentially</strong> (FIFO), not in parallel.</li>
   <li><strong>Single slot source of truth</strong> — main process <code>executeSlotPool</code> only; <code>jobQueueGuard</code> does <strong>not</strong> check global slot fill.</li>
   <li><strong>Post-job settle</strong> — 15s block on the same account after any job (<code>SESSION_SETTLING</code>, <code>POST_JOB_SETTLE_MS = 15_000</code>).</li>
   <li><strong>Scrape ⊕ Job Queue</strong> — same account cannot run both at once (<code>JOB_QUEUE_EXECUTE_FULL</code>).</li>
@@ -150,7 +150,7 @@
 <table>
   <tr><th>Behavior</th><th>Why</th><th>What to do</th></tr>
   <tr><td>11th action queues when <strong>10</strong> already active on that platform</td><td>Max <strong>10</strong> user slots per platform (WA/TG terpisah)</td><td>Wait; notification is correct</td></tr>
-  <tr><td>Multiple queued rows, same account</td><td>Auto-split batch (v1.0.31)</td><td>Normal — chunks run one after another</td></tr>
+  <tr><td>Multiple queued rows, same account</td><td>Auto-split batch</td><td>Normal — chunks run one after another</td></tr>
   <tr><td><code>SESSION_SETTLING</code></td><td>15s Chrome cleanup after job</td><td>Retry after ~15s</td></tr>
   <tr><td>Scrape blocks job (same account)</td><td>Per-account isolation</td><td>Finish scrape first</td></tr>
 </table>

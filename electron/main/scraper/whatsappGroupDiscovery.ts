@@ -66,30 +66,111 @@ export function assertWhatsAppScrapeClient(client: Client | null | undefined): a
   }
 }
 
-/** Hitung total grup di store — satu pass di browser, tanpa kirim ribuan JID ke Node. */
+/**
+ * Grup yang masih ada di akun = masih member + ada participant.
+ * Chat yang sudah leave/delete tidak masuk (progress scrape = jumlah real saja).
+ */
+async function listLiveWhatsAppGroupIdsFromStore(client: Client): Promise<string[]> {
+  return client.pupPage.evaluate(() => {
+    const chats = window.require('WAWebCollections').Chat.getModelsArray();
+    const getters = window.require('WAWebContactGetters');
+    const mePrefs = window.require('WAWebUserPrefsMeUser');
+    const mePn = mePrefs.getMaybeMePnUser?.();
+    const meLid = mePrefs.getMaybeMeLidUser?.();
+
+    function widSerialized(w: unknown): string {
+      if (!w || typeof w !== 'object') return String(w ?? '').trim();
+      const o = w as { _serialized?: string; id?: { _serialized?: string } };
+      return String(o._serialized ?? o.id?._serialized ?? '').trim();
+    }
+    function digitsOfWid(w: unknown): string {
+      const s = widSerialized(w);
+      return s.split('@')[0]?.replace(/\D/g, '') ?? '';
+    }
+    function sameParticipant(a: unknown, b: unknown): boolean {
+      const sa = widSerialized(a);
+      const sb = widSerialized(b);
+      if (!sa || !sb) return false;
+      if (sa === sb) return true;
+      const da = digitsOfWid(a);
+      const db = digitsOfWid(b);
+      return da.length >= 8 && db.length >= 8 && da === db;
+    }
+    function listParticipants(chat: {
+      groupMetadata?: {
+        participants?: {
+          serialize?: () => Array<{ id?: unknown }>;
+          getModelsArray?: () => unknown[];
+          _models?: Array<{ serialize?: () => { id?: unknown } }>;
+          forEach?: (fn: (p: { serialize?: () => { id?: unknown } }) => void) => void;
+        };
+      };
+    }): Array<{ id?: unknown }> {
+      const raw = chat.groupMetadata?.participants;
+      if (!raw) return [];
+      if (typeof raw.serialize === 'function') {
+        try {
+          return raw.serialize() || [];
+        } catch {
+          /* fall through */
+        }
+      }
+      if (Array.isArray(raw._models)) {
+        return raw._models.map((m) => (m.serialize ? m.serialize() : (m as { id?: unknown })));
+      }
+      if (typeof raw.getModelsArray === 'function') {
+        try {
+          return (raw.getModelsArray() || []) as Array<{ id?: unknown }>;
+        } catch {
+          return [];
+        }
+      }
+      const out: Array<{ id?: unknown }> = [];
+      if (typeof raw.forEach === 'function') {
+        raw.forEach((p) => out.push(p.serialize ? p.serialize() : p));
+      }
+      return out;
+    }
+
+    const out: string[] = [];
+    for (const chat of chats) {
+      const serialized = String(
+        chat?.id?._serialized ?? (typeof chat?.id === 'string' ? chat.id : '') ?? '',
+      ).trim();
+      const isGroup =
+        (typeof getters.getIsGroup === 'function' && getters.getIsGroup(chat)) ||
+        Boolean(chat.groupMetadata) ||
+        serialized.endsWith('@g.us');
+      if (!isGroup || !serialized) continue;
+
+      const participants = listParticipants(chat);
+      if (participants.length === 0) continue;
+
+      let meInGroup = false;
+      for (const p of participants) {
+        const pid = p.id ?? p;
+        if (sameParticipant(pid, mePn) || sameParticipant(pid, meLid)) {
+          meInGroup = true;
+          break;
+        }
+      }
+      if (!meInGroup) continue;
+
+      out.push(serialized);
+    }
+    return out;
+  });
+}
+
+/** Hitung total grup di akun — hanya yang masih member. */
 export async function countWhatsAppGroupsOnDevice(
   client: Client,
   options?: { storeWaitMs?: number },
 ): Promise<number> {
   assertWhatsAppScrapeClient(client);
   await waitForWhatsAppStoreReady(client, options?.storeWaitMs);
-
-  return client.pupPage.evaluate(() => {
-    const chats = window.require('WAWebCollections').Chat.getModelsArray();
-    const getters = window.require('WAWebContactGetters');
-    let total = 0;
-    for (const chat of chats) {
-      const serialized = String(
-        chat?.id?._serialized ?? (typeof chat?.id === 'string' ? chat.id : '') ?? '',
-      );
-      const isGroup =
-        (typeof getters.getIsGroup === 'function' && getters.getIsGroup(chat)) ||
-        Boolean(chat.groupMetadata) ||
-        serialized.endsWith('@g.us');
-      if (isGroup) total += 1;
-    }
-    return total;
-  });
+  const ids = await listLiveWhatsAppGroupIdsFromStore(client);
+  return ids.length;
 }
 
 /** Setelah cold-boot — tunggu jumlah grup di store stabil (WA Web selesai sync inbox).
@@ -180,7 +261,7 @@ export async function waitForWhatsAppInboxStable(
   );
 }
 
-/** Daftar JID grup dari store WA Web — tanpa `client.getChats()`. */
+/** Daftar JID grup di akun — hanya yang masih member. */
 export async function listWhatsAppGroupIds(
   client: Client,
   options?: { storeWaitMs?: number },
@@ -188,28 +269,11 @@ export async function listWhatsAppGroupIds(
   assertWhatsAppScrapeClient(client);
   await waitForWhatsAppStoreReady(client, options?.storeWaitMs);
 
-  const ids = await client.pupPage.evaluate(async () => {
-    const chats = window.require('WAWebCollections').Chat.getModelsArray();
-    const getters = window.require('WAWebContactGetters');
-    const out: string[] = [];
-    for (const chat of chats) {
-      const serialized = String(
-        chat?.id?._serialized ?? (typeof chat?.id === 'string' ? chat.id : '') ?? '',
-      ).trim();
-      const isGroup =
-        (typeof getters.getIsGroup === 'function' && getters.getIsGroup(chat)) ||
-        Boolean(chat.groupMetadata) ||
-        serialized.endsWith('@g.us');
-      if (!isGroup) continue;
-      if (serialized) out.push(serialized);
-    }
-    return out;
-  });
-
+  const ids = await listLiveWhatsAppGroupIdsFromStore(client);
   const unique = Array.from(new Set(ids));
   if (unique.length > WA_STORE_GROUP_LIST_CAP) {
     console.warn(
-      `[wa-groups] ${unique.length} groups on device; capping list at ${WA_STORE_GROUP_LIST_CAP}`,
+      `[wa-groups] ${unique.length} groups on account; capping list at ${WA_STORE_GROUP_LIST_CAP}`,
     );
     return unique.slice(0, WA_STORE_GROUP_LIST_CAP);
   }

@@ -1,7 +1,7 @@
 # GM App — Job Queue & Execute Worker Troubleshooting Reference
 
 **Product:** Resource Management (Electron)  
-**Version:** v1.0.31  
+**Version:** v1.0.32  
 **Audience:** Developers and ops maintaining WhatsApp / Telegram automation  
 **Scope:** Job Queue, execute slot pool, Sync / Scrape interaction — not Reporting or Supabase schema
 
@@ -17,7 +17,7 @@
 | Job `running` forever | Duration vs action timeout | Chrome hang; wait 90m stale sweep or restart app |
 | TG jobs fail in batch | `FLOOD_WAIT` in error | Telegram rate limit exceeded |
 | Sync blocked right after job | Within ~15s of job end | `SESSION_SETTLING` — **expected** |
-| Many rows for one account | Queue count vs groups selected | **Expected (v1.0.31):** auto-split ≤30 groups per job |
+| Many rows for one account | Queue count vs groups selected | **Expected:** auto-split ≤30 groups per job |
 
 **First actions:** Open global Job Queue panel → read error message → restart app if global queue stuck → relogin **affected account only**.
 
@@ -27,7 +27,8 @@
 
 - **Max 10 parallel accounts per platform** — WA dan TG **terpisah** (masing-masing hingga 10). Pool bersama untuk Sync, Scrape, dan Job Queue user (`executeSlotPool` + `deviceConcurrencyPolicy.ts`). Auto-scrape brand: lane terpisah max **6** per platform.
 - **Per-account isolation** — account A failure or block does not stop account B; **one account uses at most 1 slot**.
-- **Batch auto-split (v1.0.31)** — large group lists split at enqueue into jobs of ≤ `maxPerRun` (default 30); chunks for the **same account run sequentially** (FIFO), not in parallel.
+- **Batch auto-split** — large group lists split at enqueue into jobs of ≤ `maxPerRun` (default 30); chunks for the **same account run sequentially** (FIFO), not in parallel.
+- **Partial batch → Failed** — if some groups fail, job status is **Failed** (not green Completed); open VIEW / Remark.
 - **Single slot source of truth** — main process `executeSlotPool` only; `jobQueueGuard` does **not** check global slot fill.
 - **Post-job settle** — 15s block on the same account after any job (`SESSION_SETTLING`, `POST_JOB_SETTLE_MS = 15_000`).
 - **Scrape ⊕ Job Queue** — same account cannot run both at once (`JOB_QUEUE_EXECUTE_FULL`).
@@ -103,7 +104,7 @@
 | Behavior | Why | What to do |
 |----------|-----|------------|
 | 11th action queues when **10** already active on that platform | Max **10** user slots per platform (WA/TG terpisah) | Wait; notification is correct |
-| Multiple queued rows, same account | Auto-split batch (v1.0.31) | Normal — chunks run one after another |
+| Multiple queued rows, same account | Auto-split batch | Normal — chunks run one after another |
 | `SESSION_SETTLING` | 15s Chrome cleanup after job | Retry after ~15s |
 | Scrape blocks job on same account | Per-account isolation | Finish scrape first |
 

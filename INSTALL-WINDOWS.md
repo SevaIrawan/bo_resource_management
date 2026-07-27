@@ -67,7 +67,7 @@ VALUES ('nama_user', 'password_rahasia');
 
 | Masalah | Solusi |
 |---------|--------|
-| Layar merah "config missing" | Install **Setup terbaru** dari IT (**v1.0.31**), atau minta IT publish Release & Restart |
+| Layar merah "config missing" | Install **Setup terbaru** dari IT (**v1.0.32**), atau minta IT publish Release & Restart |
 | Update tidak muncul | Release GitHub harus **Public**; version harus lebih tinggi dari yang terinstall |
 | Telegram gagal login | Pastikan migrasi `023` sudah jalan; restart app |
 | Sync WA: "Could not find Chrome" | Install **Setup 0.1.3+** dari IT (Chrome sudah dibundel). Versi lama: minta installer baru, bukan salin folder cache manual |

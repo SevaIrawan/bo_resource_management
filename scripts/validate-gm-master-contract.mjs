@@ -115,8 +115,19 @@ const checks = [
     })(),
   },
   {
-    name: '§ WA scrape log skip grup (bukan silent)',
-    ok: read('electron/main/scraper/whatsappScrape.ts').includes('skip group'),
+    name: '§ WA scrape: absent membership (bukan silent / bukan fake skip incomplete)',
+    ok:
+      read('electron/main/scraper/whatsappScrape.ts').includes('absent (not on account)') &&
+      read('electron/main/scraper/whatsappScrape.ts').includes('absentFromAccount') &&
+      read('electron/main/scraper/whatsappScrape.ts').includes('realGroupCount'),
+  },
+  {
+    name: '§ WA discovery: hanya grup masih member (bukan semua @g.us ghost)',
+    ok:
+      read('electron/main/scraper/whatsappGroupDiscovery.ts').includes(
+        'listLiveWhatsAppGroupIdsFromStore',
+      ) &&
+      read('electron/main/scraper/whatsappGroupDiscovery.ts').includes('meInGroup'),
   },
 ];
 

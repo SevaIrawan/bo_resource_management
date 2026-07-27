@@ -37,6 +37,7 @@ import {
 } from './jobQueueStore';
 import { maybeAutoEnqueueSetPhotoFromCreate } from './autoEnqueueSetPhotoFromCreate';
 import { maybeAutoEnqueueDeleteFromExit } from './autoEnqueueDeleteFromExit';
+import { clearScrapeCheckpoint } from '../scraper/scrapeCheckpoint';
 
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let tickInProgress = false;
@@ -389,6 +390,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
           ),
         });
         tryAutoEnqueueSetPhotoAfterCreate(job);
+        clearScrapeCheckpointAfterLeaveDelete(job);
         tryAutoEnqueueDeleteAfterExit(job);
       }
       return;
@@ -409,6 +411,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       });
       // Partial create tetap bisa lanjut Set Photo — jangan buang grup yang sudah di device.
       tryAutoEnqueueSetPhotoAfterCreate(job);
+      clearScrapeCheckpointAfterLeaveDelete(job);
       tryAutoEnqueueDeleteAfterExit(job);
       return;
     }
@@ -425,6 +428,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
               : batchSuccessCount(result, job) + progressOffsetFromOutcomes(job),
         });
         tryAutoEnqueueSetPhotoAfterCreate(job);
+        clearScrapeCheckpointAfterLeaveDelete(job);
         tryAutoEnqueueDeleteAfterExit(job);
       }
       return;
@@ -511,6 +515,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
         ...outcomeExtras,
       });
       tryAutoEnqueueSetPhotoAfterCreate(job);
+      clearScrapeCheckpointAfterLeaveDelete(job);
       tryAutoEnqueueDeleteAfterExit(job);
       tryRequestScrapeAfterJoin(job, success);
       return;
@@ -526,6 +531,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       ...outcomeExtras,
     });
     tryAutoEnqueueSetPhotoAfterCreate(job);
+    clearScrapeCheckpointAfterLeaveDelete(job);
     tryAutoEnqueueDeleteAfterExit(job);
   } catch (error) {
     if (getAutomationJobStatus(job.id) === 'running') {
@@ -549,6 +555,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
             : undefined,
       });
       tryAutoEnqueueSetPhotoAfterCreate(job);
+      clearScrapeCheckpointAfterLeaveDelete(job);
       tryAutoEnqueueDeleteAfterExit(job);
     }
   } finally {
@@ -609,6 +616,28 @@ function tryAutoEnqueueDeleteAfterExit(job: AutomationJobRecord): void {
   }
 }
 
+/** Setelah leave/delete massal — buang checkpoint scrape agar daily tidak diisi membership palsu. */
+function clearScrapeCheckpointAfterLeaveDelete(job: AutomationJobRecord): void {
+  if (
+    job.action !== 'leave_group' &&
+    job.action !== 'delete_group' &&
+    job.action !== 'exit_delete_group'
+  ) {
+    return;
+  }
+  const sessionId = job.sessionId?.trim();
+  if (!sessionId) return;
+  try {
+    clearScrapeCheckpoint(sessionId);
+  } catch (error) {
+    console.warn(
+      '[jobQueue] clear scrape checkpoint after leave/delete failed',
+      job.id,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
 async function runnerTick(): Promise<void> {
   if (tickInProgress) {
     tickPending = true;
@@ -623,6 +652,7 @@ async function runnerTick(): Promise<void> {
     if (staleFailed.length > 0) {
       for (const stale of staleFailed) {
         tryAutoEnqueueSetPhotoAfterCreate(stale);
+        clearScrapeCheckpointAfterLeaveDelete(stale);
         tryAutoEnqueueDeleteAfterExit(stale);
       }
       scheduleRunnerTick(0);

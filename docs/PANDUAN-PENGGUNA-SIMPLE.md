@@ -1,6 +1,6 @@
 # Panduan Group Monitoring
 
-**Versi app:** 1.0.31  
+**Versi app:** 1.0.32  
 **Untuk:** Tim **Depart Resource Management (R&M)** — semua yang menjalankan monitoring grup WhatsApp & Telegram  
 **Bahasa UI:** English / 中文 → ubah di **Settings → Language**
 
@@ -198,7 +198,9 @@ Akun **Not Aligned** di Remark / badge not aligned jika masih ada gap.
 
 ## 6. Scrape lengkap & kolom Last update
 
-**Fungsi scrape penuh:** baca **semua** grup dari HP → simpan ke database → perbarui **On device, Junk, Missing, Not admin, Remark, Group matrix, stock chips Account**.
+**Fungsi scrape penuh:** baca **semua grup yang masih ada di akun (HP)** → simpan ke database → perbarui **On device, Junk, Missing, Not admin, Remark, Group matrix, stock chips Account**.
+
+Progress scrape menampilkan **jumlah real** (mis. `11/11`), bukan chat yang sudah Leave/Delete. Setelah Job Queue Leave (+ delete), jalankan **Sync → Scrape now** — angka harus selaras dengan grup yang tersisa di HP.
 
 **Cara menjalankan scrape penuh:**
 
@@ -230,7 +232,7 @@ Kolom **Last update** (Card view) menampilkan waktu scrape terakhir atau progres
 | Progress *Reading groups…* | Sedang scrape |
 | **Cancel scrape** (saat progress, di kolom Remark) | Batalkan — data tidak disimpan |
 
-**Scrape penuh ≠ Sync ringkas.** Sync = cek session + pintu scrape. Scrape = baca lengkap semua grup ke database.
+**Scrape penuh ≠ Sync ringkas.** Sync = cek session + pintu scrape. Scrape = baca lengkap **grup yang masih di akun** ke database.
 
 ---
 
@@ -296,7 +298,7 @@ Tab **Operations** = **Job Queue** saja (filter **Platform** di slicer). Brand d
 
 Satu akun tidak bisa **Sync** bersamaan dengan job di akun yang sama. Maks **10 akun berbeda per platform** (WA dan TG terpisah) bisa jalan paralel (masing-masing 1 slot).
 
-**Batch besar (v1.0.31):** Queue banyak grup (mis. 100) → otomatis pecah **maks 30 grup per job**. Akun yang sama antri berurutan. Tunggu semua baris selesai.
+**Batch besar:** Queue banyak grup (mis. 100) → otomatis pecah **maks 30 grup per job**. Akun yang sama antri berurutan. Tunggu semua baris selesai. Jika sebagian grup gagal → status job **Failed** (bukan Completed hijau) — buka VIEW / Remark.
 
 Setelah **Queue** sukses, runner jalan otomatis jika slot kosong.
 
@@ -485,4 +487,4 @@ Hanya yang sering di operasi. Pesan lain → baca alert / VIEW Remark → Team D
 
 ---
 
-*Panduan ini untuk modul **Group Monitoring** v1.0.31 — tim operasional Depart Resource Management.*
+*Panduan ini untuk modul **Group Monitoring** v1.0.32 — tim operasional Depart Resource Management.*

@@ -51,7 +51,7 @@ function extractMeta(md) {
 
 function mdToHtmlDocument(md, guide) {
   const meta = extractMeta(md);
-  const version = meta['App version'] || meta['应用版本'] || '1.0.31';
+  const version = meta['App version'] || meta['应用版本'] || '1.0.32';
   const body = marked.parse(md);
   return `<!DOCTYPE html>
 <html lang="${guide.lang}">

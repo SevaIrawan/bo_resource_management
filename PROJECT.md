@@ -1,7 +1,7 @@
 # Resource Management — Dokumen Resmi Proyek
 
-**Versi dokumen:** 2026-07-24  
-**Versi aplikasi:** `1.0.31` (lihat `package.json`)  
+**Versi dokumen:** 2026-07-27  
+**Versi aplikasi:** `1.0.32` (lihat `package.json`)  
 **Status:** Produksi internal — desktop **Windows, macOS, Linux** (installer + auto-update multi-platform)  
 **Rilis CI:** [docs/RELEASE-CI.md](./docs/RELEASE-CI.md) — workflow **Release multi-platform** (`.exe`, `.dmg`/`.zip`, `.AppImage`)
 
@@ -65,7 +65,7 @@
 
 ---
 
-## 4. Konfigurasi & installer (kondisi 1.0.31)
+## 4. Konfigurasi & installer (kondisi 1.0.32)
 
 ### 4.1 Variabel lingkungan
 
@@ -384,4 +384,4 @@ release/                Output installer (gitignore)
 
 ---
 
-*Dokumen ini mencerminkan kondisi codebase per build **1.0.31**. Scrape tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase; Job Queue batch split 30 grup per job + join VIEW per-grup; Automatic account scrape kontrak UI factory reset.*
+*Dokumen ini mencerminkan kondisi codebase per build **1.0.32**. Scrape WA hanya grup yang masih di akun; tulis DB lewat RPC `rm_commit_account_scrape` atomik; PK master `(brand, platform, group_id)` — migrasi **036** di Supabase; Job Queue batch split 30 grup per job + status partial = Failed; Automatic account scrape kontrak UI factory reset.*

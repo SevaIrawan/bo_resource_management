@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.31 |
+| **App version** | 1.0.32 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (**Settings** → Language) |
 
 This document is the **official guide to every feature** in the current application. For architecture and IT release notes, see [PROJECT.md](../../PROJECT.md).
 
-> **v1.0.31:** There is **no Ticket tab**. Issues appear on the **Account** tab (not-aligned badges: Junk / Missing / Not admin). Remediation runs through **Operations → Job Queue** (SETUP: join / set admin / exit). **Operations** is Job Queue only (no Overview). Stock chips and the Group matrix live on the Account brand header. Prefer sidebar **Settings** (`/settings`); `/admin` redirects there.
+> **v1.0.32:** Full scrape reads **only groups still on the account** (progress = real count after Leave/Delete). Job Queue partial batch → **Failed** (not green Completed). There is **no Ticket tab**. Issues appear on the **Account** tab (not-aligned badges: Junk / Missing / Not admin). Remediation runs through **Operations → Job Queue** (SETUP: join / set admin / exit). **Operations** is Job Queue only (no Overview). Stock chips and the Group matrix live on the Account brand header. Prefer sidebar **Settings** (`/settings`); `/admin` redirects there.
 
 ---
 
@@ -266,7 +266,7 @@ Sync behavior depends on **Session** column value.
 
 | Term | Meaning |
 |------|---------|
-| **Scrape now** | Full scrape — all groups written to database (modal after Sync) |
+| **Scrape now** | Full scrape — **only groups still on the account** written to database (modal after Sync) |
 | **Sync** | Session check + scrape gate — not always a full scrape |
 
 There is **no separate Run button** in the grid. **Last update** is read-only.
@@ -665,4 +665,4 @@ Login (Username / Password)
 
 ---
 
-*This guide matches application version **1.0.31**. Update PDF/Word after each release via `npm run build:handbook-docs`.*
+*This guide matches application version **1.0.32**. Update PDF/Word after each release via `npm run build:handbook-docs`.*

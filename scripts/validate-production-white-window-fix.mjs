@@ -43,10 +43,11 @@ const checks = [
       waTs.includes('browser.close'),
   },
   {
-    name: 'Probe strict gagal → forceRelease (hindari double Chrome)',
+    name: 'Probe gagal → forceRelease (hindari double Chrome)',
     ok:
       validateTs.includes('forceReleaseWhatsAppForLogin') &&
-      validateTs.includes('strict && !result.valid'),
+      validateTs.includes('probeWhatsAppSessionLinked') &&
+      validateTs.includes('urgent: true, fast: true'),
   },
   {
     name: 'Phone login tanpa showNotification (hindari window OS)',

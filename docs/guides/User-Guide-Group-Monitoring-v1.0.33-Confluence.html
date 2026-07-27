@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User Guide - Group Monitoring v1.0.33</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.55; max-width: 920px; margin: 24px auto; color: #172b4d; }
+    h1 { font-size: 24px; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-top: 0; }
+    h2 { font-size: 18px; margin-top: 28px; color: #0052cc; border-bottom: 1px solid #dfe1e6; padding-bottom: 4px; }
+    h3 { font-size: 15px; margin-top: 20px; color: #172b4d; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 13px; }
+    th, td { border: 1px solid #c1c7d0; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f4f5f7; font-weight: 600; }
+    .panel { border-radius: 4px; padding: 12px 14px; margin: 16px 0; border-left: 4px solid; }
+    .info { background: #deebff; border-color: #0052cc; }
+    .warning { background: #fffae6; border-color: #ff991f; }
+    .tip { background: #e3fcef; border-color: #00875a; }
+    .panel-title { font-weight: 700; margin-bottom: 6px; }
+    pre { background: #f4f5f7; border: 1px solid #dfe1e6; padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.4; white-space: pre-wrap; }
+    code { background: #f4f5f7; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    ul, ol { margin: 8px 0 16px; padding-left: 24px; }
+    li { margin: 4px 0; }
+    a { color: #0052cc; }
+    hr { border: none; border-top: 1px solid #dfe1e6; margin: 24px 0; }
+    blockquote { margin: 16px 0; padding: 12px 14px; background: #deebff; border-left: 4px solid #0052cc; border-radius: 0 4px 4px 0; }
+    blockquote p { margin: 0; }
+    .doc-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #dfe1e6; font-size: 12px; color: #5e6c84; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<h1>User Guide - Backend Operation (Group Monitoring)</h1>
+
+<div class="panel info">
+  <div class="panel-title">Document information</div>
+  <table>
+    <tr><th>App version</th><td>1.0.33</td></tr>
+    <tr><th>For</th><td>R&amp;M operations team</td></tr>
+    <tr><th>UI language</th><td>English / Chinese (Settings &gt; Language)</td></tr>
+  </table>
+</div>
+
+<h2 id="toc">Table of contents</h2>
+<ol>
+  <li><a href="#what">What is this app?</a></li>
+  <li><a href="#start">Quick start</a></li>
+  <li><a href="#terms">Key terms</a></li>
+  <li><a href="#nav">Navigation</a></li>
+  <li><a href="#account">Account tab</a></li>
+  <li><a href="#cta">Gap lists and Job Queue shortcuts</a></li>
+  <li><a href="#sync">Sync and Scrape now</a></li>
+  <li><a href="#lists">Group lists from Account</a></li>
+  <li><a href="#stock">Stock on brand header</a></li>
+  <li><a href="#job-queue">Operations - Job Queue</a></li>
+  <li><a href="#matrix">Group matrix</a></li>
+  <li><a href="#settings">Settings</a></li>
+  <li><a href="#issues">Common issues</a></li>
+  <li><a href="#contact">Contact Team Develop</a></li>
+  <li><a href="#quick">Quick reference</a></li>
+</ol>
+<hr />
+
+<h2 id="what">What is this app?</h2>
+<p>Desktop app to monitor many WhatsApp and Telegram accounts per brand.</p>
+<ul>
+  <li>See session <strong>Active</strong> or <strong>Logout</strong></li>
+  <li>See gap counts: Junk, Missing, Not admin</li>
+  <li>Run Job Queue: Join missing, Create group, Set admin, Leave group</li>
+  <li>Open stock chips and Group matrix from the Account brand header</li>
+</ul>
+<hr />
+
+<h2 id="start">Quick start</h2>
+<ol>
+  <li>Install from Team Develop, open the app, log in with username and password</li>
+  <li>Open Group Monitoring &gt; Account</li>
+  <li>On accounts with Session <strong>Logout</strong>, click Sync and scan QR on the marketing phone</li>
+  <li>When the app asks, choose <strong>Scrape now</strong> (or Later if you will scrape later)</li>
+</ol>
+<blockquote>
+  <p>App login is not WA/TG login. WA/TG login is only through Sync.</p>
+</blockquote>
+<hr />
+
+<h2 id="terms">Key terms</h2>
+<table>
+  <thead><tr><th>Term (as shown in UI)</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Active</strong> / <strong>Logout</strong></td><td>Session connected or disconnected on this PC</td></tr>
+    <tr><td><strong>On device</strong></td><td>Total groups on the phone from the latest scrape</td></tr>
+    <tr><td><strong>Junk</strong></td><td>Count of phone groups not in brand master</td></tr>
+    <tr><td><strong>Missing</strong></td><td>Count of master groups not yet joined</td></tr>
+    <tr><td><strong>Not admin</strong></td><td>Count of joined master groups where this account is not admin</td></tr>
+    <tr><td><strong>Aligned</strong> / <strong>Not Aligned</strong></td><td>Shown in Remark column</td></tr>
+    <tr><td><strong>SETUP</strong></td><td>Job Queue form. Submit button is <strong>Queue</strong></td></tr>
+    <tr><td><strong>Master</strong> (Role)</td><td>Required role for Create group</td></tr>
+    <tr><td><strong>GCS</strong> (Role)</td><td>Other account role (not used to create groups)</td></tr>
+  </tbody>
+</table>
+<hr />
+
+<h2 id="nav">Navigation</h2>
+<pre><code>Sidebar                 Work area
+Group Monitoring   -&gt;   Account | Operations
+Settings           -&gt;   Language, auto scrape, stock, workers
+Logout             -&gt;   App logout only (does not log out WA/TG)
+</code></pre>
+<table>
+  <thead><tr><th>Place</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Account</strong></td><td>Accounts, Sync, gap lists, stock chips, Group matrix</td></tr>
+    <tr><td><strong>Operations</strong></td><td>Job Queue only</td></tr>
+    <tr><td><strong>Settings</strong></td><td>App settings</td></tr>
+  </tbody>
+</table>
+<hr />
+
+<h2 id="account">Account tab</h2>
+<p>KPI at top: Brands, Accounts, Online, Aligned.</p>
+<p>Filters: Search Acc Name/Number, Brand, Platform, <strong>Session</strong> (Active / Logout), <strong>Status</strong> (Aligned / Not Aligned).</p>
+<p>Use <strong>Card view</strong> for Sync, Scrape, and Clear Session.</p>
+
+<h3>Columns (Card view)</h3>
+<table>
+  <thead><tr><th>Column header</th><th>What you see</th><th>If there is a problem</th></tr></thead>
+  <tbody>
+    <tr><td>Account</td><td>Platform, name, phone</td><td>-</td></tr>
+    <tr><td>Role</td><td>Master or GCS</td><td>Create group needs Master</td></tr>
+    <tr><td>Location</td><td>Device label</td><td>-</td></tr>
+    <tr><td>Session</td><td><strong>Active</strong> or <strong>Logout</strong></td><td>Sync + QR when Logout</td></tr>
+    <tr><td>On device</td><td>Number (total groups on phone)</td><td>Scrape now after phone changes</td></tr>
+    <tr><td>Junk</td><td>Gap count (clickable if &gt; 0)</td><td>Open list, then Leave</td></tr>
+    <tr><td>Missing</td><td>Gap count (clickable if &gt; 0)</td><td>Open list, then Join missing</td></tr>
+    <tr><td>Not admin</td><td>Gap count (clickable if &gt; 0)</td><td>Open list, then Set admin</td></tr>
+    <tr><td>Last update</td><td>Time or scrape progress. Read-only</td><td>Sync then Scrape now</td></tr>
+    <tr><td>Remark</td><td>Aligned / Not Aligned (or Cancel scrape while scraping)</td><td>Fix gaps then Scrape now</td></tr>
+  </tbody>
+</table>
+
+<p>Add account: <strong>+Add</strong> &gt; platform &gt; name + phone &gt; Save &gt; Sync.<br>
+Clear Session: hover Session when Active, click X. Next Sync asks for a new QR.</p>
+<hr />
+
+<h2 id="cta">Gap lists and Job Queue shortcuts</h2>
+<div class="panel info">
+  <div class="panel-title">Real click path</div>
+  <p>Click a gap number (Junk / Missing / Not admin) &gt; group list opens &gt; press the button <strong>Join missing</strong>, <strong>Set admin</strong>, or <strong>Leave</strong> &gt; SETUP opens &gt; Queue.</p>
+  <p>You can also open SETUP from Operations Add bar without using a gap list.</p>
+  <p>VIEW / RUN / PAUSE / CANCEL control jobs already in the queue. They are not Account gap shortcuts.</p>
+</div>
+
+<table>
+  <thead><tr><th>From Account</th><th>Button in list</th><th>Job Queue task</th></tr></thead>
+  <tbody>
+    <tr><td>Missing count</td><td>Join missing</td><td>Join missing</td></tr>
+    <tr><td>Not admin count</td><td>Set admin</td><td>Set admin</td></tr>
+    <tr><td>Junk count</td><td>Leave</td><td>Leave group (SETUP opens on Not in master)</td></tr>
+    <tr><td>To prep (header)</td><td>Click when value &gt; 1</td><td>Create group (pick Master in SETUP)</td></tr>
+  </tbody>
+</table>
+<hr />
+
+<h2 id="sync">Sync and Scrape now</h2>
+<p><strong>Sync</strong> checks the platform session.</p>
+<ul>
+  <li>Session <strong>Logout</strong>: scan QR (or phone login), then you may get Scrape now / Later</li>
+  <li>Session <strong>Active</strong>: light session check. Full group numbers update when you choose <strong>Scrape now</strong></li>
+</ul>
+<p><strong>Scrape now</strong> reads <strong>only groups still on the account (phone)</strong> and writes them to the database. Progress shows the <strong>real count</strong> (e.g. 11/11), not left/deleted chats. Last update shows progress. Do not close the app. Cancel scrape = nothing saved.</p>
+<p><strong>Busy:</strong> while this account is Syncing/Scraping or has a Job Queue task, the other activity is blocked until the first finishes (two-way).</p>
+<p>After Job Queue Leave/Delete, run Sync then Scrape now so On device / Junk / Missing / Not admin match the groups left on the phone.</p>
+<hr />
+
+<h2 id="lists">Group lists from Account</h2>
+<p>Open lists by clicking the Account columns (when the number allows it):</p>
+<table>
+  <thead><tr><th>List</th><th>How to open</th></tr></thead>
+  <tbody>
+    <tr><td><strong>On Device</strong></td><td>Click On device (when &gt; 0)</td></tr>
+    <tr><td><strong>Not in Master</strong></td><td>Click Junk (when &gt; 0)</td></tr>
+    <tr><td><strong>Missing</strong></td><td>Click Missing (when &gt; 0)</td></tr>
+    <tr><td><strong>Not admin</strong></td><td>Click Not admin (when &gt; 0)</td></tr>
+  </tbody>
+</table>
+<p>Empty? Sync then Scrape now first.</p>
+<hr />
+
+<h2 id="stock">Stock on brand header</h2>
+<p>On each Account brand card header:</p>
+<ul>
+  <li><strong>Avg ND</strong> and <strong>To prep</strong></li>
+  <li>Chips: <strong>Ready</strong>, <strong>Recycle</strong>, <strong>Review</strong> (click a chip to open that list)</li>
+</ul>
+<p><strong>To prep</strong> opens Create group SETUP only when the To prep number is <strong>greater than 1</strong>.</p>
+<p>Click the platform group count badge (example: WA n Group) to open Group matrix.</p>
+<hr />
+
+<h2 id="job-queue">Operations - Job Queue</h2>
+<p>Operations = Job Queue only. Choose Platform in the slicer. Brand, task, and account are in the Add bar / SETUP.</p>
+
+<h3>Task types (exact labels)</h3>
+<table>
+  <thead><tr><th>Task</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Join missing</strong></td><td>Join master groups not yet on the account (invite from master)</td></tr>
+    <tr><td><strong>Create group</strong></td><td>Create groups on the phone. Role Master. Brand photo required in SETUP. Set photo usually queues automatically after create</td></tr>
+    <tr><td><strong>Set admin</strong></td><td>OWNER/ADMIN promotes Account to promote on eligible groups</td></tr>
+    <tr><td><strong>Leave group</strong></td><td>Leave selected groups. If Delete is on in worker Leave &amp; delete, delete chat queues automatically after leave</td></tr>
+  </tbody>
+</table>
+
+<p>Status: Queued, Running, Completed, Failed, Cancelled, Paused.<br>
+Row controls: VIEW, RUN, PAUSE, CANCEL. SETUP submit = Queue.</p>
+<p>Do not Sync the same account while its job is Running.<br>
+Up to <strong>10</strong> concurrent execute slots per platform (shared by Sync, Scrape, and jobs).<br>
+Large join / leave / set admin / set photo lists split by Settings Max per run (default <strong>30</strong> groups per job row). Same account runs those rows in order.<br>
+Create group max default is <strong>25</strong> groups per Master run (separate from the 30 split).</p>
+
+<h3>PAUSE / CANCEL / RUN</h3>
+<table>
+  <thead><tr><th>Button</th><th>What happens</th></tr></thead>
+  <tbody>
+    <tr><td>PAUSE</td><td>Stops the job. Progress is kept. RUN continues.</td></tr>
+    <tr><td>CANCEL</td><td>Status Cancelled. Row stays. RUN can put it back in queue. Delete the row only to remove it.</td></tr>
+    <tr><td>RUN</td><td>Starts or resumes Queued / Failed / Cancelled / paused work.</td></tr>
+  </tbody>
+</table>
+<p>No fixed max retry count. Read VIEW Remark first. If invite expired, get a new link and queue a new Join missing. Do not spam RUN.</p>
+
+<hr />
+<h3>Join missing</h3>
+<ol>
+  <li>From Operations, or from Missing list &gt; Join missing</li>
+  <li>SETUP: drop CSV/XLSX, or open Select from master list and tick groups</li>
+  <li>Queue</li>
+  <li>If Failed: VIEW (No / Group / Status / Remark), fix cause if needed, Run</li>
+  <li>Account: Sync then Scrape now</li>
+</ol>
+
+<hr />
+<h3>Create group</h3>
+<p><strong>When:</strong> Need new Ready stock, or To prep &gt; 1 on the brand header.</p>
+<p><strong>Account:</strong> Role <strong>Master</strong>. Limits: max about 25 groups per run; one create run per Master per day (used Masters show as used today).</p>
+<p>From To prep, pick the Master account inside SETUP.</p>
+
+<p><strong>SETUP cards:</strong></p>
+<ol>
+  <li><strong>Group batch</strong>
+    <ul>
+      <li>Group name (required)</li>
+      <li>Total to create (required)</li>
+      <li>Number each group name (switch) + Start from</li>
+    </ul>
+  </li>
+  <li><strong>Group permissions</strong> (defaults from Settings; change only for this job)
+    <ul>
+      <li>WhatsApp: Admins send only, Admins add only, Admins edit info</li>
+      <li>Telegram: Hide history for members</li>
+    </ul>
+  </li>
+  <li><strong>Upload Photo</strong> / <strong>Preview Photo</strong> (required). Upload or Change before Queue. Without a photo, Queue stays off.</li>
+</ol>
+
+<ol start="4">
+  <li>Queue and wait for Completed</li>
+  <li>Set photo usually queues automatically after create (Remark may say set photo queues automatically)</li>
+  <li>VIEW shows created groups (name, id, invite link) and <strong>Queue Set Photo</strong> if you need to retry</li>
+  <li>Account: Sync then Scrape now</li>
+</ol>
+
+<hr />
+<h3>Set admin</h3>
+<ol>
+  <li><strong>OWNER/ADMIN</strong> = account already admin in the groups</li>
+  <li><strong>Account to promote</strong> = target</li>
+  <li>SETUP lists only eligible groups (owner is admin, target joined, not admin yet)</li>
+  <li>Queue, then Sync + Scrape now on the target account</li>
+</ol>
+
+<hr />
+<h3>Leave group</h3>
+<p><strong>When:</strong> Junk or other groups to leave, or Junk list &gt; Leave.</p>
+<p>Leave must be enabled under Settings &gt; <strong>WhatsApp worker</strong> or <strong>Telegram worker</strong> &gt; <strong>Leave &amp; delete</strong>.</p>
+<ol>
+  <li>Pick one account + task Leave group</li>
+  <li>SETUP tabs:
+    <ul>
+      <li><strong>On device</strong> - all groups from latest daily scrape</li>
+      <li><strong>Not in master</strong> - junk. Junk &gt; Leave opens this tab</li>
+    </ul>
+  </li>
+  <li>Tick groups, Queue</li>
+  <li>Job leaves the groups. If Delete is enabled in Leave &amp; delete, delete chat queues automatically for groups that Left</li>
+  <li>Delete here clears/deletes chat on this account. It does not dissolve the group for everyone</li>
+  <li>VIEW <strong>Queue delete (left groups)</strong> is mainly to retry if auto-delete failed or did not run</li>
+  <li>Account: Sync then Scrape now</li>
+</ol>
+<p>Note: some Setup window titles may still say "exit &amp; delete" in the title text, but the task tab label is <strong>Leave group</strong>.</p>
+<hr />
+
+<h2 id="matrix">Group matrix</h2>
+<p>Read-only. Open from the Account brand header group count badge.</p>
+<p>Bookmarks: <strong>Full Group</strong>, <strong>Full Admin</strong>. Filters and Excel export available. Updates after scrape.</p>
+<hr />
+
+<h2 id="settings">Settings</h2>
+<table>
+  <thead><tr><th>Section</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Language</td><td>English / Chinese</td></tr>
+    <tr><td>Check for updates</td><td>App update</td></tr>
+    <tr><td>Automatic account scrape</td><td>On Scheduled + Scrape Now</td></tr>
+    <tr><td>Operations stock policy</td><td>Ready target %, Avg ND days</td></tr>
+    <tr><td>SOP naming</td><td>Naming patterns</td></tr>
+    <tr><td>WhatsApp worker / Telegram worker</td><td>Delays, create defaults, Leave &amp; delete. Ask team lead before changing</td></tr>
+  </tbody>
+</table>
+
+<h3>Automatic account scrape</h3>
+<ul>
+  <li>Default idle: On Scheduled On, Scrape Now Off, daily time 12:00 PM, brands FWSG / JMMY / M24SG / SBMY / STMY / WBSG (max 6 per platform)</li>
+  <li>Scrape Now Off: buttons <strong>Save</strong> / <strong>Cancel</strong></li>
+  <li>Scrape Now On: buttons <strong>Execute</strong> / <strong>Discard</strong>. Brands start unchecked (0/6). Status shows standby until Execute</li>
+  <li>After Execute finishes, settings restore to defaults</li>
+  <li>App must be open at the scheduled time. No catch-up if the app was closed</li>
+  <li>While On Scheduled is running, Scrape Now stays blocked</li>
+</ul>
+<hr />
+
+<h2 id="issues">Common issues</h2>
+<p>Problems R&amp;M hits most often. If your message is not listed, read VIEW Remark / the alert text, then Contact Team Develop.</p>
+<table>
+  <thead><tr><th>What you see</th><th>What to do</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Session <strong>Logout</strong>, or alert: not logged in / session no longer valid / <strong>WhatsApp session timed out… Linked Devices</strong></td>
+      <td><strong>Sync (↻)</strong> → scan QR or phone linking (WhatsApp → Linked Devices). If QR never appears: Clear Session (X on Session when Active) → Sync → QR</td>
+    </tr>
+    <tr>
+      <td><strong>Navigating frame was detached</strong></td>
+      <td><strong>Clear Session</strong> → Sync → QR → Session Active → then VIEW <strong>RUN</strong>. Do not RUN first</td>
+    </tr>
+    <tr>
+      <td>Remark <strong>Not Aligned</strong> (Junk / Missing / Not admin &gt; 0)</td>
+      <td>Open the gap list → Join missing / Set admin / Leave → Queue. Then Sync → <strong>Scrape now</strong></td>
+    </tr>
+    <tr>
+      <td>Scrape running (<strong>Reading groups…</strong>, progress, Cancel scrape)</td>
+      <td>Normal. Keep the app open. Do not Sync or start a job on the same account until it finishes</td>
+    </tr>
+    <tr>
+      <td>Job finished but Account numbers / matrix still wrong</td>
+      <td>Sync → <strong>Scrape now</strong> on that account</td>
+    </tr>
+    <tr>
+      <td>Invite expired / rejected (Join missing Failed)</td>
+      <td>Scrape an admin that owns the group → get a fresh invite → new Join missing. Do not spam RUN</td>
+    </tr>
+    <tr>
+      <td><strong>Leave is disabled in worker settings</strong></td>
+      <td>Settings → WhatsApp/Telegram worker → Leave &amp; delete → enable Leave → queue again</td>
+    </tr>
+    <tr>
+      <td>Create group Queue disabled / need Master</td>
+      <td>Account Role = <strong>Master</strong>. SETUP needs Group name, Total to create, and Upload Photo</td>
+    </tr>
+    <tr>
+      <td>Execute slots busy / account already has a task running</td>
+      <td>Wait. Max <strong>10</strong> accounts per platform; one Sync/scrape/job per account</td>
+    </tr>
+    <tr>
+      <td>Job <strong>Failed</strong> / WhatsApp store flake — retry</td>
+      <td>VIEW → read Remark → <strong>RUN</strong> once. If the next error is frame detached → Clear Session path above</td>
+    </tr>
+    <tr>
+      <td>Scheduled auto scrape did not run</td>
+      <td>App must be open at the schedule time, or Settings → Scrape Now → <strong>Execute</strong></td>
+    </tr>
+  </tbody>
+</table>
+<hr />
+
+<h2 id="contact">Contact Team Develop</h2>
+<p>Only after the steps above fail. Include app version 1.0.33, brand, account, platform, steps, screenshots, and Remark text.</p>
+<hr />
+
+<h2 id="quick">Quick reference</h2>
+<table>
+  <thead><tr><th>Need</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td>Login WA/TG</td><td>Account → Sync (↻)</td></tr>
+    <tr><td>Full group list in DB</td><td>Sync → Scrape now</td></tr>
+    <tr><td>Fix Missing / Not admin / Junk</td><td>Click the gap number → Join missing / Set admin / Leave</td></tr>
+    <tr><td>Create groups</td><td>Operations → Create group (Master + photo)</td></tr>
+    <tr><td>Chrome frame detached</td><td>Clear Session → Sync → QR → RUN</td></tr>
+  </tbody>
+</table>
+
+<p class="doc-footer">User Guide v1.0.33 — Group Monitoring (R&amp;M operations)</p>
+
+</body>
+</html>

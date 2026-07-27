@@ -21,10 +21,10 @@ const checks = [
       config.includes('rm_worker_settings_telegram'),
   },
   {
-    name: 'Safe defaults: human safe, delete off, TG minimal admin rights',
+    name: 'Safe defaults: human safe, delete on, TG minimal admin rights',
     ok:
       config.includes("humanProfile: 'safe'") &&
-      config.includes('deleteEnabled: false') &&
+      config.includes('deleteEnabled: true') &&
       config.includes('postMessages: true') &&
       config.includes('addAdmins: false') &&
       /defaultWhatsAppWorkerSettings[\s\S]*messagesAdminsOnly: false/.test(config),

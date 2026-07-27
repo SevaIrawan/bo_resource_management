@@ -61,9 +61,9 @@ WA promote has no granular rights in whatsapp-web.js — only delay.
 | Field | WA | TG | Safe default |
 |-------|----|----|--------------|
 | Allow leave job | ✓ | ✓ | ON |
-| Allow delete job | ✓ | ✓ | **OFF** |
+| Allow delete job | ✓ | ✓ | **ON** (tim R&M: Leave lalu hapus otomatis) |
 | Require owner for delete | — | ✓ | ON |
-| Clear chat on delete | ✓ | — | OFF |
+| Clear chat on delete | ✓ | — | **ON** (selaras `SAFE_LEAVE_DELETE.clearChatHistoryOnDelete`) |
 | Delay between groups | ✓ | ✓ | 60s |
 
 ## Reference

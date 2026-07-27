@@ -1,6 +1,6 @@
 # Panduan Group Monitoring
 
-**Versi app:** 1.0.32  
+**Versi app:** 1.0.33  
 **Untuk:** Tim **Depart Resource Management (R&M)** — semua yang menjalankan monitoring grup WhatsApp & Telegram  
 **Bahasa UI:** English / 中文 → ubah di **Settings → Language**
 
@@ -169,6 +169,8 @@ Akun **Not Aligned** di Remark / badge not aligned jika masih ada gap.
 ## 5. Tombol Sync (↻)
 
 **Fungsi:** cek apakah WA/TG masih terhubung di PC ini + pintu scrape penuh (**Scrape now** / **Later**). Sync ringkas **bukan** scrape penuh semua grup.
+
+**Busy:** akun yang sedang Sync/Scrape **atau** Job Queue tidak bisa dipakai aktivitas lain sampai selesai (saling blokir dua arah).
 
 ### Session = Logout
 
@@ -487,4 +489,4 @@ Hanya yang sering di operasi. Pesan lain → baca alert / VIEW Remark → Team D
 
 ---
 
-*Panduan ini untuk modul **Group Monitoring** v1.0.32 — tim operasional Depart Resource Management.*
+*Panduan ini untuk modul **Group Monitoring** v1.0.33 — tim operasional Depart Resource Management.*

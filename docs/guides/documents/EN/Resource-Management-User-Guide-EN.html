@@ -11,7 +11,7 @@
     <p class="doc-cover-logo">Backend Operation</p>
     <h1>Resource Management</h1>
     <p class="doc-cover-subtitle">Official User Guide</p>
-    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.32</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Settings → Language)</td></tr></table>
+    <table class="doc-meta-table"><tr><th>Product</th><td>Backend Operation — Resource Management</td></tr><tr><th>App version</th><td>1.0.33</td></tr><tr><th>Audience</th><td>Internal operations team (marketing / monitoring of WhatsApp & Telegram groups)</td></tr><tr><th>Platform</th><td>Windows / macOS / Linux desktop installers</td></tr><tr><th>UI languages</th><td>English / 中文 (Settings → Language)</td></tr></table>
   </header>
   
 <section class="doc-toc">
@@ -34,7 +34,7 @@
   <main class="doc-body">
     <p>This document is the <strong>official guide to every feature</strong> in the current application. For architecture and IT release notes, see <a href="../../PROJECT.md">PROJECT.md</a>.</p>
 <blockquote>
-<p><strong>v1.0.32:</strong> Full scrape reads <strong>only groups still on the account</strong> (progress = real count after Leave/Delete). Job Queue partial batch → <strong>Failed</strong> (not green Completed). There is <strong>no Ticket tab</strong>. Issues appear on the <strong>Account</strong> tab (not-aligned badges: Junk / Missing / Not admin). Remediation runs through <strong>Operations → Job Queue</strong> (SETUP: join / set admin / exit). <strong>Operations</strong> is Job Queue only (no Overview). Stock chips and the Group matrix live on the Account brand header. Prefer sidebar <strong>Settings</strong> (<code>/settings</code>); <code>/admin</code> redirects there.</p>
+<p><strong>v1.0.33:</strong> Sync and Job Queue <strong>block each other</strong> on the same account (including Checking Session). Full scrape reads <strong>only groups still on the account</strong> (progress = real count after Leave/Delete). Job Queue partial batch → <strong>Failed</strong> (not green Completed). There is <strong>no Ticket tab</strong>. Issues appear on the <strong>Account</strong> tab (not-aligned badges: Junk / Missing / Not admin). Remediation runs through <strong>Operations → Job Queue</strong> (SETUP: join / set admin / exit). <strong>Operations</strong> is Job Queue only (no Overview). Stock chips and the Group matrix live on the Account brand header. Prefer sidebar <strong>Settings</strong> (<code>/settings</code>); <code>/admin</code> redirects there.</p>
 </blockquote>
 <hr>
 <h2 id="table-of-contents">Table of contents</h2>
@@ -1333,11 +1333,11 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>This guide matches application version <strong>1.0.32</strong>. Update PDF/Word after each release via <code>npm run build:handbook-docs</code>.</em></p>
+<p><em>This guide matches application version <strong>1.0.33</strong>. Update PDF/Word after each release via <code>npm run build:handbook-docs</code>.</em></p>
 
   </main>
   <footer class="doc-footer">
-    <p>Internal use only — Resource Management v1.0.32</p>
+    <p>Internal use only — Resource Management v1.0.33</p>
   </footer>
 </body>
 </html>

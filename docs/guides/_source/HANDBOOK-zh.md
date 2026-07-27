@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | **产品** | 后端运营 — 资源管理（Backend Operation — Resource Management） |
-| **应用版本** | 1.0.32 |
+| **应用版本** | 1.0.33 |
 | **适用对象** | 内部运营团队（营销 / WhatsApp 与 Telegram 群组监控） |
 | **平台** | Windows / macOS / Linux 桌面安装包 |
 | **界面语言** | English / 中文（**设置** → **语言**） |
 
 本文档为当前应用中**全部功能的官方使用说明**。架构与 IT 发布说明请参阅 [PROJECT.md](../../PROJECT.md)。
 
-> **v1.0.32：** 完整抓取只读**账号上仍存在的群**（Leave/Delete 后进度为真实数量）。Job Queue 部分失败 → **Failed**（不是绿色 Completed）。**无「工单」标签**。问题显示在 **账号** 页（未对齐徽章：Junk / 缺群 / 非管理员）。修复通过 **Operations → Job Queue**（SETUP：入群 / 设管理员 / 退出）。**Operations** 仅为 Job Queue（无 Overview）。库存 chips 与群组矩阵在账号页品牌标题栏。侧栏优先使用 **设置**（`/settings`）；`/admin` 会重定向到此页。
+> **v1.0.33：** 同一账号上 Sync 与 Job Queue **互相阻塞**（含 Checking Session）。完整抓取只读**账号上仍存在的群**（Leave/Delete 后进度为真实数量）。Job Queue 部分失败 → **Failed**（不是绿色 Completed）。**无「工单」标签**。问题显示在 **账号** 页（未对齐徽章：Junk / 缺群 / 非管理员）。修复通过 **Operations → Job Queue**（SETUP：入群 / 设管理员 / 退出）。**Operations** 仅为 Job Queue（无 Overview）。库存 chips 与群组矩阵在账号页品牌标题栏。侧栏优先使用 **设置**（`/settings`）；`/admin` 会重定向到此页。
 
 ---
 
@@ -653,4 +653,4 @@ Telegram 在会话**在线**时其他 PC 可用（会话在云端）。交接请
 
 ---
 
-*本手册对应应用版本 **1.0.32**。每次发布后请运行 `npm run build:handbook-docs` 更新 PDF/Word。*
+*本手册对应应用版本 **1.0.33**。每次发布后请运行 `npm run build:handbook-docs` 更新 PDF/Word。*

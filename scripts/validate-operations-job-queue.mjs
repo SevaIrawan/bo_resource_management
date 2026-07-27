@@ -208,7 +208,7 @@ const checks = [
         tg.includes("createStatus: 'created'") &&
         tg.includes('groupOutcomes') &&
         tg.includes('persistPartial') &&
-        tg.includes('{ retry: false }') &&
+        tg.includes('{ retry: false, timeoutMs:') &&
         runner.includes('resolveCreateGroupOutcomesFromSingle') &&
         runner.includes('group(s) created before error')
       );
@@ -219,7 +219,7 @@ const checks = [
     ok: (() => {
       const ui = read('src/lib/operationsJobQueueUi.ts');
       return (
-        ui.includes("row.createStatus !== 'failed'") &&
+        ui.includes("row.createStatus === 'created'") &&
         ui.includes('resolveCreateGroupResultOutcomes') &&
         ui.includes("'groupName', 'groupId', 'inviteLink', 'status'") &&
         ui.includes('createStatusCreated')

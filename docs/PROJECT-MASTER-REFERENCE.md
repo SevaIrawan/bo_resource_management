@@ -1,7 +1,7 @@
 # Resource Management — Referensi Master Proyek
 
 **Versi dokumen:** 2026-07-24  
-**Versi aplikasi:** 1.0.32 (`package.json`)  
+**Versi aplikasi:** 1.0.33 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
 ## Prinsip dokumen ini
@@ -820,6 +820,7 @@ flowchart TD
 | 2026-06-06 | Audit script `validate:master-reference`; perbaiki endpoint sidecar; hierarki kebenaran; hak akses Sync admin-only |
 | 2026-06-11 | Grid On device / Junk; Clear Session; remove slot rebuild master |
 | 2026-07-24 | Grid UI: Missing / Not admin / Remark (Active/Logout); daftar via klik gap |
+| 2026-07-27 | v1.0.33: Sync↔Job mutual block (execute slot); await WA validate; worker Leave delete/clear-chat defaults ON; validators pre-release gate; docs sync |
 | 2026-07-27 | v1.0.32: scrape WA hanya grup masih di akun; clear checkpoint setelah leave/delete; Job Queue partial=Failed; docs + Confluence sync |
 | 2026-07-24 | v1.0.31: `/settings` primer (`/admin`→`/settings`); Last update read-only; grid 10 kolom; no ticket tables; validators auto-scrape + worker + real-ops |
 

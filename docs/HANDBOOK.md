@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.32 |
+| **Versi app** | 1.0.33 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Settings → Language) |
@@ -123,7 +123,7 @@ Angka berubah sesuai tab aktif.
 | Online | Akun dengan session **Active** |
 | Aligned | Akun Remark **Aligned** (tanpa gap Junk/Missing/Not admin) |
 
-**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. Batch besar auto-split 30 grup per job; batch partial → **Failed** (bukan Completed). **v1.0.32:** scrape WA hanya grup yang masih di akun (progress = jumlah real). Execute slots max **10**/platform; auto scrape brands max **6**.
+**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. Batch besar auto-split 30 grup per job; batch partial → **Failed** (bukan Completed). **v1.0.33:** Sync↔Job saling blokir; scrape WA hanya grup masih di akun (progress = jumlah real). Execute slots max **10**/platform; auto scrape brands max **6**.
 
 > Tidak ada tab Ticket / Reporting di shell. Issue = KPI Account + gap kolom + Remark. Matrix = modal dari badge grup.
 
@@ -478,4 +478,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.32**.*
+*Handbook ini selaras dengan aplikasi versi **1.0.33**.*

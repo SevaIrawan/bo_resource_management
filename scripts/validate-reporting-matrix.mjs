@@ -27,14 +27,14 @@ const checks = [
       !fs.existsSync(path.join(root, 'src/components/group-monitoring/ReportingMonitoringPanel.tsx')),
   },
   {
-    name: 'Modal Group: brand+platform scoped, semua Acc (tanpa Acc slicer)',
+    name: 'Modal Group: brand+platform scoped, semua Acc (tanpa Acc slicer; groupNameSearch OK)',
     ok:
       modal.includes('loadJoinGroupMatrix') &&
       modal.includes('ReportingJoinMatrixTable') &&
       modal.includes("['full_group', 'full_admin']") &&
       modal.includes('.filter((account) => account.platform === platform)') &&
       !modal.includes('REPORTING_ACCOUNT_ALL') &&
-      !modal.includes('groupNameSearch') &&
+      modal.includes('groupNameSearch') &&
       !modal.includes('stockStatus'),
   },
   {

@@ -210,7 +210,7 @@ export function registerScraperIpc() {
       if (payload.platform === 'telegram') {
         return await validateTelegramSession(payload.sessionId, payload.storedSessionString);
       }
-      return validateWhatsAppSession(payload.sessionId, { strict: true });
+      return await validateWhatsAppSession(payload.sessionId, { strict: true });
     } catch (error) {
       return {
         valid: false,

@@ -8,6 +8,7 @@ import { accountJobStepTotal, isJobQueueBlockingExecutes, listBusyAccountIds } f
 import { listSettlingSessionIds, markSessionSettleAfterJob } from './jobQueueSettle';
 import { getActiveScrapeSessionCount, isScrapeActiveForSession, listActiveScrapeSessionIds } from '../scraper/scrapeCancel';
 import { getActiveAutoScrapeSessionCount, isAutoScrapeActiveForSession, listActiveAutoScrapeSessionIds } from '../scraper/autoScrapeCancel';
+import { isExecuteSlotActiveForAccount } from './executeSlotPool';
 import {
   countCreatedGroupOutcomes,
   mergeJobGroupOutcomes,
@@ -411,6 +412,8 @@ export function pickQueuedJobsForDispatch(): AutomationJobRecord[] {
     for (const job of queued) {
       if (platformPicked >= dispatchBudget) break;
       if (runningAccountIds.has(job.accountId)) continue;
+      // Sync/Scrape/Job yang pegang execute slot — jangan dispatch (hindari retry same_account cepat).
+      if (isExecuteSlotActiveForAccount(job.accountId)) continue;
       if (isScrapeActiveForSession(job.sessionId)) continue;
       if (isAutoScrapeActiveForSession(job.sessionId)) continue;
       if (picked.some((row) => row.accountId === job.accountId)) continue;

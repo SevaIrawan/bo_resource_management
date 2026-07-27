@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.32` (lihat `package.json`)
+**Versi saat ini:** `1.0.33` (lihat `package.json`)
+
+**Rilis 1.0.33:** Sync ↔ Job Queue saling blokir dua arah (execute slot); await WA validate-session; scrape hanya grup live; validator + worker defaults (delete/clear-chat ON) diselaraskan; docs sync.
 
 **Rilis 1.0.32:** Scrape WA hanya grup yang **masih di akun** (progress = jumlah real setelah Leave/Delete, bukan chat ghost); checkpoint scrape di-clear setelah leave/delete Job Queue; Job Queue batch partial → **Failed** (bukan Completed hijau); master invite hanya admin brand; harden scrape akun besar + create-group finish; docs sync.
 

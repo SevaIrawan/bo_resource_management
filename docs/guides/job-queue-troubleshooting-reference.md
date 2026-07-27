@@ -1,7 +1,7 @@
 # GM App — Job Queue & Execute Worker Troubleshooting Reference
 
 **Product:** Resource Management (Electron)  
-**Version:** v1.0.32  
+**Version:** v1.0.33  
 **Audience:** Developers and ops maintaining WhatsApp / Telegram automation  
 **Scope:** Job Queue, execute slot pool, Sync / Scrape interaction — not Reporting or Supabase schema
 
@@ -28,6 +28,7 @@
 - **Max 10 parallel accounts per platform** — WA dan TG **terpisah** (masing-masing hingga 10). Pool bersama untuk Sync, Scrape, dan Job Queue user (`executeSlotPool` + `deviceConcurrencyPolicy.ts`). Auto-scrape brand: lane terpisah max **6** per platform.
 - **Per-account isolation** — account A failure or block does not stop account B; **one account uses at most 1 slot**.
 - **Batch auto-split** — large group lists split at enqueue into jobs of ≤ `maxPerRun` (default 30); chunks for the **same account run sequentially** (FIFO), not in parallel.
+- **Sync / Job mutual block** — while Sync (including Checking Session) or Scrape holds the account execute slot, queued jobs for that account stay queued (no fast same_account retry loop).
 - **Partial batch → Failed** — if some groups fail, job status is **Failed** (not green Completed); open VIEW / Remark.
 - **Single slot source of truth** — main process `executeSlotPool` only; `jobQueueGuard` does **not** check global slot fill.
 - **Post-job settle** — 15s block on the same account after any job (`SESSION_SETTLING`, `POST_JOB_SETTLE_MS = 15_000`).

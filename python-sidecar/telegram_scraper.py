@@ -300,6 +300,38 @@ def _is_group_dialog(dialog) -> bool:
     return bool(is_group or is_megagroup)
 
 
+async def _is_me_listed_as_owner(client, entity, me) -> bool:
+    """Creator saja — bukan admin biasa."""
+    try:
+        async for user in client.iter_participants(
+            entity,
+            filter=ChannelParticipantsAdmins,
+        ):
+            if user.id != me.id:
+                continue
+            participant = getattr(user, "participant", None)
+            if isinstance(participant, ChannelParticipantCreator):
+                return True
+            if getattr(user, "is_creator", False):
+                return True
+    except Exception:  # noqa: BLE001
+        pass
+
+    if isinstance(entity, Chat):
+        try:
+            full = await client(GetFullChatRequest(chat_id=entity.id))
+            participants = getattr(full.full_chat, "participants", None)
+            for p in getattr(participants, "participants", []) or []:
+                if getattr(p, "user_id", None) != me.id:
+                    continue
+                if isinstance(p, ChatParticipantCreator):
+                    return True
+        except Exception:  # noqa: BLE001
+            pass
+
+    return False
+
+
 async def _is_me_listed_as_admin(client, entity, me) -> bool:
     """Fallback bila get_permissions gagal (grup biasa / megagroup)."""
     try:
@@ -332,15 +364,24 @@ async def _is_me_listed_as_admin(client, entity, me) -> bool:
     return False
 
 
-async def _is_group_admin(client, entity, me) -> bool:
+async def _my_group_roles(client, entity, me) -> tuple[bool, bool]:
+    """(is_admin, is_owner). Owner ⇒ is_admin True. Satu get_permissions bila memungkinkan."""
+    is_owner = False
+    is_admin = False
     try:
         perms = await client.get_permissions(entity, me)
-        if perms.is_admin or perms.is_creator:
-            return True
+        is_owner = bool(getattr(perms, "is_creator", False))
+        is_admin = bool(getattr(perms, "is_admin", False) or is_owner)
+        if is_admin or is_owner:
+            return True, is_owner
     except Exception:  # noqa: BLE001
         pass
 
-    return await _is_me_listed_as_admin(client, entity, me)
+    is_owner = await _is_me_listed_as_owner(client, entity, me)
+    if is_owner:
+        return True, True
+    is_admin = await _is_me_listed_as_admin(client, entity, me)
+    return is_admin, False
 
 
 async def _resolve_invite_link(
@@ -572,9 +613,9 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                 member_count, existing_invite = 0, None
 
             try:
-                is_admin_flag = await _count_with_flood_retry(
-                    lambda: _is_group_admin(client, entity, me),
-                    label="is_admin",
+                is_admin_flag, is_owner_flag = await _count_with_flood_retry(
+                    lambda: _my_group_roles(client, entity, me),
+                    label="group_roles",
                     session_id=session_id,
                     current=index,
                     total=total,
@@ -583,8 +624,13 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                 return _cancelled_payload(session_id, groups)
             except FloodWaitError:
                 is_admin_flag = False
+                is_owner_flag = False
             except Exception:  # noqa: BLE001
                 is_admin_flag = False
+                is_owner_flag = False
+
+            if is_owner_flag:
+                is_admin_flag = True
 
             try:
                 owner_count, admin_count = await _count_with_flood_retry(
@@ -631,6 +677,7 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                     "group_name": group_name,
                     "invite_link": invite_link,
                     "is_admin": _admin_label(is_admin_flag),
+                    "is_owner": _admin_label(is_owner_flag),
                     "member_count": member_count,
                     "admin_count": admin_count,
                     "owner_count": owner_count,
@@ -768,13 +815,26 @@ async def scrape_telegram_groups(
     session_string: str | None = None,
     expected_phone: str | None = None,
 ) -> dict:
-    if session_string and session_string.strip():
+    # Jangan restore ulang jika Electron sudah restore (client ready) —
+    # cancel+TelegramClient baru = risiko AUTH_KEY_DUPLICATED.
+    session = SESSIONS.get(session_id)
+    need_restore = bool(
+        session_string
+        and session_string.strip()
+        and (not session or session.status != "ready")
+    )
+    if need_restore:
         restored = await restore_telegram_session(session_id, session_string.strip())
         if restored.get("status") == "error":
             return {
                 "status": "error",
                 "message": restored.get("message", "Session restore failed"),
             }
+    elif not session or session.status != "ready":
+        return {
+            "status": "error",
+            "message": "Login session not found. Log in first.",
+        }
 
     result = await _collect_groups(session_id, expected_phone)
     if result.get("status") == "error":
@@ -787,17 +847,57 @@ async def scrape_telegram_groups(
     return payload
 
 
+def _is_session_warm_pending_message(msg: str) -> bool:
+    """Soft: client masih start/timeout — BUKAN AuthKeyDuplicated (substring 'connect' di InitConnectionRequest)."""
+    from telegram_login import _is_auth_key_dead_message
+
+    if _is_auth_key_dead_message(msg):
+        return False
+    lower = str(msg).lower()
+    return (
+        "not ready" in lower
+        or "still starting" in lower
+        or "connection timed out" in lower
+        or "timed out" in lower
+        or "timeout" in lower
+        or "disconnected" in lower
+        or "not connected" in lower
+    )
+
+
+def _auth_key_dead_validate_message(msg: str) -> str:
+    """Kode stabil untuk UI: invalidate DB + login ulang (jangan retry warm)."""
+    detail = str(msg or "").strip() or "Telegram authorization key is no longer valid"
+    return f"TG_AUTH_KEY_DUPLICATED: {detail}"
+
+
 async def validate_telegram_session(session_id: str, session_string: str | None = None) -> dict:
-    from telegram_login import SESSIONS, _verify_client_live, restore_telegram_session
+    from telegram_login import (
+        SESSIONS,
+        _is_auth_key_dead_message,
+        _verify_client_live,
+        restore_telegram_session,
+    )
 
     session = SESSIONS.get(session_id)
     if not session and session_string:
         restored = await restore_telegram_session(session_id, session_string)
         if restored.get("status") == "error":
             msg = restored.get("message", "Session restore failed")
-            lower = str(msg).lower()
-            if "not ready" in lower or "connect" in lower or "timeout" in lower:
-                return {"status": "ok", "valid": False, "message": f"SESSION_WARM_PENDING: {msg}"}
+            # AUTH_KEY_DUPLICATED: jangan bungkus SESSION_WARM_PENDING
+            # (pesan Telethon mengandung InitConnectionRequest → substring "connect").
+            if _is_auth_key_dead_message(msg):
+                return {
+                    "status": "ok",
+                    "valid": False,
+                    "message": _auth_key_dead_validate_message(msg),
+                }
+            if _is_session_warm_pending_message(msg):
+                return {
+                    "status": "ok",
+                    "valid": False,
+                    "message": f"SESSION_WARM_PENDING: {msg}",
+                }
             return {
                 "status": "ok",
                 "valid": False,
@@ -824,7 +924,13 @@ async def validate_telegram_session(session_id: str, session_string: str | None 
         return {"status": "ok", "valid": True}
 
     err_msg = err or f"Session not ready (status={session.status})"
-    if session.status in ("pending", "confirming") or "not ready" in err_msg.lower():
+    if _is_auth_key_dead_message(err_msg):
+        return {
+            "status": "ok",
+            "valid": False,
+            "message": _auth_key_dead_validate_message(err_msg),
+        }
+    if session.status in ("pending", "confirming") or _is_session_warm_pending_message(err_msg):
         return {
             "status": "ok",
             "valid": False,

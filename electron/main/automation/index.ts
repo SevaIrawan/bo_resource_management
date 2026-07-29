@@ -23,20 +23,12 @@ import {
   tryAcquireExecuteSlot,
   waitForExecuteSlot,
 } from './executeSlotPool';
+import {
+  forceReleaseAutomationAccountLock,
+  withAutomationAccountLock,
+} from './automationAccountLock';
 
-const accountLocks = new Map<string, Promise<unknown>>();
-
-export function withAutomationAccountLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
-  const prev = accountLocks.get(sessionId) ?? Promise.resolve();
-  const next = prev.then(fn, fn);
-  accountLocks.set(sessionId, next);
-  void next.finally(() => {
-    if (accountLocks.get(sessionId) === next) {
-      accountLocks.delete(sessionId);
-    }
-  });
-  return next;
-}
+export { withAutomationAccountLock, forceReleaseAutomationAccountLock };
 
 export async function runAutomationAction(
   payload: AutomationRunPayload,
@@ -77,7 +69,15 @@ export function registerAutomationIpc(): void {
   });
 
   ipcMain.handle('jobQueue:cancel', (_event, jobId: string) => {
+    const snap = getJobQueueSnapshot();
+    const before = snap.jobs.find((row) => row.id === jobId);
     const ok = cancelAutomationJob(jobId);
+    if (ok && before) {
+      // Lepas execute slot agar akun lain bisa jalan.
+      // JANGAN forceRelease account lock — work orphan masih hold Telethon;
+      // forceRelease memungkinkan job kedua akun sama → AuthKey / fetch race.
+      releaseExecuteSlot(before.accountId);
+    }
     if (ok) scheduleRunnerTick(0);
     return { ok };
   });

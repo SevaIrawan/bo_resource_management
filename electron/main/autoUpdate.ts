@@ -148,11 +148,6 @@ export function setupAutoUpdate(resolveWindow: () => BrowserWindow | null) {
   autoUpdater.on('error', (err) => {
     const message = err.message || 'Update gagal';
     console.error('[auto-update]', message);
-    try {
-      autoUpdater.cancelDownload?.();
-    } catch {
-      /* no active download */
-    }
     const checksumFailed =
       /sha512|checksum|integrity|ENOENT|404|403/i.test(message) ||
       message.includes('size');

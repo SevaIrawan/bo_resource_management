@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Architecture Plan: Telegram Integration to GM</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.6; max-width: 920px; margin: 24px auto; color: #172b4d; }
+    h1 { font-size: 24px; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-top: 0; }
+    h2 { font-size: 18px; margin-top: 28px; color: #0052cc; border-bottom: 1px solid #dfe1e6; padding-bottom: 4px; }
+    table { border-collapse: collapse; width: 100%; max-width: 100%; margin: 12px 0 20px; font-size: 13px; table-layout: fixed; }
+    th, td { border: 1px solid #c1c7d0; padding: 8px 10px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+    th { background: #f4f5f7; font-weight: 600; }
+    .panel { border-radius: 4px; padding: 12px 14px; margin: 16px 0; border-left: 4px solid; }
+    .info { background: #deebff; border-color: #0052cc; }
+    .panel-title { font-weight: 700; margin-bottom: 6px; }
+    ul, ol { margin: 8px 0 16px; padding-left: 24px; }
+    li { margin: 5px 0; }
+    .doc-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #dfe1e6; font-size: 12px; color: #5e6c84; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<h1>Architecture Plan: Telegram Integration to GM</h1>
+
+<div class="panel info">
+  <div class="panel-title">Document information</div>
+  <table>
+    <tr><th>Scope</th><td>Telegram accounts, all brands (MYR &amp; SGD)</td></tr>
+    <tr><th>Tools</th><td>GM Apps (Group Monitoring)</td></tr>
+  </table>
+</div>
+
+<h2>1. Background</h2>
+<p>GM Apps was built to monitor and manage WhatsApp accounts per brand. Telegram will be integrated as a second platform into GM, following the same architecture as WhatsApp.</p>
+
+<h2>2. Technical Framework: WhatsApp and Telegram in GM</h2>
+<p>Telegram will be built following the exact same pattern as WhatsApp in GM. One Job Queue, one Worker Settings, one way of calculating Aligned, Junk, and Review for both platforms. The only difference is the connection layer to the platform itself.</p>
+<table>
+  <colgroup><col style="width: 22%"><col style="width: 39%"><col style="width: 39%"></colgroup>
+  <thead><tr><th>Layer</th><th>WhatsApp (already running)</th><th>Telegram (to be built)</th></tr></thead>
+  <tbody>
+    <tr><td>Connection to platform</td><td>Puppeteer/Chrome, runs directly inside the Electron app</td><td>Separate Python sidecar (Telethon), the Electron app talks to this sidecar over HTTP</td></tr>
+    <tr><td>Jobs needed</td><td>Create group, Join by invite link, Set admin, Set group photo, Leave group, Delete group, Exit and delete group</td><td>The same seven job types, built following the WhatsApp pattern</td></tr>
+    <tr><td>Aligned/Junk/Review calculation</td><td>One system, no logic split by platform</td><td>Uses the same system, no new logic needed</td></tr>
+  </tbody>
+</table>
+<p>What needs to be provided specifically for Telegram, since it does not exist for WhatsApp:</p>
+<ul>
+  <li>11 admin right settings per role (WhatsApp only has 3)</li>
+  <li>Automatic handling when hitting Telegram's rate limit (FloodWait, auto-sleep up to 7200 seconds)</li>
+  <li>Automatic retry when fetching an invite link fails</li>
+</ul>
+
+<h2>3. Data Layer</h2>
+<p>WhatsApp and Telegram write to the same Supabase tables (<code>group_scrape_daily</code>, <code>groups_master</code>), through one RPC (<code>rm_commit_account_scrape</code>) that takes a platform parameter. There is no separate table or RPC per platform, only a <code>platform</code> column that distinguishes the rows.</p>
+
+<h2>4. Packaging and Deployment</h2>
+<p>The Telegram Python sidecar (<code>rm-telegram-sidecar.exe</code>) will be packaged into the installer alongside the main Electron app, the same way the Puppeteer/Chrome dependency is packaged for WhatsApp. Users do not need a separate installation, one installer file covers both.</p>
+
+<h2>5. Resource Isolation Between Platforms</h2>
+<p>WhatsApp and Telegram have separate quotas across two execution lanes:</p>
+<table>
+  <thead><tr><th>Lane</th><th>WhatsApp quota</th><th>Telegram quota</th></tr></thead>
+  <tbody>
+    <tr><td>Main execution (Job Queue, Sync, manual Scrape)</td><td>10 accounts active at once</td><td>10 accounts active at once</td></tr>
+    <tr><td>Scheduled auto scrape</td><td>6 sessions active at once</td><td>6 sessions active at once</td></tr>
+  </tbody>
+</table>
+<p>Both lanes are counted and capped separately per platform, so a surge in usage on one platform does not eat into the other platform's quota.</p>
+
+<h2>6. Auto Scrape</h2>
+<p>The Automatic account scrape feature (scheduled sync in Settings) applies to both platforms through one shared module (<code>autoScrapeLane.ts</code>), not a separate module for Telegram.</p>
+<p>The difference: WhatsApp auto scrape needs a dedicated Chrome pool (<code>waAutoScrapeBrowserPool.ts</code>) so it does not compete for browser instances with the Chrome the user is actively using. Telegram does not need an equivalent pool, since its auto scrape runs through the same sidecar as manual scrape, with no separate browser process involved.</p>
+
+<h2>7. Login Session Storage</h2>
+<p>WhatsApp stores its login session in a local folder on the PC (<code>wa-sessions</code>); the database only stores its status flag. A WhatsApp session is tied to one PC, and cannot be moved to another PC without logging in again.</p>
+<p>Telegram stores its login session as a string in the database, not in a local file. A Telegram session is portable, it can be used from another PC as long as the data in the database is still valid, with no need to log in again on every PC change.</p>
+
+<h2>8. Scope</h2>
+<p>Applies to all Telegram accounts across all brands (MYR &amp; SGD).</p>
+
+<p class="doc-footer">Architecture Plan: Telegram Integration to GM</p>
+
+</body>
+</html>

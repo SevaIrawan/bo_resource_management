@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TG Feature Scope Definition</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.6; max-width: 920px; margin: 24px auto; color: #172b4d; }
+    h1 { font-size: 24px; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-top: 0; }
+    h2 { font-size: 18px; margin-top: 28px; color: #0052cc; border-bottom: 1px solid #dfe1e6; padding-bottom: 4px; }
+    h3 { font-size: 15px; margin-top: 18px; color: #172b4d; }
+    table { border-collapse: collapse; width: 100%; max-width: 100%; margin: 12px 0 20px; font-size: 13px; table-layout: fixed; }
+    th, td { border: 1px solid #c1c7d0; padding: 8px 10px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+    th { background: #f4f5f7; font-weight: 600; }
+    .panel { border-radius: 4px; padding: 12px 14px; margin: 16px 0; border-left: 4px solid; }
+    .info { background: #deebff; border-color: #0052cc; }
+    .panel-title { font-weight: 700; margin-bottom: 6px; }
+    ul, ol { margin: 8px 0 16px; padding-left: 24px; }
+    li { margin: 4px 0; }
+    .doc-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #dfe1e6; font-size: 12px; color: #5e6c84; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<h1>TG Feature Scope Definition</h1>
+
+<div class="panel info">
+  <div class="panel-title">Document information</div>
+  <table>
+    <tr><th>Scope</th><td>Telegram accounts, all brands (MYR &amp; SGD)</td></tr>
+    <tr><th>Tools</th><td>GM Apps (Group Monitoring)</td></tr>
+  </table>
+</div>
+
+<p>Full scope of Telegram features built in GM Apps, mirroring the existing WhatsApp implementation. Each feature below is broken down by what it does and how it works.</p>
+
+<h2>1. Sync</h2>
+<p>Checks the real connection between the account and Telegram before any other action runs.</p>
+<ul>
+  <li>If the session is Logout, Sync opens the login screen (phone number and code, or QR)</li>
+  <li>If the session is Active, Sync verifies the session through the Python sidecar before allowing Scrape to continue</li>
+  <li>Runs through the same execute slot pool as WhatsApp Sync, one account can only run one Sync/Scrape/Job at a time</li>
+</ul>
+
+<h2>2. Scrape</h2>
+<p>Reads the full group list from the account and saves it.</p>
+<ul>
+  <li>Runs through <code>telegramScrape.ts</code> in the main process, paired with the Python sidecar for the actual Telegram-side read</li>
+  <li>Result feeds into the same Aligned, Junk, and Review calculation used by WhatsApp, no separate logic per platform</li>
+  <li>Capped at 6000 groups per account, same cap as WhatsApp, with a truncation warning shown in the UI if exceeded</li>
+</ul>
+
+<h2>3. Stock Group</h2>
+<p>Classifies every scraped group into Ready, Recycle, or Review, shown as chips on the brand header.</p>
+<ul>
+  <li>Uses the same shared classification logic as WhatsApp (<code>classifyGroupStock.ts</code>), no Telegram-specific rules</li>
+  <li>A group that does not match any SOP naming pattern for the brand automatically falls into Review</li>
+</ul>
+
+<h2>4. Job Queue</h2>
+<p>All job types below share the same Job Queue, Worker Settings, and batch split (30 groups per job) as WhatsApp.</p>
+
+<h3>4.1 Join Missing</h3>
+<p>Joins groups that the account should be in but has not joined yet, using the invite link from the group master list. Includes automatic retry on FloodWait (Telegram's rate limit), with auto-sleep up to 7200 seconds.</p>
+
+<h3>4.2 Create Group + Set Photo</h3>
+<p>Creates a new group and sets its photo right after creation. Group naming and photo follow the same SETUP form as WhatsApp (group name, total to create, upload photo required before Queue is enabled).</p>
+
+<h3>4.3 Set Admin</h3>
+<p>Promotes an account to admin in a group, with 11 individually configurable admin rights, wider than WhatsApp's 3:</p>
+<table>
+  <thead><tr><th>#</th><th>Right</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Change group info</td></tr>
+    <tr><td>2</td><td>Post messages</td></tr>
+    <tr><td>3</td><td>Edit messages</td></tr>
+    <tr><td>4</td><td>Delete messages</td></tr>
+    <tr><td>5</td><td>Ban users</td></tr>
+    <tr><td>6</td><td>Invite users</td></tr>
+    <tr><td>7</td><td>Pin messages</td></tr>
+    <tr><td>8</td><td>Add new admins</td></tr>
+    <tr><td>9</td><td>Manage voice/video calls</td></tr>
+    <tr><td>10</td><td>Stay anonymous</td></tr>
+    <tr><td>11</td><td>Delete stories</td></tr>
+  </tbody>
+</table>
+
+<h3>4.4 Leave Group</h3>
+<p>Leaves selected groups, picked from the On device or Not in master (Junk) tab in SETUP, same tab structure as WhatsApp.</p>
+
+<h3>4.5 Delete Chat</h3>
+<p>Removes the group from the account after leaving. Requires the account to already hold admin rights in that group; Telegram does not allow a non-admin account to delete a group. Automatically queued right after Leave Group completes, following the same Leave &amp; Delete worker setting as WhatsApp.</p>
+
+<p class="doc-footer">TG Feature Scope Definition</p>
+
+</body>
+</html>

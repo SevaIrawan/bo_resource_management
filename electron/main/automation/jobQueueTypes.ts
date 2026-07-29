@@ -119,6 +119,8 @@ export interface AutomationJobRecord {
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
+  /** Terakhir progress berubah — deteksi hang saat Process N/N tidak finish. */
+  progressUpdatedAt?: string;
   error?: string;
   message?: string;
   progress?: AutomationJobProgress;

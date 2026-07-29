@@ -388,14 +388,37 @@ const checks = [
     ok: read('electron/main/automation/jobQueueTypes.ts').includes('adminRights'),
   },
   {
-    name: 'Join/set_admin: progress + job timeout',
+    name: 'Join/set_admin: progress + job timeout + running watchdog',
     ok: (() => {
       const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const store = read('electron/main/automation/jobQueueStore.ts');
       const wa = read('electron/main/automation/waAutomation.ts');
       const ui = read('src/lib/operationsJobQueueUi.ts');
+      const timeout = read('electron/main/automation/promiseTimeout.ts');
+      const lock = read('electron/main/automation/automationAccountLock.ts');
+      const idx = read('electron/main/automation/index.ts');
+      const tg = read('electron/main/automation/tgAutomationClient.ts');
+      const py = read('python-sidecar/telegram_automation.py');
       return (
         runner.includes('withJobTimeoutSettle') &&
         runner.includes('failStaleRunningJobs') &&
+        runner.includes('ensureRunningJobsWatchdog') &&
+        runner.includes('hasQueuedReadyAutomationJobs') &&
+        store.includes('JOB_PROGRESS_STALL') &&
+        store.includes('progressUpdatedAt') &&
+        timeout.includes('forceSettleAfterMs') &&
+        lock.includes('forceReleaseAutomationAccountLock') &&
+        idx.includes('releaseExecuteSlot(before.accountId)') &&
+        tg.includes('skipInviteDelay') &&
+        tg.includes('sleepJoinGap') &&
+        tg.includes('FLOOD_WAIT_RETRY') &&
+        tg.includes('parseFloodWaitSeconds') &&
+        runner.includes('countDoneOutcomesForAction(job.action, job.payload.groupOutcomes) >= stepTotal') &&
+        runner.includes('tryRequestScrapeAfterJoin(job, success)') &&
+        runner.includes('tryRequestScrapeAfterJoin(job, joined)') &&
+        store.includes('countJoinDoneOutcomes(job.payload.groupOutcomes)') &&
+        py.includes('skip_invite_delay') &&
+        py.includes('seconds > 60') &&
         wa.includes('withPromiseTimeout') &&
         wa.includes('acceptInvite') &&
         ui.includes('isJobQueueStepInProgress')

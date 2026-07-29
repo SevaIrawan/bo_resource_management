@@ -31,7 +31,6 @@ function isJobStopRequested(jobId?: string): boolean {
   return Boolean(jobId && peekJobStopRequest(jobId));
 }
 async function postTelegramAutomation(
-  sessionId: string,
   path: string,
   body: Record<string, unknown>,
   options?: { retry?: boolean; timeoutMs?: number },
@@ -98,6 +97,9 @@ function humanizeTgJoinError(raw: string, link: string): string {
   if (!raw || raw.length <= 3) {
     return `Invite link rejected — link may be expired, revoked, or group is full (${link})`;
   }
+  if (/fetch failed|econnreset|econnrefused|network|socket/i.test(raw)) {
+    return `Network error talking to Telegram sidecar — retry join (${link})`;
+  }
   if (/timeout/i.test(raw)) {
     return `Timeout waiting for Telegram to accept invite (${link})`;
   }
@@ -114,6 +116,41 @@ function humanizeTgJoinError(raw: string, link: string): string {
     return `Account has joined too many groups/channels (${link})`;
   }
   return raw;
+}
+
+function isJoinTransportError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('fetch failed') ||
+    lower.includes('econnreset') ||
+    lower.includes('econnrefused') ||
+    lower.includes('etimedout') ||
+    lower.includes('network') ||
+    lower.includes('aborted due to timeout') ||
+    lower.includes('operation was aborted')
+  );
+}
+
+/** Parse FloodWait N dari pesan sidecar — sleep di Electron (luar HTTP). */
+function parseFloodWaitSeconds(message: string | undefined, errorCode?: string): number | null {
+  if (errorCode !== 'FLOOD_WAIT_RETRY' && errorCode !== 'FLOOD_WAIT') return null;
+  const match = String(message ?? '').match(/FloodWait\s+(\d+)/i);
+  if (!match) return null;
+  const sec = Number(match[1]);
+  if (!Number.isFinite(sec) || sec <= 0) return null;
+  // Cap 15 menit — jangan blok job selamanya pada flood ekstrem.
+  return Math.min(Math.floor(sec), 15 * 60);
+}
+
+async function postJoinInviteOnce(
+  sid: string,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<AutomationRunResult> {
+  return postTelegramAutomation(`/telegram/automation/join-invite/${sid}`, body, {
+    retry: false,
+    timeoutMs,
+  });
 }
 
 export async function runTelegramAutomation(
@@ -137,7 +174,6 @@ export async function runTelegramAutomation(
       };
     }
     return postTelegramAutomation(
-      payload.sessionId,
       `/telegram/automation/create-group/${sid}`,
       {
         ...base,
@@ -192,7 +228,6 @@ export async function runTelegramAutomation(
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
       const result = await postTelegramAutomation(
-        payload.sessionId,
         `/telegram/automation/set-admin/${sid}`,
         {
           ...base,
@@ -289,7 +324,6 @@ export async function runTelegramAutomation(
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
       const result = await postTelegramAutomation(
-        payload.sessionId,
         `/telegram/automation/set-group-photo/${sid}`,
         {
           ...base,
@@ -357,7 +391,6 @@ export async function runTelegramAutomation(
       onProgress?.(exited, groups.length, `Leave: ${label}`);
 
       const leaveResult = await postTelegramAutomation(
-        payload.sessionId,
         `/telegram/automation/leave-group/${sid}`,
         {
           ...base,
@@ -375,7 +408,6 @@ export async function runTelegramAutomation(
       onProgress?.(exited, groups.length, `Delete: ${label}`);
 
       const deleteResult = await postTelegramAutomation(
-        payload.sessionId,
         `/telegram/automation/delete-group/${sid}`,
         {
           ...base,
@@ -436,15 +468,36 @@ export async function runTelegramAutomation(
       }
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
-      const result = await postTelegramAutomation(
-        payload.sessionId,
-        `/telegram/automation/leave-group/${sid}`,
-        {
-          ...base,
+      let result: AutomationRunResult;
+      try {
+        result = await postTelegramAutomation(
+          `/telegram/automation/leave-group/${sid}`,
+          {
+            ...base,
+            groupId: group.groupId,
+            groupLink: group.groupLink,
+          },
+        );
+      } catch (err) {
+        const exitError = err instanceof Error ? err.message : String(err);
+        failed.push(`${group.groupName ?? group.groupId}: ${exitError}`);
+        groupOutcomes.push({
           groupId: group.groupId,
+          groupName: group.groupName,
           groupLink: group.groupLink,
-        },
-      );
+          exitStatus: 'failed',
+          exitError,
+        });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
+        onProgress?.(i + 1, groups.length, group.groupName ?? 'Exit failed');
+        await sleepBetweenGroups(payload, i, groups.length);
+        continue;
+      }
       if (result.status === 'ok') {
         success += 1;
         groupOutcomes.push({
@@ -453,6 +506,12 @@ export async function runTelegramAutomation(
           groupLink: group.groupLink,
           exitStatus: 'left',
         });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Left');
       } else {
         const exitError = result.message ?? 'failed';
@@ -464,6 +523,12 @@ export async function runTelegramAutomation(
           exitStatus: 'failed',
           exitError,
         });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Exit failed');
       }
       await sleepBetweenGroups(payload, i, groups.length);
@@ -504,19 +569,37 @@ export async function runTelegramAutomation(
     let success = 0;
     const failed: string[] = [];
     for (let i = 0; i < groups.length; i += 1) {
+      if (isJobStopRequested(payload.jobId)) {
+        return {
+          status: success > 0 ? 'ok' : 'error',
+          action: 'delete_group',
+          message: 'Stopped by user',
+          errorCode: 'JOB_STOPPED',
+          result: { success, total: groups.length, failed },
+        };
+      }
       const group = groups[i];
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
-      const result = await postTelegramAutomation(
-        payload.sessionId,
-        `/telegram/automation/delete-group/${sid}`,
-        {
-          ...base,
-          groupId: group.groupId,
-          groupLink: group.groupLink,
-          requireOwner,
-          clearChatHistory,
-        },
-      );
+      let result: AutomationRunResult;
+      try {
+        result = await postTelegramAutomation(
+          `/telegram/automation/delete-group/${sid}`,
+          {
+            ...base,
+            groupId: group.groupId,
+            groupLink: group.groupLink,
+            requireOwner,
+            clearChatHistory,
+          },
+        );
+      } catch (err) {
+        failed.push(
+          `${group.groupName ?? group.groupId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        onProgress?.(i + 1, groups.length, group.groupName ?? 'Delete failed');
+        await sleepBetweenGroups(payload, i, groups.length);
+        continue;
+      }
       if (result.status === 'ok') {
         success += 1;
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Deleted');
@@ -560,8 +643,29 @@ export async function runTelegramAutomation(
       joinStatus: 'joined' | 'already_member' | 'failed';
       joinError?: string;
     }> = [];
+    /** Delay di Electron (di luar HTTP) — sidecar skipInviteDelay. HTTP hanya kerja API. */
+    const joinTimeoutMs = 2 * 60 * 1000;
+    const batchEvery = Math.max(1, Number(payload.delay?.invite_batch_every ?? 10));
+    const delayMinSec = Number(payload.delay?.invite_delay_min_sec ?? 30);
+    const delayMaxSec = Number(payload.delay?.invite_delay_max_sec ?? 60);
+    const batchMinSec = Number(payload.delay?.invite_batch_delay_min_sec ?? 180);
+    const batchMaxSec = Number(payload.delay?.invite_batch_delay_max_sec ?? 360);
+
+    async function sleepJoinGap(sequenceIndex: number): Promise<void> {
+      if (sequenceIndex <= 1) return;
+      const useBatch = batchEvery > 0 && sequenceIndex % batchEvery === 0;
+      const lo = useBatch ? batchMinSec : delayMinSec;
+      const hi = useBatch ? batchMaxSec : delayMaxSec;
+      const sec = lo + Math.random() * Math.max(0, hi - lo);
+      const jitterPercent = payload.delay?.jitter_percent ?? 35;
+      await sleep(jitterMs(sec * 1000, jitterPercent));
+    }
+
     for (let i = 0; i < groups.length; i += 1) {
       if (isJobStopRequested(payload.jobId)) {
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, { groupOutcomes: [...groupOutcomes] });
+        }
         return {
           status: success > 0 ? 'ok' : 'error',
           action: 'join_by_invite_link',
@@ -573,16 +677,84 @@ export async function runTelegramAutomation(
       const group = groups[i];
       const expectedGroupId = group.groupId.trim();
       onProgress?.(i, groups.length, group.groupName ?? group.groupId);
-      const result = await postTelegramAutomation(
-        payload.sessionId,
-        `/telegram/automation/join-invite/${sid}`,
-        {
-          ...base,
-          inviteLink: group.inviteLink,
-          joinSequenceIndex: i + 1,
-          expectedGroupId: expectedGroupId || undefined,
-        },
-      );
+      await sleepJoinGap(i + 1);
+      const joinBody = {
+        ...base,
+        inviteLink: group.inviteLink,
+        joinSequenceIndex: i + 1,
+        skipInviteDelay: true,
+        expectedGroupId: expectedGroupId || undefined,
+      };
+      let result: AutomationRunResult;
+      try {
+        result = await postJoinInviteOnce(sid, joinBody, joinTimeoutMs);
+        // FloodWait panjang: sleep di Electron (bukan di sidecar HTTP) lalu 1× retry.
+        const floodSec = parseFloodWaitSeconds(result.message, result.errorCode);
+        if (result.status !== 'ok' && floodSec != null) {
+          onProgress?.(i, groups.length, `FloodWait ${floodSec}s…`);
+          await sleep(floodSec * 1000 + 1500);
+          if (isJobStopRequested(payload.jobId)) {
+            if (payload.jobId) {
+              attachJobGroupOutcomes(payload.jobId, { groupOutcomes: [...groupOutcomes] });
+            }
+            return {
+              status: success > 0 ? 'ok' : 'error',
+              action: 'join_by_invite_link',
+              message: 'Stopped by user',
+              errorCode: 'JOB_STOPPED',
+              result: { success, total: groups.length, failed, groupOutcomes },
+            };
+          }
+          result = await postJoinInviteOnce(sid, joinBody, joinTimeoutMs);
+        }
+      } catch (err) {
+        const rawErr = err instanceof Error ? err.message : String(err);
+        // Transport sekali putus — 1× retry (bukan retry invite sukses / create).
+        if (isJoinTransportError(rawErr) && !isJobStopRequested(payload.jobId)) {
+          onProgress?.(i, groups.length, 'Retry network…');
+          await sleep(1500);
+          try {
+            result = await postJoinInviteOnce(sid, joinBody, joinTimeoutMs);
+          } catch (err2) {
+            const raw2 = err2 instanceof Error ? err2.message : String(err2);
+            const errMsg = humanizeTgJoinError(raw2, group.inviteLink ?? '');
+            failed.push(`${group.groupName ?? group.groupId}: ${errMsg}`);
+            groupOutcomes.push({
+              groupId: expectedGroupId || group.groupId,
+              expectedGroupId: expectedGroupId || undefined,
+              groupName: group.groupName,
+              inviteLink: group.inviteLink,
+              joinStatus: 'failed',
+              joinError: errMsg,
+            });
+            if (payload.jobId) {
+              attachJobGroupOutcomes(payload.jobId, {
+                groupOutcomes: [...groupOutcomes],
+                progressCurrent: Math.min(i + 1, groups.length),
+              });
+            }
+            continue;
+          }
+        } else {
+          const errMsg = humanizeTgJoinError(rawErr, group.inviteLink ?? '');
+          failed.push(`${group.groupName ?? group.groupId}: ${errMsg}`);
+          groupOutcomes.push({
+            groupId: expectedGroupId || group.groupId,
+            expectedGroupId: expectedGroupId || undefined,
+            groupName: group.groupName,
+            inviteLink: group.inviteLink,
+            joinStatus: 'failed',
+            joinError: errMsg,
+          });
+          if (payload.jobId) {
+            attachJobGroupOutcomes(payload.jobId, {
+              groupOutcomes: [...groupOutcomes],
+              progressCurrent: Math.min(i + 1, groups.length),
+            });
+          }
+          continue;
+        }
+      }
       if (result.status === 'ok') {
         const deviceId = String(result.result?.group_id ?? '').trim();
         if (!deviceId) {
@@ -596,19 +768,19 @@ export async function runTelegramAutomation(
             joinStatus: 'failed',
             joinError: errMsg,
           });
-          continue;
+        } else {
+          success += 1;
+          const alreadyMember = result.result?.already_member === true;
+          const deviceName = String(result.result?.group_name ?? '').trim();
+          groupOutcomes.push({
+            groupId: deviceId,
+            expectedGroupId: expectedGroupId || undefined,
+            groupName: deviceName || group.groupName,
+            inviteLink: group.inviteLink,
+            joinStatus: alreadyMember ? 'already_member' : 'joined',
+          });
+          onProgress?.(i + 1, groups.length, deviceName || group.groupName || 'Joined');
         }
-        success += 1;
-        const alreadyMember = result.result?.already_member === true;
-        const deviceName = String(result.result?.group_name ?? '').trim();
-        groupOutcomes.push({
-          groupId: deviceId,
-          expectedGroupId: expectedGroupId || undefined,
-          groupName: deviceName || group.groupName,
-          inviteLink: group.inviteLink,
-          joinStatus: alreadyMember ? 'already_member' : 'joined',
-        });
-        onProgress?.(i + 1, groups.length, deviceName || group.groupName || 'Joined');
       } else {
         const rawErr = result.message ?? 'failed';
         const errMsg = humanizeTgJoinError(rawErr, group.inviteLink ?? '');
@@ -620,6 +792,17 @@ export async function runTelegramAutomation(
           inviteLink: group.inviteLink,
           joinStatus: 'failed',
           joinError: errMsg,
+        });
+      }
+      if (payload.jobId) {
+        attachJobGroupOutcomes(payload.jobId, {
+          groupOutcomes: [...groupOutcomes],
+          progressCurrent: Math.min(
+            groupOutcomes.filter(
+              (r) => r.joinStatus === 'joined' || r.joinStatus === 'already_member',
+            ).length,
+            groups.length,
+          ),
         });
       }
     }

@@ -63,18 +63,3 @@ export function clearScrapeCheckpoint(sessionId: string): void {
     // missing ok
   }
 }
-
-/** Merge rows by group_id (incoming menang). */
-export function mergeCheckpointRows(
-  prev: ScrapedGroupRow[],
-  next: ScrapedGroupRow[],
-): ScrapedGroupRow[] {
-  const map = new Map<string, ScrapedGroupRow>();
-  for (const row of prev) {
-    if (row.group_id) map.set(String(row.group_id), row);
-  }
-  for (const row of next) {
-    if (row.group_id) map.set(String(row.group_id), row);
-  }
-  return [...map.values()];
-}

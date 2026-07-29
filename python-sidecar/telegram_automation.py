@@ -25,12 +25,17 @@ from telethon.tl.functions.channels import (
 from telethon.tl.functions.contacts import ImportContactsRequest
 from telethon.tl.functions.messages import (
     CheckChatInviteRequest,
+    EditChatAdminRequest,
     ExportChatInviteRequest,
+    GetFullChatRequest,
     ImportChatInviteRequest,
 )
 from telethon.tl.types import (
     Channel,
+    Chat,
     ChatAdminRights,
+    ChatParticipantAdmin,
+    ChatParticipantCreator,
     InputPhoneContact,
     User,
 )
@@ -439,16 +444,142 @@ async def _find_participant_by_phone(client, entity, phone_digits: str):
     return None
 
 
+def _basic_chat_id(entity: Chat) -> int:
+    """EditChatAdmin / DeleteChatUser butuh chat_id positif (bukan peer id negatif)."""
+    return abs(int(entity.id))
+
+
 async def _participant_is_admin(client, entity, user) -> tuple[bool, bool]:
+    """
+    (in_group, already_admin).
+    Channel → GetParticipantRequest; basic Chat → GetFullChat (bukan channels API).
+    """
+    uid = int(getattr(user, "id", 0) or 0)
+    if isinstance(entity, Chat):
+        try:
+            full = await client(GetFullChatRequest(chat_id=_basic_chat_id(entity)))
+            participants = getattr(full.full_chat, "participants", None)
+            for p in getattr(participants, "participants", []) or []:
+                if getattr(p, "user_id", None) != uid:
+                    continue
+                already_admin = isinstance(p, (ChatParticipantCreator, ChatParticipantAdmin))
+                return True, already_admin
+            return False, False
+        except Exception:  # noqa: BLE001
+            # Fallback scan iter_participants (Chat kecil).
+            try:
+                async for member in client.iter_participants(entity):
+                    if int(getattr(member, "id", 0) or 0) != uid:
+                        continue
+                    already = bool(
+                        getattr(member, "is_admin", False)
+                        or getattr(member, "is_creator", False)
+                        or getattr(member, "admin_rights", None)
+                    )
+                    return True, already
+            except Exception:  # noqa: BLE001
+                return False, False
+            return False, False
+
     try:
         part = await client(GetParticipantRequest(entity, user))
         participant = part.participant
         cls = participant.__class__.__name__
-        in_group = True
         already_admin = "Admin" in cls or "Creator" in cls
-        return in_group, already_admin
+        return True, already_admin
     except UserNotParticipantError:
         return False, False
+    except TypeError as cast_exc:
+        # Peer ternyata basic Chat tapi isinstance gagal — jangan propagate InputPeerChat.
+        msg = str(cast_exc).lower()
+        if "inputpeerchat" in msg or "inputchannel" in msg:
+            return False, False
+        raise
+
+
+async def _caller_can_promote(client, entity) -> tuple[bool, str | None]:
+    """Cek hak promote sebelum EditAdmin — bedakan bukan-admin vs tidak punya add_admins."""
+    try:
+        me = await client.get_me()
+        perms = await client.get_permissions(entity, me)
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc) or "Cannot read caller permissions"
+
+    if getattr(perms, "is_creator", False):
+        return True, None
+    if not getattr(perms, "is_admin", False):
+        return False, "Caller is not admin in this group"
+    if hasattr(perms, "add_admins") and perms.add_admins is False:
+        return False, "Caller admin rights do not allow promoting others (need add_admins)"
+    return True, None
+
+
+async def _promote_group_admin(client, entity, user, rights: ChatAdminRights) -> None:
+    """Channel/megagroup → EditAdminRequest; basic Chat → EditChatAdminRequest."""
+    if isinstance(entity, Channel):
+        ok, reason = await _caller_can_promote(client, entity)
+        if not ok:
+            raise PermissionError(reason or "Cannot promote")
+        try:
+            me = await client.get_me()
+            perms = await client.get_permissions(entity, me)
+            if not getattr(perms, "is_creator", False) and hasattr(perms, "add_admins") and not perms.add_admins:
+                rights = ChatAdminRights(
+                    change_info=bool(rights.change_info),
+                    post_messages=bool(rights.post_messages),
+                    edit_messages=bool(rights.edit_messages),
+                    delete_messages=bool(rights.delete_messages),
+                    ban_users=bool(rights.ban_users),
+                    invite_users=bool(rights.invite_users),
+                    pin_messages=bool(rights.pin_messages),
+                    add_admins=False,
+                    anonymous=bool(rights.anonymous),
+                    manage_call=bool(rights.manage_call),
+                )
+        except Exception:  # noqa: BLE001
+            pass
+        await client(
+            EditAdminRequest(
+                channel=entity,
+                user_id=user,
+                admin_rights=rights,
+                rank="Admin",
+            )
+        )
+        return
+    if isinstance(entity, Chat):
+        await client(
+            EditChatAdminRequest(
+                chat_id=_basic_chat_id(entity),
+                user_id=user,
+                is_admin=True,
+            )
+        )
+        return
+    # Fallback: coba channel dulu, lalu basic chat (entity custom / cached).
+    try:
+        await client(
+            EditAdminRequest(
+                channel=entity,
+                user_id=user,
+                admin_rights=rights,
+                rank="Admin",
+            )
+        )
+    except Exception as cast_exc:  # noqa: BLE001
+        msg = str(cast_exc).lower()
+        if "inputpeerchat" not in msg and "inputchannel" not in msg:
+            raise
+        chat_id = getattr(entity, "id", None) or getattr(entity, "chat_id", None)
+        if chat_id is None:
+            raise
+        await client(
+            EditChatAdminRequest(
+                chat_id=abs(int(chat_id)),
+                user_id=user,
+                is_admin=True,
+            )
+        )
 
 
 async def run_create_group(
@@ -687,14 +818,7 @@ async def run_set_admin(
                     promoted.append(target)
                     continue
 
-                await client(
-                    EditAdminRequest(
-                        channel=entity,
-                        user_id=user,
-                        admin_rights=rights,
-                        rank="Admin",
-                    )
-                )
+                await _promote_group_admin(client, entity, user, rights)
                 promoted.append(target)
             except FloodWaitError as exc:
                 cap = max_floodwait_auto_sleep(delay_cfg)
@@ -704,14 +828,7 @@ async def run_set_admin(
                     await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
                     try:
                         user = await _resolve_set_admin_user(client, target)
-                        await client(
-                            EditAdminRequest(
-                                channel=entity,
-                                user_id=user,
-                                admin_rights=rights,
-                                rank="Admin",
-                            )
-                        )
+                        await _promote_group_admin(client, entity, user, rights)
                         promoted.append(target)
                     except Exception as retry_exc:  # noqa: BLE001
                         errors.append(
@@ -760,6 +877,7 @@ async def run_join_by_invite_link(
     *,
     invite_link: str,
     join_sequence_index: int = 1,
+    skip_invite_delay: bool = False,
     session_string: str | None = None,
     expected_phone: str | None = None,
     expected_group_id: str | None = None,
@@ -779,7 +897,8 @@ async def run_join_by_invite_link(
             prep_err["action"] = action
             return prep_err
 
-        await apply_join_invite_delay(delay_cfg, join_sequence_index)
+        if not skip_invite_delay:
+            await apply_join_invite_delay(delay_cfg, join_sequence_index)
 
         try:
             invite_hash = extract_invite_hash(link)
@@ -851,11 +970,77 @@ async def run_join_by_invite_link(
                     )
             return _err(action, "Unsupported invite link format", error_code="INVITE_UNSUPPORTED")
         except FloodWaitError as exc:
+            seconds = int(exc.seconds)
             cap = max_floodwait_auto_sleep(delay_cfg)
-            if int(exc.seconds) > cap:
-                return _err(action, f"FloodWait {exc.seconds}s", error_code="FLOOD_WAIT")
-            await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
-            return _err(action, f"FloodWait {exc.seconds}s — retry job", error_code="FLOOD_WAIT_RETRY")
+            if seconds > cap:
+                return _err(action, f"FloodWait {seconds}s", error_code="FLOOD_WAIT")
+            # Sleep panjang di HTTP bentrok timeout Electron (2m) + tahan tg_session_lock.
+            # Electron sleep di luar HTTP lalu retry grup yang sama.
+            if seconds > 60:
+                return _err(
+                    action,
+                    f"FloodWait {seconds}s — retry job",
+                    error_code="FLOOD_WAIT_RETRY",
+                )
+            await asyncio.sleep(flood_wait_seconds(delay_cfg, seconds))
+            # Satu kali retry setelah sleep pendek.
+            try:
+                invite_hash = extract_invite_hash(link)
+                if invite_hash:
+                    updates = await client(ImportChatInviteRequest(invite_hash))
+                    chats = getattr(updates, "chats", None) or []
+                    chat = chats[0] if chats else None
+                    gid = _peer_group_id(chat) if chat else ""
+                    title = str(getattr(chat, "title", "") or gid) if chat else ""
+                    if not gid:
+                        gid, title = await _resolve_joined_peer(
+                            client,
+                            link=link,
+                            invite_hash=invite_hash,
+                            expected_group_id=expected,
+                        )
+                    return _join_ok(
+                        action,
+                        group_id=gid,
+                        group_name=title,
+                        invite_link=link,
+                        already_member=False,
+                    )
+                entity = await client.get_entity(link)
+                if isinstance(entity, Channel):
+                    await client(JoinChannelRequest(entity))
+                    return _join_ok(
+                        action,
+                        group_id=_peer_group_id(entity),
+                        group_name=str(getattr(entity, "title", "") or _peer_group_id(entity)),
+                        invite_link=link,
+                        already_member=False,
+                    )
+                return _err(
+                    action,
+                    f"FloodWait {seconds}s — retry job",
+                    error_code="FLOOD_WAIT_RETRY",
+                )
+            except UserAlreadyParticipantError:
+                gid, title = await _resolve_joined_peer(
+                    client,
+                    link=link,
+                    invite_hash=extract_invite_hash(link),
+                    expected_group_id=expected,
+                )
+                return _join_ok(
+                    action,
+                    group_id=gid,
+                    group_name=title,
+                    invite_link=link,
+                    already_member=True,
+                )
+            except Exception as retry_exc:  # noqa: BLE001
+                return _err(
+                    action,
+                    f"FloodWait retry failed: {retry_exc}",
+                    error_code="FLOOD_WAIT_RETRY",
+                )
         except UserAlreadyParticipantError:
             gid, title = await _resolve_joined_peer(
                 client,

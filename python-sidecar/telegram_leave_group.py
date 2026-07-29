@@ -1,4 +1,4 @@
-"""Leave Telegram supergroup/channel."""
+"""Leave Telegram group — Channel/megagroup + basic Chat."""
 
 from __future__ import annotations
 
@@ -10,8 +10,10 @@ from telethon.errors import (
     UserNotParticipantError,
 )
 from telethon.tl.functions.channels import LeaveChannelRequest
+from telethon.tl.functions.messages import DeleteChatUserRequest
+from telethon.tl.types import Channel, Chat
 
-from telegram_automation import _peer_group_id, _prepare_session, _resolve_group_entity
+from telegram_automation import _basic_chat_id, _peer_group_id, _prepare_session, _resolve_group_entity
 from telegram_human_delay import (
     flood_wait_seconds,
     max_floodwait_auto_sleep,
@@ -59,7 +61,20 @@ async def run_leave_group(
         gid = _peer_group_id(entity) or str(group_id or "").strip()
 
         try:
-            await client(LeaveChannelRequest(channel=entity))
+            if isinstance(entity, Chat):
+                # Basic group: kick self (LeaveChannelRequest hanya untuk Channel).
+                await client(
+                    DeleteChatUserRequest(
+                        chat_id=_basic_chat_id(entity),
+                        user_id="me",
+                    )
+                )
+            elif isinstance(entity, Channel):
+                await client(LeaveChannelRequest(channel=entity))
+            else:
+                # Fallback: delete_dialog (leave + tutup dialog).
+                await client.delete_dialog(entity)
+
             return _ok(
                 action,
                 {
@@ -90,5 +105,30 @@ async def run_leave_group(
                 return _err(action, f"FloodWait {exc.seconds}s exceeds cap {cap}s", error_code="FLOOD_WAIT")
             await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
             return _err(action, f"FloodWait {exc.seconds}s — retry job", error_code="FLOOD_WAIT_RETRY")
+        except TypeError as cast_exc:
+            # Peer Chat kena LeaveChannel — coba DeleteChatUser.
+            msg = str(cast_exc).lower()
+            if "inputpeerchat" in msg or "inputchannel" in msg:
+                try:
+                    chat_id = getattr(entity, "id", None)
+                    if chat_id is None:
+                        raise cast_exc
+                    await client(
+                        DeleteChatUserRequest(
+                            chat_id=abs(int(chat_id)),
+                            user_id="me",
+                        )
+                    )
+                    return _ok(
+                        action,
+                        {
+                            "group_id": gid,
+                            "outcome": "left",
+                            "already_member": False,
+                        },
+                    )
+                except Exception as retry_exc:  # noqa: BLE001
+                    return _err(action, str(retry_exc) or str(cast_exc) or "leave failed")
+            return _err(action, str(cast_exc) or "leave failed")
         except Exception as exc:  # noqa: BLE001
             return _err(action, str(exc) or "leave failed")

@@ -140,7 +140,7 @@ const checks = [
       !tgScrape.includes("withNetworkRetry('Telegram scrape'") &&
       tgPy.includes('start_telegram_scrape_job') &&
       read('python-sidecar/main.py').includes('/telegram/scrape/result/') &&
-      read('electron/main/platformLogin/telegramSidecar.ts').includes('SIDECAR_VERSION = 4'),
+      read('electron/main/platformLogin/telegramSidecar.ts').includes('SIDECAR_VERSION = 6'),
   },
   {
     name: 'TG finishing: reconnect sebelum export + soft-fail setelah write DB',

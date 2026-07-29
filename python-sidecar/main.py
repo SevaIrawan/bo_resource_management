@@ -131,6 +131,8 @@ class SetAdminBody(BaseModel):
 class JoinInviteBody(BaseModel):
     inviteLink: str = Field(min_length=8)
     joinSequenceIndex: int = 1
+    # Electron sudah sleep delay — sidecar skip agar HTTP tidak timeout di batch rest.
+    skipInviteDelay: bool = False
     sessionString: str | None = None
     expectedPhone: str | None = None
     expectedGroupId: str | None = None
@@ -170,7 +172,7 @@ def _delay_dict(body: AutomationDelayBody | None) -> dict | None:
 async def health() -> dict:
     return {
         "ok": True,
-        "version": 4,
+        "version": 6,
         "activeScrapes": count_active_telegram_scrapes(),
         "features": ["login", "scrape", "count", "validate", "automation", "scrape_async"],
     }
@@ -280,6 +282,7 @@ async def telegram_automation_join_invite(session_id: str, body: JoinInviteBody)
         session_id,
         invite_link=body.inviteLink,
         join_sequence_index=body.joinSequenceIndex,
+        skip_invite_delay=body.skipInviteDelay,
         session_string=body.sessionString,
         expected_phone=body.expectedPhone,
         expected_group_id=body.expectedGroupId,

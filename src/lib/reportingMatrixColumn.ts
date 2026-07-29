@@ -1,14 +1,22 @@
 import type { JoinGroupMatrixRow } from '@/lib/loadJoinGroupReport';
+import { isTelegramSuperGroupId } from '@/lib/telegramGroupKind';
 
 export type ReportingMatrixColumnFilterValue = 'yes' | 'no';
 
-/** Satu kolom akun aktif — filter baris berdasarkan Yes/No di kolom itu. */
-export type ReportingMatrixColumnFilter = {
-  accountId: string;
-  value: ReportingMatrixColumnFilterValue;
-} | null;
+/** Satu kolom aktif — filter baris berdasarkan Yes/No di kolom itu. */
+export type ReportingMatrixColumnFilter =
+  | {
+      kind: 'account';
+      accountId: string;
+      value: ReportingMatrixColumnFilterValue;
+    }
+  | {
+      kind: 'superGroup';
+      value: ReportingMatrixColumnFilterValue;
+    }
+  | null;
 
-function rowValue(
+function rowAccountValue(
   row: JoinGroupMatrixRow,
   accountId: string,
   mode: 'join' | 'admin',
@@ -16,7 +24,11 @@ function rowValue(
   return mode === 'admin' ? row.adminByAccountId[accountId] : row.joinByAccountId[accountId];
 }
 
-/** Filter baris: kolom terpilih Yes/No; kolom akun lain tetap tampil untuk baris yang lolos. */
+function rowSuperGroupYes(row: JoinGroupMatrixRow): boolean {
+  return isTelegramSuperGroupId(row.groupId);
+}
+
+/** Filter baris: kolom terpilih Yes/No; kolom lain tetap tampil untuk baris yang lolos. */
 export function filterReportingMatrixRows(
   rows: JoinGroupMatrixRow[],
   filter: ReportingMatrixColumnFilter,
@@ -24,8 +36,15 @@ export function filterReportingMatrixRows(
 ): JoinGroupMatrixRow[] {
   if (!filter) return rows;
 
+  if (filter.kind === 'superGroup') {
+    return rows.filter((row) => {
+      const yes = rowSuperGroupYes(row);
+      return filter.value === 'yes' ? yes : !yes;
+    });
+  }
+
   return rows.filter((row) => {
-    const yes = rowValue(row, filter.accountId, mode);
+    const yes = rowAccountValue(row, filter.accountId, mode);
     return filter.value === 'yes' ? yes : !yes;
   });
 }

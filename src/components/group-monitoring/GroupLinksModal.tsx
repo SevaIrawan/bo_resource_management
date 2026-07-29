@@ -12,6 +12,7 @@ import {
   type AccountGroupLinkRow,
 } from '@/lib/accountGroupLinks';
 import { exportGroupLinksExcel } from '@/lib/exportExcel';
+import { telegramSuperGroupLabel, telegramSuperGroupYesNo } from '@/lib/telegramGroupKind';
 import { cn } from '@/lib/utils';
 
 export type AccountMetricGroupsMode = 'account' | 'junk' | 'missing' | 'notAdmin';
@@ -66,6 +67,7 @@ export function GroupLinksModal({
 }: GroupLinksModalProps) {
   const { t } = useLanguage();
   const viewMode = initialViewMode;
+  const showSuperGroup = platform === 'telegram';
   const [links, setLinks] = useState<AccountGroupLinkRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +161,7 @@ export function GroupLinksModal({
       accountName,
       rows: links,
       viewMode: viewMode === 'account' ? 'account' : 'junk',
+      platform,
     });
   }
 
@@ -244,23 +247,51 @@ export function GroupLinksModal({
                           <th>{t('groupMonitoring.groupLinks.colNo')}</th>
                           <th>{t('groupMonitoring.groupLinks.colName')}</th>
                           <th>{t('groupMonitoring.groupLinks.colId')}</th>
+                          {showSuperGroup ? (
+                            <th>{t('groupMonitoring.groupLinks.colSuperGroup')}</th>
+                          ) : null}
                           <th>{t('groupMonitoring.groupLinks.colMemberCount')}</th>
                           <th>{t('groupMonitoring.groupLinks.colAdminCount')}</th>
                           <th>{t('groupMonitoring.groupLinks.colIsAdmin')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colIsOwner')}</th>
                           <th>{t('groupMonitoring.groupLinks.colLink')}</th>
                         </>
                       ) : (
                         <>
                           <th>{t('groupMonitoring.groupLinks.colName')}</th>
                           <th>{t('groupMonitoring.groupLinks.colId')}</th>
+                          {showSuperGroup ? (
+                            <th>{t('groupMonitoring.groupLinks.colSuperGroup')}</th>
+                          ) : null}
                           <th>{t('groupMonitoring.groupLinks.colLink')}</th>
                           <th>{t('groupMonitoring.groupLinks.colAdmin')}</th>
+                          <th>{t('groupMonitoring.groupLinks.colOwner')}</th>
                         </>
                       )}
                     </tr>
                   </thead>
                   <tbody>
-                    {pageRows.map((row, index) => (
+                    {pageRows.map((row, index) => {
+                      const superValue = showSuperGroup
+                        ? telegramSuperGroupYesNo(row.groupId)
+                        : null;
+                      const superCell = showSuperGroup ? (
+                        <td className="group-links-table__admin">
+                          <span
+                            className={
+                              superValue === 'Yes'
+                                ? 'group-links-admin-badge group-links-admin-badge--yes'
+                                : 'group-links-admin-badge group-links-admin-badge--no'
+                            }
+                          >
+                            {telegramSuperGroupLabel(row.groupId, {
+                              yes: t('groupMonitoring.groupLinks.adminYes'),
+                              no: t('groupMonitoring.groupLinks.adminNo'),
+                            })}
+                          </span>
+                        </td>
+                      ) : null;
+                      return (
                       <tr key={`${viewMode}-${row.groupId}-${row.groupName}`}>
                         {isAccountDaily ? (
                           <>
@@ -273,6 +304,7 @@ export function GroupLinksModal({
                             <td className="group-links-table__id" title={row.groupId}>
                               {row.groupId || '—'}
                             </td>
+                            {superCell}
                             <td className="group-links-table__count tabular-nums">
                               {row.memberCount}
                             </td>
@@ -290,6 +322,19 @@ export function GroupLinksModal({
                                 {row.isAdmin === 'yes'
                                   ? t('groupMonitoring.groupLinks.adminYes')
                                   : t('groupMonitoring.groupLinks.adminNo')}
+                              </span>
+                            </td>
+                            <td className="group-links-table__admin">
+                              <span
+                                className={
+                                  row.isOwner === 'yes'
+                                    ? 'group-links-admin-badge group-links-admin-badge--yes'
+                                    : 'group-links-admin-badge group-links-admin-badge--no'
+                                }
+                              >
+                                {row.isOwner === 'yes'
+                                  ? t('groupMonitoring.groupLinks.ownerYes')
+                                  : t('groupMonitoring.groupLinks.ownerNo')}
                               </span>
                             </td>
                             <td className="group-links-table__link">
@@ -315,6 +360,7 @@ export function GroupLinksModal({
                             <td className="group-links-table__id" title={row.groupId}>
                               {row.groupId || '—'}
                             </td>
+                            {superCell}
                             <td className="group-links-table__link">
                               {row.inviteLink ? (
                                 <a
@@ -342,10 +388,24 @@ export function GroupLinksModal({
                                   : t('groupMonitoring.groupLinks.adminNo')}
                               </span>
                             </td>
+                            <td className="group-links-table__admin">
+                              <span
+                                className={
+                                  row.isOwner === 'yes'
+                                    ? 'group-links-admin-badge group-links-admin-badge--yes'
+                                    : 'group-links-admin-badge group-links-admin-badge--no'
+                                }
+                              >
+                                {row.isOwner === 'yes'
+                                  ? t('groupMonitoring.groupLinks.ownerYes')
+                                  : t('groupMonitoring.groupLinks.ownerNo')}
+                              </span>
+                            </td>
                           </>
                         )}
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

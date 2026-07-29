@@ -1,5 +1,6 @@
 import type { BrowserWindow } from 'electron';
-import { spawn, exec, type ChildProcessWithoutNullSignals } from 'child_process';
+import { spawn, exec, type ChildProcessByStdio } from 'child_process';
+import type { Readable } from 'stream';
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
@@ -9,7 +10,7 @@ import { withNetworkRetry } from '../lib/networkRetry';
 const SIDECAR_URL = 'http://127.0.0.1:8765';
 export { SIDECAR_URL };
 const SIDECAR_PORT = 8765;
-const SIDECAR_VERSION = 4;
+const SIDECAR_VERSION = 6;
 const pollTimers = new Map<string, ReturnType<typeof setInterval>>();
 const pollErrorStreak = new Map<string, number>();
 const POLL_ERROR_MAX_STREAK = 8;
@@ -24,7 +25,7 @@ function getPythonCommand(): [string, string[]] {
   return ['python3', []];
 }
 
-let sidecarProcess: ChildProcessWithoutNullSignals | null = null;
+let sidecarProcess: ChildProcessByStdio<null, Readable, Readable> | null = null;
 let sidecarStarting: Promise<void> | null = null;
 
 function projectRoot() {
@@ -378,11 +379,16 @@ function normalizeTelegramResponse(json: {
   qrDataUrl?: string | null;
   message?: string | null;
   hint?: string;
-}) {
+}): { status: string; qrDataUrl?: string | null; message?: string; hint?: string } {
   if (!json.status) {
     throw new Error('Telegram sidecar returned an invalid response. Restart the app.');
   }
-  return json;
+  return {
+    qrDataUrl: json.qrDataUrl,
+    message: json.message ?? undefined,
+    hint: json.hint,
+    status: json.status,
+  };
 }
 
 export async function startTelegramQrLogin(sessionId: string, win: BrowserWindow) {

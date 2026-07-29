@@ -90,6 +90,23 @@ async def _create_client() -> TelegramClient:
     return client
 
 
+def _tg_session_log(session_id: str, event: str, detail: str | None = None) -> None:
+    """Log bukti lifecycle session — jangan log StringSession penuh."""
+    sid = (session_id or "")[:8]
+    extra = f" | {detail[:220]}" if detail else ""
+    print(f"[tg-session] sessionId={sid}… event={event}{extra}", flush=True)
+
+
+def _is_auth_key_dead_message(msg: str | None) -> bool:
+    lower = (msg or "").lower()
+    return (
+        "auth_key_duplicated" in lower
+        or ("authorization key" in lower and "no longer be used" in lower)
+        or "two different ip" in lower
+        or "authkeyduplicated" in lower
+    )
+
+
 async def _ensure_client_connected(client: TelegramClient) -> None:
     """Reconnect jika drop setelah scrape panjang — hindari 'Cannot send request while disconnected'."""
     try:
@@ -101,11 +118,16 @@ async def _ensure_client_connected(client: TelegramClient) -> None:
 
 
 async def _force_reconnect(client: TelegramClient) -> None:
-    """Socket sering 'hidup' palsu setelah scrape panjang — putus dulu lalu connect ulang."""
+    """
+    Socket 'hidup' palsu setelah scrape panjang — putus dulu lalu connect ulang
+    pada CLIENT YANG SAMA (bukan TelegramClient baru). Tunggu sebentar agar
+    server melepas koneksi lama sebelum connect ulang (cegah AUTH_KEY_DUPLICATED).
+    """
     try:
         await client.disconnect()
     except Exception:  # noqa: BLE001
         pass
+    await asyncio.sleep(0.75)
     await asyncio.wait_for(client.connect(), timeout=30)
 
 
@@ -121,6 +143,8 @@ async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]
         return False, "2FA"
     except Exception as exc:  # noqa: BLE001
         msg = str(exc) or "Telegram session expired. Link device again."
+        if _is_auth_key_dead_message(msg):
+            return False, msg
         lower = msg.lower()
         if "disconnected" in lower or "not connected" in lower or "connection" in lower:
             try:
@@ -132,7 +156,8 @@ async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]
             except SessionPasswordNeededError:
                 return False, "2FA"
             except Exception as retry_exc:  # noqa: BLE001
-                return False, str(retry_exc) or msg
+                retry_msg = str(retry_exc) or msg
+                return False, retry_msg
         return False, msg
 
 
@@ -438,6 +463,7 @@ async def _export_telegram_session_locked(session_id: str) -> dict:
     Export StringSession dari memori.
     Setelah scrape panjang socket sering drop — reconnect best-effort, tapi
     serialize session TIDAK bergantung get_me (auth key sudah di StringSession).
+    AUTH_KEY_DUPLICATED → jangan export sebagai OK (string sudah mati di server).
     """
     session = SESSIONS.get(session_id)
     if not session:
@@ -449,13 +475,28 @@ async def _export_telegram_session_locked(session_id: str) -> dict:
         await _ensure_client_connected(session.client)
         live_ok, live_err = await _verify_client_live(session.client)
         if not live_ok and live_err:
+            if _is_auth_key_dead_message(live_err):
+                _tg_session_log(session_id, "export_auth_key_dead", live_err)
+                session.status = "error"
+                session.error = live_err
+                return {"status": "error", "message": live_err}
             lower = live_err.lower()
             if "disconnected" in lower or "not connected" in lower or "connection" in lower:
                 await _force_reconnect(session.client)
                 live_ok, live_err = await _verify_client_live(session.client)
+                if not live_ok and _is_auth_key_dead_message(live_err):
+                    _tg_session_log(session_id, "export_auth_key_dead_after_reconnect", live_err)
+                    session.status = "error"
+                    session.error = live_err
+                    return {"status": "error", "message": live_err or "Session dead"}
     except Exception as exc:  # noqa: BLE001
         live_ok = False
         live_err = str(exc) or "Telegram reconnect failed"
+        if _is_auth_key_dead_message(live_err):
+            _tg_session_log(session_id, "export_auth_key_dead_exc", live_err)
+            session.status = "error"
+            session.error = live_err
+            return {"status": "error", "message": live_err}
 
     try:
         session_string = session.client.session.save()
@@ -475,9 +516,11 @@ async def _export_telegram_session_locked(session_id: str) -> dict:
             "message": session.error,
         }
 
-    # StringSession lokal valid → export OK meski get_me gagal (finishing scrape).
+    # StringSession lokal valid → export OK meski get_me gagal (finishing scrape),
+    # kecuali AUTH_KEY sudah ditolak di atas.
     session.status = "ready"
     session.error = None
+    _tg_session_log(session_id, "export_ok", None if live_ok else f"warn={live_err}")
     return {
         "status": "ok",
         "sessionString": str(session_string).strip(),
@@ -491,30 +534,88 @@ async def restore_telegram_session(session_id: str, session_string: str) -> dict
 
 
 async def _restore_telegram_session_locked(session_id: str, session_string: str) -> dict:
-    await cancel_telegram(session_id)
-
-    if not session_string.strip():
+    """
+    Restore StringSession ke memori.
+    Reuse client ready + string sama → jangan cancel + TelegramClient baru
+    (pemicu AUTH_KEY_DUPLICATED bila koneksi lama belum lepas di server).
+    """
+    wanted = session_string.strip()
+    if not wanted:
         return {"status": "error", "message": "Session string is empty"}
+
+    existing = SESSIONS.get(session_id)
+    if existing and existing.status == "ready":
+        try:
+            current = existing.client.session.save()
+            if current and str(current).strip() == wanted:
+                ok, err = await _verify_client_live(existing.client)
+                if ok:
+                    _tg_session_log(session_id, "restore_reuse")
+                    return {"status": "ready", "reused": True}
+                if err and _is_auth_key_dead_message(err):
+                    _tg_session_log(session_id, "restore_reuse_dead", err)
+                    await cancel_telegram(session_id)
+                    return {
+                        "status": "error",
+                        "message": err,
+                    }
+                # Soft reconnect pada client yang sama
+                try:
+                    await _ensure_client_connected(existing.client)
+                    ok2, err2 = await _verify_client_live(existing.client)
+                    if ok2:
+                        _tg_session_log(session_id, "restore_reuse_after_ensure")
+                        return {"status": "ready", "reused": True}
+                    if err2 and _is_auth_key_dead_message(err2):
+                        _tg_session_log(session_id, "restore_reuse_dead_after_ensure", err2)
+                        await cancel_telegram(session_id)
+                        return {"status": "error", "message": err2}
+                except Exception as soft_exc:  # noqa: BLE001
+                    soft_msg = str(soft_exc)
+                    if _is_auth_key_dead_message(soft_msg):
+                        _tg_session_log(session_id, "restore_reuse_dead_exc", soft_msg)
+                        await cancel_telegram(session_id)
+                        return {"status": "error", "message": soft_msg}
+        except Exception as reuse_exc:  # noqa: BLE001
+            _tg_session_log(session_id, "restore_reuse_failed", str(reuse_exc))
+
+    _tg_session_log(session_id, "restore_new_client")
+    await cancel_telegram(session_id)
+    # Beri waktu server melepas koneksi lama sebelum auth key dipakai lagi.
+    await asyncio.sleep(0.75)
 
     try:
         api_id = int(os.environ["TELEGRAM_API_ID"])
         api_hash = os.environ["TELEGRAM_API_HASH"]
-        client = TelegramClient(StringSession(session_string.strip()), api_id, api_hash)
+        # receive_updates=False — kurangi koneksi update paralel di balik layar.
+        client = TelegramClient(
+            StringSession(wanted),
+            api_id,
+            api_hash,
+            receive_updates=False,
+        )
         await asyncio.wait_for(client.connect(), timeout=30)
 
         ok, err = await _verify_client_live(client)
         if not ok:
-            await client.disconnect()
+            _tg_session_log(session_id, "restore_verify_failed", err)
+            try:
+                await client.disconnect()
+            except Exception:  # noqa: BLE001
+                pass
             return {
                 "status": "error",
                 "message": err or "Stored Telegram session expired. Log in again.",
             }
 
         SESSIONS[session_id] = TgLoginSession(client=client, mode="qr", status="ready")
+        _tg_session_log(session_id, "restore_ready")
         return {"status": "ready"}
     except asyncio.TimeoutError:
+        _tg_session_log(session_id, "restore_timeout")
         return {"status": "error", "message": "Telegram connection timed out"}
     except Exception as exc:  # noqa: BLE001
+        _tg_session_log(session_id, "restore_error", str(exc))
         return {"status": "error", "message": str(exc)}
 
 async def cancel_telegram(session_id: str) -> None:
@@ -522,6 +623,7 @@ async def cancel_telegram(session_id: str) -> None:
     if not session:
         return
 
+    _tg_session_log(session_id, "cancel_disconnect")
     if session.wait_task and not session.wait_task.done():
         session.wait_task.cancel()
         try:
@@ -535,3 +637,5 @@ async def cancel_telegram(session_id: str) -> None:
         await session.client.disconnect()
     except Exception:  # noqa: BLE001
         pass
+    # Sedikit jeda agar peer TCP / server drop auth connection lama.
+    await asyncio.sleep(0.25)

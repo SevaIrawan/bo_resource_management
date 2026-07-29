@@ -238,6 +238,5 @@ export async function runWaDeleteGroupChat(
         result: { success, total, deleted, notFound, failed, groupOutcomes },
       };
     },
-    { purpose: 'operation' },
   );
 }

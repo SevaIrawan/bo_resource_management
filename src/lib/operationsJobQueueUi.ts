@@ -11,12 +11,14 @@ import {
   resolveExitJobDeleteFollowUpRemarkKey,
 } from '@/lib/exitDeleteFlow';
 import { createGroupBatchUsesNumbering } from '@/lib/createGroupBatchNaming';
+import { telegramSuperGroupYesNo, localizeTelegramSuperGroupYesNo } from '@/lib/telegramGroupKind';
 import {
   isSetPhotoFromCreateJob,
   jobMatchesCreateGroupTaskType,
   resolveCreateJobSetPhotoFollowUpRemarkKey,
   resolveSetPhotoJobRemarkKey,
 } from '@/lib/createSetPhotoFlow';
+import type { Platform } from '@/types/database';
 
 export type JobQueueTaskType =
   | 'join'
@@ -341,6 +343,7 @@ export type JobQueueViewTableColumnId =
   | 'no'
   | 'groupName'
   | 'groupId'
+  | 'superGroup'
   | 'inviteLink'
   | 'targetJoin'
   | 'targetAdmin'
@@ -353,6 +356,8 @@ export interface JobQueueViewTableRow {
   no: string;
   groupName: string;
   groupId: string;
+  /** Diisi otomatis via withSuperGroupField (Yes/No/—). */
+  superGroup?: string;
   inviteLink: string;
   targetJoin: string;
   targetAdmin: string;
@@ -365,6 +370,7 @@ const VIEW_COL_I18N: Record<JobQueueViewTableColumnId, string> = {
   no: 'operations.jobQueue.viewColNo',
   groupName: 'operations.jobQueue.viewColGroupName',
   groupId: 'operations.jobQueue.viewColGroupId',
+  superGroup: 'operations.jobQueue.viewColSuperGroup',
   inviteLink: 'operations.jobQueue.viewColInviteLink',
   targetJoin: 'operations.jobQueue.viewColTargetJoin',
   targetAdmin: 'operations.jobQueue.viewColTargetAdmin',
@@ -373,25 +379,57 @@ const VIEW_COL_I18N: Record<JobQueueViewTableColumnId, string> = {
   remark: 'operations.jobQueue.viewColRemark',
 };
 
+function withTelegramSuperGroupColumn(
+  columns: JobQueueViewTableColumnId[],
+  platform: Platform,
+): JobQueueViewTableColumnId[] {
+  if (platform !== 'telegram') return columns;
+  const idx = columns.indexOf('groupId');
+  if (idx < 0 || columns.includes('superGroup')) return columns;
+  return [...columns.slice(0, idx + 1), 'superGroup', ...columns.slice(idx + 1)];
+}
+
+function withSuperGroupField(rows: JobQueueViewTableRow[]): JobQueueViewTableRow[] {
+  return rows.map((row) => ({
+    ...row,
+    superGroup: telegramSuperGroupYesNo(row.groupId),
+  }));
+}
+
+/** Label Super Group di VIEW Job Queue (Detail + Create) — satu path i18n. */
+export function jobQueueViewSuperGroupLabel(
+  row: Pick<JobQueueViewTableRow, 'groupId' | 'superGroup'>,
+  t: (key: string) => string,
+): string {
+  const value = row.superGroup ?? telegramSuperGroupYesNo(row.groupId);
+  return localizeTelegramSuperGroupYesNo(value, {
+    yes: t('groupMonitoring.groupLinks.adminYes'),
+    no: t('groupMonitoring.groupLinks.adminNo'),
+  });
+}
+
 export function jobQueueViewTableColumnIds(
   job: AutomationJobRecord,
 ): JobQueueViewTableColumnId[] {
+  let columns: JobQueueViewTableColumnId[];
   if (job.action === 'join_by_invite_link') {
-    return ['no', 'groupName', 'groupId', 'inviteLink', 'status', 'remark'];
+    columns = ['no', 'groupName', 'groupId', 'inviteLink', 'status', 'remark'];
+  } else if (job.action === 'create_group') {
+    columns = ['groupName', 'groupId', 'inviteLink', 'status', 'remark'];
+  } else if (job.action === 'set_admin') {
+    columns = ['groupName', 'groupId', 'inviteLink', 'targetAdmin', 'status', 'remark'];
+  } else if (job.action === 'set_group_photo') {
+    columns = ['groupName', 'groupId', 'inviteLink', 'status', 'remark'];
+  } else if (
+    job.action === 'leave_group' ||
+    job.action === 'delete_group' ||
+    job.action === 'exit_delete_group'
+  ) {
+    columns = ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
+  } else {
+    columns = ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
   }
-  if (job.action === 'create_group') {
-    return ['groupName', 'groupId', 'inviteLink', 'status', 'remark'];
-  }
-  if (job.action === 'set_admin') {
-    return ['groupName', 'groupId', 'inviteLink', 'targetAdmin', 'status', 'remark'];
-  }
-  if (job.action === 'set_group_photo') {
-    return ['groupName', 'groupId', 'inviteLink', 'status', 'remark'];
-  }
-  if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
-    return ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
-  }
-  return ['groupName', 'groupId', 'inviteLink', 'targetJoin', 'status'];
+  return withTelegramSuperGroupColumn(columns, job.platform);
 }
 
 function jobQueueViewRowStatusLabel(
@@ -430,8 +468,13 @@ function resolveInviteLink(group: {
   return group.inviteLink?.trim() || group.groupLink?.trim() || '—';
 }
 
-export function jobQueueCreateGroupResultColumnIds(): JobQueueViewTableColumnId[] {
-  return ['groupName', 'groupId', 'inviteLink', 'status', 'remark'];
+export function jobQueueCreateGroupResultColumnIds(
+  platform: Platform = 'whatsapp',
+): JobQueueViewTableColumnId[] {
+  return withTelegramSuperGroupColumn(
+    ['groupName', 'groupId', 'inviteLink', 'status', 'remark'],
+    platform,
+  );
 }
 
 function resolveCreateGroupResultOutcomes(
@@ -453,21 +496,23 @@ export function jobQueueCreateGroupResultTableRows(
 ): JobQueueViewTableRow[] {
   const createdOutcomes = resolveCreateGroupResultOutcomes(job);
   if (createdOutcomes.length > 0) {
-    return createdOutcomes.map((row, index) => ({
-      key: row.groupId || String(index),
-      no: String(index + 1),
-      groupName: row.groupName?.trim() || row.groupId || '—',
-      groupId: row.groupId || '—',
-      inviteLink: resolveInviteLink(row),
-      targetJoin: '—',
-      targetAdmin: '—',
-      count: '—',
-      status: '—',
-      remark: '',
-    }));
+    return withSuperGroupField(
+      createdOutcomes.map((row, index) => ({
+        key: row.groupId || String(index),
+        no: String(index + 1),
+        groupName: row.groupName?.trim() || row.groupId || '—',
+        groupId: row.groupId || '—',
+        inviteLink: resolveInviteLink(row),
+        targetJoin: '—',
+        targetAdmin: '—',
+        count: '—',
+        status: '—',
+        remark: '',
+      })),
+    );
   }
 
-  return [
+  return withSuperGroupField([
     {
       key: 'create-batch',
       no: '1',
@@ -480,7 +525,7 @@ export function jobQueueCreateGroupResultTableRows(
       status: '—',
       remark: '',
     },
-  ];
+  ]);
 }
 
 function resolveJoinViewTableRows(
@@ -532,6 +577,13 @@ function resolveJoinViewTableRows(
 }
 
 export function jobQueueViewTableRows(
+  job: AutomationJobRecord,
+  t: (key: string) => string,
+): JobQueueViewTableRow[] {
+  return withSuperGroupField(jobQueueViewTableRowsRaw(job, t));
+}
+
+function jobQueueViewTableRowsRaw(
   job: AutomationJobRecord,
   t: (key: string) => string,
 ): JobQueueViewTableRow[] {

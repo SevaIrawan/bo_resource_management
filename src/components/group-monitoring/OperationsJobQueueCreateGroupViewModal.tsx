@@ -13,6 +13,7 @@ import {
   jobQueueCreateGroupResultTableRows,
   jobQueueViewMetaText,
   jobQueueViewSubtitle,
+  jobQueueViewSuperGroupLabel,
   jobQueueViewTableColumnLabel,
   type JobQueueViewTableColumnId,
   type JobQueueViewTableRow,
@@ -51,14 +52,27 @@ function cellValue(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumnI
       return row.groupName;
     case 'groupId':
       return row.groupId;
+    case 'superGroup':
+      return row.superGroup ?? '—';
     case 'inviteLink':
       return row.inviteLink;
+    case 'status':
+      return row.status;
+    case 'remark':
+      return row.remark;
     default:
       return '—';
   }
 }
 
-function renderCell(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumnId) {
+function renderCell(
+  row: JobQueueViewTableRow,
+  columnId: JobQueueViewTableColumnId,
+  t: (key: string) => string,
+) {
+  if (columnId === 'superGroup') {
+    return jobQueueViewSuperGroupLabel(row, t);
+  }
   const value = cellValue(row, columnId);
   if (columnId === 'inviteLink' && value.startsWith('http')) {
     return (
@@ -81,7 +95,7 @@ export function OperationsJobQueueCreateGroupViewModal({
   const [queueingSetPhoto, setQueueingSetPhoto] = useState(false);
   const [queueError, setQueueError] = useState<string | null>(null);
 
-  const columns = jobQueueCreateGroupResultColumnIds();
+  const columns = jobQueueCreateGroupResultColumnIds(job.platform);
   const rows = jobQueueCreateGroupResultTableRows(job);
 
   const photoPath = job.payload.photoPath ?? null;
@@ -175,7 +189,7 @@ export function OperationsJobQueueCreateGroupViewModal({
                           className={cellClassName(columnId)}
                           title={cellValue(row, columnId)}
                         >
-                          {renderCell(row, columnId)}
+                          {renderCell(row, columnId, t)}
                         </td>
                       ))}
                     </tr>

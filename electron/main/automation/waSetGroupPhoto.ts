@@ -154,7 +154,11 @@ async function setPhotoOnGroup(
         await waitForWhatsAppStoreReady(client, 30_000);
         await sleep(WA_SET_PHOTO_RETRY_MS * attempt);
       }
-      const outcome = await setPhotoViaPageEvaluate(client, chatId, media);
+      const outcome = await setPhotoViaPageEvaluate(client, chatId, {
+        mimetype: media.mimetype,
+        data: media.data,
+        filename: media.filename ?? undefined,
+      });
       if (outcome === 'set' || outcome === 'not_found' || outcome === 'denied') {
         return outcome;
       }
@@ -291,6 +295,5 @@ export async function runWaSetGroupPhoto(
         result: { success, total: groups.length, failed, groupOutcomes },
       };
     },
-    { purpose: 'operation' },
   );
 }

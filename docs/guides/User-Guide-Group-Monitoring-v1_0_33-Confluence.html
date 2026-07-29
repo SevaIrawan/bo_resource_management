@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User Guide - Group Monitoring v1.0.33</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.55; max-width: 920px; margin: 24px auto; color: #172b4d; }
+    h1 { font-size: 24px; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-top: 0; }
+    h2 { font-size: 18px; margin-top: 28px; color: #0052cc; border-bottom: 1px solid #dfe1e6; padding-bottom: 4px; }
+    h3 { font-size: 15px; margin-top: 20px; color: #172b4d; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 13px; }
+    th, td { border: 1px solid #c1c7d0; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f4f5f7; font-weight: 600; }
+    .panel { border-radius: 4px; padding: 12px 14px; margin: 16px 0; border-left: 4px solid; }
+    .info { background: #deebff; border-color: #0052cc; }
+    .warning { background: #fffae6; border-color: #ff991f; }
+    .tip { background: #e3fcef; border-color: #00875a; }
+    .panel-title { font-weight: 700; margin-bottom: 6px; }
+    pre { background: #f4f5f7; border: 1px solid #dfe1e6; padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.4; white-space: pre-wrap; }
+    code { background: #f4f5f7; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    ul, ol { margin: 8px 0 16px; padding-left: 24px; }
+    li { margin: 4px 0; }
+    a { color: #0052cc; }
+    hr { border: none; border-top: 1px solid #dfe1e6; margin: 24px 0; }
+    blockquote { margin: 16px 0; padding: 12px 14px; background: #deebff; border-left: 4px solid #0052cc; border-radius: 0 4px 4px 0; }
+    blockquote p { margin: 0; }
+    .issue-card { border: 1px solid #dfe1e6; border-radius: 6px; padding: 12px 14px; margin: 10px 0; }
+    .issue-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #172b4d; }
+    .issue-card ol { margin: 4px 0 0; padding-left: 20px; }
+    .issue-card li { margin: 3px 0; }
+    .category-label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #5e6c84; margin: 18px 0 6px; }
+    .doc-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #dfe1e6; font-size: 12px; color: #5e6c84; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<h1>User Guide - Backend Operation (Group Monitoring)</h1>
+
+<div class="panel info">
+  <div class="panel-title">Document information</div>
+  <table>
+    <tr><th>App version</th><td>1.0.33</td></tr>
+    <tr><th>For</th><td>R&amp;M operations team</td></tr>
+    <tr><th>UI language</th><td>English / Chinese (Settings &gt; Language)</td></tr>
+  </table>
+</div>
+
+<h2 id="toc">Table of contents</h2>
+<ol>
+  <li><a href="#what">What is this app?</a></li>
+  <li><a href="#start">Quick start</a></li>
+  <li><a href="#terms">Key terms</a></li>
+  <li><a href="#nav">Navigation</a></li>
+  <li><a href="#account">Account tab</a></li>
+  <li><a href="#cta">Gap lists and Job Queue shortcuts</a></li>
+  <li><a href="#sync">Sync and Scrape now</a></li>
+  <li><a href="#busy">One account, one task at a time</a></li>
+  <li><a href="#lists">Group lists from Account</a></li>
+  <li><a href="#stock">Stock on brand header</a></li>
+  <li><a href="#job-queue">Operations - Job Queue</a></li>
+  <li><a href="#matrix">Group matrix</a></li>
+  <li><a href="#settings">Settings</a></li>
+  <li><a href="#issues">Common issues</a></li>
+  <li><a href="#contact">Contact Team Develop</a></li>
+  <li><a href="#quick">Quick reference</a></li>
+</ol>
+<hr />
+
+<h2 id="what">What is this app?</h2>
+<p>A desktop app to watch and manage many WhatsApp and Telegram accounts, grouped by brand.</p>
+<ul>
+  <li>See which accounts are logged in and which are logged out</li>
+  <li>See gap counts: Junk, Missing, Not admin</li>
+  <li>Run tasks from the Job Queue: Join missing, Create group, Set admin, Leave group</li>
+  <li>Open stock numbers and Group matrix from the brand header</li>
+</ul>
+<hr />
+
+<h2 id="start">Quick start</h2>
+<ol>
+  <li>Open the app and log in with your username and password</li>
+  <li>Go to Group Monitoring &gt; Account</li>
+  <li>For any account showing <strong>Logout</strong>, click Sync and scan the QR code on the marketing phone</li>
+  <li>When asked, choose <strong>Scrape now</strong> (or Later if you want to scrape at a different time)</li>
+</ol>
+<blockquote>
+  <p>Logging into the app is not the same as logging into WhatsApp or Telegram. WA/TG login only happens through Sync.</p>
+</blockquote>
+<hr />
+
+<h2 id="terms">Key terms</h2>
+<table>
+  <thead><tr><th>Term (as shown in UI)</th><th>What it means</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Active</strong> / <strong>Logout</strong></td><td>Whether the account is connected on this computer right now</td></tr>
+    <tr><td><strong>On device</strong></td><td>Total groups found on the phone in the last scrape</td></tr>
+    <tr><td><strong>Junk</strong></td><td>Groups on the phone that are not supposed to be there</td></tr>
+    <tr><td><strong>Missing</strong></td><td>Groups the account should join but has not joined yet</td></tr>
+    <tr><td><strong>Not admin</strong></td><td>Groups already joined where this account is not admin yet</td></tr>
+    <tr><td><strong>Aligned</strong> / <strong>Not Aligned</strong></td><td>Shown in the Remark column. Not Aligned means one of the gaps above is not zero</td></tr>
+    <tr><td><strong>SETUP</strong></td><td>The form you fill before sending a task to the Job Queue. The button to send it is <strong>Queue</strong></td></tr>
+    <tr><td><strong>Master</strong> (Role)</td><td>The account role needed to create groups</td></tr>
+    <tr><td><strong>GCS</strong> (Role)</td><td>A different account role, cannot create groups</td></tr>
+  </tbody>
+</table>
+<hr />
+
+<h2 id="nav">Navigation</h2>
+<pre><code>Sidebar                 Work area
+Group Monitoring   -&gt;   Account | Operations
+Settings           -&gt;   Language, auto scrape, stock, workers
+Logout             -&gt;   Logs you out of the app only, not WA/TG
+</code></pre>
+<table>
+  <thead><tr><th>Place</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Account</strong></td><td>Your accounts, Sync, gap lists, stock numbers, Group matrix</td></tr>
+    <tr><td><strong>Operations</strong></td><td>Job Queue only</td></tr>
+    <tr><td><strong>Settings</strong></td><td>App settings</td></tr>
+  </tbody>
+</table>
+<hr />
+
+<h2 id="account">Account tab</h2>
+<p>At the top you see totals: Brands, Accounts, Online, Aligned.</p>
+<p>You can filter by Account name or number, Brand, Platform, <strong>Session</strong> (Active / Logout), and <strong>Status</strong> (Aligned / Not Aligned).</p>
+<p>Use <strong>Card view</strong> to Sync, Scrape, or Clear a session.</p>
+
+<h3>Columns (Card view)</h3>
+<table>
+  <thead><tr><th>Column</th><th>What you see</th><th>If something is wrong</th></tr></thead>
+  <tbody>
+    <tr><td>Account</td><td>Platform, name, phone number</td><td>-</td></tr>
+    <tr><td>Role</td><td>Master or GCS</td><td>Creating groups needs Master</td></tr>
+    <tr><td>Location</td><td>Device label</td><td>-</td></tr>
+    <tr><td>Session</td><td><strong>Active</strong> or <strong>Logout</strong></td><td>Sync and scan a new QR when Logout</td></tr>
+    <tr><td>On device</td><td>Total groups on the phone</td><td>Scrape now after you change something on the phone</td></tr>
+    <tr><td>Junk</td><td>Gap count, click it if above 0</td><td>Open the list, then Leave</td></tr>
+    <tr><td>Missing</td><td>Gap count, click it if above 0</td><td>Open the list, then Join missing</td></tr>
+    <tr><td>Not admin</td><td>Gap count, click it if above 0</td><td>Open the list, then Set admin</td></tr>
+    <tr><td>Last update</td><td>Time, or scrape progress. Read only</td><td>Sync then Scrape now</td></tr>
+    <tr><td>Remark</td><td>Aligned / Not Aligned, or Cancel scrape while scraping</td><td>Fix the gaps then Scrape now</td></tr>
+  </tbody>
+</table>
+
+<p>To add an account: click <strong>+Add</strong>, pick a platform, enter name and phone, Save, then Sync.<br>
+To clear a session: hover over Session while it is Active and click the X. The next Sync will ask for a new QR.</p>
+<hr />
+
+<h2 id="cta">Gap lists and Job Queue shortcuts</h2>
+<div class="panel info">
+  <div class="panel-title">How it actually works</div>
+  <p>Click a gap number (Junk / Missing / Not admin), the group list opens, then press <strong>Join missing</strong>, <strong>Set admin</strong>, or <strong>Leave</strong>. This opens SETUP. Fill it in and press Queue.</p>
+  <p>You can also open SETUP from the Operations Add bar without going through a gap list.</p>
+  <p>VIEW, RUN, PAUSE, and CANCEL control tasks already sitting in the queue. They are not shortcuts from the Account tab.</p>
+</div>
+
+<table>
+  <thead><tr><th>From Account</th><th>Button in the list</th><th>Job Queue task</th></tr></thead>
+  <tbody>
+    <tr><td>Missing count</td><td>Join missing</td><td>Join missing</td></tr>
+    <tr><td>Not admin count</td><td>Set admin</td><td>Set admin</td></tr>
+    <tr><td>Junk count</td><td>Leave</td><td>Leave group (SETUP opens on the Not in master tab)</td></tr>
+  </tbody>
+</table>
+<hr />
+
+<h2 id="sync">Sync and Scrape now</h2>
+<p><strong>Sync</strong> checks the real connection to the phone. <strong>Scrape now</strong> reads the full group list from the phone and saves it.</p>
+<ol>
+  <li>If Session shows <strong>Logout</strong>: Sync opens the QR or phone linking screen right away</li>
+  <li>If Session shows <strong>Active</strong>: Sync first checks the phone (you will see <strong>Checking Session</strong>, up to 20 seconds), then asks if you want to Scrape now or Later</li>
+</ol>
+<div class="panel tip">
+  <div class="panel-title">Why the check takes a moment</div>
+  <p>This check makes sure the account is really connected before doing anything else. It also stops two Chrome windows from opening for the same account at the same time, which used to cause a blank white window. Let it finish, do not close the app or click Sync again while it is checking.</p>
+</div>
+<hr />
+
+<h2 id="busy">One account, one task at a time</h2>
+<p>An account can only do one thing at a time: Sync, Scrape, or a Job Queue task. This is on purpose, running two things on the same account at once causes errors.</p>
+<ul>
+  <li>If a Job Queue task is running on an account and you press Sync, you will see a busy message. Wait for the task to finish, then try again</li>
+  <li>If Sync or Scrape is running on an account, any Job Queue task waiting for that same account will simply wait its turn. It does not need to be started again by hand, it starts on its own once Sync or Scrape is done</li>
+</ul>
+<p>Up to <strong>10 accounts per platform</strong> can be active at the same time. If you hit that limit, wait for one to finish.</p>
+<hr />
+
+<h2 id="lists">Group lists from Account</h2>
+<p>Group link list: 7 columns from the account's daily scrape, or compare admin vs master. Export to Excel as <code>RM-[account name]-YYYYMMDD.xlsx</code>.</p>
+<hr />
+
+<h2 id="stock">Stock on brand header</h2>
+<p>Stock numbers show on the Account brand header. They update automatically after a scrape, and can also update on a schedule from Settings.</p>
+<hr />
+
+<h2 id="job-queue">Operations - Job Queue</h2>
+<p>Go to Operations to see and manage every task: SETUP to create a new one, VIEW to check details, RUN, PAUSE, CANCEL for tasks already queued.</p>
+
+<h3>Create group</h3>
+<p><strong>SETUP cards:</strong></p>
+<ol>
+  <li><strong>Group batch</strong>
+    <ul>
+      <li>Group name (required)</li>
+      <li>Total to create (required)</li>
+      <li>Number each group name (toggle) and Start from</li>
+    </ul>
+  </li>
+  <li><strong>Group permissions</strong> (comes from Settings by default, you can change it just for this task)
+    <ul>
+      <li>WhatsApp: Admins send only, Admins add only, Admins edit info</li>
+      <li>Telegram: Hide history for members</li>
+    </ul>
+  </li>
+  <li><strong>Upload Photo</strong> / <strong>Preview Photo</strong> (required). Upload or change it before pressing Queue. Without a photo, Queue stays off</li>
+</ol>
+<ol start="4">
+  <li>Press Queue and wait for it to show Completed</li>
+  <li>Set photo usually queues by itself right after the group is created</li>
+  <li>VIEW shows the groups created (name, id, invite link) and a <strong>Queue Set Photo</strong> button if you need to retry</li>
+  <li>Go back to Account and run Sync then Scrape now</li>
+</ol>
+
+<hr />
+<h3>Set admin</h3>
+<ol>
+  <li><strong>OWNER/ADMIN</strong> is the account that is already admin in the groups</li>
+  <li><strong>Account to promote</strong> is the account you want to make admin</li>
+  <li>SETUP only lists groups where this actually applies: owner is admin, target has joined, target is not admin yet</li>
+  <li>Press Queue, then Sync and Scrape now on the target account</li>
+</ol>
+
+<hr />
+<h3>Leave group</h3>
+<p><strong>When to use it:</strong> for Junk groups, or any group you want to leave.</p>
+<p>Leave has to be turned on first, under Settings &gt; <strong>WhatsApp worker</strong> or <strong>Telegram worker</strong> &gt; <strong>Leave &amp; delete</strong>.</p>
+<ol>
+  <li>Pick one account and the Leave group task</li>
+  <li>SETUP tabs:
+    <ul>
+      <li><strong>On device</strong>: every group from the latest scrape</li>
+      <li><strong>Not in master</strong>: junk groups. Clicking Junk &gt; Leave opens this tab directly</li>
+    </ul>
+  </li>
+  <li>Tick the groups you want, press Queue</li>
+  <li>The task leaves the groups. Right after that, delete queues on its own for every group that was left successfully, this is the normal behavior</li>
+  <li>Delete here means: this account leaves the group and its chat history is also cleared on this account. It does not delete the group for everyone else in it</li>
+  <li>VIEW has a <strong>Queue delete (left groups)</strong> button, use it only if the automatic delete did not run or failed</li>
+  <li>Go back to Account and run Sync then Scrape now</li>
+</ol>
+<div class="panel info">
+  <div class="panel-title">Note</div>
+  <p>Some SETUP window titles may still say "exit and delete", but the task tab is simply called <strong>Leave group</strong>, and it works the same way described above.</p>
+</div>
+<hr />
+
+<h2 id="matrix">Group matrix</h2>
+<p>Read only view. Open it from the group count badge on the Account brand header.</p>
+<p>Bookmarks: <strong>Full Group</strong>, <strong>Full Admin</strong>. You can filter and export to Excel. It updates after a scrape.</p>
+<hr />
+
+<h2 id="settings">Settings</h2>
+<table>
+  <thead><tr><th>Section</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Language</td><td>English / Chinese</td></tr>
+    <tr><td>Check for updates</td><td>App update</td></tr>
+    <tr><td>Automatic account scrape</td><td>On Scheduled and Scrape Now</td></tr>
+    <tr><td>Operations stock policy</td><td>Ready target percent, average ND days</td></tr>
+    <tr><td>SOP naming</td><td>Naming patterns</td></tr>
+    <tr><td>WhatsApp worker / Telegram worker</td><td>Delays, create group defaults, Leave &amp; delete. Ask your team lead before changing anything here</td></tr>
+  </tbody>
+</table>
+
+<h3>Automatic account scrape</h3>
+<ul>
+  <li>Default: On Scheduled is on, Scrape Now is off, runs daily at 12:00 PM, for brands FWSG / JMMY / M24SG / SBMY / STMY / WBSG, up to 6 per platform</li>
+  <li>Scrape Now off: buttons are <strong>Save</strong> / <strong>Cancel</strong></li>
+  <li>Scrape Now on: buttons are <strong>Execute</strong> / <strong>Discard</strong>. Brands start unchecked, status shows standby until you press Execute</li>
+  <li>After Execute finishes, the settings go back to default</li>
+  <li>The app has to be open at the scheduled time. It will not catch up later if it was closed</li>
+  <li>While the scheduled run is happening, Scrape Now stays blocked</li>
+</ul>
+<hr />
+
+<h2 id="issues">Common issues</h2>
+<p>The problems R&amp;M runs into most often. If yours is not listed here, check the VIEW Remark or the alert text first, then contact Team Develop.</p>
+
+<div class="category-label">Login and session</div>
+
+<div class="issue-card">
+  <div class="issue-title">Session shows Logout, or you see a message about the session no longer being valid</div>
+  <ol>
+    <li>Press <strong>Sync</strong> and scan the QR, or use phone linking (WhatsApp &gt; Linked Devices)</li>
+    <li>If the QR never shows up, click <strong>Clear Session</strong> (the X next to Session while Active), then Sync again</li>
+  </ol>
+</div>
+
+<div class="issue-card">
+  <div class="issue-title">Error message: "Navigating frame was detached"</div>
+  <p style="margin: 0 0 6px; font-size: 14px; color: #5e6c84;">Can happen during Sync or while a Scrape is running.</p>
+  <ol>
+    <li>Click <strong>Clear Session</strong> on that account</li>
+    <li>Sync again and log in (scan the QR or use phone linking)</li>
+  </ol>
+</div>
+
+<div class="category-label">Sync, scrape, and busy accounts</div>
+
+<div class="issue-card">
+  <div class="issue-title">An account is busy, or a task will not start on an account with another task already running</div>
+  <ol>
+    <li>This is expected. One account can only do one thing at a time</li>
+    <li>Wait for the current Sync, Scrape, or Job task to finish, it will continue on its own</li>
+    <li>Up to 10 accounts per platform can run at once</li>
+  </ol>
+</div>
+
+<div class="issue-card">
+  <div class="issue-title">Scrape is running (you see "Reading groups...", a progress bar, or Cancel scrape)</div>
+  <ol>
+    <li>This is normal, keep the app open</li>
+    <li>Do not Sync or start a task on the same account until it finishes</li>
+  </ol>
+</div>
+
+<div class="issue-card">
+  <div class="issue-title">A task finished but the numbers on Account or the matrix still look wrong</div>
+  <ol>
+    <li>Go to Account, press Sync, then Scrape now</li>
+  </ol>
+</div>
+
+<div class="category-label">Job queue</div>
+
+<div class="issue-card">
+  <div class="issue-title">Join missing failed because the invite link expired or was rejected</div>
+  <ol>
+    <li>Scrape an admin account that owns the group to get a fresh invite link</li>
+    <li>Start a new Join missing task with the fresh link</li>
+    <li>Do not press RUN repeatedly on the same failed task</li>
+  </ol>
+</div>
+
+<div class="issue-card">
+  <div class="issue-title">Message: "Leave is disabled in worker settings"</div>
+  <ol>
+    <li>Go to Settings &gt; WhatsApp worker or Telegram worker &gt; Leave &amp; delete</li>
+    <li>Turn Leave on</li>
+    <li>Queue the task again</li>
+  </ol>
+</div>
+
+<div class="issue-card">
+  <div class="issue-title">Create group Queue button stays disabled, or it asks for Master</div>
+  <ol>
+    <li>Account Role has to be <strong>Master</strong></li>
+    <li>SETUP needs a Group name, Total to create, and a photo uploaded</li>
+  </ol>
+</div>
+
+<div class="issue-card">
+  <div class="issue-title">Task shows Failed, or a message about a WhatsApp store error</div>
+  <ol>
+    <li>Open VIEW and read the Remark</li>
+    <li>Press <strong>RUN</strong> once to retry</li>
+    <li>If the next error is "frame detached", follow the Clear Session steps above instead</li>
+  </ol>
+</div>
+
+<div class="category-label">Settings</div>
+
+<div class="issue-card">
+  <div class="issue-title">Scheduled auto scrape did not run</div>
+  <ol>
+    <li>The app has to be open at the scheduled time</li>
+    <li>Or go to Settings &gt; Automatic account scrape &gt; turn on Scrape Now &gt; Execute</li>
+  </ol>
+</div>
+
+<hr />
+
+<h2 id="contact">Contact Team Develop</h2>
+<p>Only reach out after trying the steps above. When you do, include the app version (1.0.33), brand, account, platform, what you did step by step, screenshots, and the Remark text.</p>
+<hr />
+
+<h2 id="quick">Quick reference</h2>
+<table>
+  <thead><tr><th>What you need</th><th>Where to go</th></tr></thead>
+  <tbody>
+    <tr><td>Log into WA/TG</td><td>Account &gt; Sync</td></tr>
+    <tr><td>Get the full group list into the system</td><td>Sync, then Scrape now</td></tr>
+    <tr><td>Fix Missing / Not admin / Junk</td><td>Click the gap number, then Join missing / Set admin / Leave</td></tr>
+    <tr><td>Create groups</td><td>Operations &gt; Create group (needs Master role and a photo)</td></tr>
+    <tr><td>Chrome frame detached error</td><td>Clear Session, Sync, scan QR, then RUN</td></tr>
+    <tr><td>Account or task stuck on busy</td><td>Wait, it will continue on its own once the current task finishes</td></tr>
+  </tbody>
+</table>
+
+<p class="doc-footer">User Guide v1.0.33 - Group Monitoring (R&amp;M operations)</p>
+
+</body>
+</html>

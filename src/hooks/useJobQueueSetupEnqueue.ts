@@ -273,7 +273,7 @@ export function useJobQueueSetupEnqueue({
 
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
-    const maxPerRun = Math.max(1, workerSettings.inviteLink.maxPerRun || 20);
+    const maxPerRun = Math.max(1, workerSettings.inviteLink.maxPerRun || 30);
 
     const groupsByAccount = new Map<
       string,
@@ -354,7 +354,7 @@ export function useJobQueueSetupEnqueue({
 
     const workerSettings =
       platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
-    const maxPerRun = Math.max(1, workerSettings.inviteLink.maxPerRun || 20);
+    const maxPerRun = Math.max(1, workerSettings.inviteLink.maxPerRun || 30);
 
     beginSubmitting();
     let queuedJobs = 0;

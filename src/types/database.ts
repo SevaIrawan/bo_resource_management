@@ -114,6 +114,8 @@ export interface GroupScrapeRow {
   admin_count: number;
   member_count: number;
   is_admin: AdminYesNo;
+  /** Creator/owner akun scrape ini — daily only; master tidak punya kolom ini. */
+  is_owner: AdminYesNo;
   platform: Platform;
   scrape_date: string;
   scraped_at: string;

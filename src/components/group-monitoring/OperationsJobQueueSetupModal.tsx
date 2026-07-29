@@ -21,6 +21,7 @@ import {
 import { buildCreateGroupAccountSelectModel } from '@/lib/createGroupAccountEligibility';
 import { fetchJobQueueSnapshot } from '@/lib/automationJobQueueClient';
 import { parseJoinImportFile } from '@/lib/parseCsvJoinImport';
+import { telegramSuperGroupLabel } from '@/lib/telegramGroupKind';
 import {
   validateCsvJoinAgainstMaster,
   type ValidatedCsvJoinRow,
@@ -1035,6 +1036,9 @@ export function OperationsJobQueueSetupModal({
                         <tr>
                           <th>{t('operations.jobQueue.csvColGroup')}</th>
                           <th>{t('operations.jobQueue.csvColGroupId')}</th>
+                          {platform === 'telegram' ? (
+                            <th>{t('operations.jobQueue.csvColSuperGroup')}</th>
+                          ) : null}
                           <th>{t('operations.jobQueue.csvColStatus')}</th>
                         </tr>
                       </thead>
@@ -1043,6 +1047,14 @@ export function OperationsJobQueueSetupModal({
                           <tr key={row.groupId || idx}>
                             <td>{row.groupName}</td>
                             <td className="group-links-table__id">{row.groupId || '—'}</td>
+                            {platform === 'telegram' ? (
+                              <td>
+                                {telegramSuperGroupLabel(row.groupId, {
+                                  yes: t('groupMonitoring.groupLinks.adminYes'),
+                                  no: t('groupMonitoring.groupLinks.adminNo'),
+                                })}
+                              </td>
+                            ) : null}
                             <td>
                               <span className={`operations-job-queue-csv-status operations-job-queue-csv-status--${row.status.replace('_', '-')}`}>
                                 {row.status === 'matched'
@@ -1117,19 +1129,31 @@ export function OperationsJobQueueSetupModal({
                             </label>
                           </th>
                           <th>{t('operations.jobQueue.colGroup')}</th>
+                          {platform === 'telegram' ? (
+                            <>
+                              <th>{t('operations.jobQueue.viewColGroupId')}</th>
+                              <th>{t('operations.jobQueue.viewColSuperGroup')}</th>
+                            </>
+                          ) : null}
                         </tr>
                       </thead>
                       <tbody>
                         {loadingJoinGroups ? (
                           <tr>
-                            <td colSpan={2} className="operations-job-queue-empty">
+                            <td
+                              colSpan={platform === 'telegram' ? 4 : 2}
+                              className="operations-job-queue-empty"
+                            >
                               <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
                               {t('operations.jobQueue.loadingMissing')}
                             </td>
                           </tr>
                         ) : visibleJoinGroups.length === 0 ? (
                           <tr>
-                            <td colSpan={2} className="operations-job-queue-empty">
+                            <td
+                              colSpan={platform === 'telegram' ? 4 : 2}
+                              className="operations-job-queue-empty"
+                            >
                               {joinGroupQuery.trim()
                                 ? t('operations.jobQueue.noGroupSearchMatch')
                                 : t('operations.jobQueue.noMissingGroups')}
@@ -1148,6 +1172,17 @@ export function OperationsJobQueueSetupModal({
                                 />
                               </td>
                               <td>{group.groupName}</td>
+                              {platform === 'telegram' ? (
+                                <>
+                                  <td className="group-links-table__id">{group.groupId}</td>
+                                  <td>
+                                    {telegramSuperGroupLabel(group.groupId, {
+                                      yes: t('groupMonitoring.groupLinks.adminYes'),
+                                      no: t('groupMonitoring.groupLinks.adminNo'),
+                                    })}
+                                  </td>
+                                </>
+                              ) : null}
                             </tr>
                           ))
                         )}
@@ -1434,31 +1469,49 @@ export function OperationsJobQueueSetupModal({
                         </label>
                       </th>
                       <th>{t('operations.jobQueue.colGroup')}</th>
+                      {platform === 'telegram' ? (
+                        <>
+                          <th>{t('operations.jobQueue.viewColGroupId')}</th>
+                          <th>{t('operations.jobQueue.viewColSuperGroup')}</th>
+                        </>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
                     {loadingSetAdminGroupList ? (
                       <tr>
-                        <td colSpan={2} className="operations-job-queue-empty">
+                        <td
+                          colSpan={platform === 'telegram' ? 4 : 2}
+                          className="operations-job-queue-empty"
+                        >
                           <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
                           {t('operations.jobQueue.loadingMissing')}
                         </td>
                       </tr>
                     ) : ownerAccountCandidates && !superAdminAccount ? (
                       <tr>
-                        <td colSpan={2} className="operations-job-queue-empty">
+                        <td
+                          colSpan={platform === 'telegram' ? 4 : 2}
+                          className="operations-job-queue-empty"
+                        >
                           {t('operations.jobQueue.setAdminSelectOwnerFirst')}
                         </td>
                       </tr>
                     ) : !selectedSetAdminTargetAccountId ? (
                       <tr>
-                        <td colSpan={2} className="operations-job-queue-empty">
+                        <td
+                          colSpan={platform === 'telegram' ? 4 : 2}
+                          className="operations-job-queue-empty"
+                        >
                           {t('operations.jobQueue.setAdminSelectTargetFirst')}
                         </td>
                       </tr>
                     ) : eligibleSetAdminGroups.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="operations-job-queue-empty">
+                        <td
+                          colSpan={platform === 'telegram' ? 4 : 2}
+                          className="operations-job-queue-empty"
+                        >
                           {t('operations.jobQueue.setAdminAllTargetsAlreadyAdmin')}
                         </td>
                       </tr>
@@ -1475,6 +1528,17 @@ export function OperationsJobQueueSetupModal({
                             />
                           </td>
                           <td>{group.groupName}</td>
+                          {platform === 'telegram' ? (
+                            <>
+                              <td className="group-links-table__id">{group.groupId}</td>
+                              <td>
+                                {telegramSuperGroupLabel(group.groupId, {
+                                  yes: t('groupMonitoring.groupLinks.adminYes'),
+                                  no: t('groupMonitoring.groupLinks.adminNo'),
+                                })}
+                              </td>
+                            </>
+                          ) : null}
                         </tr>
                       ))
                     )}
@@ -1508,6 +1572,9 @@ export function OperationsJobQueueSetupModal({
                     <col className="operations-job-queue-col-select" />
                     <col className="operations-job-queue-col-group" />
                     <col className="operations-job-queue-col-group-id" />
+                    {platform === 'telegram' ? (
+                      <col className="operations-job-queue-col-super-group" />
+                    ) : null}
                   </colgroup>
                   <thead>
                     <tr>
@@ -1530,19 +1597,28 @@ export function OperationsJobQueueSetupModal({
                       <th className="operations-job-queue-col-group-id">
                         {t('operations.jobQueue.viewColGroupId')}
                       </th>
+                      {platform === 'telegram' ? (
+                        <th>{t('operations.jobQueue.viewColSuperGroup')}</th>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
                     {loadingAccountDailyGroups ? (
                       <tr>
-                        <td colSpan={3} className="operations-job-queue-empty">
+                        <td
+                          colSpan={platform === 'telegram' ? 4 : 3}
+                          className="operations-job-queue-empty"
+                        >
                           <Loader2 className="inline h-4 w-4 animate-spin" aria-hidden />{' '}
                           {t('operations.jobQueue.loadingDailyGroups')}
                         </td>
                       </tr>
                     ) : visibleExitGroups.length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="operations-job-queue-empty">
+                        <td
+                          colSpan={platform === 'telegram' ? 4 : 3}
+                          className="operations-job-queue-empty"
+                        >
                           {exitGroupQuery.trim()
                             ? t('operations.jobQueue.noGroupSearchMatch')
                             : exitGroupTab === 'daily'
@@ -1577,6 +1653,14 @@ export function OperationsJobQueueSetupModal({
                           >
                             {group.groupId}
                           </td>
+                          {platform === 'telegram' ? (
+                            <td>
+                              {telegramSuperGroupLabel(group.groupId, {
+                                yes: t('groupMonitoring.groupLinks.adminYes'),
+                                no: t('groupMonitoring.groupLinks.adminNo'),
+                              })}
+                            </td>
+                          ) : null}
                         </tr>
                       ))
                     )}

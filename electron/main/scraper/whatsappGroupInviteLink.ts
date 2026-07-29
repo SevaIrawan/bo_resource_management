@@ -33,29 +33,15 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
-function normalizeInviteCode(raw: unknown): string | null {
-  if (raw == null) return null;
-  if (typeof raw === 'string') {
-    const t = raw.trim();
-    if (!t) return null;
-    const fromUrl = t.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]+)/i);
-    if (fromUrl?.[1]) return fromUrl[1];
-    if (/^[A-Za-z0-9_-]{8,}$/.test(t)) return t;
-    return null;
-  }
-  if (typeof raw === 'object') {
-    const o = raw as { code?: unknown; inviteCode?: unknown };
-    return normalizeInviteCode(o.code ?? o.inviteCode ?? null);
-  }
-  return null;
-}
-
 /**
  * Export invite lewat WA Web store/Mex/page saja.
  * Tidak serialize chat penuh ke Node (hindari Error "r").
  */
 async function fetchInviteCodeFromStore(client: Client, groupId: string): Promise<string | null> {
   assertWhatsAppScrapeClient(client);
+  if (!client.pupPage) {
+    throw new Error('WA_CLIENT_NOT_READY: WhatsApp browser session not initialized. Wait for login to finish.');
+  }
 
   return client.pupPage.evaluate(async (gid: string) => {
     function pickCode(raw: unknown): string | null {

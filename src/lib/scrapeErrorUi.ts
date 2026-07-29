@@ -13,6 +13,7 @@ export type ScrapeErrorModalCode =
   | 'SCRAPER_WA_CONNECT_FAILED'
   | 'SCRAPER_WA_SESSION_UNLINKED'
   | 'SCRAPER_TG_CONNECT_FAILED'
+  | 'SCRAPER_TG_AUTH_KEY_DUPLICATED'
   | 'SCRAPER_INCOMPLETE'
   | 'SCRAPER_TRUNCATED_CAP'
   | 'SCRAPER_CONNECTION_LOST'
@@ -25,6 +26,7 @@ export const SCRAPE_CONNECTION_MODAL_CODES: ReadonlySet<ScrapeErrorModalCode> = 
   'SCRAPER_WA_DISCONNECTED',
   'SCRAPER_WA_CONNECT_FAILED',
   'SCRAPER_TG_CONNECT_FAILED',
+  'SCRAPER_TG_AUTH_KEY_DUPLICATED',
   'SCRAPER_INCOMPLETE',
   'SCRAPER_TRUNCATED_CAP',
   'SCRAPER_CONNECTION_LOST',
@@ -53,9 +55,28 @@ export function normalizeScrapeErrorMessage(message: string): string {
   return trimmed;
 }
 
+/**
+ * Telegram StringSession mati karena dipakai 2 IP/PC sekaligus (AuthKeyDuplicated).
+ * Portable session — wajib login QR ulang; jangan treat sebagai SESSION_WARM_PENDING.
+ */
+export function isTelegramAuthKeyDeadMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  const lower = normalizeScrapeErrorMessage(message).toLowerCase();
+  return (
+    lower.includes('tg_auth_key_duplicated') ||
+    lower.includes('scraper_tg_auth_key_duplicated') ||
+    lower.includes('auth_key_duplicated') ||
+    lower.includes('authkeyduplicated') ||
+    (lower.includes('authorization key') && lower.includes('no longer be used')) ||
+    lower.includes('two different ip')
+  );
+}
+
 /** Client WA masih nyala / sync / timeout — bukan unlink di HP. */
 export function isDeviceBusyMessage(message: string | undefined): boolean {
   if (!message) return false;
+  // Auth key mati sering kebungkus SESSION_WARM_PENDING (bug lama) — jangan anggap busy.
+  if (isTelegramAuthKeyDeadMessage(message)) return false;
   if (
     message === 'SESSION_SETTLING' ||
     message === 'SCRAPER_GLOBAL_BUSY' ||
@@ -77,12 +98,15 @@ export function isDeviceBusyMessage(message: string | undefined): boolean {
 
 /** Unlink di HP (UNPAIRED / logout) — DB + UI invalid. */
 export function isDeviceSessionDeadMessage(message: string | undefined): boolean {
-  if (!message || isDeviceBusyMessage(message)) return false;
+  if (!message) return false;
+  if (isTelegramAuthKeyDeadMessage(message)) return true;
+  if (isDeviceBusyMessage(message)) return false;
   if (isWaUnlinkedProbeMessage(message)) return true;
   return scrapeFailureNeedsLoginModal(message);
 }
 
 export function scrapeFailureNeedsLoginModal(message: string): boolean {
+  if (isTelegramAuthKeyDeadMessage(message)) return true;
   if (isDeviceBusyMessage(message)) return false;
   if (isWaChromeConnectFailedMessage(message)) return false;
   if (isTgSidecarConnectFailedMessage(message)) return false;
@@ -243,6 +267,10 @@ export function resolveScrapeErrorModalCode(message: string): ScrapeErrorModalCo
 
   if (isScrapeUserCancelledMessage(normalized)) return 'SCRAPER_CANCELLED';
 
+  if (isTelegramAuthKeyDeadMessage(normalized)) {
+    return 'SCRAPER_TG_AUTH_KEY_DUPLICATED';
+  }
+
   if (
     lower === 'scraper_wa_session_unlinked' ||
     lower.startsWith('scraper_wa_session_unlinked') ||
@@ -359,6 +387,8 @@ function resolveScrapeAlertMessageForCode(
       return t('groupMonitoring.sync.scraperWaConnectFailed');
     case 'SCRAPER_TG_CONNECT_FAILED':
       return t('groupMonitoring.sync.scraperTgConnectFailed');
+    case 'SCRAPER_TG_AUTH_KEY_DUPLICATED':
+      return t('groupMonitoring.sync.tgAuthKeyDuplicated');
     case 'SCRAPER_WA_SESSION_UNLINKED':
       return t('groupMonitoring.sync.scraperWaSessionUnlinked');
     case 'SCRAPER_INCOMPLETE':
@@ -430,7 +460,10 @@ export function resolveSyncFlowAlertMessage(
   if (code === 'SYNC_FAILED') {
     return t('groupMonitoring.sync.syncFailed');
   }
-  if (code === 'SESSION_WARM_PENDING') {
+  if (code === 'SESSION_WARM_PENDING' || code.startsWith('SESSION_WARM_PENDING:')) {
+    if (isTelegramAuthKeyDeadMessage(code)) {
+      return t('groupMonitoring.sync.tgAuthKeyDuplicated');
+    }
     return t('groupMonitoring.sync.sessionWarmPending');
   }
   if (code === 'SESSION_SETTLING' || code === 'SESSION_CHECK_BUSY') {

@@ -61,6 +61,7 @@ export interface ScrapedGroupRow {
   group_name: string;
   invite_link: string | null;
   is_admin: 'yes' | 'no';
+  is_owner: 'yes' | 'no';
   member_count: number;
   admin_count: number;
   owner_count: number;

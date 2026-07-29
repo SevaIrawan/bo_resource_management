@@ -16,6 +16,8 @@ export interface AccountGroupLinkRow {
   groupName: string;
   inviteLink: string | null;
   isAdmin: AdminYesNo;
+  /** Creator/owner akun ini di grup (dari daily.is_owner). */
+  isOwner: AdminYesNo;
   /** true bila group_id ada di daily akun (join). */
   isJoined?: boolean;
   inMaster: boolean;
@@ -30,6 +32,7 @@ type DailyGroupRow = {
   group_name: string | null;
   invite_link: string | null;
   is_admin: AdminYesNo;
+  is_owner?: AdminYesNo | null;
   member_count: number;
   admin_count: number;
   scraped_at: string;
@@ -38,7 +41,7 @@ type DailyGroupRow = {
 async function fetchDailyForAccount(accountId: string, keepLatest = false): Promise<DailyGroupRow[]> {
   const rows = await fetchAllSupabaseRows<DailyGroupRow>(
     TABLES.groupScrapeDaily,
-    'group_id, group_name, invite_link, is_admin, member_count, admin_count, scraped_at',
+    'group_id, group_name, invite_link, is_admin, is_owner, member_count, admin_count, scraped_at',
     [{ column: 'account_id', value: accountId }],
   );
   return keepLatest ? dedupeDailyRowsByGroupIdKeepLatest(rows) : dedupeDailyRowsByGroupId(rows);
@@ -82,6 +85,7 @@ function mapDailyToLinkRow(
     groupName: (d.group_name as string)?.trim() || 'Group',
     inviteLink: d.invite_link?.trim() || null,
     isAdmin: d.is_admin === 'yes' ? 'yes' : 'no',
+    isOwner: d.is_owner === 'yes' ? 'yes' : 'no',
     isJoined: true,
     inMaster,
     memberCount: Math.max(0, Number(d.member_count) || 0),
@@ -177,6 +181,7 @@ export async function fetchAccountGroupLinks(
       groupName,
       inviteLink: m.invite_link?.trim() || null,
       isAdmin: d?.is_admin === 'yes' ? 'yes' : 'no',
+      isOwner: d?.is_owner === 'yes' ? 'yes' : 'no',
       isJoined: Boolean(d),
       inMaster: true,
       memberCount: Math.max(0, Number(d?.member_count) || 0),

@@ -287,6 +287,33 @@ function requeueAutomationJob(job: AutomationJobRecord): void {
       total,
       label: job.progress?.label ?? job.payload.groupNamePrefix ?? job.payload.groupName,
     };
+    job.progressUpdatedAt = new Date().toISOString();
+  } else if (
+    job.action === 'join_by_invite_link' ||
+    job.action === 'set_admin' ||
+    job.action === 'set_group_photo' ||
+    job.action === 'leave_group' ||
+    job.action === 'delete_group'
+  ) {
+    const total = accountJobStepTotal(job);
+    const already =
+      job.action === 'join_by_invite_link'
+        ? (job.payload.groupOutcomes ?? []).filter(
+            (r) => r.joinStatus === 'joined' || r.joinStatus === 'already_member',
+          ).length
+        : job.action === 'set_admin'
+          ? (job.payload.groupOutcomes ?? []).filter((r) => r.adminStatus === 'promoted').length
+          : job.action === 'set_group_photo'
+            ? (job.payload.groupOutcomes ?? []).filter((r) => r.photoStatus === 'set').length
+            : (job.payload.groupOutcomes ?? []).filter(
+                (r) => r.exitStatus === 'left' || r.deleteStatus === 'deleted',
+              ).length;
+    job.progress = {
+      current: Math.min(already, total),
+      total,
+      label: job.progress?.label ?? job.payload.groupName ?? job.accountName,
+    };
+    job.progressUpdatedAt = new Date().toISOString();
   }
   bumpJobToQueueFront(job);
 }
@@ -434,6 +461,7 @@ export function markJobRunning(jobId: string): boolean {
     job.status = 'running';
     job.paused = false;
     job.startedAt = new Date().toISOString();
+    job.progressUpdatedAt = job.startedAt;
     const stepTotal = accountJobStepTotal(job);
     job.progress = job.progress ?? {
       current: 0,
@@ -487,7 +515,7 @@ export function attachJobGroupOutcomes(
         detail.groupOutcomes,
       );
     }
-    if (detail?.progressCurrent != null || job.action === 'create_group') {
+    if (detail?.progressCurrent != null || job.action === 'create_group' || job.action === 'join_by_invite_link') {
       const total = Math.max(
         1,
         job.progress?.total ??
@@ -495,19 +523,26 @@ export function attachJobGroupOutcomes(
             ? Math.floor(Number(job.payload.totalToCreate) || 1)
             : accountJobStepTotal(job)),
       );
+      // Setelah merge: floor dari outcomes + progress lama — jangan mundur saat resume
+      // (caller sering kirim progressCurrent hanya dari run saat ini).
       const fromOutcomes =
         job.action === 'create_group'
           ? countCreatedGroupOutcomes(job.payload.groupOutcomes)
-          : undefined;
+          : job.action === 'join_by_invite_link'
+            ? countJoinDoneOutcomes(job.payload.groupOutcomes)
+            : 0;
       const current = Math.max(
         0,
-        detail?.progressCurrent ?? fromOutcomes ?? job.progress?.current ?? 0,
+        detail?.progressCurrent ?? 0,
+        fromOutcomes,
+        job.progress?.current ?? 0,
       );
       job.progress = {
         current: Math.min(current, total),
         total,
         label: job.progress?.label ?? job.payload.groupNamePrefix ?? job.payload.groupName,
       };
+      job.progressUpdatedAt = new Date().toISOString();
     }
   });
 }
@@ -566,35 +601,77 @@ export function getAutomationJobStatus(jobId: string): AutomationJobStatus | nul
   return jobs.find((row) => row.id === jobId)?.status ?? null;
 }
 
-/** Jobs stuck in running (browser hang) — fail so queue can continue. Keep outcomes. */
-export function failStaleRunningJobs(maxAgeMs: number): AutomationJobRecord[] {
+/** Progress penuh (N/N) tapi job tidak finish — hang setelah langkah terakhir. */
+export const PROGRESS_COMPLETE_STALL_MS = 3 * 60 * 1000;
+
+function countJoinDoneOutcomes(
+  outcomes: AutomationJobRecord['payload']['groupOutcomes'] | undefined,
+): number {
+  if (!outcomes?.length) return 0;
+  return outcomes.filter(
+    (r) => r.joinStatus === 'joined' || r.joinStatus === 'already_member',
+  ).length;
+}
+
+/** Ada job running? Watchdog tick supaya stale/stall tetap dicek meski antrian kosong. */
+export function hasRunningAutomationJobs(): boolean {
+  ensureLoaded();
+  return jobs.some((row) => row.status === 'running');
+}
+
+/** Ada queued siap dispatch? Watchdog harus hidup meski tidak ada running (Queued stuck). */
+export function hasQueuedReadyAutomationJobs(): boolean {
+  ensureLoaded();
+  return jobs.some((row) => row.status === 'queued' && !row.paused);
+}
+
+/**
+ * Jobs stuck in running (browser/sidecar hang) — fail so queue can continue. Keep outcomes.
+ * Juga fail jika progress sudah N/N tapi tidak finish (stall) — kasus Join "Process 18/18" hung.
+ */
+export function failStaleRunningJobs(
+  maxAgeMs: number,
+  progressCompleteStallMs: number = PROGRESS_COMPLETE_STALL_MS,
+): AutomationJobRecord[] {
   const failedJobs: AutomationJobRecord[] = [];
+  const now = Date.now();
   touchImmediate(() => {
     for (const job of jobs) {
       if (job.status !== 'running' || !job.startedAt) continue;
-      const age = Date.now() - new Date(job.startedAt).getTime();
-      if (age <= maxAgeMs) continue;
+      const age = now - new Date(job.startedAt).getTime();
+      const progress = job.progress;
+      const progressFull =
+        Boolean(progress) &&
+        progress!.total > 0 &&
+        progress!.current >= progress!.total;
+      const progressAt = job.progressUpdatedAt
+        ? new Date(job.progressUpdatedAt).getTime()
+        : new Date(job.startedAt).getTime();
+      const stalledAtFullProgress =
+        progressFull && now - progressAt > progressCompleteStallMs;
+
+      if (age <= maxAgeMs && !stalledAtFullProgress) continue;
+
       jobStopRequests.delete(job.id);
       job.status = 'failed';
       job.finishedAt = new Date().toISOString();
-      job.error = 'JOB_STALE_TIMEOUT';
+      job.error = stalledAtFullProgress ? 'JOB_PROGRESS_STALL' : 'JOB_STALE_TIMEOUT';
       const created =
         job.action === 'create_group'
           ? countCreatedGroupOutcomes(job.payload.groupOutcomes)
-          : 0;
-      job.message =
-        created > 0
-          ? `${created} group(s) created before stale timeout`
+          : job.action === 'join_by_invite_link'
+            ? countJoinDoneOutcomes(job.payload.groupOutcomes)
+            : Math.max(0, progress?.current ?? 0);
+      job.message = stalledAtFullProgress
+        ? `Progress ${progress!.current}/${progress!.total} but job did not finish — cancelled (hang)`
+        : created > 0
+          ? `${created} step(s) done before stale timeout`
           : 'Job exceeded maximum runtime — cancelled automatically';
-      if (created > 0) {
-        const total = Math.max(
-          1,
-          job.progress?.total ?? Math.floor(Number(job.payload.totalToCreate) || 1),
-        );
+      if (progress && progress.total > 0) {
         job.progress = {
-          current: Math.min(created, total),
-          total,
-          label: job.progress?.label ?? job.payload.groupNamePrefix ?? job.payload.groupName,
+          current: Math.min(Math.max(created, progress.current), progress.total),
+          total: progress.total,
+          label: progress.label ?? job.payload.groupNamePrefix ?? job.payload.groupName,
         };
       }
       markSessionSettleAfterJob(job.sessionId);
@@ -613,6 +690,7 @@ export function updateJobProgress(
     const job = jobs.find((row) => row.id === jobId);
     if (!job || job.status !== 'running') return;
     job.progress = progress;
+    job.progressUpdatedAt = new Date().toISOString();
   });
 }
 

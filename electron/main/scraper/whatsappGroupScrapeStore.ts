@@ -40,6 +40,9 @@ async function evaluateWhatsAppGroupFromStore(
   groupId: string,
   retryDelaysMs: number[],
 ): Promise<WhatsAppGroupScrapeStoreResult> {
+  if (!client.pupPage) {
+    throw new Error('WA_CLIENT_NOT_READY: WhatsApp browser session not initialized. Wait for login to finish.');
+  }
   return client.pupPage.evaluate(
     async (gid, delays: number[]) => {
     if (typeof window.WWebJS?.getChat !== 'function') {
@@ -128,7 +131,7 @@ async function evaluateWhatsAppGroupFromStore(
 
     async function trySyncChatHistory(gid: string): Promise<void> {
       try {
-        const chatModel = (await window.WWebJS.getChat(gid, { getAsModel: true })) as {
+        const chatModel = (await window.WWebJS?.getChat?.(gid, { getAsModel: true })) as {
           syncHistory?: () => Promise<unknown>;
         } | null;
         if (chatModel && typeof chatModel.syncHistory === 'function') {
@@ -207,6 +210,7 @@ async function evaluateWhatsAppGroupFromStore(
     }
 
     let isAdmin = false;
+    let isOwner = false;
     if (typeof chat.iAmAdmin === 'function') {
       try {
         isAdmin = Boolean(chat.iAmAdmin());
@@ -214,8 +218,14 @@ async function evaluateWhatsAppGroupFromStore(
         isAdmin = false;
       }
     }
-    if (!isAdmin && meEntry) {
-      isAdmin = Boolean(meEntry.isAdmin || meEntry.isSuperAdmin);
+    if (meEntry) {
+      isOwner = Boolean(meEntry.isSuperAdmin);
+      if (!isAdmin) {
+        isAdmin = Boolean(meEntry.isAdmin || meEntry.isSuperAdmin);
+      }
+    }
+    if (isOwner) {
+      isAdmin = true;
     }
 
     const ownerCount = participants.filter((p) => p.isSuperAdmin).length;
@@ -227,6 +237,7 @@ async function evaluateWhatsAppGroupFromStore(
       group_id: gid,
       group_name: groupName,
       is_admin: isAdmin ? ('yes' as const) : ('no' as const),
+      is_owner: isOwner ? ('yes' as const) : ('no' as const),
       member_count: memberCount,
       admin_count: adminCount,
       owner_count: ownerCount,

@@ -71,6 +71,9 @@ export function assertWhatsAppScrapeClient(client: Client | null | undefined): a
  * Chat yang sudah leave/delete tidak masuk (progress scrape = jumlah real saja).
  */
 async function listLiveWhatsAppGroupIdsFromStore(client: Client): Promise<string[]> {
+  if (!client.pupPage) {
+    throw new Error('WA_CLIENT_NOT_READY: WhatsApp browser session not initialized. Wait for login to finish.');
+  }
   return client.pupPage.evaluate(() => {
     const chats = window.require('WAWebCollections').Chat.getModelsArray();
     const getters = window.require('WAWebContactGetters');
@@ -102,7 +105,7 @@ async function listLiveWhatsAppGroupIdsFromStore(client: Client): Promise<string
           serialize?: () => Array<{ id?: unknown }>;
           getModelsArray?: () => unknown[];
           _models?: Array<{ serialize?: () => { id?: unknown } }>;
-          forEach?: (fn: (p: { serialize?: () => { id?: unknown } }) => void) => void;
+          forEach?: (fn: (p: { id?: unknown; serialize?: () => { id?: unknown } }) => void) => void;
         };
       };
     }): Array<{ id?: unknown }> {

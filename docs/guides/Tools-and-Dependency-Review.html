@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tools and Dependency Review</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.6; max-width: 920px; margin: 24px auto; color: #172b4d; }
+    h1 { font-size: 24px; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-top: 0; }
+    h2 { font-size: 18px; margin-top: 28px; color: #0052cc; border-bottom: 1px solid #dfe1e6; padding-bottom: 4px; }
+    table { border-collapse: collapse; width: 100%; max-width: 100%; margin: 12px 0 20px; font-size: 13px; table-layout: fixed; }
+    th, td { border: 1px solid #c1c7d0; padding: 8px 10px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+    th { background: #f4f5f7; font-weight: 600; }
+    .panel { border-radius: 4px; padding: 12px 14px; margin: 16px 0; border-left: 4px solid; }
+    .info { background: #deebff; border-color: #0052cc; }
+    .panel-title { font-weight: 700; margin-bottom: 6px; }
+    .ready { color: #00875a; font-weight: 600; }
+    ul { margin: 8px 0 16px; padding-left: 24px; }
+    li { margin: 4px 0; }
+    code { background: #f4f5f7; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    .doc-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #dfe1e6; font-size: 12px; color: #5e6c84; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<h1>Tools and Dependency Review</h1>
+
+<div class="panel info">
+  <div class="panel-title">Document information</div>
+  <table>
+    <tr><th>Scope</th><td>Telegram integration into GM Apps</td></tr>
+    <tr><th>Tools</th><td>GM Apps (Group Monitoring)</td></tr>
+  </table>
+</div>
+
+<h2>1. Python Runtime Dependencies</h2>
+<p>Installed via <code>python-sidecar/requirements.txt</code>, using <code>py -3 -m pip install -r python-sidecar/requirements.txt</code>.</p>
+<table>
+  <thead><tr><th>Library</th><th>Version</th><th>Purpose</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>telethon</td><td>&gt;=1.36.0</td><td>Telegram client, core of the sidecar</td><td class="ready">Ready</td></tr>
+    <tr><td>fastapi</td><td>&gt;=0.115.0</td><td>HTTP server the sidecar exposes to the Electron app</td><td class="ready">Ready</td></tr>
+    <tr><td>uvicorn[standard]</td><td>&gt;=0.32.0</td><td>ASGI server that runs FastAPI</td><td class="ready">Ready</td></tr>
+    <tr><td>python-dotenv</td><td>&gt;=1.0.0</td><td>Loads environment configuration</td><td class="ready">Ready</td></tr>
+    <tr><td>qrcode[pil]</td><td>&gt;=8.0</td><td>Generates QR codes for login where needed</td><td class="ready">Ready</td></tr>
+    <tr><td>openpyxl</td><td>&gt;=3.1.5</td><td>Excel export helpers</td><td class="ready">Ready</td></tr>
+    <tr><td>httpx</td><td>&gt;=0.27.0</td><td>HTTP client used inside the sidecar</td><td class="ready">Ready</td></tr>
+    <tr><td>supabase</td><td>&gt;=2.10.0</td><td>Sidecar-side Supabase access</td><td class="ready">Ready</td></tr>
+  </tbody>
+</table>
+
+<h2>2. Build and Packaging</h2>
+<table>
+  <thead><tr><th>Tool</th><th>Purpose</th><th>Setup notes</th></tr></thead>
+  <tbody>
+    <tr><td>PyInstaller (onefile)</td><td>Bundles the sidecar into a single executable</td><td>Runs inside a dedicated build venv, output is <code>rm-telegram-sidecar.exe</code> on Windows, <code>rm-telegram-sidecar</code> on macOS/Linux</td></tr>
+    <tr><td><code>npm run build:sidecar</code></td><td>Triggers the full sidecar build (<code>scripts/build-telegram-sidecar.mjs</code>)</td><td>Auto-detects the host Python (<code>python3</code>/<code>python</code> on macOS/Linux, <code>python</code>/<code>py -3</code> on Windows), or uses the <code>PYTHON</code> environment variable if set</td></tr>
+    <tr><td><code>npm run setup:python</code></td><td>Installs Python dependencies for local development</td><td>Runs <code>pip install -r python-sidecar/requirements.txt</code></td></tr>
+  </tbody>
+</table>
+
+<h2>3. Installer Bundling</h2>
+<p>The built sidecar binary is copied into <code>resources/sidecar/</code> and packaged inside the installer alongside the main Electron app, same installer for Windows, macOS, and Linux. No separate installation step is needed on the user's side.</p>
+
+<h2>4. Overall Readiness</h2>
+<p>All dependencies are pinned with minimum versions, the build pipeline is scripted end to end (<code>build:sidecar</code>), and the sidecar is already bundled into the shipped installer. <span class="ready">Ready</span> for Telegram integration, no additional tooling required before implementation.</p>
+
+<p class="doc-footer">Tools and Dependency Review</p>
+
+</body>
+</html>

@@ -8,22 +8,6 @@ export function getBrandGroupPhotosDir(): string {
   return path.join(app.getPath('userData'), 'brand-group-photos');
 }
 
-function findCaseInsensitiveFileName(
-  dir: string,
-  baseName: string,
-  extensions: readonly string[],
-): string | null {
-  if (!fs.existsSync(dir)) return null;
-  const baseLower = baseName.toLowerCase();
-  for (const file of fs.readdirSync(dir)) {
-    const ext = path.extname(file).toLowerCase();
-    if (!extensions.includes(ext)) continue;
-    const stem = path.basename(file, path.extname(file));
-    if (stem.toLowerCase() === baseLower) return file;
-  }
-  return null;
-}
-
 function resolveBrandPhotoStorageDir(brandName: string): string {
   const base = sanitizeBrandPhotoBaseName(brandName);
   const root = getBrandGroupPhotosDir();

@@ -36,7 +36,6 @@ import {
 import {
   clearScrapeCheckpoint,
   loadScrapeCheckpoint,
-  mergeCheckpointRows,
   saveScrapeCheckpoint,
 } from './scrapeCheckpoint';
 import type { ScrapedGroupRow } from './index';

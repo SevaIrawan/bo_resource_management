@@ -2,16 +2,14 @@ import { isScrapeActiveForSession } from '../scraper/scrapeCancel';
 import { isAutoScrapeActiveForSession } from '../scraper/autoScrapeCancel';
 import { isSessionSettling, markSessionSettleAfterJob } from './jobQueueSettle';
 import { accountJobStepTotal } from './jobQueueBatchHelpers';
+import { releaseExecuteSlot, waitForExecuteSlot } from './executeSlotPool';
+import { forceReleaseAutomationAccountLock } from './automationAccountLock';
 import { runAutomationAction, withAutomationAccountLock } from './index';
 import type { AutomationJobRecord } from './jobQueueTypes';
 import type { AutomationRunPayload, AutomationRunResult } from './types';
 import { runTelegramCreateGroupBatch } from './tgAutomationClient';
 import { runWhatsAppCreateGroupBatch } from './waAutomation';
 import { withJobTimeoutSettle } from './promiseTimeout';
-import {
-  releaseExecuteSlot,
-  waitForExecuteSlot,
-} from './executeSlotPool';
 import {
   countCreatedGroupOutcomes,
   filterGroupsNotDone,
@@ -27,6 +25,8 @@ import {
   getAutomationJobStatus,
   getJobQueueSnapshot,
   getRunnerState,
+  hasQueuedReadyAutomationJobs,
+  hasRunningAutomationJobs,
   markJobFinished,
   markJobRunning,
   peekJobStopRequest,
@@ -42,8 +42,12 @@ import { clearScrapeCheckpoint } from '../scraper/scrapeCheckpoint';
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let tickInProgress = false;
 let tickPending = false;
+/** Watchdog: stale/stall tetap dicek meski antrian kosong (job hung Process N/N). */
+let runningWatchdogTimer: ReturnType<typeof setInterval> | null = null;
 
 const STALE_RUNNING_MS = 90 * 60 * 1000;
+/** Interval cek job running yang hung — tanpa ini failStale tidak jalan lagi. */
+const RUNNING_WATCHDOG_MS = 30_000;
 
 const JOB_TIMEOUT_BASE_MS: Record<string, number> = {
   join_by_invite_link: 20 * 60 * 1000,
@@ -352,7 +356,11 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
       createResume?.alreadyCreated ??
       (job.action === 'create_group'
         ? countCreatedGroupOutcomes(job.payload.groupOutcomes)
-        : Math.max(0, job.progress?.current ?? 0));
+        : Math.max(
+            0,
+            countDoneOutcomesForAction(job.action, job.payload.groupOutcomes) ||
+              (job.progress?.current ?? 0),
+          ));
 
     if (createResume && createResume.remaining <= 0 && createResume.alreadyCreated > 0) {
       markJobFinished(job.id, 'completed', {
@@ -361,6 +369,27 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
         groupOutcomes: job.payload.groupOutcomes,
       });
       tryAutoEnqueueSetPhotoAfterCreate(job);
+      return;
+    }
+
+    // Join/set_admin/…: semua step sudah done di outcomes — Completed tanpa panggil device lagi.
+    if (
+      job.action !== 'create_group' &&
+      stepTotal > 0 &&
+      countDoneOutcomesForAction(job.action, job.payload.groupOutcomes) >= stepTotal
+    ) {
+      const done = countDoneOutcomesForAction(job.action, job.payload.groupOutcomes);
+      markJobFinished(job.id, 'completed', {
+        message:
+          job.action === 'join_by_invite_link'
+            ? `Success ${done} group(s)`
+            : `${done}/${stepTotal} done`,
+        batchSuccess: done,
+        groupOutcomes: job.payload.groupOutcomes,
+      });
+      if (job.action === 'join_by_invite_link') {
+        tryRequestScrapeAfterJoin(job, done);
+      }
       return;
     }
 
@@ -471,7 +500,17 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
     const success =
       job.action === 'create_group'
         ? countCreatedGroupOutcomes(groupOutcomes)
-        : batchSuccessCount(result, job);
+        : job.action === 'join_by_invite_link' ||
+            job.action === 'set_admin' ||
+            job.action === 'set_group_photo' ||
+            job.action === 'leave_group' ||
+            job.action === 'delete_group' ||
+            job.action === 'exit_delete_group'
+          ? Math.max(
+              countDoneOutcomesForAction(job.action, groupOutcomes),
+              batchSuccessCount(result, job) + progressOffsetFromOutcomes(job),
+            )
+          : batchSuccessCount(result, job);
     const total = stepTotal;
     const message =
       job.action === 'create_group'
@@ -479,7 +518,7 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
         : (result.message ?? (batch ? `${success}/${total} created` : 'OK'));
 
     updateJobProgress(job.id, {
-      current: success,
+      current: Math.min(success, total),
       total,
       label: job.payload.groupName ?? job.accountName,
     });
@@ -533,6 +572,8 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
     tryAutoEnqueueSetPhotoAfterCreate(job);
     clearScrapeCheckpointAfterLeaveDelete(job);
     tryAutoEnqueueDeleteAfterExit(job);
+    // Partial join tetap scrape supaya Missing turun untuk yang sudah join.
+    tryRequestScrapeAfterJoin(job, success);
   } catch (error) {
     if (getAutomationJobStatus(job.id) === 'running') {
       // Outcomes mid-batch sudah di-attach ke job.payload — jangan buang saat exception.
@@ -543,20 +584,28 @@ async function runSingleJob(job: AutomationJobRecord): Promise<void> {
         job.action === 'create_group'
           ? countCreatedGroupOutcomes(partialOutcomes)
           : 0;
+      const joined =
+        job.action === 'join_by_invite_link'
+          ? countDoneOutcomesForAction(job.action, partialOutcomes)
+          : 0;
+      const partialDone = Math.max(created, joined);
       markJobFinished(job.id, 'failed', {
         error: humanizeJobError(
           error instanceof Error ? error.message : 'AUTOMATION_EXCEPTION',
         ),
-        batchSuccess: created > 0 ? created : undefined,
+        batchSuccess: partialDone > 0 ? partialDone : undefined,
         ...(partialOutcomes?.length ? { groupOutcomes: partialOutcomes } : {}),
         message:
           created > 0
             ? `${created} group(s) created before error`
-            : undefined,
+            : joined > 0
+              ? `Success ${joined} group(s) before error`
+              : undefined,
       });
       tryAutoEnqueueSetPhotoAfterCreate(job);
       clearScrapeCheckpointAfterLeaveDelete(job);
       tryAutoEnqueueDeleteAfterExit(job);
+      tryRequestScrapeAfterJoin(job, joined);
     }
   } finally {
     markSessionSettleAfterJob(job.sessionId);
@@ -646,11 +695,15 @@ async function runnerTick(): Promise<void> {
 
   tickInProgress = true;
   try {
+    ensureRunningJobsWatchdog();
+
     if (getRunnerState() === 'paused') return;
 
     const staleFailed = failStaleRunningJobs(STALE_RUNNING_MS);
     if (staleFailed.length > 0) {
       for (const stale of staleFailed) {
+        releaseExecuteSlot(stale.accountId);
+        forceReleaseAutomationAccountLock(stale.sessionId);
         tryAutoEnqueueSetPhotoAfterCreate(stale);
         clearScrapeCheckpointAfterLeaveDelete(stale);
         tryAutoEnqueueDeleteAfterExit(stale);
@@ -659,7 +712,13 @@ async function runnerTick(): Promise<void> {
     }
 
     const candidates = pickQueuedJobsForDispatch();
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) {
+      // Queued ada tapi terblokir slot/settle/scrape — tetap retry (jangan diam selamanya).
+      if (hasQueuedReadyAutomationJobs()) {
+        scheduleRunnerRetry(1500);
+      }
+      return;
+    }
 
     for (const job of candidates) {
       if (
@@ -681,6 +740,28 @@ async function runnerTick(): Promise<void> {
       tickPending = false;
       void runnerTick();
     }
+    ensureRunningJobsWatchdog();
+  }
+}
+
+/** Tanpa ini: antrian kosong + job hung → runnerTick berhenti → stale 90m tidak pernah jalan.
+ *  Juga: Queued siap tapi slot penuh/settle → harus tetap tick. */
+function ensureRunningJobsWatchdog(): void {
+  const needs = hasRunningAutomationJobs() || hasQueuedReadyAutomationJobs();
+  if (needs && !runningWatchdogTimer) {
+    runningWatchdogTimer = setInterval(() => {
+      if (!hasRunningAutomationJobs() && !hasQueuedReadyAutomationJobs()) {
+        if (runningWatchdogTimer) {
+          clearInterval(runningWatchdogTimer);
+          runningWatchdogTimer = null;
+        }
+        return;
+      }
+      scheduleRunnerTick(0);
+    }, RUNNING_WATCHDOG_MS);
+  } else if (!needs && runningWatchdogTimer) {
+    clearInterval(runningWatchdogTimer);
+    runningWatchdogTimer = null;
   }
 }
 

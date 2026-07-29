@@ -277,6 +277,5 @@ export async function runWaLeaveGroup(
         result: { success, total, left, notFound, failed, groupOutcomes },
       };
     },
-    { purpose: 'operation' },
   );
 }

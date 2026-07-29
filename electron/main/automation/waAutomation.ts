@@ -1022,7 +1022,6 @@ export async function runWhatsAppCreateGroupBatch(
         result: { success: created, total: totalTarget, failed, groupOutcomes },
       };
     },
-    { purpose: 'operation' },
   );
 }
 
@@ -1137,7 +1136,6 @@ export async function runWhatsAppAutomation(
           result: { success, total: joinGroups.length, failed, groupOutcomes },
         };
       },
-      { purpose: 'operation' },
     );
   }
 
@@ -1217,7 +1215,6 @@ export async function runWhatsAppAutomation(
           result: { success, total: adminGroups.length, failed, groupOutcomes },
         };
       },
-      { purpose: 'operation' },
     );
   }
 
@@ -1245,6 +1242,5 @@ export async function runWhatsAppAutomation(
         errorCode: 'UNKNOWN_ACTION',
       };
     },
-    { purpose: 'operation' },
   );
 }

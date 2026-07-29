@@ -38,14 +38,18 @@ const checks = [
       !modal.includes('stockStatus'),
   },
   {
-    name: 'Matrix filter kolom Acc Yes/No/All + empty back',
+    name: 'Matrix filter kolom Acc + Super Group Yes/No/All + empty back',
     ok:
       matrix.includes('showFilteredEmpty') &&
       matrix.includes('ReportingTableShell') &&
       matrix.includes('join-report-table__filter-empty-btn') &&
       matrix.includes('onColumnFilterChange(null)') &&
+      matrix.includes('SuperGroupColumnHeader') &&
+      matrix.includes("kind: 'superGroup'") &&
       modal.includes('filterReportingMatrixRows') &&
-      modal.includes('columnFilter={columnFilter}'),
+      modal.includes('columnFilter={columnFilter}') &&
+      read('src/lib/reportingMatrixColumn.ts').includes("kind: 'superGroup'") &&
+      read('src/lib/reportingMatrixColumn.ts').includes('isTelegramSuperGroupId'),
   },
   {
     name: 'Matrix filter empty: i18n matrixFilterClear',

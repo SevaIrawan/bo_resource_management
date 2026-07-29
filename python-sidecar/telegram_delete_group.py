@@ -1,4 +1,4 @@
-"""Delete / clear Telegram group chat — owner DeleteChannel atau hapus dialog lokal."""
+"""Delete / clear Telegram group — Channel + basic Chat (owner vs dialog lokal)."""
 
 from __future__ import annotations
 
@@ -12,10 +12,11 @@ from telethon.errors import (
     UserCreatorError,
     UserNotParticipantError,
 )
-from telethon.tl.functions.channels import DeleteChannelRequest
-from telethon.tl.functions.messages import DeleteHistoryRequest
+from telethon.tl.functions.channels import DeleteChannelRequest, GetParticipantRequest
+from telethon.tl.functions.messages import DeleteChatRequest, DeleteHistoryRequest, GetFullChatRequest
+from telethon.tl.types import Chat, ChatParticipantCreator
 
-from telegram_automation import _peer_group_id, _prepare_session, _resolve_group_entity
+from telegram_automation import _basic_chat_id, _peer_group_id, _prepare_session, _resolve_group_entity
 from telegram_human_delay import (
     flood_wait_seconds,
     max_floodwait_auto_sleep,
@@ -33,9 +34,20 @@ def _err(action: str, message: str, *, error_code: str = "AUTOMATION_FAILED") ->
 
 
 async def _is_creator(client, entity, me) -> bool:
-    try:
-        from telethon.tl.functions.channels import GetParticipantRequest
+    if isinstance(entity, Chat):
+        try:
+            full = await client(GetFullChatRequest(chat_id=_basic_chat_id(entity)))
+            participants = getattr(full.full_chat, "participants", None)
+            for p in getattr(participants, "participants", []) or []:
+                if getattr(p, "user_id", None) != me.id:
+                    continue
+                if isinstance(p, ChatParticipantCreator):
+                    return True
+        except Exception:  # noqa: BLE001
+            return False
+        return False
 
+    try:
         part = await client(GetParticipantRequest(entity, me))
         return part.participant.__class__.__name__ in ("ChannelParticipantCreator",)
     except Exception:  # noqa: BLE001
@@ -147,6 +159,16 @@ async def run_delete_group(
                         "delete_group requires owner/creator (require_owner=true)",
                         error_code="TG_NOT_OWNER",
                     )
+                if isinstance(entity, Chat):
+                    await client(DeleteChatRequest(chat_id=_basic_chat_id(entity)))
+                    return _ok(
+                        action,
+                        {
+                            "group_id": gid,
+                            "outcome": "deleted_chat",
+                            "creator": True,
+                        },
+                    )
                 await client(DeleteChannelRequest(channel=entity))
                 return _ok(
                     action,
@@ -185,5 +207,24 @@ async def run_delete_group(
                 return _err(action, f"FloodWait {exc.seconds}s exceeds cap {cap}s", error_code="FLOOD_WAIT")
             await asyncio.sleep(flood_wait_seconds(delay_cfg, exc.seconds))
             return _err(action, f"FloodWait {exc.seconds}s — retry job", error_code="FLOOD_WAIT_RETRY")
+        except TypeError as cast_exc:
+            msg = str(cast_exc).lower()
+            if require_owner and ("inputpeerchat" in msg or "inputchannel" in msg):
+                try:
+                    chat_id = getattr(entity, "id", None)
+                    if chat_id is None:
+                        raise cast_exc
+                    await client(DeleteChatRequest(chat_id=abs(int(chat_id))))
+                    return _ok(
+                        action,
+                        {
+                            "group_id": gid,
+                            "outcome": "deleted_chat",
+                            "creator": True,
+                        },
+                    )
+                except Exception as retry_exc:  # noqa: BLE001
+                    return _err(action, str(retry_exc) or str(cast_exc) or "delete failed")
+            return _err(action, str(cast_exc) or "delete failed")
         except Exception as exc:  # noqa: BLE001
             return _err(action, str(exc) or "delete failed")

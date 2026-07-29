@@ -12,7 +12,6 @@ import type {
 
 const { Client } = pkg;
 
-const WA_LEAVE_STEP_TIMEOUT_MS = 90_000;
 const WA_WIPE_TIMEOUT_MS = 45_000;
 const WA_STEP_GAP_MS = 1_500;
 
@@ -114,6 +113,5 @@ export async function runWaExitDeleteGroup(
         result: { success: exited, total, left, deleted, failed },
       };
     },
-    { purpose: 'operation' },
   );
 }

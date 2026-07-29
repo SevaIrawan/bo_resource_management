@@ -87,6 +87,8 @@ const checks = [
         tgScrape.includes('FloodWaitError') &&
         tgScrape.includes('scrape_between_groups_sec') &&
         tgScrape.includes('is_admin=bool(is_admin_flag)') &&
+        tgScrape.includes('"is_owner"') &&
+        tgScrape.includes('_my_group_roles') &&
         tgScrape.includes('utils.get_peer_id')
       );
     })(),
@@ -169,17 +171,73 @@ const checks = [
     })(),
   },
   {
-    name: 'TG set admin: phone normalize + FloodWait retry',
+    name: 'TG set admin: phone normalize + FloodWait retry + basic Chat EditChatAdmin',
     ok:
       tgAuto.includes('_normalize_set_admin_target') &&
-      tgAuto.includes('FloodWait retry failed'),
+      tgAuto.includes('FloodWait retry failed') &&
+      tgAuto.includes('_promote_group_admin') &&
+      tgAuto.includes('EditChatAdminRequest') &&
+      tgAuto.includes('GetFullChatRequest') &&
+      tgAuto.includes('_participant_is_admin') &&
+      tgAuto.includes('isinstance(entity, Chat)'),
+  },
+  {
+    name: 'TG leave/delete: basic Chat + Channel (bukan LeaveChannel-only)',
+    ok: (() => {
+      const leave = read('python-sidecar/telegram_leave_group.py');
+      const del = read('python-sidecar/telegram_delete_group.py');
+      return (
+        leave.includes('DeleteChatUserRequest') &&
+        leave.includes('isinstance(entity, Chat)') &&
+        del.includes('DeleteChatRequest') &&
+        del.includes('GetFullChatRequest') &&
+        del.includes('isinstance(entity, Chat)')
+      );
+    })(),
+  },
+  {
+    name: 'TG join: 1× transport retry + cancel tanpa forceRelease account lock',
+    ok: (() => {
+      const tgClient = read('electron/main/automation/tgAutomationClient.ts');
+      const ipc = read('electron/main/automation/index.ts');
+      const cancelBlock = ipc.slice(
+        ipc.indexOf("jobQueue:cancel"),
+        ipc.indexOf("jobQueue:run"),
+      );
+      return (
+        tgClient.includes('isJoinTransportError') &&
+        tgClient.includes('Retry network') &&
+        cancelBlock.includes('releaseExecuteSlot') &&
+        !cancelBlock.includes('forceReleaseAutomationAccountLock')
+      );
+    })(),
   },
   {
     name: 'Scrape → daily atomik rm_commit_account_scrape + invite_link kolom',
     ok:
       accountScraper.includes('invite_link: group.invite_link') &&
       accountScraper.includes("rpc('rm_commit_account_scrape'") &&
-      accountScraper.includes('invalidateMasterDailyCacheForScrape'),
+      accountScraper.includes('invalidateMasterDailyCacheForScrape') &&
+      accountScraper.includes('is_owner:'),
+  },
+  {
+    name: 'Daily is_owner (TG-03): kolom daily + scrape TG/WA + bukan master',
+    ok: (() => {
+      const mig = read('supabase/migrations/039_rm_daily_is_owner.sql');
+      const cols = read('src/config/groupScrapeColumns.ts');
+      const waStore = read('electron/main/scraper/whatsappGroupScrapeStore.ts');
+      const masterCols = read('src/config/masterGroupColumns.ts');
+      return (
+        mig.includes('ADD COLUMN IF NOT EXISTS is_owner') &&
+        mig.includes('is_owner,') &&
+        mig.includes("owner_implies_admin") &&
+        cols.includes("'is_owner'") &&
+        tgScrape.includes('_my_group_roles') &&
+        tgScrape.includes('"is_owner"') &&
+        waStore.includes('is_owner:') &&
+        !masterCols.includes('is_owner')
+      );
+    })(),
   },
   {
     name: 'runAccountScraper: Electron scrape → writeScrapeDailyRows',

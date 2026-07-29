@@ -12,6 +12,7 @@ export const GROUP_SCRAPE_COLUMNS = [
   'admin_count',
   'member_count',
   'is_admin',
+  'is_owner',
   'platform',
   'scrape_date',
   'scraped_at',

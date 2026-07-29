@@ -11,7 +11,6 @@ import {
   HUMAN_SETTLE_SHORT_MS,
   isRetryableNetworkError,
   NETWORK_RETRY_ATTEMPTS,
-  withNetworkRetry,
 } from '../lib/networkRetry';
 import { withWaBrowserSlot } from './waBrowserPool';
 import { withWaAutoScrapeBrowserSlot } from './waAutoScrapeBrowserPool';

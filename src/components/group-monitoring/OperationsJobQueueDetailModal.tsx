@@ -15,6 +15,7 @@ import { accountPlatformSubtitle } from '@/lib/platformSyncCopy';
 import {
   jobQueueViewMetaText,
   jobQueueViewSubtitle,
+  jobQueueViewSuperGroupLabel,
   jobQueueViewTableColumnIds,
   jobQueueViewTableColumnLabel,
   jobQueueViewTableRows,
@@ -65,6 +66,8 @@ function cellValue(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumnI
       return row.groupName;
     case 'groupId':
       return row.groupId;
+    case 'superGroup':
+      return row.superGroup ?? '—';
     case 'inviteLink':
       return row.inviteLink;
     case 'targetJoin':
@@ -82,7 +85,14 @@ function cellValue(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumnI
   }
 }
 
-function renderCell(row: JobQueueViewTableRow, columnId: JobQueueViewTableColumnId) {
+function renderCell(
+  row: JobQueueViewTableRow,
+  columnId: JobQueueViewTableColumnId,
+  t: (key: string) => string,
+) {
+  if (columnId === 'superGroup') {
+    return jobQueueViewSuperGroupLabel(row, t);
+  }
   const value = cellValue(row, columnId);
   if (columnId === 'inviteLink' && value.startsWith('http')) {
     return (
@@ -231,7 +241,7 @@ export function OperationsJobQueueDetailModal({
                           className={cellClassName(columnId)}
                           title={cellValue(row, columnId)}
                         >
-                          {renderCell(row, columnId)}
+                          {renderCell(row, columnId, t)}
                         </td>
                       ))}
                     </tr>

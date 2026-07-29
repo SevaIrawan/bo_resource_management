@@ -6,6 +6,7 @@ import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { OperationsStockDetailRow } from '@/lib/loadOperationsStockBucketDetails';
 import { REPORTING_STOCK_EXPORT_LABEL } from '@/lib/reportingStockStatus';
 import type { GroupStockBucket } from '@/types/groupStock';
+import { telegramSuperGroupYesNo } from '@/lib/telegramGroupKind';
 import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
@@ -65,7 +66,9 @@ export function exportGroupLinksExcel(input: {
   accountName: string;
   rows: AccountGroupLinkRow[];
   viewMode?: GroupLinksViewMode;
+  platform?: 'whatsapp' | 'telegram';
 }) {
+  const showSuper = input.platform === 'telegram';
   const sheet =
     input.viewMode === 'account'
       ? XLSX.utils.json_to_sheet(
@@ -73,9 +76,13 @@ export function exportGroupLinksExcel(input: {
             No: index + 1,
             'Group Name': row.groupName,
             'Group ID': row.groupId,
+            ...(showSuper
+              ? { 'Super Group': telegramSuperGroupYesNo(row.groupId) }
+              : {}),
             'Member Count': row.memberCount,
             'Admin Count': row.adminCount,
             'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
+            'Is Owner': row.isOwner === 'yes' ? 'Yes' : 'No',
             'Invite Link': row.inviteLink ?? '',
           })),
         )
@@ -83,8 +90,12 @@ export function exportGroupLinksExcel(input: {
           input.rows.map((row) => ({
             'Group Name': row.groupName,
             'Group ID': row.groupId,
+            ...(showSuper
+              ? { 'Super Group': telegramSuperGroupYesNo(row.groupId) }
+              : {}),
             'Group/Invite Link': row.inviteLink ?? '',
             'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
+            'Is Owner': row.isOwner === 'yes' ? 'Yes' : 'No',
             'In master': row.inMaster ? 'Yes' : 'No',
           })),
         );
@@ -183,6 +194,7 @@ export function exportReportingDailyExcel(input: {
       'Member Count': row.memberCount,
       'Admin Count': row.adminCount,
       'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
+      'Is Owner': row.isOwner === 'yes' ? 'Yes' : 'No',
       'Group Link': row.inviteLink ?? '',
       Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'review'],
     })),
@@ -205,6 +217,7 @@ export function exportReportingAdminDailyExcel(input: {
       'Group Link': row.inviteLink ?? '',
       Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'review'],
       'Is Admin': row.isAdmin === 'yes' ? 'Yes' : 'No',
+      'Is Owner': row.isOwner === 'yes' ? 'Yes' : 'No',
     })),
   );
   const workbook = XLSX.utils.book_new();
@@ -225,6 +238,9 @@ export function exportReportingMatrixExcel(input: {
         No: index + 1,
         'Group Name': row.groupName,
         'Group ID': row.groupId,
+        ...(input.meta.platform === 'telegram'
+          ? { 'Super Group': telegramSuperGroupYesNo(row.groupId) }
+          : {}),
         'Group Link': row.inviteLink ?? '',
         Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'review'],
       };
@@ -261,7 +277,7 @@ export function exportJobQueueViewExcel(input: {
     input.rows.map((row) => {
       const record: Record<string, string> = {};
       input.columns.forEach((col, index) => {
-        record[input.columnLabels[index]] = row[col];
+        record[input.columnLabels[index]] = String(row[col] ?? '—');
       });
       return record;
     }),

@@ -34,8 +34,8 @@ const statusFn = fnBlock(tgPy, 'get_telegram_status');
 
 const checks = [
   {
-    name: 'Sidecar API version 4 (restart sidecar lama)',
-    ok: sidecarTs.includes('SIDECAR_VERSION = 4') && mainPy.includes('"version": 4'),
+    name: 'Sidecar API version 6 (restart sidecar lama)',
+    ok: sidecarTs.includes('SIDECAR_VERSION = 6') && mainPy.includes('"version": 6'),
   },
   {
     name: 'Export session reconnect jika disconnected',
@@ -44,6 +44,41 @@ const checks = [
       tgPy.includes('_force_reconnect') &&
       tgPy.includes('serialize session TIDAK bergantung get_me') &&
       tgPy.includes('Cannot send request while disconnected'),
+  },
+  {
+    name: 'Restore reuse client ready (hindari AUTH_KEY_DUPLICATED dual connect)',
+    ok:
+      tgPy.includes('restore_reuse') &&
+      tgPy.includes('receive_updates=False') &&
+      tgPy.includes('_is_auth_key_dead_message') &&
+      tgPy.includes('AUTH_KEY_DUPLICATED'),
+  },
+  {
+    name: 'Scrape tidak restore ulang jika session already ready',
+    ok: (() => {
+      const scrapePy = read('python-sidecar/telegram_scraper.py');
+      return (
+        scrapePy.includes('need_restore') &&
+        scrapePy.includes('session.status != "ready"') &&
+        scrapePy.includes('AUTH_KEY_DUPLICATED')
+      );
+    })(),
+  },
+  {
+    name: 'Validate: AuthKeyDuplicated ≠ SESSION_WARM_PENDING (kode TG_AUTH_KEY_DUPLICATED)',
+    ok: (() => {
+      const scrapePy = read('python-sidecar/telegram_scraper.py');
+      const ui = read('src/lib/scrapeErrorUi.ts');
+      return (
+        scrapePy.includes('_is_session_warm_pending_message') &&
+        scrapePy.includes('TG_AUTH_KEY_DUPLICATED') &&
+        scrapePy.includes('_is_auth_key_dead_message(msg)') &&
+        !/if "not ready" in lower or "connect" in lower or "timeout" in lower/.test(scrapePy) &&
+        ui.includes('isTelegramAuthKeyDeadMessage') &&
+        ui.includes('SCRAPER_TG_AUTH_KEY_DUPLICATED') &&
+        read('src/i18n/locales/en.ts').includes('tgAuthKeyDuplicated')
+      );
+    })(),
   },
   {
     name: 'Finalize QR tidak cancel wait_task',

@@ -11,6 +11,7 @@ import type {
 import { cn } from '@/lib/utils';
 import type { JoinGroupMatrixRow, ReportingAccountRef } from '@/lib/loadJoinGroupReport';
 import type { ReportingStockStatusFilter } from '@/lib/filterReportingStockStatus';
+import { telegramSuperGroupLabel, telegramSuperGroupYesNo } from '@/lib/telegramGroupKind';
 
 export type ReportingMatrixMode = 'join' | 'admin';
 
@@ -19,6 +20,8 @@ interface ReportingJoinMatrixTableProps {
   accounts: ReportingAccountRef[];
   brandName: string;
   mode?: ReportingMatrixMode;
+  /** Telegram only — kolom Super Group dari Group ID (-100…). */
+  showSuperGroupColumn?: boolean;
   pageOffset?: number;
   columnFilter: ReportingMatrixColumnFilter;
   onColumnFilterChange: (filter: ReportingMatrixColumnFilter) => void;
@@ -28,23 +31,20 @@ interface ReportingJoinMatrixTableProps {
   onClearStockStatusFilter?: () => void;
 }
 
-function AccountColumnHeader({
-  accountId,
+function MatrixYesNoFilterHeader({
   label,
-  columnFilter,
-  onColumnFilterChange,
+  isActive,
+  activeValue,
+  onApply,
 }: {
-  accountId: string;
   label: string;
-  columnFilter: ReportingMatrixColumnFilter;
-  onColumnFilterChange: (filter: ReportingMatrixColumnFilter) => void;
+  isActive: boolean;
+  activeValue: ReportingMatrixColumnFilterValue | null;
+  onApply: (value: ReportingMatrixColumnFilterValue | null) => void;
 }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-
-  const isActive = columnFilter?.accountId === accountId;
-  const activeValue = isActive ? columnFilter.value : null;
 
   useEffect(() => {
     if (!open) return;
@@ -57,11 +57,7 @@ function AccountColumnHeader({
   }, [open]);
 
   const apply = (value: ReportingMatrixColumnFilterValue | null) => {
-    if (value === null) {
-      onColumnFilterChange(null);
-    } else {
-      onColumnFilterChange({ accountId, value });
-    }
+    onApply(value);
     setOpen(false);
   };
 
@@ -86,7 +82,10 @@ function AccountColumnHeader({
       >
         <span>{label}</span>
         <ChevronDown
-          className={cn('join-report-table__account-filter-icon', open && 'join-report-table__account-filter-icon--open')}
+          className={cn(
+            'join-report-table__account-filter-icon',
+            open && 'join-report-table__account-filter-icon--open',
+          )}
           aria-hidden
         />
       </button>
@@ -116,11 +115,69 @@ function AccountColumnHeader({
   );
 }
 
+function AccountColumnHeader({
+  accountId,
+  label,
+  columnFilter,
+  onColumnFilterChange,
+}: {
+  accountId: string;
+  label: string;
+  columnFilter: ReportingMatrixColumnFilter;
+  onColumnFilterChange: (filter: ReportingMatrixColumnFilter) => void;
+}) {
+  const isActive = columnFilter?.kind === 'account' && columnFilter.accountId === accountId;
+  const activeValue = isActive ? columnFilter.value : null;
+
+  return (
+    <MatrixYesNoFilterHeader
+      label={label}
+      isActive={isActive}
+      activeValue={activeValue}
+      onApply={(value) => {
+        if (value === null) {
+          onColumnFilterChange(null);
+        } else {
+          onColumnFilterChange({ kind: 'account', accountId, value });
+        }
+      }}
+    />
+  );
+}
+
+function SuperGroupColumnHeader({
+  columnFilter,
+  onColumnFilterChange,
+}: {
+  columnFilter: ReportingMatrixColumnFilter;
+  onColumnFilterChange: (filter: ReportingMatrixColumnFilter) => void;
+}) {
+  const { t } = useLanguage();
+  const isActive = columnFilter?.kind === 'superGroup';
+  const activeValue = isActive ? columnFilter.value : null;
+
+  return (
+    <MatrixYesNoFilterHeader
+      label={t('groupMonitoring.reporting.colSuperGroup')}
+      isActive={isActive}
+      activeValue={activeValue}
+      onApply={(value) => {
+        if (value === null) {
+          onColumnFilterChange(null);
+        } else {
+          onColumnFilterChange({ kind: 'superGroup', value });
+        }
+      }}
+    />
+  );
+}
+
 export function ReportingJoinMatrixTable({
   rows,
   accounts,
   brandName,
   mode = 'join',
+  showSuperGroupColumn = false,
   pageOffset = 0,
   columnFilter,
   onColumnFilterChange,
@@ -130,11 +187,12 @@ export function ReportingJoinMatrixTable({
   onClearStockStatusFilter,
 }: ReportingJoinMatrixTableProps) {
   const { t } = useLanguage();
-  const columnCount = 5 + accounts.length;
+  const columnCount = 5 + (showSuperGroupColumn ? 1 : 0) + accounts.length;
   const hasGroupNameSearch = groupNameSearch.trim().length > 0;
   const hasStockStatusFilter = stockStatusFilter !== 'all';
   const showFilteredEmpty =
     rows.length === 0 && (columnFilter !== null || hasGroupNameSearch || hasStockStatusFilter);
+  const superGroupFilterActive = columnFilter?.kind === 'superGroup';
 
   if (rows.length === 0 && !showFilteredEmpty) {
     return (
@@ -151,6 +209,14 @@ export function ReportingJoinMatrixTable({
           <th className="join-report-table__col-no">{t('groupMonitoring.reporting.colNo')}</th>
           <th>{t('groupMonitoring.reporting.colGroupName')}</th>
           <th>{t('groupMonitoring.reporting.colGroupId')}</th>
+          {showSuperGroupColumn ? (
+            <th className="join-report-table__account-col">
+              <SuperGroupColumnHeader
+                columnFilter={columnFilter}
+                onColumnFilterChange={onColumnFilterChange}
+              />
+            </th>
+          ) : null}
           <th>{t('groupMonitoring.reporting.colGroupLink')}</th>
           <th>{t('groupMonitoring.reporting.colStatus')}</th>
           {accounts.map((acc) => (
@@ -211,49 +277,66 @@ export function ReportingJoinMatrixTable({
           </td>
         </tr>
       ) : null}
-      {rows.map((row, index) => (
-        <tr key={row.groupId}>
-          <td className="join-report-table__col-no tabular-nums">{pageOffset + index + 1}</td>
-          <td>{row.groupName}</td>
-          <td className="join-report-table__mono">{row.groupId}</td>
-          <td>
-            {row.inviteLink ? (
-              <a
-                href={row.inviteLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="join-report-table__link"
-              >
-                {row.inviteLink}
-              </a>
-            ) : (
-              <span className="text-text-muted">—</span>
-            )}
-          </td>
-          <td>
-            <ReportingStockStatusCell status={row.stockStatus} />
-          </td>
-          {accounts.map((acc) => {
-            const active =
-              mode === 'admin' ? row.adminByAccountId[acc.id] : row.joinByAccountId[acc.id];
-            const isFilterColumn = columnFilter?.accountId === acc.id;
-
-            return (
+      {rows.map((row, index) => {
+        const superValue = showSuperGroupColumn ? telegramSuperGroupYesNo(row.groupId) : null;
+        return (
+          <tr key={row.groupId}>
+            <td className="join-report-table__col-no tabular-nums">{pageOffset + index + 1}</td>
+            <td>{row.groupName}</td>
+            <td className="join-report-table__mono">{row.groupId}</td>
+            {showSuperGroupColumn ? (
               <td
-                key={acc.id}
                 className={cn(
-                  active ? 'join-report-table__yes' : 'join-report-table__no',
-                  isFilterColumn && 'join-report-table__account-col--filtered',
+                  superValue === 'Yes' ? 'join-report-table__yes' : 'join-report-table__no',
+                  superGroupFilterActive && 'join-report-table__account-col--filtered',
                 )}
               >
-                {active
-                  ? t('groupMonitoring.reporting.joinYes')
-                  : t('groupMonitoring.reporting.joinNo')}
+                {telegramSuperGroupLabel(row.groupId, {
+                  yes: t('groupMonitoring.reporting.joinYes'),
+                  no: t('groupMonitoring.reporting.joinNo'),
+                })}
               </td>
-            );
-          })}
-        </tr>
-      ))}
+            ) : null}
+            <td>
+              {row.inviteLink ? (
+                <a
+                  href={row.inviteLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="join-report-table__link"
+                >
+                  {row.inviteLink}
+                </a>
+              ) : (
+                <span className="text-text-muted">—</span>
+              )}
+            </td>
+            <td>
+              <ReportingStockStatusCell status={row.stockStatus} />
+            </td>
+            {accounts.map((acc) => {
+              const active =
+                mode === 'admin' ? row.adminByAccountId[acc.id] : row.joinByAccountId[acc.id];
+              const isFilterColumn =
+                columnFilter?.kind === 'account' && columnFilter.accountId === acc.id;
+
+              return (
+                <td
+                  key={acc.id}
+                  className={cn(
+                    active ? 'join-report-table__yes' : 'join-report-table__no',
+                    isFilterColumn && 'join-report-table__account-col--filtered',
+                  )}
+                >
+                  {active
+                    ? t('groupMonitoring.reporting.joinYes')
+                    : t('groupMonitoring.reporting.joinNo')}
+                </td>
+              );
+            })}
+          </tr>
+        );
+      })}
     </ReportingTableShell>
   );
 }

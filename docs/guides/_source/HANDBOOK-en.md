@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.33 |
+| **App version** | 1.0.34 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (**Settings** → Language) |
 
 This document is the **official guide to every feature** in the current application. For architecture and IT release notes, see [PROJECT.md](../../PROJECT.md).
 
-> **v1.0.33:** Sync and Job Queue **block each other** on the same account (including Checking Session). Full scrape reads **only groups still on the account** (progress = real count after Leave/Delete). Job Queue partial batch → **Failed** (not green Completed). There is **no Ticket tab**. Issues appear on the **Account** tab (not-aligned badges: Junk / Missing / Not admin). Remediation runs through **Operations → Job Queue** (SETUP: join / set admin / exit). **Operations** is Job Queue only (no Overview). Stock chips and the Group matrix live on the Account brand header. Prefer sidebar **Settings** (`/settings`); `/admin` redirects there.
+> **v1.0.34:** Telegram Job Queue **Set admin / Leave / Delete** works on **basic groups** (Super Group = No), not only Super Groups/channels. Telegram **AuthKeyDuplicated** (portable session used on another PC/IP) → session dead — **log in again with QR**. Group matrix **Super Group** column filterable Yes/No (same as account columns). Job Queue join/leave/delete more resilient (transport retry, mid-batch outcomes, safer cancel). Daily scrape stores **is_owner**. Sync↔Job still block each other; scrape reads only groups still on the account; partial Job Queue batch → **Failed**.
 
 ---
 
@@ -372,7 +372,8 @@ The Reporting shell tab was **removed**. Join/admin matrix opens from the Accoun
 | Entry | Account → brand card header → **WA/TG Group** badge |
 | **Full Group / Full Admin** | Join or admin Yes/No vs master (all accounts on that brand+platform) |
 | Search / Status | Filter by name / stock status |
-| Column filter | Yes / No / All on account headers |
+| Column filter (account) | Yes / No / All on account headers |
+| **Super Group** filter | Yes / No / All (Telegram: `-100…` id heuristic) |
 
 Updates automatically after scrape or Supabase changes. UI shows the latest matrix without relying on a separate Reporting page.
 
@@ -665,4 +666,4 @@ Login (Username / Password)
 
 ---
 
-*This guide matches application version **1.0.33**. Update PDF/Word after each release via `npm run build:handbook-docs`.*
+*This guide matches application version **1.0.34**. Update PDF/Word after each release via `npm run build:handbook-docs`.*

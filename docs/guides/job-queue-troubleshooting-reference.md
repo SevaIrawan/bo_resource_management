@@ -1,7 +1,7 @@
-# GM App — Job Queue & Execute Worker Troubleshooting Reference
+﻿# GM App — Job Queue & Execute Worker Troubleshooting Reference
 
 **Product:** Resource Management (Electron)  
-**Version:** v1.0.33  
+**Version:** v1.0.34  
 **Audience:** Developers and ops maintaining WhatsApp / Telegram automation  
 **Scope:** Job Queue, execute slot pool, Sync / Scrape interaction — not Reporting or Supabase schema
 

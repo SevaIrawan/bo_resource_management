@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.33` (lihat `package.json`)
+**Versi saat ini:** `1.0.34` (lihat `package.json`)
+
+**Rilis 1.0.34:** Telegram Set admin / Leave / Delete untuk basic Chat (bukan hanya Super Group); AuthKeyDuplicated → session mati (re-login QR); filter Super Group Yes/No di Group matrix; harden Job Queue join/leave/delete; daily `is_owner` (migrasi 039); audit produksi + typecheck Electron bersih; docs sync.
 
 **Rilis 1.0.33:** Sync ↔ Job Queue saling blokir dua arah (execute slot); await WA validate-session; scrape hanya grup live; validator + worker defaults (delete/clear-chat ON) diselaraskan; docs sync.
 

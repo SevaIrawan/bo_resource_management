@@ -1,6 +1,6 @@
-# Panduan Group Monitoring
+﻿# Panduan Group Monitoring
 
-**Versi app:** 1.0.33  
+**Versi app:** 1.0.34  
 **Untuk:** Tim **Depart Resource Management (R&M)** — semua yang menjalankan monitoring grup WhatsApp & Telegram  
 **Bahasa UI:** English / 中文 → ubah di **Settings → Language**
 
@@ -378,7 +378,7 @@ Lalu Account → **Sync** → **Scrape now**.
 | **Full Group** | Baris = grup master; kolom = akun; isi **Yes/No** join |
 | **Full Admin** | Sama, fokus status admin |
 
-Filter Status (Active/Ready/Recycle/Review), search nama grup, dan filter kolom Yes/No tersedia di modal. Export Excel dari modal.
+Filter Status (Active/Ready/Recycle/Review), search nama grup, filter kolom akun Yes/No, dan filter kolom **Super Group** Yes/No tersedia di modal. Export Excel dari modal.
 
 Data ikut update setelah scrape selesai (event realtime `rm-reporting-reload`, debounce ~500 ms).
 
@@ -489,4 +489,4 @@ Hanya yang sering di operasi. Pesan lain → baca alert / VIEW Remark → Team D
 
 ---
 
-*Panduan ini untuk modul **Group Monitoring** v1.0.33 — tim operasional Depart Resource Management.*
+*Panduan ini untuk modul **Group Monitoring** v1.0.34 — tim operasional Depart Resource Management.*

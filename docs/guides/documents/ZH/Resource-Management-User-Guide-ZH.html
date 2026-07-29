@@ -46,7 +46,7 @@
 </tr>
 <tr>
 <td><strong>应用版本</strong></td>
-<td>1.0.33</td>
+<td>1.0.34</td>
 </tr>
 <tr>
 <td><strong>适用对象</strong></td>
@@ -63,7 +63,7 @@
 </tbody></table>
 <p>本文档为当前应用中<strong>全部功能的官方使用说明</strong>。架构与 IT 发布说明请参阅 <a href="../../PROJECT.md">PROJECT.md</a>。</p>
 <blockquote>
-<p><strong>v1.0.33：</strong> 同一账号上 Sync 与 Job Queue <strong>互相阻塞</strong>（含 Checking Session）。完整抓取只读<strong>账号上仍存在的群</strong>（Leave/Delete 后进度为真实数量）。Job Queue 部分失败 → <strong>Failed</strong>（不是绿色 Completed）。<strong>无「工单」标签</strong>。问题显示在 <strong>账号</strong> 页（未对齐徽章：Junk / 缺群 / 非管理员）。修复通过 <strong>Operations → Job Queue</strong>（SETUP：入群 / 设管理员 / 退出）。<strong>Operations</strong> 仅为 Job Queue（无 Overview）。库存 chips 与群组矩阵在账号页品牌标题栏。侧栏优先使用 <strong>设置</strong>（<code>/settings</code>）；<code>/admin</code> 会重定向到此页。</p>
+<p><strong>v1.0.34：</strong> Telegram Job Queue <strong>设管理员 / 退群 / 删群</strong> 支持<strong>普通群</strong>（Super Group = No），不只超级群/频道。Telegram <strong>AuthKeyDuplicated</strong>（便携会话在另一台 PC/IP 使用）→ 会话失效 — <strong>需重新扫码登录</strong>。群组矩阵 <strong>Super Group</strong> 列可按 Yes/No 筛选（与账号列相同）。Job Queue 入群/退群/删群更稳（传输重试、批次中途结果、取消更安全）。每日抓取写入 <strong>is_owner</strong>。Sync 与 Job Queue 仍互相阻塞；抓取只读账号上仍存在的群；部分失败 → <strong>Failed</strong>。</p>
 </blockquote>
 <hr>
 <h2 id="目录">目录</h2>
@@ -830,8 +830,12 @@
 <td>按名称 / 库存状态筛选</td>
 </tr>
 <tr>
-<td>列筛选</td>
+<td>列筛选（账号）</td>
 <td>账号列头 Yes / No / All</td>
+</tr>
+<tr>
+<td><strong>Super Group</strong> 筛选</td>
+<td>Yes / No / All（Telegram：<code>-100…</code> ID 启发式）</td>
 </tr>
 </tbody></table>
 <p>抓取或 Supabase 变更后自动刷新。无需独立 Reporting 页面即可看到最新矩阵。</p>
@@ -1342,7 +1346,7 @@
 </tr>
 </tbody></table>
 <hr>
-<p><em>本手册对应应用版本 <strong>1.0.33</strong>。每次发布后请运行 <code>npm run build:handbook-docs</code> 更新 PDF/Word。</em></p>
+<p><em>本手册对应应用版本 <strong>1.0.34</strong>。每次发布后请运行 <code>npm run build:handbook-docs</code> 更新 PDF/Word。</em></p>
 
   </main>
   <footer class="doc-footer">

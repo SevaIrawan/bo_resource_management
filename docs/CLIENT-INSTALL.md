@@ -1,10 +1,10 @@
-# Install untuk client (Win / Mac / Linux)
+﻿# Install untuk client (Win / Mac / Linux)
 
 **Tanpa install yang benar, tidak ada update in-app.**
 
 Release: https://github.com/SevaIrawan/bo_resource_management/releases
 
-**Versi terbaru:** `v1.0.33`
+**Versi terbaru:** `v1.0.34`
 
 ---
 
@@ -12,7 +12,7 @@ Release: https://github.com/SevaIrawan/bo_resource_management/releases
 
 | | |
 |---|---|
-| File | `Resource.Management.Setup.1.0.33.exe` |
+| File | `Resource.Management.Setup.1.0.34.exe` |
 | Jangan | Kirim `.dmg` ke Windows |
 
 Jalankan `.exe` → ikuti wizard → buka app.
@@ -23,7 +23,7 @@ Jalankan `.exe` → ikuti wizard → buka app.
 
 | | |
 |---|---|
-| File | `Resource.Management-1.0.33-arm64.dmg` |
+| File | `Resource.Management-1.0.34-arm64.dmg` |
 | Jangan | File `.exe`, jangan buka DMG di Windows |
 
 **Hanya di Mac:**
@@ -39,11 +39,11 @@ Jalankan `.exe` → ikuti wizard → buka app.
 
 | | |
 |---|---|
-| File | `Resource.Management-1.0.33.AppImage` |
+| File | `Resource.Management-1.0.34.AppImage` |
 
 ```bash
-chmod +x Resource.Management-1.0.33.AppImage
-./Resource.Management-1.0.33.AppImage
+chmod +x Resource.Management-1.0.34.AppImage
+./Resource.Management-1.0.34.AppImage
 ```
 
 ---

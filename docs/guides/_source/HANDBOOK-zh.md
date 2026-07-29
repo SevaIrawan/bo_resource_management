@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | **产品** | 后端运营 — 资源管理（Backend Operation — Resource Management） |
-| **应用版本** | 1.0.33 |
+| **应用版本** | 1.0.34 |
 | **适用对象** | 内部运营团队（营销 / WhatsApp 与 Telegram 群组监控） |
 | **平台** | Windows / macOS / Linux 桌面安装包 |
 | **界面语言** | English / 中文（**设置** → **语言**） |
 
 本文档为当前应用中**全部功能的官方使用说明**。架构与 IT 发布说明请参阅 [PROJECT.md](../../PROJECT.md)。
 
-> **v1.0.33：** 同一账号上 Sync 与 Job Queue **互相阻塞**（含 Checking Session）。完整抓取只读**账号上仍存在的群**（Leave/Delete 后进度为真实数量）。Job Queue 部分失败 → **Failed**（不是绿色 Completed）。**无「工单」标签**。问题显示在 **账号** 页（未对齐徽章：Junk / 缺群 / 非管理员）。修复通过 **Operations → Job Queue**（SETUP：入群 / 设管理员 / 退出）。**Operations** 仅为 Job Queue（无 Overview）。库存 chips 与群组矩阵在账号页品牌标题栏。侧栏优先使用 **设置**（`/settings`）；`/admin` 会重定向到此页。
+> **v1.0.34：** Telegram Job Queue **设管理员 / 退群 / 删群** 支持**普通群**（Super Group = No），不只超级群/频道。Telegram **AuthKeyDuplicated**（便携会话在另一台 PC/IP 使用）→ 会话失效 — **需重新扫码登录**。群组矩阵 **Super Group** 列可按 Yes/No 筛选（与账号列相同）。Job Queue 入群/退群/删群更稳（传输重试、批次中途结果、取消更安全）。每日抓取写入 **is_owner**。Sync 与 Job Queue 仍互相阻塞；抓取只读账号上仍存在的群；部分失败 → **Failed**。
 
 ---
 
@@ -360,7 +360,8 @@ Reporting 标签壳层**已移除**。入群/管理员矩阵从账号页品牌�
 | 入口 | 账号 → 品牌卡片标题栏 → **WA/TG Group** 徽章 |
 | **Full Group / Full Admin** | 相对主表的入群或管理员 Yes/No（该品牌+平台下全部账号） |
 | 搜索 / Status | 按名称 / 库存状态筛选 |
-| 列筛选 | 账号列头 Yes / No / All |
+| 列筛选（账号） | 账号列头 Yes / No / All |
+| **Super Group** 筛选 | Yes / No / All（Telegram：`-100…` ID 启发式） |
 
 抓取或 Supabase 变更后自动刷新。无需独立 Reporting 页面即可看到最新矩阵。
 
@@ -653,4 +654,4 @@ Telegram 在会话**在线**时其他 PC 可用（会话在云端）。交接请
 
 ---
 
-*本手册对应应用版本 **1.0.33**。每次发布后请运行 `npm run build:handbook-docs` 更新 PDF/Word。*
+*本手册对应应用版本 **1.0.34**。每次发布后请运行 `npm run build:handbook-docs` 更新 PDF/Word。*

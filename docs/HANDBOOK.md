@@ -1,9 +1,9 @@
-# Handbook — Panduan Penggunaan Resource Management
+﻿# Handbook — Panduan Penggunaan Resource Management
 
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.33 |
+| **Versi app** | 1.0.34 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Settings → Language) |
@@ -123,7 +123,7 @@ Angka berubah sesuai tab aktif.
 | Online | Akun dengan session **Active** |
 | Aligned | Akun Remark **Aligned** (tanpa gap Junk/Missing/Not admin) |
 
-**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. Batch besar auto-split 30 grup per job; batch partial → **Failed** (bukan Completed). **v1.0.33:** Sync↔Job saling blokir; scrape WA hanya grup masih di akun (progress = jumlah real). Execute slots max **10**/platform; auto scrape brands max **6**.
+**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. Batch besar auto-split 30 grup per job; batch partial → **Failed** (bukan Completed). **v1.0.34:** TG Set admin/Leave/Delete juga untuk basic Chat; filter Super Group di matrix; AuthKeyDuplicated → re-login QR; Sync↔Job saling blokir; scrape WA hanya grup masih di akun. Execute slots max **10**/platform; auto scrape brands max **6**.
 
 > Tidak ada tab Ticket / Reporting di shell. Issue = KPI Account + gap kolom + Remark. Matrix = modal dari badge grup.
 
@@ -310,6 +310,7 @@ Tidak ada tab **Reporting**. Matrix join/admin = **modal** dari badge jumlah gru
 | **Full Group / Full Admin** | Join status atau admin status vs master (semua akun brand+platform) |
 | **Search / Status** | Filter nama grup / stock status |
 | Filter kolom akun | Yes / No / All di header kolom |
+| Filter **Super Group** | Yes / No / All (Telegram) |
 
 Data diperbarui otomatis setelah scrape atau perubahan di Supabase (event `rm-reporting-reload`).
 
@@ -478,4 +479,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.33**.*
+*Handbook ini selaras dengan aplikasi versi **1.0.34**.*

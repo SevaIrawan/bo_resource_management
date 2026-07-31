@@ -16,3 +16,4 @@ chrome/
 Thumbs.db
 .wwebjs_cache/
 **/__pycache__/
+supabase/.temp/

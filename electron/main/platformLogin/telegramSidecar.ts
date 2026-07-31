@@ -10,7 +10,7 @@ import { withNetworkRetry } from '../lib/networkRetry';
 const SIDECAR_URL = 'http://127.0.0.1:8765';
 export { SIDECAR_URL };
 const SIDECAR_PORT = 8765;
-const SIDECAR_VERSION = 6;
+const SIDECAR_VERSION = 11;
 const pollTimers = new Map<string, ReturnType<typeof setInterval>>();
 const pollErrorStreak = new Map<string, number>();
 const POLL_ERROR_MAX_STREAK = 8;
@@ -143,15 +143,14 @@ export async function ensureSidecarRunning() {
         const health = await readSidecarHealth();
         if (health?.version === SIDECAR_VERSION) return;
 
-        // Jangan bunuh sidecar saat scrape async masih jalan — putus mid-scrape.
+        // Version beda = kode scrape lama di memori. WAJIB restart meski ada scrape aktif —
+        // kalau tidak, edit disk tidak pernah masuk (gejala restart/scrape berkali-kali sama saja).
         if (health && health.activeScrapes > 0) {
           console.warn(
-            `[telegram-sidecar] version=${health.version}≠${SIDECAR_VERSION} but ${health.activeScrapes} scrape(s) active — skip restart`,
+            `[telegram-sidecar] version=${health.version}≠${SIDECAR_VERSION} with ${health.activeScrapes} scrape(s) — force restart to load new scrape engine`,
           );
-          return;
         }
 
-        // Stale sidecar from an older build — restart so new routes are available.
         await killProcessOnPort(SIDECAR_PORT);
         sidecarProcess = null;
         await new Promise((resolve) => setTimeout(resolve, 600));

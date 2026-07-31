@@ -77,6 +77,7 @@ function outcomeLabel(
   if (outcome === 'success') return t('settings.autoSync.outcomeSuccess');
   if (outcome === 'truncated') return t('settings.autoSync.outcomeTruncated');
   if (outcome === 'failed') return t('settings.autoSync.outcomeFailed');
+  if (outcome === 'busy') return t('settings.autoSync.outcomeBusy');
   return t('settings.autoSync.outcomeSessionInvalid');
 }
 
@@ -84,6 +85,7 @@ function outcomeClass(outcome: AutoScrapeAccountOutcome): string {
   if (outcome === 'success') return 'text-emerald-400';
   if (outcome === 'truncated') return 'text-amber-300';
   if (outcome === 'failed') return 'text-rose-400';
+  if (outcome === 'busy') return 'text-sky-300';
   return 'text-amber-400';
 }
 

@@ -8,6 +8,7 @@ import { validateTelegramSession, validateWhatsAppSession } from './validateSess
 import { normalizeScrapeResult } from './scrapeOutput';
 import { assertScrapeHasGroups } from './scrapeGroupValidation';
 import { runWhatsAppScrape, runWhatsAppScrapeAutoLane } from './whatsappScrape';
+import { ScrapeTimeoutError } from './deviceGroupScale';
 import {
   abortActiveScrape,
   clearActiveScrape,
@@ -102,16 +103,19 @@ async function executeAutoScrapeRun(payload: ScrapeRunPayload) {
     });
 
     return { ...raw, groups, count: groups.length };
-  } catch (error) {
-    if (
-      error instanceof AutoScrapeCancelledError ||
-      isAutoScrapeCancelled(payload.sessionId)
-    ) {
-      throw new Error('SCRAPER_CANCELLED');
-    }
-    throw error;
-  } finally {
-    clearActiveAutoScrape(payload.sessionId);
+    } catch (error) {
+      // Watchdog stale memanggil abortActive lebih dulu, jadi flag cancel ikut menyala.
+      // Tanpa guard ini SCRAPER_IDLE_STUCK tertimpa jadi "cancelled" dan sebab asli hilang.
+      if (error instanceof ScrapeTimeoutError) throw error;
+      if (
+        error instanceof AutoScrapeCancelledError ||
+        isAutoScrapeCancelled(payload.sessionId)
+      ) {
+        throw new Error('SCRAPER_CANCELLED');
+      }
+      throw error;
+    } finally {
+      clearActiveAutoScrape(payload.sessionId);
     releaseAutoScrapeLane(payload.sessionId);
     scheduleRunnerTick(0);
   }
@@ -141,6 +145,8 @@ export function registerScraperIpc() {
 
       return { ...raw, groups, count: groups.length };
     } catch (error) {
+      // Idem lane auto: idle watchdog menyalakan flag cancel sebelum reject.
+      if (error instanceof ScrapeTimeoutError) throw error;
       if (error instanceof ScrapeCancelledError || isScrapeCancelled(payload.sessionId)) {
         throw new Error('SCRAPER_CANCELLED');
       }
@@ -162,13 +168,16 @@ export function registerScraperIpc() {
       if (wasActive) {
         // Mid-scrape cancel — lepas Chrome segera.
         await abortActiveAutoScrape(payload.sessionId, payload.platform);
+        if (payload.platform === 'telegram') {
+          // Sidecar cancel dikunci ke lane auto yang benar-benar jalan. session_id TG =
+          // UUID akun, sama dengan lane manual — teardown lane idle akan mematikan
+          // scrape manual yang sedang jalan di akun itu.
+          await cancelTelegramScrape(payload.sessionId).catch(() => undefined);
+        }
       } else if (payload.platform === 'whatsapp') {
         // Post-success teardown — soft close (hindari TargetCloseError / frame detached ke Acc berikutnya).
         const { stopWhatsAppLogin } = await import('../platformLogin/whatsapp');
         await stopWhatsAppLogin(payload.sessionId).catch(() => undefined);
-      }
-      if (payload.platform === 'telegram') {
-        await cancelTelegramScrape(payload.sessionId).catch(() => undefined);
       }
       releaseAutoScrapeLane(payload.sessionId);
       return { ok: true };

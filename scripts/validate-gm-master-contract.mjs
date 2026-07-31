@@ -20,6 +20,7 @@ const cells = read('src/components/group-monitoring/AccountMonitoringCells.tsx')
 const migration035 = read('supabase/migrations/035_rm_fix_master_pk_and_scrape_commit.sql');
 const migration036 = read('supabase/migrations/036_rm_master_pk_brand_platform_group_id.sql');
 const migration038 = read('supabase/migrations/038_rm_master_require_brand_admin.sql');
+const migration040 = read('supabase/migrations/040_rm_master_admin_invite_cross_row.sql');
 
 const checks = [
   {
@@ -38,13 +39,23 @@ const checks = [
       migration036.includes('pg_advisory_xact_lock'),
   },
   {
-    name: '§4 Master gate: invite valid AND is_admin=yes (038) — WA + TG',
+    name: '§4 Master gate: ≥1 admin AND ≥1 invite valid (boleh beda baris) — 040',
     ok:
-      migration038.includes("lower(trim(coalesce(is_admin, ''))) = 'yes'") &&
-      migration038.includes('rm_invite_link_is_valid(p_platform, invite_link)') &&
-      migration038.includes("p_platform NOT IN ('whatsapp', 'telegram')") &&
+      migration040.includes('bool_or(lower(trim(coalesce(is_admin, \'\'))) = \'yes\')') &&
+      migration040.includes('bool_or(public.rm_invite_link_is_valid(p_platform, invite_link))') &&
+      migration040.includes('invite_picked') &&
+      migration040.includes('meta_picked') &&
+      migration040.includes('eligible') &&
+      migration040.includes("p_platform NOT IN ('whatsapp', 'telegram')") &&
+      (migration040.match(/bool_or\(lower\(trim\(coalesce\(is_admin/g) || []).length >= 2 &&
+      (migration040.match(/CREATE OR REPLACE FUNCTION public\.rm_commit_account_scrape/g) || []).length >= 1 &&
+      (migration040.match(/CREATE OR REPLACE FUNCTION public\.rm_rebuild_brand_groups_master/g) || []).length >= 1,
+  },
+  {
+    name: '§4 Legacy 038 still documents brand-admin intent (superseded by 040 cross-row)',
+    ok:
       migration038.includes('WhatsApp DAN Telegram') &&
-      (migration038.match(/lower\(trim\(coalesce\(is_admin, ''\)\)\) = 'yes'/g) || []).length >= 2,
+      migration038.includes("lower(trim(coalesce(is_admin, ''))) = 'yes'"),
   },
   {
     name: '§3 Later / sync valid = sessionOnly (grid metrik tidak berubah)',

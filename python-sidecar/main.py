@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import sys
+
+# Windows: default ProactorEventLoop sering OSError [Errno 22] Invalid argument
+# pada Telethon connect/reconnect. Harus di-set SEBELUM event loop dibuat (uvicorn).
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import os
 from pathlib import Path
 
@@ -172,7 +180,7 @@ def _delay_dict(body: AutomationDelayBody | None) -> dict | None:
 async def health() -> dict:
     return {
         "ok": True,
-        "version": 6,
+        "version": 11,
         "activeScrapes": count_active_telegram_scrapes(),
         "features": ["login", "scrape", "count", "validate", "automation", "scrape_async"],
     }
@@ -234,8 +242,15 @@ async def telegram_scrape_result(session_id: str) -> dict:
 
 @app.post("/telegram/scrape/cancel/{session_id}")
 async def telegram_scrape_cancel(session_id: str) -> dict:
+    """Cancel hanya berlaku untuk scrape yang sedang jalan saat request tiba.
+
+    Flag cancel bersifat sticky per session_id, jadi teardown lane yang datang telat
+    bisa mematikan scrape berikutnya yang baru saja start. No-op kalau tidak ada job.
+    """
+    if not is_telegram_scrape_running(session_id):
+        return {"ok": True, "cancelled": False, "reason": "NO_ACTIVE_SCRAPE"}
     request_scrape_cancel(session_id)
-    return {"ok": True}
+    return {"ok": True, "cancelled": True}
 
 @app.post("/telegram/validate/{session_id}")
 async def telegram_validate(session_id: str, body: CountBody | None = None) -> dict:

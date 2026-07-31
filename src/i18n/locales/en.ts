@@ -40,6 +40,7 @@ export const en = {
       outcomeSuccess: 'Success',
       outcomeTruncated: 'Partial (6000 cap)',
       outcomeFailed: 'Failed',
+      outcomeBusy: 'Skipped — account busy',
       outcomeSessionInvalid: 'Session invalid',
       statusDetailTitle: '{{brand}} · {{platform}}',
       statusDetailHint: 'Results from the last auto scrape run for selected Acc.',
@@ -711,6 +712,10 @@ export const en = {
         'Scrape stopped before all groups on this account were read. Wait a few minutes for the app/device to finish syncing, then Scrape Now again.',
       scraperTruncatedCap:
         'Scrape saved the first 6000 groups only (account has more). Data written is real but incomplete vs full account list — split accounts or contact support if you need the full set.',
+      scraperRolesUnverified:
+        'Data was saved, but the admin role of some groups could not be read from Telegram (rate limit or API error). Those groups are recorded as not admin, so Not admin counts may be too high. Scrape this account again in a few minutes to confirm.',
+      scraperRolesUnverifiedCounts:
+        'Scrape finished and data was saved: {{scanned}} groups scraped, admin role confirmed for {{verified}}, could not be read for {{unverified}} (rate limit or API error). Those {{unverified}} are recorded as not admin, so Not admin counts may be too high. Scrape this account again in a few minutes to confirm.',
       scraperConnectionLostWa:
         'WhatsApp connection to the server was lost or interrupted. Check internet on this PC and that WhatsApp works on your phone, then run the scraper again.',
       scraperConnectionLostTg:

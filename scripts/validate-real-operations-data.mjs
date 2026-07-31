@@ -213,6 +213,18 @@ const checks = [
     })(),
   },
   {
+    name: 'Scrape dedupe: merge is_admin=yes + invite (jangan replace buta)',
+    ok: (() => {
+      const dedupe = read('src/lib/dedupeScrapedGroups.ts');
+      return (
+        dedupe.includes('mergeScrapedGroupDupes') &&
+        dedupe.includes("prev.is_admin === 'yes' || next.is_admin === 'yes'") &&
+        dedupe.includes('prevLink || nextLink') &&
+        accountScraper.includes('dedupeScrapedGroupsByGroupId')
+      );
+    })(),
+  },
+  {
     name: 'Scrape → daily atomik rm_commit_account_scrape + invite_link kolom',
     ok:
       accountScraper.includes('invite_link: group.invite_link') &&

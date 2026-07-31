@@ -32,7 +32,16 @@ import { getSupabase } from '@/lib/supabase';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Dispatch, SetStateAction } from 'react';
 
-export type AutoScrapeAccountResult = 'success' | 'truncated' | 'skipped' | 'failed' | 'aborted';
+export type AutoScrapeAccountResult =
+  | 'success'
+  | 'truncated'
+  | 'skipped'
+  | 'busy'
+  | 'failed'
+  | 'aborted';
+
+/** Kenapa akun belum boleh auto scrape. `busy` = lane user/job masih pegang akun. */
+export type AutoScrapeReadiness = 'ready' | 'busy' | 'skipped' | 'aborted';
 
 /** Auto Scrape (Settings) — skip akun yang tidak memenuhi syarat scrape otomatis. */
 export function shouldSkipAutoScrapeAccount(
@@ -57,30 +66,35 @@ function isAborted(control?: AutoScrapeCycleControl): boolean {
   return control?.isAborted() === true;
 }
 
-/** Tunggu user lane bebas untuk akun ini — timeout, skip jika stuck. */
+/**
+ * Tunggu user lane bebas untuk akun ini.
+ *
+ * Yang duluan jalan menang: scrape manual / job queue yang sedang pegang akun tidak
+ * pernah diputus auto scrape — auto yang mengalah dan dilaporkan `busy`.
+ */
 export async function waitUntilAutoScrapeAccountReady(
   account: AccountBrandRow,
   suspendedIds: ReadonlySet<string>,
   control?: AutoScrapeCycleControl,
   dbAccountId?: string,
-): Promise<boolean> {
+): Promise<AutoScrapeReadiness> {
   const started = Date.now();
 
   while (Date.now() - started < AUTO_SCRAPE_POLICY.readyMaxWaitMs) {
-    if (isAborted(control)) return false;
-    if (control?.isAccountSelected && !control.isAccountSelected(account.id)) return false;
-    if (shouldSkipAutoScrapeAccount(account, suspendedIds)) return false;
+    if (isAborted(control)) return 'aborted';
+    if (control?.isAccountSelected && !control.isAccountSelected(account.id)) return 'aborted';
+    if (shouldSkipAutoScrapeAccount(account, suspendedIds)) return 'skipped';
 
     const heavy = await isHeavyDeviceExecuteBlockedForAccount(account.id);
     const settling = await isAccountSessionSettling(account);
     const laneReady = await isAutoScrapeLaneReadyForAccount(account, dbAccountId);
 
-    if (!heavy && !settling && laneReady) return true;
+    if (!heavy && !settling && laneReady) return 'ready';
 
     await sleep(AUTO_SCRAPE_POLICY.readyPollMs);
   }
 
-  return false;
+  return 'busy';
 }
 
 /**
@@ -117,18 +131,18 @@ export async function runAutoAccountScrape(input: {
   try {
     dbAccountId = await resolveDbAccountId({ userId, account });
 
-    const ready = await waitUntilAutoScrapeAccountReady(
+    const readiness = await waitUntilAutoScrapeAccountReady(
       account,
       suspendedIds,
       cycleControl,
       dbAccountId,
     );
-    if (!ready) {
+    if (readiness !== 'ready') {
       if (isAborted(cycleControl)) return 'aborted';
       if (cycleControl?.isAccountSelected && !cycleControl.isAccountSelected(account.id)) {
         return 'aborted';
       }
-      return 'skipped';
+      return readiness === 'busy' ? 'busy' : 'skipped';
     }
     markStart(dbAccountId);
 
@@ -207,7 +221,9 @@ export async function runAutoAccountScrape(input: {
         );
       }
 
-      const truncated = /TRUNCATED_\d+/i.test(scrapeCounts.hint ?? '');
+      const hint = scrapeCounts.hint ?? '';
+      const truncated = /TRUNCATED_\d+/i.test(hint);
+      const rolesUnverified = /UNVERIFIED_ROLES_\d+/i.test(hint);
       await recordSyncActivity({
         accountId: dbAccountId,
         platform: account.platform,
@@ -216,9 +232,14 @@ export async function runAutoAccountScrape(input: {
         deviceGroups: built.groupsCurrent,
         brandGroups: built.groupsTotal,
         adminGroups: built.adminCurrent,
-        message: truncated
-          ? `auto_scrape:${built.groupsCurrent}/${built.groupsTotal}:SCRAPER_TRUNCATED_CAP`
-          : `auto_scrape:${built.groupsCurrent}/${built.groupsTotal}`,
+        message: [
+          `auto_scrape:${built.groupsCurrent}/${built.groupsTotal}`,
+          truncated ? 'SCRAPER_TRUNCATED_CAP' : null,
+          // Jejak permanen di riwayat sync — "bukan admin" vs "gagal diperiksa" bisa dibedakan.
+          rolesUnverified ? (hint.match(/UNVERIFIED_ROLES_\d+/i)?.[0] ?? null) : null,
+        ]
+          .filter(Boolean)
+          .join(':'),
       });
 
       return truncated ? 'truncated' : 'success';
@@ -237,12 +258,12 @@ export async function runAutoAccountScrape(input: {
       return isAborted(cycleControl) ? 'aborted' : 'failed';
     }
 
-    // Lane sibuk / penuh — scrape tidak dijalankan → sama skip (session/syarat), bukan failed scrape.
+    // Lane user/auto penuh — scrape tidak pernah dijalankan, jadi bukan failed.
     if (
       message.includes('AUTO_SCRAPE_USER_LANE_BUSY') ||
       message.includes('AUTO_SCRAPE_LANE_BUSY')
     ) {
-      return 'skipped';
+      return 'busy';
     }
 
     if (scrapeFailureNeedsLoginModal(message)) {

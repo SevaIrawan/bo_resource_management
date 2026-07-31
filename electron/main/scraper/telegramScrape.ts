@@ -251,11 +251,7 @@ async function postTelegramScrape(
   }
 }
 
-export async function runTelegramScrape(
-  sessionId: string,
-  storedSessionString?: string | null,
-  expectedPhone?: string,
-): Promise<{
+export type TelegramScrapeOutcome = {
   ok: boolean;
   groups: ScrapedGroupRow[];
   count: number;
@@ -264,7 +260,13 @@ export async function runTelegramScrape(
   elapsedMs?: number;
   sessionString?: string;
   loginMethod?: string;
-}> {
+};
+
+export async function runTelegramScrape(
+  sessionId: string,
+  storedSessionString?: string | null,
+  expectedPhone?: string,
+): Promise<TelegramScrapeOutcome> {
   return withTelegramScrapeSessionLock(sessionId, () =>
     withScrapeWatchdog(
       sessionId,
@@ -286,16 +288,7 @@ export async function runTelegramScrapeAutoLane(
   sessionId: string,
   storedSessionString?: string | null,
   expectedPhone?: string,
-): Promise<{
-  ok: boolean;
-  groups: ScrapedGroupRow[];
-  count: number;
-  hint?: string;
-  telegramUser?: string;
-  elapsedMs?: number;
-  sessionString?: string;
-  loginMethod?: string;
-}> {
+): Promise<TelegramScrapeOutcome> {
   return withTelegramScrapeSessionLock(sessionId, () =>
     withScrapeWatchdog(
       sessionId,
@@ -316,16 +309,7 @@ async function runTelegramScrapeInner(
   sessionId: string,
   storedSessionString?: string | null,
   expectedPhone?: string,
-): Promise<{
-  ok: boolean;
-  groups: ScrapedGroupRow[];
-  count: number;
-  hint?: string;
-  telegramUser?: string;
-  elapsedMs?: number;
-  sessionString?: string;
-  loginMethod?: string;
-}> {
+): Promise<TelegramScrapeOutcome> {
   emitScrapeProgress({ sessionId, phase: 'start' });
   try {
     await ensureSidecarRunning();
@@ -390,6 +374,15 @@ async function runTelegramScrapeInner(
   if (json.status === 'error') {
     const raw = json.message ?? 'Telegram scrape failed';
     const message = isTelegramTransportError(new Error(raw)) ? TG_CONNECT_FAILED : raw;
+    emitScrapeProgress({ sessionId, phase: 'error', label: message });
+    throw new Error(message);
+  }
+
+  // Checkpoint parsial bukan hasil scrape. rm_commit_account_scrape menghapus seluruh
+  // daily akun sebelum insert — commit parsial menghapus grup yang belum sempat dibaca.
+  if ((json as { partial?: boolean }).partial === true) {
+    const detail = json.message ? `: ${json.message}` : '';
+    const message = `SCRAPER_PARTIAL_RESULT${detail}`;
     emitScrapeProgress({ sessionId, phase: 'error', label: message });
     throw new Error(message);
   }

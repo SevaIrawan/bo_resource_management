@@ -144,6 +144,7 @@ function mapAccountResultToOutcome(
   if (result === 'success') return 'success';
   if (result === 'truncated') return 'truncated';
   if (result === 'failed') return 'failed';
+  if (result === 'busy') return 'busy';
   if (result === 'skipped') return 'session_invalid';
   return null;
 }

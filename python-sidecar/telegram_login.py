@@ -83,10 +83,8 @@ def _session_payload(session: TgLoginSession, qr_data_url: str | None = None) ->
     return payload
 
 async def _create_client() -> TelegramClient:
-    api_id = int(os.environ["TELEGRAM_API_ID"])
-    api_hash = os.environ["TELEGRAM_API_HASH"]
-    client = TelegramClient(StringSession(), api_id, api_hash)
-    await asyncio.wait_for(client.connect(), timeout=30)
+    client = _new_telegram_client(StringSession())
+    await _connect_client(client)
     return client
 
 
@@ -107,6 +105,62 @@ def _is_auth_key_dead_message(msg: str | None) -> bool:
     )
 
 
+def _is_transient_socket_error(msg: str | None) -> bool:
+    """Windows/Telethon: Errno 22 / WinError 10022 / socket drop — soft, bukan session mati."""
+    lower = (msg or "").lower()
+    return (
+        "errno 22" in lower
+        or "winerror 10022" in lower
+        or "invalid argument" in lower
+        or "disconnected" in lower
+        or "not connected" in lower
+        or "connection" in lower
+        or "timed out" in lower
+        or "timeout" in lower
+        or "network is unreachable" in lower
+        or "temporarily unavailable" in lower
+    )
+
+
+def _new_telegram_client(session: StringSession | str) -> TelegramClient:
+    api_id = int(os.environ["TELEGRAM_API_ID"])
+    api_hash = os.environ["TELEGRAM_API_HASH"]
+    sess = session if isinstance(session, StringSession) else StringSession(session)
+    # use_ipv6=False — di Windows IPv6 sering picu OSError Errno 22.
+    # receive_updates=False — kurangi koneksi update paralel.
+    return TelegramClient(
+        sess,
+        api_id,
+        api_hash,
+        receive_updates=False,
+        use_ipv6=False,
+    )
+
+
+async def _connect_client(client: TelegramClient, *, attempts: int = 3) -> None:
+    """connect() dengan retry untuk Errno 22 / socket transient di Windows."""
+    last_exc: BaseException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            await asyncio.wait_for(client.connect(), timeout=30)
+            return
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            msg = str(exc) or ""
+            if _is_auth_key_dead_message(msg):
+                raise
+            if attempt >= attempts or not _is_transient_socket_error(msg):
+                raise
+            try:
+                await client.disconnect()
+            except Exception:  # noqa: BLE001
+                pass
+            await asyncio.sleep(0.5 * attempt)
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Telegram connect failed")
+
+
 async def _ensure_client_connected(client: TelegramClient) -> None:
     """Reconnect jika drop setelah scrape panjang — hindari 'Cannot send request while disconnected'."""
     try:
@@ -114,7 +168,7 @@ async def _ensure_client_connected(client: TelegramClient) -> None:
             return
     except Exception:  # noqa: BLE001
         pass
-    await asyncio.wait_for(client.connect(), timeout=30)
+    await _connect_client(client)
 
 
 async def _force_reconnect(client: TelegramClient) -> None:
@@ -128,7 +182,7 @@ async def _force_reconnect(client: TelegramClient) -> None:
     except Exception:  # noqa: BLE001
         pass
     await asyncio.sleep(0.75)
-    await asyncio.wait_for(client.connect(), timeout=30)
+    await _connect_client(client)
 
 
 async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]:
@@ -145,8 +199,7 @@ async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]
         msg = str(exc) or "Telegram session expired. Link device again."
         if _is_auth_key_dead_message(msg):
             return False, msg
-        lower = msg.lower()
-        if "disconnected" in lower or "not connected" in lower or "connection" in lower:
+        if _is_transient_socket_error(msg):
             try:
                 await _force_reconnect(client)
                 me = await asyncio.wait_for(client.get_me(), timeout=20)
@@ -481,7 +534,9 @@ async def _export_telegram_session_locked(session_id: str) -> dict:
                 session.error = live_err
                 return {"status": "error", "message": live_err}
             lower = live_err.lower()
-            if "disconnected" in lower or "not connected" in lower or "connection" in lower:
+            if _is_transient_socket_error(live_err) or (
+                "disconnected" in lower or "not connected" in lower or "connection" in lower
+            ):
                 await _force_reconnect(session.client)
                 live_ok, live_err = await _verify_client_live(session.client)
                 if not live_ok and _is_auth_key_dead_message(live_err):
@@ -509,8 +564,13 @@ async def _export_telegram_session_locked(session_id: str) -> dict:
         }
 
     if not session_string or not str(session_string).strip():
+        # Jangan surfacing Errno 22 mentah — itu soft socket, bukan bukti string kosong.
+        if live_err and not _is_transient_socket_error(live_err):
+            empty_msg = live_err
+        else:
+            empty_msg = "Empty Telegram session string. Log in again."
         session.status = "error"
-        session.error = live_err or "Empty Telegram session string"
+        session.error = empty_msg
         return {
             "status": "error",
             "message": session.error,
@@ -585,16 +645,8 @@ async def _restore_telegram_session_locked(session_id: str, session_string: str)
     await asyncio.sleep(0.75)
 
     try:
-        api_id = int(os.environ["TELEGRAM_API_ID"])
-        api_hash = os.environ["TELEGRAM_API_HASH"]
-        # receive_updates=False — kurangi koneksi update paralel di balik layar.
-        client = TelegramClient(
-            StringSession(wanted),
-            api_id,
-            api_hash,
-            receive_updates=False,
-        )
-        await asyncio.wait_for(client.connect(), timeout=30)
+        client = _new_telegram_client(wanted)
+        await _connect_client(client)
 
         ok, err = await _verify_client_live(client)
         if not ok:

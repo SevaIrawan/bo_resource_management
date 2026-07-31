@@ -16,6 +16,7 @@ export type ScrapeErrorModalCode =
   | 'SCRAPER_TG_AUTH_KEY_DUPLICATED'
   | 'SCRAPER_INCOMPLETE'
   | 'SCRAPER_TRUNCATED_CAP'
+  | 'SCRAPER_ROLES_UNVERIFIED'
   | 'SCRAPER_CONNECTION_LOST'
   | 'SCRAPER_NETWORK_ERROR'
   | 'SCRAPER_IDLE_STUCK'
@@ -29,6 +30,7 @@ export const SCRAPE_CONNECTION_MODAL_CODES: ReadonlySet<ScrapeErrorModalCode> = 
   'SCRAPER_TG_AUTH_KEY_DUPLICATED',
   'SCRAPER_INCOMPLETE',
   'SCRAPER_TRUNCATED_CAP',
+  'SCRAPER_ROLES_UNVERIFIED',
   'SCRAPER_CONNECTION_LOST',
   'SCRAPER_NETWORK_ERROR',
   'SCRAPER_IDLE_STUCK',
@@ -300,6 +302,13 @@ export function resolveScrapeErrorModalCode(message: string): ScrapeErrorModalCo
     return 'SCRAPER_TRUNCATED_CAP';
   }
 
+  if (
+    lower.startsWith('scraper_roles_unverified') ||
+    /unverified_roles_\d+/.test(lower)
+  ) {
+    return 'SCRAPER_ROLES_UNVERIFIED';
+  }
+
   if (lower.startsWith('scraper_idle_stuck') || isScrapeIdleStuckMessage(normalized)) {
     return 'SCRAPER_IDLE_STUCK';
   }
@@ -356,6 +365,16 @@ export function isScrapeErrorCodeOnly(message: string): boolean {
   return /^(SCRAPER_[A-Z_]+|SCRAPER_FAILED|SYNC_FAILED)$/i.test(n);
 }
 
+const ROLES_UNVERIFIED_COUNTS_RE = /SCRAPER_ROLES_UNVERIFIED[:_](\d+)\s*\/\s*(\d+)/i;
+
+/** Kode + angka untuk modal: `SCRAPER_ROLES_UNVERIFIED:7/312` (gagal/terbaca total). */
+export function buildRolesUnverifiedWarning(
+  unverified: number,
+  scanned: number,
+): `SCRAPER_ROLES_UNVERIFIED:${number}/${number}` {
+  return `SCRAPER_ROLES_UNVERIFIED:${unverified}/${scanned}`;
+}
+
 export function resolveScrapeAlertMessage(
   code: string,
   t: (key: string, vars?: Record<string, string | number>) => string,
@@ -363,7 +382,7 @@ export function resolveScrapeAlertMessage(
 ): string {
   const mapped = resolveScrapeErrorModalCode(code);
   if (mapped) {
-    return resolveScrapeAlertMessageForCode(mapped, t, platform);
+    return resolveScrapeAlertMessageForCode(mapped, t, platform, code);
   }
 
   const factual = formatScrapeErrorForModal(code);
@@ -378,6 +397,7 @@ function resolveScrapeAlertMessageForCode(
   code: ScrapeErrorModalCode | string,
   t: (key: string, vars?: Record<string, string | number>) => string,
   platform?: Platform,
+  rawCode?: string,
 ): string {
   const platformName =
     platform === 'whatsapp' ? 'WhatsApp' : platform === 'telegram' ? 'Telegram' : '';
@@ -395,6 +415,17 @@ function resolveScrapeAlertMessageForCode(
       return t('groupMonitoring.sync.scraperIncomplete');
     case 'SCRAPER_TRUNCATED_CAP':
       return t('groupMonitoring.sync.scraperTruncatedCap');
+    case 'SCRAPER_ROLES_UNVERIFIED': {
+      const counts = rawCode ? ROLES_UNVERIFIED_COUNTS_RE.exec(rawCode) : null;
+      if (!counts) return t('groupMonitoring.sync.scraperRolesUnverified');
+      const unverified = Number(counts[1]);
+      const scanned = Number(counts[2]);
+      return t('groupMonitoring.sync.scraperRolesUnverifiedCounts', {
+        unverified,
+        verified: Math.max(scanned - unverified, 0),
+        scanned,
+      });
+    }
     case 'SCRAPER_WA_DISCONNECTED':
       return platform === 'telegram'
         ? t('groupMonitoring.sync.scraperConnectionLostTg')

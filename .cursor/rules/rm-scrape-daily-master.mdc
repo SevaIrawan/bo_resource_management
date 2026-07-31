@@ -32,7 +32,74 @@ Delay: `WA_SCRAPE_GROUP_DELAY_MS` + jitter (`waInviteExportDelayMs`).
 | invite_link | `getInviteCode` / `fetchWhatsAppGroupInviteLink` (admin) | `_resolve_invite_link` / `_export_invite_link` |
 | counts, is_admin | `scrapeWhatsAppGroupFromStore` | `telegram_scraper.py` |
 
-Master hanya baris dengan `rm_invite_link_is_valid`. Modal group link = **baca** `group_scrape_daily` — jangan "perbaiki" modal tanpa perbaiki scrape/DB.
+Master gate (brand+platform, per `group_id`) — migrasi **040**:
+0. `group_id` + `group_name` non-kosong (CTE `daily_all`)
+1. ≥1 baris daily `is_admin=yes` (boleh akun A)
+2. ≥1 baris daily invite `rm_invite_link_is_valid` (boleh akun B)
+Syarat boleh **beda baris/akun**. Akun `is_admin=no` tidak membuang grup dari master jika akun lain sudah yes + ada invite valid.
+
+Modal group link = **baca** `group_scrape_daily` — jangan "perbaiki" modal tanpa perbaiki scrape/DB.
+
+# TG scrape — ambil group_id yang VALID, jangan yang usang
+
+Masalahnya di **scrape**, bukan di master. ID usang yang ditulis ke daily akan tampil sebagai
+**Junk** (junk = baris daily yang `group_id` tidak ada di master — `accountMasterDailyCompare.ts`),
+karena master memakai ID Super Group. Jadi ID usang tidak boleh pernah masuk daily.
+
+Basic group yang sudah upgrade ke Super Group **tetap ada di daftar dialog** sebagai shell mati
+(`migrated_to` + `deactivated`), sementara Super Group-nya muncul sebagai dialog tersendiri. Tanpa
+penyaringan, scrape menulis DUA baris untuk satu grup: ID `-100…` yang benar dan ID basic usang.
+
+Basic Chat yang sudah upgrade ke Super Group (`migrated_to`):
+- **DILARANG** tulis 2 ID (basic + `-100…`) ke daily/master.
+- Di discovery: **skip shell** `Chat.migrated_to` via `_is_live_group_dialog` (Super Group sudah dialog Channel terpisah).
+  Filter di loop kita — **bukan** stock Telethon `iter_dialogs` + `ignore_migrated` (pagination putus bila buffer chunk kosong).
+- Safety: kalau shell lolos → `_upgrade_basic_chat_if_migrated` ke Channel atau skip; jangan tulis ID basic.
+- Discovery FloodWait/error → `DiscoveryIncomplete` / status error — **jangan** commit daily bolong (itu sumber Join Missing palsu).
+
+```python
+# discovery (setelah GetDialogs chunk)
+if isinstance(ent, Chat) and ent.migrated_to is not None:
+    continue  # jangan bawa shell
+```
+
+**DILARANG** stock `iter_dialogs` + `ignore_migrated` — buffer kosong memutus pagination → Missing.
+Pakai `_load_all_group_dialogs` (GetDialogsRequest + offset lengkap; lanjut meski 0 grup lolos filter di chunk).
+
+**DILARANG** membuang grup berdasarkan `member_count <= 0`.
+Grup mati hanya `migrated_to` / `deactivated`.
+
+# TG invite link — BACA, jangan produksi
+
+`messages.exportChatInvite` **membuat link baru setiap dipanggil** dan tiap admin punya link
+sendiri ([core.telegram.org/api/invites](https://core.telegram.org/api/invites)). Memanggilnya di
+setiap scrape = satu grup menumpuk banyak link berbeda, semuanya valid, semuanya mengarah ke grup
+yang sama → inkonsistensi "1 grup 2 link" di brand yang sama.
+
+Urutan wajib di `_resolve_invite_link` — tiga langkah pertama hanya membaca:
+1. `username` → `https://t.me/{username}`
+2. `exported_invite` dari `GetFullChannel`/`GetFullChat` (link utama grup)
+3. `_read_own_exported_invite` → `messages.getExportedChatInvites` (link yang pernah dibuat akun ini)
+4. **jalan terakhir**: `ExportChatInvite` — hanya jika admin dan benar-benar belum ada link
+
+Jangan naikkan `ExportChatInvite` ke urutan lebih awal, dan jangan panggil tanpa langkah 2–3.
+
+# Checkpoint parsial ≠ hasil scrape
+
+Sidecar menyimpan checkpoint `status: "ok"` + `partial: true` saat scrape mati di tengah. `rm_commit_account_scrape` **menghapus seluruh daily akun** sebelum insert, jadi commit parsial menghilangkan grup yang belum terbaca dari daily **dan** master (angka grid berubah tiap scrape).
+
+`telegramScrape.ts` menolak `partial === true` → `SCRAPER_PARTIAL_RESULT`.
+
+# Cancel — jangan lintas lane
+
+`session_id` TG = UUID akun, **dipakai bersama** lane manual dan lane auto.
+
+- `scraper:cancel-auto` kirim `cancelTelegramScrape` **hanya** di cabang `wasActive` — teardown lane idle tidak boleh menyentuh sidecar
+- Endpoint sidecar `/telegram/scrape/cancel` no-op kalau tidak ada job jalan (flag cancel sticky per `session_id`)
+- **Yang duluan jalan menang**: auto mengalah dengan outcome `busy` ("Skipped — account busy"), bukan `session_invalid`, dan **tidak** memutus scrape manual
+- `ScrapeTimeoutError` (`SCRAPER_IDLE_STUCK`) **jangan** ditimpa jadi `SCRAPER_CANCELLED` — watchdog menyalakan flag cancel sebelum reject, jadi sebab asli hilang
+
+Validator: `npm run validate:device-group-scale`
 
 # Master PK (036)
 

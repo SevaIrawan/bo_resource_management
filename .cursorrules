@@ -115,7 +115,7 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
 17. DATA NYATA — SCRAPE & OPERATIONS (wajib, tanpa mock/dummy/fake)
     Semua path scrape + job queue WAJIB data dari sesi WA/TG live — BUKAN mock, dummy, placeholder DB, atau hardcode null untuk field device.
     - Scrape WA/TG: `group_id`, `group_name`, `member_count`, `admin_count`, `is_admin`, `invite_link` dari device/sidecar (`getInviteCode` / `_export_invite_link` / `_resolve_invite_link`).
-    - Tulis DB: `writeScrapeDailyRows` → RPC `rm_commit_account_scrape` atomik (DELETE daily akun + INSERT daily + rebuild master brand+platform). `rm_rebuild_brand_groups_master` hanya saat hapus akun, bukan scrape.
+    - Tulis DB: `writeScrapeDailyRows` → RPC `rm_commit_account_scrape` atomik (DELETE daily akun + INSERT daily + rebuild master brand+platform). Master gate (040): ≥1 `is_admin=yes` AND ≥1 invite valid per `group_id` (boleh beda akun). `rm_rebuild_brand_groups_master` hanya saat hapus akun, bukan scrape.
     - Join job: `inviteLink` dari `groups_master` via `loadMissingMasterGroupsJoinSnapshot` — `client.acceptInvite` / sidecar join.
     - Create group: grup dibuat di device; WA `fetchWhatsAppGroupInviteLink`, TG `_export_invite_link`.
     - Set admin: `promoteParticipants` (WA) / Telethon promote (TG) — target dari payload nyata.

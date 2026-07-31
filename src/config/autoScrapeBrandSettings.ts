@@ -21,7 +21,12 @@ export type AutoScrapeBrandAccountMap = Record<string, AutoScrapeBrandAccountSel
  * - failed = dijalankan tapi gagal
  * - session_invalid = tidak dijalankan (skip / session tidak valid) — bukan gagal scrape
  */
-export type AutoScrapeAccountOutcome = 'success' | 'truncated' | 'failed' | 'session_invalid';
+export type AutoScrapeAccountOutcome =
+  | 'success'
+  | 'truncated'
+  | 'failed'
+  | 'busy'
+  | 'session_invalid';
 
 export type AutoScrapeBrandAccountResultRow = {
   accountId: string;
@@ -287,6 +292,7 @@ function parseAccountOutcome(value: unknown): AutoScrapeAccountOutcome | null {
     value === 'success' ||
     value === 'truncated' ||
     value === 'failed' ||
+    value === 'busy' ||
     value === 'session_invalid'
   ) {
     return value;

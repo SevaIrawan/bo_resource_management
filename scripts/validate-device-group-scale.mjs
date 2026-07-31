@@ -22,6 +22,18 @@ const tgScrape = read('electron/main/scraper/telegramScrape.ts');
 const watchdog = read('electron/main/scraper/scrapeWatchdog.ts');
 const scrapeProgress = read('electron/main/scraper/scrapeProgress.ts');
 const scraperIdx = read('electron/main/scraper/index.ts');
+const sidecarMain = read('python-sidecar/main.py');
+const autoScrape = read('src/lib/runAutoAccountScrape.ts');
+
+/** Handler cancel-auto saja — cancel sidecar tidak boleh bocor ke lane manual. */
+const cancelAutoBody = scraperIdx.slice(
+  scraperIdx.indexOf("'scraper:cancel-auto'"),
+  scraperIdx.indexOf("'scraper:auto-lane-ready'"),
+);
+const cancelAutoActiveBranch = cancelAutoBody.slice(
+  cancelAutoBody.indexOf('if (wasActive) {'),
+  cancelAutoBody.indexOf('} else if'),
+);
 
 const executeSyncCheckBody = syncFlow.slice(
   syncFlow.indexOf('export async function executeSyncCheck'),
@@ -29,6 +41,89 @@ const executeSyncCheckBody = syncFlow.slice(
 );
 
 const checks = [
+  {
+    name: 'TG scrape: shell migrate tidak masuk targets (1 grup 1 ID Super Group saja)',
+    ok:
+      tgPy.includes('_is_live_group_dialog') &&
+      tgPy.includes('skipped_migrate') &&
+      tgPy.includes('Shell basic setelah migrate') &&
+      tgPy.includes('_upgrade_basic_chat_if_migrated') &&
+      // Jangan tulis Chat yang masih punya migrated_to.
+      tgPy.includes('isinstance(entity, Chat) and getattr(entity, "migrated_to", None) is not None') &&
+      // Jangan pakai migrated_from untuk konversi/rank (kontrak: skip shell di discovery).
+      !tgPy.includes('_basic_chat_peer_id') &&
+      !/_resolve_member_count[\s\S]*migrated_from_chat_id/.test(tgPy),
+  },
+  {
+    name: 'TG scrape: discovery putus → error (jangan commit daily bolong)',
+    ok:
+      tgPy.includes('class DiscoveryIncomplete') &&
+      tgPy.includes('SCRAPER_DISCOVERY_FLOODWAIT') &&
+      tgPy.includes('SCRAPER_DISCOVERY_FAILED') &&
+      /except FloodWaitError as exc:[\s\S]*?continue/.test(tgPy),
+  },
+  {
+    name: 'TG scrape: GetDialogs pagination sendiri (bukan iter_dialogs — buffer kosong putus)',
+    ok:
+      tgPy.includes('_load_all_group_dialogs') &&
+      tgPy.includes('GetDialogsRequest') &&
+      !tgPy.includes('async for dialog in client.iter_dialogs(') &&
+      !/iter_dialogs\([^)]*ignore_migrated\s*=\s*True/.test(tgPy) &&
+      !tgPy.includes('_resolve_live_group_entity') &&
+      !tgPy.includes('_resolve_migrated_channel') &&
+      tgPy.includes('seen_peer_ids'),
+  },
+  {
+    name: 'TG scrape: basic group terhapus (deactivated) tidak ditulis ke daily',
+    ok: /isinstance\(entity, Chat\) and getattr\(entity, "deactivated", False\)/.test(tgPy),
+  },
+  {
+    name: 'TG scrape: invite link DIBACA dulu, ExportChatInvite (membuat link baru) jalan terakhir',
+    ok:
+      tgPy.includes('GetExportedChatInvitesRequest') &&
+      tgPy.includes('_read_own_exported_invite') &&
+      // Urutan wajib: existing_invite (GetFull) → link lama akun → baru boleh export.
+      tgPy.indexOf('_read_own_exported_invite(client, entity)') <
+        tgPy.indexOf('ExportChatInviteRequest(peer=entity)'),
+  },
+  {
+    name: 'Grup TIDAK dibuang karena member_count 0 (0 juga berarti API gagal → missing_group palsu)',
+    ok:
+      !/member_count\s*or\s*0\)\s*<=\s*0/.test(tgPy) &&
+      !/member_count\s*\|\|\s*0\)\s*<=\s*0/.test(read('src/lib/dedupeScrapedGroups.ts')),
+  },
+  {
+    name: 'TG scrape: checkpoint parsial tidak boleh commit daily (rm_commit menghapus daily akun)',
+    ok:
+      tgScrape.includes('SCRAPER_PARTIAL_RESULT') &&
+      tgScrape.includes(".partial === true"),
+  },
+  {
+    name: 'Teardown auto lane idle tidak cancel sidecar (jangan patahkan scrape manual akun sama)',
+    ok:
+      cancelAutoActiveBranch.includes('cancelTelegramScrape') &&
+      cancelAutoBody.split('cancelTelegramScrape').length - 1 === 1,
+  },
+  {
+    name: 'Sidecar cancel no-op tanpa scrape jalan (flag sticky tidak bunuh scrape berikutnya)',
+    ok:
+      sidecarMain.includes('if not is_telegram_scrape_running(session_id):') &&
+      sidecarMain.includes('NO_ACTIVE_SCRAPE'),
+  },
+  {
+    name: 'Idle stuck tidak disamarkan jadi SCRAPER_CANCELLED',
+    ok:
+      scraperIdx.includes("import { ScrapeTimeoutError } from './deviceGroupScale'") &&
+      scraperIdx.split('if (error instanceof ScrapeTimeoutError) throw error;').length - 1 === 2,
+  },
+  {
+    name: 'Auto scrape mengalah ke lane yang duluan jalan → remark busy (bukan session_invalid)',
+    ok:
+      autoScrape.includes("Promise<AutoScrapeReadiness>") &&
+      autoScrape.includes("return 'busy'") &&
+      autoScrape.includes("readiness === 'busy' ? 'busy' : 'skipped'") &&
+      read('src/hooks/useAutoAccountSync.ts').includes("if (result === 'busy') return 'busy';"),
+  },
   {
     name: 'Store cap 6000 grup (electron)',
     ok:
@@ -140,7 +235,7 @@ const checks = [
       !tgScrape.includes("withNetworkRetry('Telegram scrape'") &&
       tgPy.includes('start_telegram_scrape_job') &&
       read('python-sidecar/main.py').includes('/telegram/scrape/result/') &&
-      read('electron/main/platformLogin/telegramSidecar.ts').includes('SIDECAR_VERSION = 6'),
+      read('electron/main/platformLogin/telegramSidecar.ts').includes('SIDECAR_VERSION = 11'),
   },
   {
     name: 'TG finishing: reconnect sebelum export + soft-fail setelah write DB',
@@ -184,14 +279,14 @@ const checks = [
       waScrape.includes('RESUMED_CHECKPOINT'),
   },
   {
-    name: 'TG partial checkpoint + no sidecar kill mid-scrape',
+    name: 'TG partial checkpoint + version mismatch force-reloads scrape engine',
     ok:
       tgPy.includes('PARTIAL_CHECKPOINT') &&
       tgPy.includes('PARTIAL_AFTER_ERROR') &&
       tgPy.includes('count_active_telegram_scrapes') &&
       read('python-sidecar/main.py').includes('activeScrapes') &&
       read('electron/main/platformLogin/telegramSidecar.ts').includes('activeScrapes') &&
-      read('electron/main/platformLogin/telegramSidecar.ts').includes('skip restart'),
+      read('electron/main/platformLogin/telegramSidecar.ts').includes('force restart to load new scrape engine'),
   },
   {
     name: 'TG truncate >6000: hint TRUNCATED (bukan sukses diam)',

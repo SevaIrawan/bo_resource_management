@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import time
 
 from telethon import utils
 from telethon.errors import FloodWaitError
+from telethon.tl import custom as tl_custom
+from telethon.tl import types as tl_types
 from telethon.tl.functions.channels import GetFullChannelRequest
-from telethon.tl.functions.messages import ExportChatInviteRequest, GetFullChatRequest
+from telethon.tl.functions.messages import (
+    ExportChatInviteRequest,
+    GetDialogsRequest,
+    GetExportedChatInvitesRequest,
+    GetFullChatRequest,
+)
 from telethon.tl.types import (
     Channel,
     ChannelParticipantAdmin,
@@ -26,6 +34,7 @@ from telegram_human_delay import (
 from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
 
 DEVICE_GROUP_TARGET_MAX = 6000
+_DIALOG_CHUNK = 100
 # Jeda antar grup (~2s) + ban safety.
 _SCRAPE_DELAY = merge_delay(
     {
@@ -44,6 +53,10 @@ _scrape_tasks: dict[str, asyncio.Task] = {}
 
 class ScrapeCancelled(Exception):
     """Operator cancel — termasuk mid FloodWait / long await."""
+
+
+class DiscoveryIncomplete(Exception):
+    """Listing dialog putus di tengah — JANGAN commit daily (Missing palsu massal)."""
 
 
 def request_scrape_cancel(session_id: str) -> None:
@@ -293,11 +306,215 @@ async def _resolve_member_count(client, entity) -> tuple[int, str | None]:
     return 0, full_invite
 
 
-def _is_group_dialog(dialog) -> bool:
+def _is_live_group_dialog(dialog) -> bool:
+    """Grup hidup untuk scrape. Shell migrate / Chat deactivated = BUKAN target.
+
+    Sama seperti ignore_migrated Telethon/app resmi — tapi filter di sini, bukan lewat
+    stock iter_dialogs (stock stop prematur jika buffer chunk kosong).
+    """
     entity = dialog.entity
-    is_group = dialog.is_group
-    is_megagroup = isinstance(entity, Channel) and bool(getattr(entity, "megagroup", False))
-    return bool(is_group or is_megagroup)
+    if isinstance(entity, Chat) and getattr(entity, "migrated_to", None) is not None:
+        return False
+    if isinstance(entity, Chat) and getattr(entity, "deactivated", False):
+        return False
+    if dialog.is_group:
+        return True
+    return isinstance(entity, Channel) and bool(getattr(entity, "megagroup", False))
+
+
+def _dialog_message_key(peer, message_id):
+    channel_id = peer.channel_id if isinstance(peer, tl_types.PeerChannel) else None
+    return channel_id, message_id
+
+
+async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
+    """Ambil semua dialog grup HIDUP akun ini.
+
+    Returns: (dialogs, skipped_migrate_shells).
+
+    Kenapa bukan stock Telethon iter_dialogs + ignore_migrated:
+    Stock Telethon (`dialogs.py`): jika SEMUA dialog di satu chunk di-skip
+    (mis. banyak shell migrate) → buffer kosong → `return True` → pagination PUTUS.
+    Akibat: Super Group di halaman berikutnya tidak terbaca → daily bolong → Join Missing
+    meski di device sudah admin.
+
+    Kontrak di sini:
+    1. Pagination GetDialogsRequest lengkap (lanjut meski 0 grup lolos filter di chunk).
+    2. Shell Chat.migrated_to / deactivated → skip (1 grup migrate = 1 ID Super saja).
+    3. FloodWait/error discovery → DiscoveryIncomplete (jangan commit daily bolong).
+    """
+    offset_date = None
+    offset_id = 0
+    offset_peer: tl_types.TypeInputPeer = tl_types.InputPeerEmpty()
+    exclude_pinned = False
+    seen: set[int] = set()
+    out: list = []
+    skipped_migrate = 0
+
+    while True:
+        if is_scrape_cancelled(session_id):
+            raise ScrapeCancelled()
+
+        async def _fetch_chunk():
+            return await client(
+                GetDialogsRequest(
+                    offset_date=offset_date,
+                    offset_id=offset_id,
+                    offset_peer=offset_peer,
+                    limit=_DIALOG_CHUNK,
+                    hash=0,
+                    exclude_pinned=exclude_pinned,
+                    folder_id=None,
+                )
+            )
+
+        try:
+            result = await _count_with_flood_retry(
+                _fetch_chunk,
+                label="get_dialogs",
+                session_id=session_id,
+            )
+        except ScrapeCancelled:
+            raise
+        except FloodWaitError as exc:
+            # JANGAN break + return partial. Commit daftar bolong = Missing di semua akun.
+            cap = max_floodwait_auto_sleep(_SCRAPE_DELAY)
+            if int(exc.seconds) > cap:
+                raise DiscoveryIncomplete(
+                    f"SCRAPER_DISCOVERY_FLOODWAIT:{exc.seconds}"
+                ) from exc
+            await _sleep_flood_with_heartbeat(
+                session_id,
+                flood_wait_seconds(_SCRAPE_DELAY, exc.seconds),
+                label_base="discover FloodWait",
+            )
+            if is_scrape_cancelled(session_id):
+                raise ScrapeCancelled()
+            continue
+        except Exception as exc:  # noqa: BLE001
+            raise DiscoveryIncomplete(f"SCRAPER_DISCOVERY_FAILED:{exc}") from exc
+
+        entities = {
+            utils.get_peer_id(x): x
+            for x in itertools.chain(result.users, result.chats)
+            if not isinstance(x, (tl_types.UserEmpty, tl_types.ChatEmpty))
+        }
+        client._mb_entity_cache.extend(result.users, result.chats)
+
+        messages = {}
+        for msg in result.messages:
+            msg._finish_init(client, entities, None)
+            messages[_dialog_message_key(msg.peer_id, msg.id)] = msg
+
+        new_peers = 0
+        last_input_peer = None
+        for raw in result.dialogs:
+            peer_id = utils.get_peer_id(raw.peer)
+
+            entity = entities.get(peer_id)
+            if entity is None:
+                try:
+                    entity = await client.get_entity(raw.peer)
+                    entities[peer_id] = entity
+                except Exception:  # noqa: BLE001
+                    # Jangan tandai seen: peer belum resolve. Offset tetap maju lewat peer lain.
+                    continue
+
+            try:
+                last_input_peer = utils.get_input_peer(entity)
+            except Exception:  # noqa: BLE001
+                pass
+
+            if peer_id in seen:
+                continue
+            seen.add(peer_id)
+            new_peers += 1
+
+            message = messages.get(_dialog_message_key(raw.peer, raw.top_message))
+            try:
+                dialog = tl_custom.Dialog(client, raw, entities, message)
+            except Exception:  # noqa: BLE001
+                continue
+
+            ent = dialog.entity
+            if isinstance(ent, Chat) and getattr(ent, "migrated_to", None) is not None:
+                # Shell basic setelah migrate — Super Group sudah dialog Channel sendiri.
+                skipped_migrate += 1
+                continue
+            if not _is_live_group_dialog(dialog):
+                continue
+            out.append(dialog)
+
+        set_scrape_progress(
+            session_id,
+            phase="discover",
+            current=len(out),
+            total=0,
+            label=f"Listing groups on device ({len(out)})…",
+        )
+
+        raw_count = len(result.dialogs)
+        # BEDA dari stock Telethon: jangan stop hanya karena 0 grup lolos filter di chunk ini.
+        if not isinstance(result, tl_types.messages.DialogsSlice):
+            break
+        if raw_count == 0 or raw_count < _DIALOG_CHUNK:
+            break
+        if new_peers == 0:
+            break
+
+        last_message = next(
+            filter(
+                None,
+                (
+                    messages.get(_dialog_message_key(d.peer, d.top_message))
+                    for d in reversed(result.dialogs)
+                ),
+            ),
+            None,
+        )
+        if last_input_peer is None:
+            last_raw = result.dialogs[-1]
+            try:
+                last_input_peer = await client.get_input_entity(last_raw.peer)
+            except Exception as exc:  # noqa: BLE001
+                raise DiscoveryIncomplete(
+                    f"SCRAPER_DISCOVERY_FAILED: cannot advance offset ({exc})"
+                ) from exc
+
+        exclude_pinned = True
+        offset_id = last_message.id if last_message else 0
+        offset_date = last_message.date if last_message else None
+        offset_peer = last_input_peer
+
+    return out, skipped_migrate
+
+
+async def _upgrade_basic_chat_if_migrated(client, entity):
+    """Safety net: Chat.migrated_to → Channel saja. Jangan pernah tulis ID basic usang."""
+    if not isinstance(entity, Chat):
+        return entity
+
+    if getattr(entity, "deactivated", False) and getattr(entity, "migrated_to", None) is None:
+        return None
+
+    migrated = getattr(entity, "migrated_to", None)
+    if migrated is None:
+        return entity
+
+    try:
+        channel = await client.get_entity(migrated)
+    except Exception:  # noqa: BLE001
+        try:
+            channel_id = getattr(migrated, "channel_id", None)
+            if channel_id is None:
+                return None
+            channel = await client.get_entity(int(channel_id))
+        except Exception:  # noqa: BLE001
+            return None
+
+    if isinstance(channel, Channel) and bool(getattr(channel, "megagroup", False)):
+        return channel
+    return None
 
 
 async def _is_me_listed_as_owner(client, entity, me) -> bool:
@@ -384,6 +601,43 @@ async def _my_group_roles(client, entity, me) -> tuple[bool, bool]:
     return is_admin, False
 
 
+async def _read_own_exported_invite(client, entity) -> str | None:
+    """Baca link yang SUDAH pernah dibuat akun ini — tanpa membuat link baru.
+
+    `messages.exportChatInvite` **membuat** link baru setiap dipanggil
+    (core.telegram.org/api/invites: "To generate a new one, use messages.exportChatInvite"),
+    dan tiap admin punya link sendiri. Memanggilnya di setiap scrape membuat satu grup
+    menumpuk banyak link berbeda — semuanya valid dan semuanya mengarah ke grup yang sama.
+    `getExportedChatInvites` hanya membaca, jadi scrape kedua dan seterusnya memakai ulang
+    link yang sama.
+    """
+    try:
+        result = await client(
+            GetExportedChatInvitesRequest(peer=entity, admin_id="me", limit=50)
+        )
+    except FloodWaitError as exc:
+        # Jangan naikkan — pemanggil hanya menangani ScrapeCancelled, dan jalur export
+        # di bawahnya sudah punya penanganan FloodWait sendiri.
+        print(f"[tg-scrape] read invites FloodWait {exc.seconds}s — skip reuse", flush=True)
+        return None
+    except Exception:  # noqa: BLE001
+        return None
+
+    invites = list(getattr(result, "invites", None) or [])
+    usable = [inv for inv in invites if not getattr(inv, "revoked", False)]
+    # Link permanen = link utama grup; link berbatas waktu/kuota bisa mati.
+    for invite in usable:
+        if getattr(invite, "permanent", False):
+            link = _link_from_exported_invite(invite)
+            if link:
+                return link
+    for invite in usable:
+        link = _link_from_exported_invite(invite)
+        if link:
+            return link
+    return None
+
+
 async def _resolve_invite_link(
     client,
     entity,
@@ -395,7 +649,12 @@ async def _resolve_invite_link(
     current: int = 0,
     total: int = 0,
 ) -> str | None:
-    """Username → t.me; admin: pakai exported_invite dari GetFull dulu, baru ExportChatInvite."""
+    """Username → exported_invite GetFull → link lama akun ini → baru boleh buat link.
+
+    Urutannya sengaja: tiga langkah pertama hanya MEMBACA. `ExportChatInvite` (yang membuat
+    link baru) jadi jalan terakhir, supaya satu grup tidak punya link berbeda-beda per akun
+    dan per scrape.
+    """
     if username:
         return f"https://t.me/{username}"
     if existing_invite:
@@ -403,6 +662,10 @@ async def _resolve_invite_link(
     # Export hanya jika admin (non-admin biasanya gagal / spam API).
     if not is_admin:
         return None
+
+    reused = await _read_own_exported_invite(client, entity)
+    if reused:
+        return reused
     delay_cfg = _SCRAPE_DELAY
     retries = 2
     for attempt in range(1, retries + 1):
@@ -530,25 +793,15 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
     try:
         set_scrape_progress(session_id, phase="discover", label="Discovering groups on Telegram")
 
-        # Refresh dialog list — akun besar bisa lama; heartbeat agar idle watchdog Electron tidak putus diam.
-        await _await_with_progress_heartbeat(
-            session_id,
-            client.get_dialogs(),
-            phase="discover",
-            label="Refreshing dialog list from Telegram",
-        )
-        if is_scrape_cancelled(session_id):
-            return _cancelled_payload(session_id)
-
+        # Pagination GetDialogs sendiri — jangan stock iter_dialogs (buffer kosong = putus).
         targets: list = []
         total_on_account = 0
-        async for dialog in client.iter_dialogs():
-            if is_scrape_cancelled(session_id):
-                return _cancelled_payload(session_id)
-            if not _is_group_dialog(dialog):
-                continue
-            total_on_account += 1
-            if total_on_account == 1 or total_on_account % 50 == 0:
+        discover_stop = asyncio.Event()
+
+        async def _discover_heartbeat() -> None:
+            while not discover_stop.is_set():
+                if is_scrape_cancelled(session_id):
+                    return
                 set_scrape_progress(
                     session_id,
                     phase="discover",
@@ -556,8 +809,34 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                     total=0,
                     label=f"Listing groups on device ({total_on_account})…",
                 )
-            if len(targets) < DEVICE_GROUP_TARGET_MAX:
-                targets.append(dialog)
+                try:
+                    await asyncio.wait_for(discover_stop.wait(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    pass
+
+        discover_hb = asyncio.create_task(_discover_heartbeat())
+        try:
+            all_group_dialogs, skipped_migrate = await _load_all_group_dialogs(client, session_id)
+            total_on_account = len(all_group_dialogs)
+            targets = all_group_dialogs[:DEVICE_GROUP_TARGET_MAX]
+        except ScrapeCancelled:
+            return _cancelled_payload(session_id)
+        except DiscoveryIncomplete as exc:
+            # Gagal listing = error keras. Jangan status ok + daily bolong.
+            return {
+                "status": "error",
+                "message": str(exc) or "SCRAPER_DISCOVERY_FAILED",
+                "valid": False,
+            }
+        finally:
+            discover_stop.set()
+            try:
+                await discover_hb
+            except Exception:  # noqa: BLE001
+                pass
+
+        if is_scrape_cancelled(session_id):
+            return _cancelled_payload(session_id)
 
         truncated = total_on_account > DEVICE_GROUP_TARGET_MAX
         if truncated:
@@ -565,6 +844,13 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                 f"[tg-scrape] sessionId={session_id} {total_on_account} groups; "
                 f"scraping first {DEVICE_GROUP_TARGET_MAX}",
             )
+
+        print(
+            f"[tg-scrape] sessionId={session_id} me={me_label} "
+            f"discovered={total_on_account} skipped_migrate_shells={skipped_migrate} "
+            f"group dialogs from Telegram",
+            flush=True,
+        )
 
         total = len(targets)
         set_scrape_progress(
@@ -583,21 +869,90 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
         )
 
         groups: list[dict] = []
+        seen_peer_ids: set[str] = set()
+        # Grup yang perannya GAGAL dibaca (FloodWait / API error). Nilainya jatuh ke
+        # is_admin='no', dan tanpa dilaporkan itu tidak bisa dibedakan dari "memang bukan
+        # admin" — sumber tiket not_admin palsu dan angka grid yang berubah tiap scrape.
+        unverified_role_groups: list[str] = []
         for index, dialog in enumerate(targets):
             if is_scrape_cancelled(session_id):
                 return _cancelled_payload(session_id, groups)
+
+            dialog_label = dialog.title or dialog.name or f"dialog-{index}"
+            # Progress SEBELUM resolve/GetFull — skip migrate panjang tanpa heartbeat
+            # memicu idle watchdog → cancel palsu saat hampir selesai.
+            set_scrape_progress(
+                session_id,
+                phase="group",
+                current=index,
+                total=total,
+                label=f"{dialog_label} ({index}/{total})",
+            )
 
             if index > 0:
                 await asyncio.sleep(
                     jitter_seconds(float(_SCRAPE_DELAY.get("scrape_between_groups_sec", 1.5)), _SCRAPE_DELAY)
                 )
 
-            entity = dialog.entity
+            # Safety: shell migrate jangan tulis ID basic (1 grup 2 ID).
+            raw_entity = dialog.entity
+            try:
+                entity = await _upgrade_basic_chat_if_migrated(client, raw_entity)
+            except ScrapeCancelled:
+                return _cancelled_payload(session_id, groups)
+
+            if entity is None:
+                continue
+
+            # Masih Chat + migrated_to = usang — jangan tulis.
+            if isinstance(entity, Chat) and getattr(entity, "migrated_to", None) is not None:
+                try:
+                    seen_peer_ids.add(str(utils.get_peer_id(entity)))
+                except Exception:  # noqa: BLE001
+                    pass
+                continue
+
+            if isinstance(entity, Chat) and getattr(entity, "deactivated", False):
+                continue
+
+            # Channel non-megagroup (broadcast) jangan masuk daily grup.
+            if isinstance(entity, Channel) and not bool(getattr(entity, "megagroup", False)):
+                if not dialog.is_group:
+                    continue
+
             try:
                 group_id = str(utils.get_peer_id(entity))
             except Exception:  # noqa: BLE001
                 group_id = str(dialog.id)
-            group_name = dialog.title or dialog.name or group_id
+
+            # Tandai peer basic usang supaya tidak dobel jika shell ikut terproses.
+            if (
+                isinstance(raw_entity, Chat)
+                and getattr(raw_entity, "migrated_to", None) is not None
+                and isinstance(entity, Channel)
+            ):
+                try:
+                    seen_peer_ids.add(str(utils.get_peer_id(raw_entity)))
+                except Exception:  # noqa: BLE001
+                    pass
+
+            if group_id in seen_peer_ids:
+                set_scrape_progress(
+                    session_id,
+                    phase="group",
+                    current=index + 1,
+                    total=total,
+                    label=f"Skip duplicate peer ({index + 1}/{total})",
+                )
+                continue
+            seen_peer_ids.add(group_id)
+
+            group_name = (
+                getattr(entity, "title", None)
+                or dialog.title
+                or dialog.name
+                or group_id
+            )
 
             set_scrape_progress(
                 session_id,
@@ -614,7 +969,7 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
 
             try:
                 is_admin_flag, is_owner_flag = await _count_with_flood_retry(
-                    lambda: _my_group_roles(client, entity, me),
+                    lambda e=entity: _my_group_roles(client, e, me),
                     label="group_roles",
                     session_id=session_id,
                     current=index,
@@ -625,16 +980,23 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             except FloodWaitError:
                 is_admin_flag = False
                 is_owner_flag = False
+                unverified_role_groups.append(group_id)
             except Exception:  # noqa: BLE001
                 is_admin_flag = False
                 is_owner_flag = False
+                unverified_role_groups.append(group_id)
 
             if is_owner_flag:
                 is_admin_flag = True
 
+            # Setelah upgrade migrate, entity sudah Channel/Chat live.
+            # JANGAN buang grup karena member_count 0 — nilai itu juga 0 saat GetFullChat /
+            # get_participants gagal (umum untuk member non-admin), dan membuang baris daily
+            # grup yang benar-benar diikuti akun akan memunculkan tiket missing_group palsu.
+
             try:
                 owner_count, admin_count = await _count_with_flood_retry(
-                    lambda: _count_admin_roles(client, entity),
+                    lambda e=entity: _count_admin_roles(client, e),
                     label="admin_roles",
                     session_id=session_id,
                     current=index,
@@ -698,7 +1060,25 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                     },
                 )
 
+        set_scrape_progress(
+            session_id,
+            phase="group",
+            current=total,
+            total=total,
+            label=f"Finalizing scrape ({len(groups)} groups)…",
+        )
+
         elapsed_sec = time.monotonic() - started_at
+
+        # Ringkasan wajib tercetak: discovered (dari Telethon) vs targets (setelah cap) vs
+        # written (baris final, setelah skip deactivated/duplicate). Kalau written < targets
+        # tanpa print skip yang sepadan di atas, berarti ada jalur pembuang baris yang belum
+        # ketemu di audit kode — bukti langsung, bukan tebakan.
+        print(
+            f"[tg-scrape] sessionId={session_id} me={me_label} summary: "
+            f"discovered={total_on_account} targets={total} written={len(groups)}",
+            flush=True,
+        )
 
         admin_count = sum(1 for group in groups if group["is_admin"] == "yes")
         payload = {
@@ -709,8 +1089,17 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             "adminCount": admin_count,
             "telegramUser": me_label,
             "elapsedMs": int(elapsed_sec * 1000),
+            "unverifiedRoleCount": len(unverified_role_groups),
         }
         hint_parts: list[str] = []
+        if unverified_role_groups:
+            hint_parts.append(f"UNVERIFIED_ROLES_{len(unverified_role_groups)}")
+            payload["unverifiedRoleGroupIds"] = unverified_role_groups[:50]
+            print(
+                f"[tg-scrape] sessionId={session_id} roles unread for "
+                f"{len(unverified_role_groups)} group(s) — is_admin recorded as 'no'",
+                flush=True,
+            )
         if truncated:
             hint_parts.append(f"TRUNCATED_{DEVICE_GROUP_TARGET_MAX}")
             payload["message"] = (
@@ -777,6 +1166,35 @@ async def start_telegram_scrape_job(
         try:
             result = await scrape_telegram_groups(session_id, session_string, expected_phone)
             set_scrape_result(session_id, result)
+        except asyncio.CancelledError:
+            # `CancelledError` TIDAK turunan `Exception` (Python 3.8+) — tanpa blok ini,
+            # task yang dibatalkan oleh apapun di luar cancel-flag kita sendiri (event loop,
+            # shutdown sidecar, dsb) mati diam TANPA menulis hasil. Electron polling melihat
+            # status running/idle terus, baru timeout lewat watchdog-nya sendiri — persis
+            # gejala "scrape cancel padahal sudah mau finish" untuk akun besar / grup di
+            # ujung daftar dialog. Simpan checkpoint terakhir + pesan jelas, jangan diam.
+            prev = get_scrape_result(session_id)
+            groups = list((prev or {}).get("groups") or [])
+            print(
+                f"[tg-scrape] sessionId={session_id} task cancelled mid-scrape "
+                f"(checkpoint groups={len(groups)})",
+                flush=True,
+            )
+            set_scrape_result(
+                session_id,
+                {
+                    "status": "ok" if groups else "error",
+                    "groups": groups,
+                    "count": len(groups),
+                    "partial": bool(groups),
+                    "hint": "TASK_CANCELLED",
+                    "message": (
+                        "Telegram scrape task dibatalkan tak terduga (bukan oleh user) "
+                        "sebelum selesai. Data lama TIDAK diubah — coba Scrape Now lagi."
+                    ),
+                    "telegramUser": (prev or {}).get("telegramUser"),
+                },
+            )
         except Exception as exc:  # noqa: BLE001
             prev = get_scrape_result(session_id)
             groups = list((prev or {}).get("groups") or [])

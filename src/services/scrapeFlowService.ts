@@ -19,6 +19,7 @@ import {
 } from '@/lib/sessionRealtimePolicy';
 import { invalidateUserSessionOnDeviceFailure } from '@/lib/userActionSession';
 import {
+  buildRolesUnverifiedWarning,
   isScrapeConnectionModalCode,
   isScrapeUserCancelledMessage,
   normalizeScrapeErrorMessage,
@@ -51,8 +52,11 @@ export type ScrapeRunOutcome =
       brandX: number;
       /** true = login/sync barusan — update Session+Status; false = session sudah valid sebelum scrape. */
       updateSession: boolean;
-      /** Cap 6000 / hint device — data sudah ditulis; UI wajib notif (bukan sukses diam). */
-      warningCode?: 'SCRAPER_TRUNCATED_CAP';
+      /**
+       * Cap 6000 / peran gagal dibaca — data sudah ditulis; UI wajib notif (bukan sukses diam).
+       * Peran gagal dibaca membawa angkanya: `SCRAPER_ROLES_UNVERIFIED:<gagal>/<total>`.
+       */
+      warningCode?: 'SCRAPER_TRUNCATED_CAP' | `SCRAPER_ROLES_UNVERIFIED:${number}/${number}`;
     };
 
 export async function resolveScrapeLoginIfNeeded(input: {
@@ -191,6 +195,10 @@ export async function executeScrapeRun(input: {
 
     const hint = scrapeCounts.hint ?? '';
     const truncated = /TRUNCATED_\d+/i.test(hint);
+    // Peran gagal dibaca → is_admin tercatat 'no'. Data tetap ditulis (permintaan operator),
+    // tapi wajib dilaporkan berikut angkanya supaya "bukan admin" bisa dibedakan dari
+    // "gagal diperiksa".
+    const unverifiedRoles = Number(/UNVERIFIED_ROLES_(\d+)/i.exec(hint)?.[1] ?? 0);
 
     return {
       kind: 'success',
@@ -201,7 +209,11 @@ export async function executeScrapeRun(input: {
       scrapedAt: new Date().toISOString(),
       brandX,
       updateSession: input.updateSessionOnSuccess === true,
-      warningCode: truncated ? 'SCRAPER_TRUNCATED_CAP' : undefined,
+      warningCode: truncated
+        ? 'SCRAPER_TRUNCATED_CAP'
+        : unverifiedRoles > 0
+          ? buildRolesUnverifiedWarning(unverifiedRoles, scrapeCounts.deviceGroupCount)
+          : undefined,
     };
   } catch (error) {
     const raw = getErrorMessage(error, 'SCRAPER_FAILED');

@@ -42,6 +42,7 @@ export const zh: Messages = {
       outcomeSuccess: '成功',
       outcomeTruncated: '部分完成（上限 6000）',
       outcomeFailed: '失败',
+      outcomeBusy: '已跳过 — 账号占用中',
       outcomeSessionInvalid: '会话无效',
       statusDetailTitle: '{{brand}} · {{platform}}',
       statusDetailHint: '所选账号最近一次自动抓取结果。',
@@ -687,6 +688,10 @@ export const zh: Messages = {
         '抓取在读取完本账号全部群组前已停止。请等待应用/设备同步完成几分钟后，再次 Scrape Now。',
       scraperTruncatedCap:
         '本次仅保存前 6000 个群（账号群数更多）。已写入数据真实但不完整 — 如需全量请拆分账号或联系支持。',
+      scraperRolesUnverified:
+        '数据已保存，但部分群组的管理员身份未能从 Telegram 读取（限流或接口错误）。这些群被记为非管理员，因此 Not admin 数量可能偏高。请几分钟后重新抓取该账号确认。',
+      scraperRolesUnverifiedCounts:
+        '抓取完成且数据已保存：共抓取 {{scanned}} 个群，其中 {{verified}} 个已确认管理员身份，{{unverified}} 个未能读取（限流或接口错误）。这 {{unverified}} 个被记为非管理员，因此 Not admin 数量可能偏高。请几分钟后重新抓取该账号确认。',
       scraperConnectionLostWa:
         '与 WhatsApp 服务器的连接已中断。请检查本机网络及手机 WhatsApp 是否正常，然后重新运行抓取。',
       scraperConnectionLostTg:

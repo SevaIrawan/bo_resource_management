@@ -701,6 +701,8 @@ function jobQueueViewTableRowsRaw(
           groupName: group.groupName,
           inviteLink: group.inviteLink,
           groupLink: group.groupLink,
+          exitStatus: 'pending' as const,
+          deleteStatus: 'pending' as const,
         }));
     return outcomes.map((row, index) => {
       const fullyDone = row.exitStatus === 'left' && row.deleteStatus === 'deleted';

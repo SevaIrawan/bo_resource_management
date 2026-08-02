@@ -820,9 +820,14 @@
   }
 
   .operations-job-queue-table-wrap--scroll-body {
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     min-height: 10rem;
-    max-height: min(42vh, 22rem);
+    max-height: calc(
+      var(--job-queue-setup-head-h, 2.25rem) + var(--job-queue-setup-row-h, 2.05rem) *
+        var(--job-queue-setup-visible-rows, 10)
+    );
   }
 
   .operations-job-queue-table-wrap--scroll-body .operations-job-queue-table thead th {
@@ -833,9 +838,14 @@
     box-shadow: 0 1px 0 var(--color-border-subtle);
   }
 
+  /* width saja — JANGAN overflow:hidden (membunuh scroll 100 row / viewport 10). */
   .operations-job-queue-table-wrap--paged {
-    overflow: hidden;
     width: 100%;
+  }
+
+  .operations-job-queue-table-wrap--scroll-body.operations-job-queue-table-wrap--paged {
+    overflow-x: auto;
+    overflow-y: auto;
   }
 
   .operations-job-queue-table--exit-groups {
@@ -4299,10 +4309,16 @@
   }
 
   .brand-modal-panel--job-queue-setup-exit-delete .operations-job-queue-setup-form--exit-delete {
-    flex: none;
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .brand-modal-panel--job-queue-setup-exit-delete .operations-job-queue-table-wrap--scroll-body {
+    flex: 1 1 auto;
+    min-height: 10rem;
   }
 
   .brand-modal-panel.brand-modal-panel--job-queue-setup .operations-job-queue-field--wide,
@@ -4740,9 +4756,16 @@
   }
 
   .brand-modal-panel--job-queue-setup-join .operations-job-queue-table-wrap--scroll-body,
-  .brand-modal-panel--job-queue-setup-set-admin .operations-job-queue-table-wrap--scroll-body {
+  .brand-modal-panel--job-queue-setup-set-admin .operations-job-queue-table-wrap--scroll-body,
+  .brand-modal-panel--job-queue-setup-exit-delete .operations-job-queue-table-wrap--scroll-body {
     min-height: 10rem;
-    max-height: min(42vh, 22rem);
+    max-height: calc(
+      var(--job-queue-setup-head-h, 2.25rem) + var(--job-queue-setup-row-h, 2.05rem) *
+        var(--job-queue-setup-visible-rows, 10)
+    );
+    overflow-x: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .brand-modal-panel.brand-modal-panel--job-queue-setup .operations-job-queue-table th,

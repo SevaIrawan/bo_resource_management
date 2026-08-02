@@ -56,7 +56,7 @@ function stripMetaAndToc(md) {
 
 function extractVersion(md) {
   const m = md.match(/\*\*Versi app:\*\*\s*([^\n]+)/);
-  return m ? m[1].trim() : '1.0.34';
+  return m ? m[1].trim() : '1.0.35';
 }
 
 function extractIntro(md) {

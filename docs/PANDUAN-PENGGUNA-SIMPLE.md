@@ -1,6 +1,6 @@
 ﻿# Panduan Group Monitoring
 
-**Versi app:** 1.0.34  
+**Versi app:** 1.0.35  
 **Untuk:** Tim **Depart Resource Management (R&M)** — semua yang menjalankan monitoring grup WhatsApp & Telegram  
 **Bahasa UI:** English / 中文 → ubah di **Settings → Language**
 
@@ -489,4 +489,4 @@ Hanya yang sering di operasi. Pesan lain → baca alert / VIEW Remark → Team D
 
 ---
 
-*Panduan ini untuk modul **Group Monitoring** v1.0.34 — tim operasional Depart Resource Management.*
+*Panduan ini untuk modul **Group Monitoring** v1.0.35 — tim operasional Depart Resource Management.*

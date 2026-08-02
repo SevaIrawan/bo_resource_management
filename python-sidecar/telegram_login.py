@@ -105,6 +105,36 @@ def _is_auth_key_dead_message(msg: str | None) -> bool:
     )
 
 
+def _is_session_revoked_message(msg: str | None, exc: Exception | None = None) -> bool:
+    """Session logout/revoked ASLI di device (bukan konflik multi-device AUTH_KEY_DUPLICATED).
+
+    Telethon melempar exception class spesifik (AuthKeyUnregisteredError /
+    UserDeactivatedError / UserDeactivatedBanError / SessionRevokedError) tapi pesan teksnya
+    generik ("The key is not registered in the system…") — jangan hanya cek string, cek nama
+    class exception juga supaya tidak lolos sebagai SESSION_WARM_PENDING / device_busy.
+    """
+    if exc is not None:
+        name = type(exc).__name__.lower()
+        if (
+            "authkeyunregistered" in name
+            or "userdeactivated" in name
+            or "sessionrevoked" in name
+            or "authkeynotfound" in name
+        ):
+            return True
+    lower = (msg or "").lower()
+    return (
+        "auth_key_unregistered" in lower
+        or "authkeyunregistered" in lower
+        or "user_deactivated" in lower
+        or "userdeactivated" in lower
+        or "session_revoked" in lower
+        or "sessionrevoked" in lower
+        or "key is not registered in the system" in lower
+        or "telegram session is not valid" in lower
+    )
+
+
 def _is_transient_socket_error(msg: str | None) -> bool:
     """Windows/Telethon: Errno 22 / WinError 10022 / socket drop — soft, bukan session mati."""
     lower = (msg or "").lower()
@@ -191,7 +221,7 @@ async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]
         await _ensure_client_connected(client)
         me = await asyncio.wait_for(client.get_me(), timeout=20)
         if me is None:
-            return False, "Telegram session is not valid. Link device again."
+            return False, "TG_SESSION_DEAD: Telegram session is not valid. Link device again."
         return True, None
     except SessionPasswordNeededError:
         return False, "2FA"
@@ -199,17 +229,24 @@ async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]
         msg = str(exc) or "Telegram session expired. Link device again."
         if _is_auth_key_dead_message(msg):
             return False, msg
+        if _is_session_revoked_message(msg, exc):
+            return False, f"TG_SESSION_DEAD: {msg}"
         if _is_transient_socket_error(msg):
             try:
                 await _force_reconnect(client)
                 me = await asyncio.wait_for(client.get_me(), timeout=20)
                 if me is None:
-                    return False, "Telegram session is not valid. Link device again."
+                    return (
+                        False,
+                        "TG_SESSION_DEAD: Telegram session is not valid. Link device again.",
+                    )
                 return True, None
             except SessionPasswordNeededError:
                 return False, "2FA"
             except Exception as retry_exc:  # noqa: BLE001
                 retry_msg = str(retry_exc) or msg
+                if _is_session_revoked_message(retry_msg, retry_exc):
+                    return False, f"TG_SESSION_DEAD: {retry_msg}"
                 return False, retry_msg
         return False, msg
 

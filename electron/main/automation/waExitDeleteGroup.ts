@@ -52,6 +52,13 @@ export async function runWaExitDeleteGroup(
       let deleted = 0;
       let exited = 0;
       const failed: string[] = [];
+      const groupOutcomes: Array<{
+        groupId: string;
+        groupName?: string;
+        exitStatus: 'left' | 'failed';
+        exitError?: string;
+        deleteStatus: 'deleted' | 'failed' | 'skipped';
+      }> = [];
 
       for (let i = 0; i < groups.length; i += 1) {
         const group = groups[i];
@@ -63,12 +70,27 @@ export async function runWaExitDeleteGroup(
           left += 1;
         } else if (leaveResult.outcome === 'not_found') {
           failed.push(`${label}: leave not found`);
+          groupOutcomes.push({
+            groupId: group.groupId,
+            groupName: group.groupName,
+            exitStatus: 'failed',
+            exitError: 'not found',
+            deleteStatus: 'skipped',
+          });
           if (i < groups.length - 1) {
             await sleep(jitterMs(betweenSec * 1000, jitterPercent));
           }
           continue;
         } else {
-          failed.push(`${label}: leave ${leaveResult.message ?? 'failed'}`);
+          const exitError = leaveResult.message ?? 'failed';
+          failed.push(`${label}: leave ${exitError}`);
+          groupOutcomes.push({
+            groupId: group.groupId,
+            groupName: group.groupName,
+            exitStatus: 'failed',
+            exitError,
+            deleteStatus: 'skipped',
+          });
           if (i < groups.length - 1) {
             await sleep(jitterMs(betweenSec * 1000, jitterPercent));
           }
@@ -87,16 +109,40 @@ export async function runWaExitDeleteGroup(
           if (wipeOutcome === 'deleted') {
             deleted += 1;
             exited += 1;
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              exitStatus: 'left',
+              deleteStatus: 'deleted',
+            });
             onProgress?.(exited, groups.length, `Exited: ${label}`);
           } else if (wipeOutcome === 'not_found') {
             failed.push(`${label}: left OK, delete not found`);
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              exitStatus: 'left',
+              deleteStatus: 'failed',
+            });
           } else {
             failed.push(`${label}: left OK, delete failed`);
+            groupOutcomes.push({
+              groupId: group.groupId,
+              groupName: group.groupName,
+              exitStatus: 'left',
+              deleteStatus: 'failed',
+            });
           }
         } catch (error) {
           failed.push(
             `${label}: left OK, delete ${error instanceof Error ? error.message : 'error'}`,
           );
+          groupOutcomes.push({
+            groupId: group.groupId,
+            groupName: group.groupName,
+            exitStatus: 'left',
+            deleteStatus: 'failed',
+          });
         }
 
         if (i < groups.length - 1) {
@@ -110,7 +156,7 @@ export async function runWaExitDeleteGroup(
         action: 'exit_delete_group',
         message: `Exited ${exited}/${total} (left ${left}, deleted ${deleted})`,
         errorCode: exited > 0 ? undefined : 'EXIT_DELETE_GROUP_FAILED',
-        result: { success: exited, total, left, deleted, failed },
+        result: { success: exited, total, left, deleted, failed, groupOutcomes },
       };
     },
   );

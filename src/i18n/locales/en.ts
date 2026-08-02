@@ -214,6 +214,8 @@ export const en = {
         'Exit (leave) is disabled — enable in Settings → Worker → Leave & delete.',
       exitStatusLeft: 'Left',
       exitStatusFailed: 'Exit failed',
+      deleteStatusDeleted: 'Deleted',
+      deleteStatusFailed: 'Delete failed',
       exitRemarkDeleteAutoPending: 'Delete chat queues automatically after leave — VIEW to retry if needed',
       exitRemarkDeleteQueued: 'Delete chat queued',
       exitRemarkDeleteRunning: 'Delete chat in progress',

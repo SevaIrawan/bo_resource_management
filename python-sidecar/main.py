@@ -180,7 +180,7 @@ def _delay_dict(body: AutomationDelayBody | None) -> dict | None:
 async def health() -> dict:
     return {
         "ok": True,
-        "version": 11,
+        "version": 12,
         "activeScrapes": count_active_telegram_scrapes(),
         "features": ["login", "scrape", "count", "validate", "automation", "scrape_async"],
     }

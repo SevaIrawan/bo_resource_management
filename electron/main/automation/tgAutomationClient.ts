@@ -384,8 +384,25 @@ export async function runTelegramAutomation(
     let deleted = 0;
     let exited = 0;
     const failed: string[] = [];
+    const groupOutcomes: Array<{
+      groupId: string;
+      groupName?: string;
+      groupLink?: string;
+      exitStatus: 'left' | 'failed';
+      exitError?: string;
+      deleteStatus: 'deleted' | 'failed' | 'skipped';
+    }> = [];
 
     for (let i = 0; i < groups.length; i += 1) {
+      if (isJobStopRequested(payload.jobId)) {
+        return {
+          status: exited > 0 ? 'ok' : 'error',
+          action: 'exit_delete_group',
+          message: 'Stopped by user',
+          errorCode: 'JOB_STOPPED',
+          result: { success: exited, total: groups.length, left, deleted, failed, groupOutcomes },
+        };
+      }
       const group = groups[i];
       const label = group.groupName ?? group.groupId;
       onProgress?.(exited, groups.length, `Leave: ${label}`);
@@ -400,7 +417,23 @@ export async function runTelegramAutomation(
       );
 
       if (leaveResult.status !== 'ok') {
-        failed.push(`${label}: leave ${leaveResult.message ?? 'failed'}`);
+        const exitError = leaveResult.message ?? 'failed';
+        failed.push(`${label}: leave ${exitError}`);
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          exitStatus: 'failed',
+          exitError,
+          deleteStatus: 'skipped',
+        });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
+        await sleepBetweenGroups(payload, i, groups.length);
         continue;
       }
 
@@ -421,18 +454,51 @@ export async function runTelegramAutomation(
       if (deleteResult.status === 'ok') {
         deleted += 1;
         exited += 1;
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          exitStatus: 'left',
+          deleteStatus: 'deleted',
+        });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
         onProgress?.(exited, groups.length, `Exited: ${label}`);
       } else {
-        failed.push(`${label}: left OK, delete ${deleteResult.message ?? 'failed'}`);
+        const deleteError = deleteResult.message ?? 'failed';
+        failed.push(`${label}: left OK, delete ${deleteError}`);
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          exitStatus: 'left',
+          deleteStatus: 'failed',
+        });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
       }
+      await sleepBetweenGroups(payload, i, groups.length);
     }
 
     return {
-      status: exited > 0 ? 'ok' : 'error',
+      status: batchResultStatus(exited, groups.length),
       action: 'exit_delete_group',
       message: `Exited ${exited}/${groups.length} (left ${left}, deleted ${deleted})`,
-      errorCode: exited > 0 ? undefined : 'EXIT_DELETE_GROUP_FAILED',
-      result: { success: exited, total: groups.length, left, deleted, failed },
+      errorCode:
+        exited >= groups.length
+          ? undefined
+          : exited > 0
+            ? 'EXIT_DELETE_GROUP_PARTIAL'
+            : 'EXIT_DELETE_GROUP_FAILED',
+      result: { success: exited, total: groups.length, left, deleted, failed, groupOutcomes },
     };
   }
 
@@ -568,6 +634,12 @@ export async function runTelegramAutomation(
 
     let success = 0;
     const failed: string[] = [];
+    const groupOutcomes: Array<{
+      groupId: string;
+      groupName?: string;
+      groupLink?: string;
+      deleteStatus: 'deleted' | 'failed';
+    }> = [];
     for (let i = 0; i < groups.length; i += 1) {
       if (isJobStopRequested(payload.jobId)) {
         return {
@@ -575,7 +647,7 @@ export async function runTelegramAutomation(
           action: 'delete_group',
           message: 'Stopped by user',
           errorCode: 'JOB_STOPPED',
-          result: { success, total: groups.length, failed },
+          result: { success, total: groups.length, failed, groupOutcomes },
         };
       }
       const group = groups[i];
@@ -593,18 +665,53 @@ export async function runTelegramAutomation(
           },
         );
       } catch (err) {
-        failed.push(
-          `${group.groupName ?? group.groupId}: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        const deleteError = err instanceof Error ? err.message : String(err);
+        failed.push(`${group.groupName ?? group.groupId}: ${deleteError}`);
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          deleteStatus: 'failed',
+        });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Delete failed');
         await sleepBetweenGroups(payload, i, groups.length);
         continue;
       }
       if (result.status === 'ok') {
         success += 1;
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          deleteStatus: 'deleted',
+        });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
         onProgress?.(i + 1, groups.length, group.groupName ?? 'Deleted');
       } else {
         failed.push(`${group.groupName ?? group.groupId}: ${result.message ?? 'failed'}`);
+        groupOutcomes.push({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupLink: group.groupLink,
+          deleteStatus: 'failed',
+        });
+        if (payload.jobId) {
+          attachJobGroupOutcomes(payload.jobId, {
+            groupOutcomes: [...groupOutcomes],
+            progressCurrent: Math.min(i + 1, groups.length),
+          });
+        }
       }
       await sleepBetweenGroups(payload, i, groups.length);
     }
@@ -618,7 +725,7 @@ export async function runTelegramAutomation(
           : success > 0
             ? 'DELETE_GROUP_PARTIAL'
             : 'DELETE_GROUP_BATCH_FAILED',
-      result: { success, total: groups.length, failed },
+      result: { success, total: groups.length, failed, groupOutcomes },
     };
   }
 

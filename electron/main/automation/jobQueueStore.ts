@@ -293,7 +293,8 @@ function requeueAutomationJob(job: AutomationJobRecord): void {
     job.action === 'set_admin' ||
     job.action === 'set_group_photo' ||
     job.action === 'leave_group' ||
-    job.action === 'delete_group'
+    job.action === 'delete_group' ||
+    job.action === 'exit_delete_group'
   ) {
     const total = accountJobStepTotal(job);
     const already =
@@ -305,9 +306,13 @@ function requeueAutomationJob(job: AutomationJobRecord): void {
           ? (job.payload.groupOutcomes ?? []).filter((r) => r.adminStatus === 'promoted').length
           : job.action === 'set_group_photo'
             ? (job.payload.groupOutcomes ?? []).filter((r) => r.photoStatus === 'set').length
-            : (job.payload.groupOutcomes ?? []).filter(
-                (r) => r.exitStatus === 'left' || r.deleteStatus === 'deleted',
-              ).length;
+            : job.action === 'delete_group'
+              ? (job.payload.groupOutcomes ?? []).filter((r) => r.deleteStatus === 'deleted').length
+              : job.action === 'exit_delete_group'
+                ? (job.payload.groupOutcomes ?? []).filter(
+                    (r) => r.exitStatus === 'left' && r.deleteStatus === 'deleted',
+                  ).length
+                : (job.payload.groupOutcomes ?? []).filter((r) => r.exitStatus === 'left').length;
     job.progress = {
       current: Math.min(already, total),
       total,

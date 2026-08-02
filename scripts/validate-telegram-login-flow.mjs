@@ -23,6 +23,8 @@ const loginTs = read('src/hooks/usePlatformLogin.ts');
 const loginModalTs = read('src/components/group-monitoring/PlatformLoginModal.tsx');
 const syncFlowTs = read('src/hooks/useAccountSyncFlow.ts');
 const loginFlowService = read('src/services/loginFlowService.ts');
+const scrapeErrorUi = read('src/lib/scrapeErrorUi.ts');
+const userActionSession = read('src/lib/userActionSession.ts');
 
 function fnBlock(source, name) {
   const re = new RegExp(`async def ${name}[\\s\\S]*?(?=\\nasync def |\\nexport )`);
@@ -34,8 +36,12 @@ const statusFn = fnBlock(tgPy, 'get_telegram_status');
 
 const checks = [
   {
-    name: 'Sidecar API version 11 (restart sidecar lama)',
-    ok: sidecarTs.includes('SIDECAR_VERSION = 11') && mainPy.includes('"version": 11'),
+    name: 'Sidecar API version bumped bareng (TS + Python) — restart sidecar lama wajib match',
+    ok: (() => {
+      const tsMatch = sidecarTs.match(/SIDECAR_VERSION\s*=\s*(\d+)/);
+      const pyMatch = mainPy.match(/"version":\s*(\d+)/);
+      return Boolean(tsMatch && pyMatch && tsMatch[1] === pyMatch[1]);
+    })(),
   },
   {
     name: 'Export session reconnect jika disconnected',
@@ -164,6 +170,24 @@ const checks = [
       syncFlowTs.includes('persistSessionAfterLogin') &&
       syncFlowTs.includes("setStep('idle')") &&
       loginFlowService.includes('fetchMasterGroupStatsForAccount'),
+  },
+  {
+    name: 'Session TG mati asli (logout/revoked di HP) → modal Login, bukan notif "busy"',
+    ok:
+      // Python: klasifikasi exception class (bukan cuma substring pesan generik Telethon).
+      tgPy.includes('_is_session_revoked_message') &&
+      /_is_session_revoked_message[\s\S]*?authkeyunregistered[\s\S]*?userdeactivated/.test(
+        tgPy.toLowerCase(),
+      ) &&
+      tgPy.includes('TG_SESSION_DEAD:') &&
+      /_verify_client_live[\s\S]*?TG_SESSION_DEAD/.test(tgPy) &&
+      // JS: TG_SESSION_DEAD wajib dianggap dead SEBELUM dicek busy (urutan menentukan).
+      scrapeErrorUi.includes('isTelegramSessionDeadMessage') &&
+      /isDeviceBusyMessage[\s\S]*?isTelegramSessionDeadMessage/.test(scrapeErrorUi) &&
+      /isDeviceSessionDeadMessage[\s\S]*?isTelegramSessionDeadMessage/.test(scrapeErrorUi) &&
+      // userActionSession: device_failed(dead) → login, bukan device_busy generik dari pesan tebakan.
+      userActionSession.includes("kind: 'device_busy'") &&
+      userActionSession.includes("kind: 'device_failed'"),
   },
 ];
 

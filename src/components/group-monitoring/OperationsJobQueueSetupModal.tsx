@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight, FileUp, ImagePlus, Loader2, X } from 'lucide-react';
 import { DarkSelect } from '@/components/ui/DarkSelect';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
@@ -41,9 +41,11 @@ import {
 import type { AutomationJobRecord } from '@/types/automationJob';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
+import {
+  JOB_QUEUE_SETUP_VISIBLE_ROWS,
+  sliceJobQueueSetupPage,
+} from '@/config/jobQueueSetupTable';
 import { reportingAccountDisplayName } from '@/lib/reportingDisplayName';
-
-const EXIT_GROUP_SETUP_PAGE_SIZE = 10;
 
 export interface JobQueueCreateGroupDraft {
   groupName: string;
@@ -211,6 +213,9 @@ export function OperationsJobQueueSetupModal({
   );
   const [exitGroupTab, setExitGroupTab] = useState<'daily' | 'junk'>('daily');
   const [exitGroupPage, setExitGroupPage] = useState(1);
+  const [joinGroupPage, setJoinGroupPage] = useState(1);
+  const [csvPreviewPage, setCsvPreviewPage] = useState(1);
+  const [setAdminGroupPage, setSetAdminGroupPage] = useState(1);
   const [exitGroupProcessedAlertOpen, setExitGroupProcessedAlertOpen] = useState(false);
   const [selectedLeaveDeleteGroupIds, setSelectedLeaveDeleteGroupIds] = useState<Set<string>>(
     () => new Set(),
@@ -332,13 +337,31 @@ export function OperationsJobQueueSetupModal({
     });
   }, [eligibleJoinGroups, joinGroupQuery]);
 
+  const joinPageSlice = useMemo(
+    () => sliceJobQueueSetupPage(visibleJoinGroups, joinGroupPage),
+    [visibleJoinGroups, joinGroupPage],
+  );
+  const pagedJoinGroups = joinPageSlice.pageRows;
+
+  const csvPageSlice = useMemo(
+    () => sliceJobQueueSetupPage(csvValidatedRows, csvPreviewPage),
+    [csvValidatedRows, csvPreviewPage],
+  );
+  const pagedCsvRows = csvPageSlice.pageRows;
+
+  const setAdminPageSlice = useMemo(
+    () => sliceJobQueueSetupPage(eligibleSetAdminGroups, setAdminGroupPage),
+    [eligibleSetAdminGroups, setAdminGroupPage],
+  );
+  const pagedSetAdminGroups = setAdminPageSlice.pageRows;
+
   const allJoinGroupsSelected =
-    visibleJoinGroups.length > 0 &&
-    visibleJoinGroups.every((group) => selectedJoinGroupIds.has(group.groupId));
+    pagedJoinGroups.length > 0 &&
+    pagedJoinGroups.every((group) => selectedJoinGroupIds.has(group.groupId));
 
   const allSetAdminGroupsSelected =
-    eligibleSetAdminGroups.length > 0 &&
-    eligibleSetAdminGroups.every((group) => selectedSetAdminGroupIds.has(group.groupId));
+    pagedSetAdminGroups.length > 0 &&
+    pagedSetAdminGroups.every((group) => selectedSetAdminGroupIds.has(group.groupId));
 
   const exitGroupsForTab = useMemo((): AccountDailyGroupForLeaveDelete[] => {
     return exitGroupTab === 'daily' ? accountExitGroups.daily : accountExitGroups.junk;
@@ -354,22 +377,16 @@ export function OperationsJobQueueSetupModal({
     });
   }, [exitGroupQuery, exitGroupsForTab]);
 
-  const exitGroupPageCount = Math.max(
-    1,
-    Math.ceil(visibleExitGroups.length / EXIT_GROUP_SETUP_PAGE_SIZE),
+  const exitPageSlice = useMemo(
+    () => sliceJobQueueSetupPage(visibleExitGroups, exitGroupPage),
+    [visibleExitGroups, exitGroupPage],
   );
-  const exitGroupPageSafe = Math.min(exitGroupPage, exitGroupPageCount);
-  const exitGroupPageOffset = (exitGroupPageSafe - 1) * EXIT_GROUP_SETUP_PAGE_SIZE;
-  const pagedExitGroups = visibleExitGroups.slice(
-    exitGroupPageOffset,
-    exitGroupPageOffset + EXIT_GROUP_SETUP_PAGE_SIZE,
-  );
-  const showExitGroupPagination = visibleExitGroups.length > EXIT_GROUP_SETUP_PAGE_SIZE;
-  const exitGroupPageFrom = visibleExitGroups.length === 0 ? 0 : exitGroupPageOffset + 1;
-  const exitGroupPageTo = Math.min(
-    exitGroupPageOffset + EXIT_GROUP_SETUP_PAGE_SIZE,
-    visibleExitGroups.length,
-  );
+  const pagedExitGroups = exitPageSlice.pageRows;
+  const showExitGroupPagination = exitPageSlice.showPagination;
+  const exitGroupPageSafe = exitPageSlice.pageSafe;
+  const exitGroupPageCount = exitPageSlice.pageCount;
+  const exitGroupPageFrom = exitPageSlice.pageFrom;
+  const exitGroupPageTo = exitPageSlice.pageTo;
 
   const selectablePagedExitGroups = useMemo(
     () => pagedExitGroups.filter((group) => !processedExitGroupIds?.has(group.groupId)),
@@ -616,10 +633,40 @@ export function OperationsJobQueueSetupModal({
   }, [exitGroupTab, exitGroupQuery]);
 
   useEffect(() => {
-    if (exitGroupPage > exitGroupPageCount) {
-      setExitGroupPage(exitGroupPageCount);
+    setJoinGroupPage(1);
+  }, [joinGroupQuery, selectedAccounts, activeBrand]);
+
+  useEffect(() => {
+    setCsvPreviewPage(1);
+  }, [csvValidatedRows]);
+
+  useEffect(() => {
+    setSetAdminGroupPage(1);
+  }, [eligibleSetAdminGroups, selectedSetAdminTargetAccountId]);
+
+  useEffect(() => {
+    if (exitGroupPage > exitPageSlice.pageCount) {
+      setExitGroupPage(exitPageSlice.pageCount);
     }
-  }, [exitGroupPage, exitGroupPageCount]);
+  }, [exitGroupPage, exitPageSlice.pageCount]);
+
+  useEffect(() => {
+    if (joinGroupPage > joinPageSlice.pageCount) {
+      setJoinGroupPage(joinPageSlice.pageCount);
+    }
+  }, [joinGroupPage, joinPageSlice.pageCount]);
+
+  useEffect(() => {
+    if (csvPreviewPage > csvPageSlice.pageCount) {
+      setCsvPreviewPage(csvPageSlice.pageCount);
+    }
+  }, [csvPreviewPage, csvPageSlice.pageCount]);
+
+  useEffect(() => {
+    if (setAdminGroupPage > setAdminPageSlice.pageCount) {
+      setSetAdminGroupPage(setAdminPageSlice.pageCount);
+    }
+  }, [setAdminGroupPage, setAdminPageSlice.pageCount]);
 
   useEffect(() => {
     if (!open || taskType !== 'set_admin') return;
@@ -702,10 +749,18 @@ export function OperationsJobQueueSetupModal({
     }
     if (joinActiveSource !== 'master') setJoinActiveSource('master');
     if (allJoinGroupsSelected) {
-      setSelectedJoinGroupIds(new Set());
+      setSelectedJoinGroupIds((prev) => {
+        const next = new Set(prev);
+        for (const group of pagedJoinGroups) next.delete(group.groupId);
+        return next;
+      });
       return;
     }
-    setSelectedJoinGroupIds(new Set(visibleJoinGroups.map((group) => group.groupId)));
+    setSelectedJoinGroupIds((prev) => {
+      const next = new Set(prev);
+      for (const group of pagedJoinGroups) next.add(group.groupId);
+      return next;
+    });
   }
 
   function confirmSwitchToMaster() {
@@ -724,10 +779,18 @@ export function OperationsJobQueueSetupModal({
 
   function toggleAllSetAdminGroups() {
     if (allSetAdminGroupsSelected) {
-      setSelectedSetAdminGroupIds(new Set());
+      setSelectedSetAdminGroupIds((prev) => {
+        const next = new Set(prev);
+        for (const group of pagedSetAdminGroups) next.delete(group.groupId);
+        return next;
+      });
       return;
     }
-    setSelectedSetAdminGroupIds(new Set(eligibleSetAdminGroups.map((group) => group.groupId)));
+    setSelectedSetAdminGroupIds((prev) => {
+      const next = new Set(prev);
+      for (const group of pagedSetAdminGroups) next.add(group.groupId);
+      return next;
+    });
   }
 
   function isExitGroupAlreadyProcessed(groupId: string): boolean {
@@ -908,6 +971,48 @@ export function OperationsJobQueueSetupModal({
     (taskType === 'set_admin' && !canSaveSetAdmin) ||
     (taskType === 'exit_delete_group' && !canSaveExitDelete);
 
+  const setupListPagination =
+    taskType === 'join' && joinActiveSource === 'csv' && csvPageSlice.showPagination
+      ? {
+          pageSafe: csvPageSlice.pageSafe,
+          pageCount: csvPageSlice.pageCount,
+          pageFrom: csvPageSlice.pageFrom,
+          pageTo: csvPageSlice.pageTo,
+          total: csvValidatedRows.length,
+          setPage: setCsvPreviewPage,
+        }
+      : taskType === 'join' &&
+          joinActiveSource === 'master' &&
+          masterListExpanded &&
+          joinPageSlice.showPagination
+        ? {
+            pageSafe: joinPageSlice.pageSafe,
+            pageCount: joinPageSlice.pageCount,
+            pageFrom: joinPageSlice.pageFrom,
+            pageTo: joinPageSlice.pageTo,
+            total: visibleJoinGroups.length,
+            setPage: setJoinGroupPage,
+          }
+        : taskType === 'set_admin' && setAdminPageSlice.showPagination
+          ? {
+              pageSafe: setAdminPageSlice.pageSafe,
+              pageCount: setAdminPageSlice.pageCount,
+              pageFrom: setAdminPageSlice.pageFrom,
+              pageTo: setAdminPageSlice.pageTo,
+              total: eligibleSetAdminGroups.length,
+              setPage: setSetAdminGroupPage,
+            }
+          : taskType === 'exit_delete_group' && showExitGroupPagination
+            ? {
+                pageSafe: exitGroupPageSafe,
+                pageCount: exitGroupPageCount,
+                pageFrom: exitGroupPageFrom,
+                pageTo: exitGroupPageTo,
+                total: visibleExitGroups.length,
+                setPage: setExitGroupPage,
+              }
+            : null;
+
   const setupModeClass =
     taskType === 'join'
       ? 'brand-modal-panel--job-queue-setup-join'
@@ -1030,7 +1135,14 @@ export function OperationsJobQueueSetupModal({
                       skipped: String(csvSkippedCount),
                     })}
                   </p>
-                  <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
+                  <div
+                    className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body"
+                    style={
+                      {
+                        '--job-queue-setup-visible-rows': JOB_QUEUE_SETUP_VISIBLE_ROWS,
+                      } as CSSProperties
+                    }
+                  >
                     <table className="operations-job-queue-table operations-job-queue-table--missing">
                       <thead>
                         <tr>
@@ -1043,8 +1155,8 @@ export function OperationsJobQueueSetupModal({
                         </tr>
                       </thead>
                       <tbody>
-                        {csvValidatedRows.map((row, idx) => (
-                          <tr key={row.groupId || idx}>
+                        {pagedCsvRows.map((row, idx) => (
+                          <tr key={`${row.groupId || row.inviteLink || row.groupName}-${csvPageSlice.pageOffset + idx}`}>
                             <td>{row.groupName}</td>
                             <td className="group-links-table__id">{row.groupId || '—'}</td>
                             {platform === 'telegram' ? (
@@ -1113,7 +1225,14 @@ export function OperationsJobQueueSetupModal({
                         aria-label={t('operations.jobQueue.groupListSearchPlaceholder')}
                       />
                     </div>
-                  <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
+                  <div
+                    className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body"
+                    style={
+                      {
+                        '--job-queue-setup-visible-rows': JOB_QUEUE_SETUP_VISIBLE_ROWS,
+                      } as CSSProperties
+                    }
+                  >
                     <table className="operations-job-queue-table operations-job-queue-table--missing">
                       <thead>
                         <tr>
@@ -1123,7 +1242,7 @@ export function OperationsJobQueueSetupModal({
                                 type="checkbox"
                                 checked={allJoinGroupsSelected}
                                 onChange={toggleAllJoinGroups}
-                                disabled={loadingJoinGroups || visibleJoinGroups.length === 0 || saving}
+                                disabled={loadingJoinGroups || pagedJoinGroups.length === 0 || saving}
                               />
                               <span>{t('operations.jobQueue.selectAll')}</span>
                             </label>
@@ -1160,7 +1279,7 @@ export function OperationsJobQueueSetupModal({
                             </td>
                           </tr>
                         ) : (
-                          visibleJoinGroups.map((group) => (
+                          pagedJoinGroups.map((group) => (
                             <tr key={group.groupId}>
                               <td className="operations-job-queue-select-col">
                                 <input
@@ -1448,7 +1567,14 @@ export function OperationsJobQueueSetupModal({
                   />
                 )}
               </div>
-              <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body">
+              <div
+                className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body"
+                style={
+                  {
+                    '--job-queue-setup-visible-rows': JOB_QUEUE_SETUP_VISIBLE_ROWS,
+                  } as CSSProperties
+                }
+              >
                 <table className="operations-job-queue-table operations-job-queue-table--missing">
                   <thead>
                     <tr>
@@ -1460,7 +1586,7 @@ export function OperationsJobQueueSetupModal({
                             onChange={toggleAllSetAdminGroups}
                             disabled={
                               loadingSetAdminGroupList ||
-                              eligibleSetAdminGroups.length === 0 ||
+                              pagedSetAdminGroups.length === 0 ||
                               saving ||
                               selectedSetAdminTargetAccountId === ''
                             }
@@ -1516,7 +1642,7 @@ export function OperationsJobQueueSetupModal({
                         </td>
                       </tr>
                     ) : (
-                      eligibleSetAdminGroups.map((group) => (
+                      pagedSetAdminGroups.map((group) => (
                         <tr key={group.groupId}>
                           <td className="operations-job-queue-select-col">
                             <input
@@ -1566,7 +1692,14 @@ export function OperationsJobQueueSetupModal({
                   aria-label={t('operations.jobQueue.groupListSearchPlaceholder')}
                 />
               </div>
-              <div className="operations-job-queue-table-wrap operations-job-queue-table-wrap--paged">
+              <div
+                className="operations-job-queue-table-wrap operations-job-queue-table-wrap--scroll-body operations-job-queue-table-wrap--paged"
+                style={
+                  {
+                    '--job-queue-setup-visible-rows': JOB_QUEUE_SETUP_VISIBLE_ROWS,
+                  } as CSSProperties
+                }
+              >
                 <table className="operations-job-queue-table operations-job-queue-table--missing operations-job-queue-table--exit-groups">
                   <colgroup>
                     <col className="operations-job-queue-col-select" />
@@ -1691,32 +1824,33 @@ export function OperationsJobQueueSetupModal({
         <footer
           className={cn(
             'operations-job-queue-setup-footer',
-            !(taskType === 'exit_delete_group' && showExitGroupPagination) &&
-              'operations-job-queue-setup-footer--actions-only',
+            !setupListPagination && 'operations-job-queue-setup-footer--actions-only',
           )}
         >
-          {taskType === 'exit_delete_group' && showExitGroupPagination ? (
+          {setupListPagination ? (
             <div className="operations-job-queue-setup-footer__pagination">
               <nav
                 className="group-links-pagination operations-job-queue-setup-pagination"
                 aria-label={t('groupMonitoring.groupLinks.pageLabel', {
-                  page: exitGroupPageSafe,
-                  pages: exitGroupPageCount,
+                  page: setupListPagination.pageSafe,
+                  pages: setupListPagination.pageCount,
                 })}
               >
                 <span className="group-links-pagination-range">
                   {t('groupMonitoring.groupLinks.pageRange', {
-                    from: exitGroupPageFrom,
-                    to: exitGroupPageTo,
-                    total: visibleExitGroups.length,
+                    from: setupListPagination.pageFrom,
+                    to: setupListPagination.pageTo,
+                    total: setupListPagination.total,
                   })}
                 </span>
                 <div className="group-links-pagination-actions">
                   <button
                     type="button"
                     className="group-links-page-btn"
-                    disabled={exitGroupPageSafe <= 1 || saving}
-                    onClick={() => setExitGroupPage((page) => Math.max(1, page - 1))}
+                    disabled={setupListPagination.pageSafe <= 1 || saving}
+                    onClick={() =>
+                      setupListPagination.setPage((page) => Math.max(1, page - 1))
+                    }
                     aria-label={t('groupMonitoring.groupLinks.prevPage')}
                   >
                     <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
@@ -1725,9 +1859,13 @@ export function OperationsJobQueueSetupModal({
                   <button
                     type="button"
                     className="group-links-page-btn"
-                    disabled={exitGroupPageSafe >= exitGroupPageCount || saving}
+                    disabled={
+                      setupListPagination.pageSafe >= setupListPagination.pageCount || saving
+                    }
                     onClick={() =>
-                      setExitGroupPage((page) => Math.min(exitGroupPageCount, page + 1))
+                      setupListPagination.setPage((page) =>
+                        Math.min(setupListPagination.pageCount, page + 1),
+                      )
                     }
                     aria-label={t('groupMonitoring.groupLinks.nextPage')}
                   >

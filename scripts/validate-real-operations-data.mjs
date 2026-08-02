@@ -151,6 +151,19 @@ const checks = [
     })(),
   },
   {
+    name: 'TG set photo: Channel EditPhoto + basic Chat EditChatPhoto (bukan Channel-only)',
+    ok: (() => {
+      const photo = read('python-sidecar/telegram_set_group_photo.py');
+      return (
+        photo.includes('EditPhotoRequest') &&
+        photo.includes('EditChatPhotoRequest') &&
+        photo.includes('isinstance(entity, Channel)') &&
+        photo.includes('isinstance(entity, Chat)') &&
+        photo.includes('_basic_chat_id')
+      );
+    })(),
+  },
+  {
     name: 'TG join: invite_link dari parameter nyata',
     ok: tgAuto.includes('run_join_by_invite_link') && tgAuto.includes('invite_link'),
   },

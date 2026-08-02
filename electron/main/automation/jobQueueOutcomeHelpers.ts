@@ -54,7 +54,7 @@ export function resolveCreateResumeSlice(job: AutomationJobRecord): {
 export function filterGroupsNotDone(
   groups: Array<{ groupId: string; groupName?: string; inviteLink?: string; groupLink?: string }>,
   outcomes: AutomationJobRecord['payload']['groupOutcomes'] | undefined,
-  kind: 'join' | 'set_admin' | 'set_group_photo' | 'leave',
+  kind: 'join' | 'set_admin' | 'set_group_photo' | 'leave' | 'delete' | 'exit_delete',
 ): typeof groups {
   if (!groups.length || !outcomes?.length) return groups;
   const done = new Set<string>();
@@ -72,7 +72,19 @@ export function filterGroupsNotDone(
     if (kind === 'set_group_photo' && row.photoStatus === 'set') {
       if (deviceId) done.add(deviceId);
     }
-    if (kind === 'leave' && (row.exitStatus === 'left' || row.deleteStatus === 'deleted')) {
+    if (kind === 'leave' && row.exitStatus === 'left') {
+      if (masterId) done.add(masterId);
+      if (deviceId) done.add(deviceId);
+    }
+    if (kind === 'delete' && row.deleteStatus === 'deleted') {
+      if (masterId) done.add(masterId);
+      if (deviceId) done.add(deviceId);
+    }
+    if (
+      kind === 'exit_delete' &&
+      row.exitStatus === 'left' &&
+      row.deleteStatus === 'deleted'
+    ) {
       if (masterId) done.add(masterId);
       if (deviceId) done.add(deviceId);
     }

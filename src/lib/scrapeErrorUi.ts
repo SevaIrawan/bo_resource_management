@@ -75,10 +75,35 @@ export function isTelegramAuthKeyDeadMessage(message: string | undefined): boole
 }
 
 /** Client WA masih nyala / sync / timeout — bukan unlink di HP. */
+/**
+ * Session TG logout/revoked ASLI di device (bukan konflik AUTH_KEY_DUPLICATED, bukan busy).
+ * Sidecar menandai dengan prefix `TG_SESSION_DEAD:` (lihat `_verify_client_live` /
+ * `validate_telegram_session`) — jangan tebak keyword bebas, pesan Telethon
+ * (AuthKeyUnregistered/UserDeactivated/SessionRevoked) sering generik dan bisa memuat kata
+ * seperti "timeout"/"connect" yang salah kena filter busy/transient.
+ */
+export function isTelegramSessionDeadMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.startsWith('tg_session_dead:') ||
+    lower.includes('tg_session_dead:') ||
+    lower.includes('auth_key_unregistered') ||
+    lower.includes('authkeyunregistered') ||
+    lower.includes('user_deactivated') ||
+    lower.includes('userdeactivated') ||
+    lower.includes('session_revoked') ||
+    lower.includes('sessionrevoked') ||
+    lower.includes('key is not registered in the system') ||
+    lower.includes('telegram session is not valid')
+  );
+}
+
 export function isDeviceBusyMessage(message: string | undefined): boolean {
   if (!message) return false;
   // Auth key mati sering kebungkus SESSION_WARM_PENDING (bug lama) — jangan anggap busy.
   if (isTelegramAuthKeyDeadMessage(message)) return false;
+  if (isTelegramSessionDeadMessage(message)) return false;
   if (
     message === 'SESSION_SETTLING' ||
     message === 'SCRAPER_GLOBAL_BUSY' ||
@@ -102,6 +127,7 @@ export function isDeviceBusyMessage(message: string | undefined): boolean {
 export function isDeviceSessionDeadMessage(message: string | undefined): boolean {
   if (!message) return false;
   if (isTelegramAuthKeyDeadMessage(message)) return true;
+  if (isTelegramSessionDeadMessage(message)) return true;
   if (isDeviceBusyMessage(message)) return false;
   if (isWaUnlinkedProbeMessage(message)) return true;
   return scrapeFailureNeedsLoginModal(message);
@@ -109,6 +135,7 @@ export function isDeviceSessionDeadMessage(message: string | undefined): boolean
 
 export function scrapeFailureNeedsLoginModal(message: string): boolean {
   if (isTelegramAuthKeyDeadMessage(message)) return true;
+  if (isTelegramSessionDeadMessage(message)) return true;
   if (isDeviceBusyMessage(message)) return false;
   if (isWaChromeConnectFailedMessage(message)) return false;
   if (isTgSidecarConnectFailedMessage(message)) return false;

@@ -5,8 +5,6 @@ import type {
   AutomationJobStatus,
 } from '@/types/automationJob';
 import {
-  isExitDeleteDeleteJob,
-  isExitDeleteExitJob,
   jobMatchesExitDeleteTaskType,
   resolveExitJobDeleteFollowUpRemarkKey,
 } from '@/lib/exitDeleteFlow';
@@ -637,7 +635,7 @@ function jobQueueViewTableRowsRaw(
   const groups = job.payload.groups ?? [];
   const targetAdmin = resolveTargetAdminLabel(job);
 
-  if (isExitDeleteExitJob(job)) {
+  if (job.action === 'leave_group') {
     const outcomes = job.payload.groupOutcomes?.length
       ? job.payload.groupOutcomes
       : groups.map((group) => ({
@@ -666,19 +664,70 @@ function jobQueueViewTableRowsRaw(
     }));
   }
 
-  if (isExitDeleteDeleteJob(job)) {
-    return groups.map((group, index) => ({
-      key: group.groupId || String(index),
+  if (job.action === 'delete_group') {
+    const outcomes = job.payload.groupOutcomes?.length
+      ? job.payload.groupOutcomes
+      : groups.map((group) => ({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          inviteLink: group.inviteLink,
+          groupLink: group.groupLink,
+          deleteStatus: 'pending' as const,
+        }));
+    return outcomes.map((row, index) => ({
+      key: row.groupId || String(index),
       no: String(index + 1),
-      groupName: group.groupName?.trim() || group.groupId || '—',
-      groupId: group.groupId || '—',
-      inviteLink: resolveInviteLink(group),
+      groupName: row.groupName?.trim() || row.groupId || '—',
+      groupId: row.groupId || '—',
+      inviteLink: resolveInviteLink(row),
       targetJoin: job.accountName,
       targetAdmin: '—',
       count: '—',
-      status: jobQueueViewRowStatusLabel(job, index, t),
+      status:
+        row.deleteStatus === 'deleted'
+          ? t('operations.jobQueue.deleteStatusDeleted')
+          : row.deleteStatus === 'failed'
+            ? t('operations.jobQueue.deleteStatusFailed')
+            : jobQueueViewRowStatusLabel(job, index, t),
       remark: '',
     }));
+  }
+
+  if (job.action === 'exit_delete_group') {
+    const outcomes = job.payload.groupOutcomes?.length
+      ? job.payload.groupOutcomes
+      : groups.map((group) => ({
+          groupId: group.groupId,
+          groupName: group.groupName,
+          inviteLink: group.inviteLink,
+          groupLink: group.groupLink,
+        }));
+    return outcomes.map((row, index) => {
+      const fullyDone = row.exitStatus === 'left' && row.deleteStatus === 'deleted';
+      const leaveFailed = row.exitStatus === 'failed';
+      const deleteFailed = row.exitStatus === 'left' && row.deleteStatus === 'failed';
+      const status = fullyDone
+        ? t('operations.jobQueue.deleteStatusDeleted')
+        : leaveFailed
+          ? t('operations.jobQueue.exitStatusFailed')
+          : deleteFailed
+            ? t('operations.jobQueue.deleteStatusFailed')
+            : row.exitStatus === 'left'
+              ? t('operations.jobQueue.exitStatusLeft')
+              : jobQueueViewRowStatusLabel(job, index, t);
+      return {
+        key: row.groupId || String(index),
+        no: String(index + 1),
+        groupName: row.groupName?.trim() || row.groupId || '—',
+        groupId: row.groupId || '—',
+        inviteLink: resolveInviteLink(row),
+        targetJoin: job.accountName,
+        targetAdmin: '—',
+        count: '—',
+        status,
+        remark: (row as { exitError?: string }).exitError ?? '',
+      };
+    });
   }
 
   if (job.action === 'set_admin') {
@@ -749,21 +798,6 @@ function jobQueueViewTableRowsRaw(
         row.photoStatus === 'failed'
           ? String((row as { photoError?: string }).photoError ?? '')
           : '',
-    }));
-  }
-
-  if (job.action === 'leave_group' || job.action === 'delete_group' || job.action === 'exit_delete_group') {
-    return groups.map((group, index) => ({
-      key: group.groupId || String(index),
-      no: String(index + 1),
-      groupName: group.groupName?.trim() || group.groupId || '—',
-      groupId: group.groupId || '—',
-      inviteLink: resolveInviteLink(group),
-      targetJoin: job.accountName,
-      targetAdmin: '—',
-      count: '—',
-      status: jobQueueViewRowStatusLabel(job, index, t),
-      remark: '',
     }));
   }
 

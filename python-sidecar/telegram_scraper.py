@@ -8,7 +8,7 @@ from telethon import utils
 from telethon.errors import FloodWaitError
 from telethon.tl import custom as tl_custom
 from telethon.tl import types as tl_types
-from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.channels import GetFullChannelRequest, GetParticipantRequest
 from telethon.tl.functions.messages import (
     ExportChatInviteRequest,
     GetDialogsRequest,
@@ -74,7 +74,7 @@ def is_scrape_cancelled(session_id: str) -> bool:
 def _cancelled_payload(session_id: str, groups: list | None = None) -> dict:
     clear_scrape_cancel(session_id)
     clear_scrape_progress(session_id)
-    rows = list(groups or [])
+    rows = _groups_for_payload(list(groups or []))
     payload = {
         "status": "cancelled",
         "message": "SCRAPER_CANCELLED",
@@ -82,7 +82,9 @@ def _cancelled_payload(session_id: str, groups: list | None = None) -> dict:
         "count": len(rows),
     }
     if rows:
-        # Cancel mid-way — simpan parsial agar Electron bisa commit, bukan buang 500+ grup.
+        # Cancel mid-way — checkpoint parsial hanya untuk diagnosa/poll.
+        # Electron MENOLAK partial (SCRAPER_PARTIAL_RESULT) — jangan commit ke daily
+        # (rm_commit menghapus seluruh daily akun). Operator harus Scrape ulang.
         payload["hint"] = "PARTIAL_BEFORE_CANCEL"
         set_scrape_result(session_id, {**payload, "status": "ok", "partial": True})
     return payload
@@ -198,6 +200,11 @@ def _admin_label(is_admin: bool) -> str:
     return "yes" if is_admin else "no"
 
 
+def _groups_for_payload(groups: list[dict]) -> list[dict]:
+    """Buang referensi entity non-JSON sebelum checkpoint / response HTTP."""
+    return [{k: v for k, v in g.items() if k != "_entity_ref"} for g in groups]
+
+
 def _normalize_phone_digits(raw: str) -> str:
     return "".join(ch for ch in raw if ch.isdigit())
 
@@ -307,12 +314,18 @@ async def _resolve_member_count(client, entity) -> tuple[int, str | None]:
 
 
 def _is_live_group_dialog(dialog) -> bool:
-    """Grup hidup untuk scrape. Shell migrate / Chat deactivated = BUKAN target.
+    """Grup hidup untuk scrape. Shell migrate / Chat deactivated / sudah left = BUKAN target.
 
     Sama seperti ignore_migrated Telethon/app resmi — tapi filter di sini, bukan lewat
     stock iter_dialogs (stock stop prematur jika buffer chunk kosong).
+
+    `left=True` (Chat & Channel): dialog kadang masih nyangkut sesaat di hasil GetDialogs
+    setelah leave/delete (cache server belum sinkron) — kalau ini tidak difilter, grup yang
+    sudah ditinggalkan bisa tertulis lagi ke daily sebagai Junk walau device sudah bersih.
     """
     entity = dialog.entity
+    if getattr(entity, "left", False):
+        return False
     if isinstance(entity, Chat) and getattr(entity, "migrated_to", None) is not None:
         return False
     if isinstance(entity, Chat) and getattr(entity, "deactivated", False):
@@ -325,6 +338,105 @@ def _is_live_group_dialog(dialog) -> bool:
 def _dialog_message_key(peer, message_id):
     channel_id = peer.channel_id if isinstance(peer, tl_types.PeerChannel) else None
     return channel_id, message_id
+
+
+def _ingest_migrated_from_chat_ids(chats, migrated_from_chat_ids: set[int]) -> None:
+    """Kumpulkan basic chat_id yang sudah migrate — dari Channel.migrated_from_chat_id + shell Chat.
+
+    Dipakai untuk SKIP shell di discovery (bukan konversi ID / rank). Dialog cache kadang
+    mengirim Chat tanpa `migrated_to` meski Super Group sudah ada di list yang sama.
+    """
+    for x in chats or []:
+        if isinstance(x, Channel):
+            mid = getattr(x, "migrated_from_chat_id", None)
+            if mid is not None:
+                try:
+                    migrated_from_chat_ids.add(int(mid))
+                except (TypeError, ValueError):
+                    pass
+        elif isinstance(x, Chat) and getattr(x, "migrated_to", None) is not None:
+            try:
+                migrated_from_chat_ids.add(int(x.id))
+            except (TypeError, ValueError):
+                pass
+
+
+def _is_migrated_basic_shell(entity, migrated_from_chat_ids: set[int]) -> bool:
+    if not isinstance(entity, Chat):
+        return False
+    if getattr(entity, "migrated_to", None) is not None:
+        return True
+    try:
+        return int(entity.id) in migrated_from_chat_ids
+    except (TypeError, ValueError):
+        return False
+
+
+def _prune_migrated_shells_from_dialogs(
+    dialogs: list, migrated_from_chat_ids: set[int]
+) -> tuple[list, int]:
+    """Buang Chat basic yang chat_id-nya sudah ter-cover Super (urutan chunk bisa belakangan)."""
+    if not migrated_from_chat_ids:
+        return dialogs, 0
+    kept: list = []
+    removed = 0
+    for dialog in dialogs:
+        ent = dialog.entity
+        if _is_migrated_basic_shell(ent, migrated_from_chat_ids):
+            removed += 1
+            continue
+        kept.append(dialog)
+    return kept, removed
+
+
+def _roles_from_channel_entity(entity) -> tuple[bool, bool] | None:
+    """Fast path dari flags GetDialogs (Channel.creator / admin_rights).
+
+    None = flags tidak menyatakan admin (bisa member, atau entity tidak lengkap).
+    (True, owner) = terverifikasi admin dari entity dialog — tanpa API tambahan.
+    """
+    if not isinstance(entity, Channel):
+        return None
+    if bool(getattr(entity, "creator", False)):
+        return True, True
+    if getattr(entity, "admin_rights", None) is not None:
+        return True, False
+    return None
+
+
+async def _resolve_dialog_peer_with_retry(client, peer, session_id: str, attempts: int = 3):
+    """get_entity dengan retry pendek — jangan biarkan satu error transient menghapus 1 grup
+    permanen dari daily (peer yang gagal resolve tidak akan muncul lagi di chunk berikutnya).
+    """
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        if is_scrape_cancelled(session_id):
+            raise ScrapeCancelled()
+        try:
+            return await client.get_entity(peer)
+        except FloodWaitError as exc:
+            cap = max_floodwait_auto_sleep(_SCRAPE_DELAY)
+            if int(exc.seconds) > cap:
+                raise DiscoveryIncomplete(
+                    f"SCRAPER_DISCOVERY_FLOODWAIT:{exc.seconds}"
+                ) from exc
+            await _sleep_flood_with_heartbeat(
+                session_id,
+                flood_wait_seconds(_SCRAPE_DELAY, exc.seconds),
+                label_base="discover peer FloodWait",
+            )
+            last_exc = exc
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if attempt < attempts - 1:
+                await asyncio.sleep(0.6 * (attempt + 1))
+    if last_exc is not None:
+        print(
+            f"[tg-scrape] sessionId={session_id} resolve peer failed after {attempts} "
+            f"attempts: {last_exc}",
+            flush=True,
+        )
+    return None
 
 
 async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
@@ -340,7 +452,7 @@ async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
 
     Kontrak di sini:
     1. Pagination GetDialogsRequest lengkap (lanjut meski 0 grup lolos filter di chunk).
-    2. Shell Chat.migrated_to / deactivated → skip (1 grup migrate = 1 ID Super saja).
+    2. Shell Chat.migrated_to / deactivated / migrated_from Super → skip (1 ID Super saja).
     3. FloodWait/error discovery → DiscoveryIncomplete (jangan commit daily bolong).
     """
     offset_date = None
@@ -350,6 +462,7 @@ async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
     seen: set[int] = set()
     out: list = []
     skipped_migrate = 0
+    migrated_from_chat_ids: set[int] = set()
 
     while True:
         if is_scrape_cancelled(session_id):
@@ -394,6 +507,8 @@ async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
         except Exception as exc:  # noqa: BLE001
             raise DiscoveryIncomplete(f"SCRAPER_DISCOVERY_FAILED:{exc}") from exc
 
+        _ingest_migrated_from_chat_ids(result.chats, migrated_from_chat_ids)
+
         entities = {
             utils.get_peer_id(x): x
             for x in itertools.chain(result.users, result.chats)
@@ -413,12 +528,17 @@ async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
 
             entity = entities.get(peer_id)
             if entity is None:
-                try:
-                    entity = await client.get_entity(raw.peer)
-                    entities[peer_id] = entity
-                except Exception:  # noqa: BLE001
-                    # Jangan tandai seen: peer belum resolve. Offset tetap maju lewat peer lain.
-                    continue
+                entity = await _resolve_dialog_peer_with_retry(client, raw.peer, session_id)
+                if entity is None:
+                    # Retry habis — JANGAN diam-diam skip. Grup live yang gagal resolve sekali
+                    # akan hilang permanen dari daily (sumber Missing palsu untuk akun dengan
+                    # ribuan grup, di mana probabilitas transient error per-panggilan tinggi).
+                    raise DiscoveryIncomplete(
+                        f"SCRAPER_DISCOVERY_FAILED: cannot resolve peer {peer_id}"
+                    )
+                entities[peer_id] = entity
+                if isinstance(entity, (Channel, Chat)):
+                    _ingest_migrated_from_chat_ids([entity], migrated_from_chat_ids)
 
             try:
                 last_input_peer = utils.get_input_peer(entity)
@@ -437,13 +557,17 @@ async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
                 continue
 
             ent = dialog.entity
-            if isinstance(ent, Chat) and getattr(ent, "migrated_to", None) is not None:
+            if _is_migrated_basic_shell(ent, migrated_from_chat_ids):
                 # Shell basic setelah migrate — Super Group sudah dialog Channel sendiri.
                 skipped_migrate += 1
                 continue
             if not _is_live_group_dialog(dialog):
                 continue
             out.append(dialog)
+
+        # Super di chunk ini / sebelumnya bisa baru mengungkapkan migrated_from — prune shell.
+        out, pruned = _prune_migrated_shells_from_dialogs(out, migrated_from_chat_ids)
+        skipped_migrate += pruned
 
         set_scrape_progress(
             session_id,
@@ -460,7 +584,14 @@ async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
         if raw_count == 0 or raw_count < _DIALOG_CHUNK:
             break
         if new_peers == 0:
-            break
+            # Chunk PENUH (raw_count == _DIALOG_CHUNK) tapi 100% peer sudah `seen` sebelumnya —
+            # server tidak mungkin mengembalikan halaman identik kalau offset benar-benar maju.
+            # Ini sinyal cursor macet (bug), BUKAN akhir list yang legit (itu sudah ditangani
+            # oleh raw_count < _DIALOG_CHUNK di atas). Diam-diam `break` di sini = sumber Missing
+            # untuk akun grup besar — jangan commit daily bolong, minta scrape ulang.
+            raise DiscoveryIncomplete(
+                "SCRAPER_DISCOVERY_STALLED: full page returned with 0 new peers"
+            )
 
         last_message = next(
             filter(
@@ -486,6 +617,8 @@ async def _load_all_group_dialogs(client, session_id: str) -> tuple[list, int]:
         offset_date = last_message.date if last_message else None
         offset_peer = last_input_peer
 
+    out, pruned_final = _prune_migrated_shells_from_dialogs(out, migrated_from_chat_ids)
+    skipped_migrate += pruned_final
     return out, skipped_migrate
 
 
@@ -498,8 +631,22 @@ async def _upgrade_basic_chat_if_migrated(client, entity):
         return None
 
     migrated = getattr(entity, "migrated_to", None)
+    # Dialog cache kadang kosongkan migrated_to — refresh entity sebelum tulis ID basic.
     if migrated is None:
-        return entity
+        try:
+            refreshed = await client.get_entity(entity)
+        except Exception:  # noqa: BLE001
+            return entity
+        if isinstance(refreshed, Channel) and bool(getattr(refreshed, "megagroup", False)):
+            return refreshed
+        if not isinstance(refreshed, Chat):
+            return None
+        entity = refreshed
+        if getattr(entity, "deactivated", False) and getattr(entity, "migrated_to", None) is None:
+            return None
+        migrated = getattr(entity, "migrated_to", None)
+        if migrated is None:
+            return entity
 
     try:
         channel = await client.get_entity(migrated)
@@ -517,22 +664,23 @@ async def _upgrade_basic_chat_if_migrated(client, entity):
     return None
 
 
-async def _is_me_listed_as_owner(client, entity, me) -> bool:
-    """Creator saja — bukan admin biasa."""
-    try:
-        async for user in client.iter_participants(
-            entity,
-            filter=ChannelParticipantsAdmins,
-        ):
-            if user.id != me.id:
-                continue
-            participant = getattr(user, "participant", None)
+async def _roles_via_get_participant(
+    client, entity, me
+) -> tuple[bool, bool] | None:
+    """None = gagal baca. (is_admin, is_owner) jika sukses (termasuk verified member)."""
+    if isinstance(entity, Channel):
+        try:
+            part = await client(GetParticipantRequest(entity, me))
+            participant = getattr(part, "participant", None)
             if isinstance(participant, ChannelParticipantCreator):
-                return True
-            if getattr(user, "is_creator", False):
-                return True
-    except Exception:  # noqa: BLE001
-        pass
+                return True, True
+            if isinstance(participant, ChannelParticipantAdmin):
+                return True, False
+            return False, False
+        except FloodWaitError:
+            raise
+        except Exception:  # noqa: BLE001
+            return None
 
     if isinstance(entity, Chat):
         try:
@@ -542,16 +690,24 @@ async def _is_me_listed_as_owner(client, entity, me) -> bool:
                 if getattr(p, "user_id", None) != me.id:
                     continue
                 if isinstance(p, ChatParticipantCreator):
-                    return True
+                    return True, True
+                if isinstance(p, ChatParticipantAdmin):
+                    return True, False
+                return False, False
+            return False, False
+        except FloodWaitError:
+            raise
         except Exception:  # noqa: BLE001
-            pass
+            return None
 
-    return False
+    return None
 
 
-async def _is_me_listed_as_admin(client, entity, me) -> bool:
-    """Fallback bila get_permissions gagal (grup biasa / megagroup)."""
+async def _admin_list_role(client, entity, me) -> tuple[bool, bool] | None:
+    """Scan ChannelParticipantsAdmins. None = list gagal (unverified)."""
     try:
+        is_owner = False
+        is_admin = False
         async for user in client.iter_participants(
             entity,
             filter=ChannelParticipantsAdmins,
@@ -559,46 +715,54 @@ async def _is_me_listed_as_admin(client, entity, me) -> bool:
             if user.id != me.id:
                 continue
             participant = getattr(user, "participant", None)
-            if isinstance(participant, (ChannelParticipantCreator, ChannelParticipantAdmin)):
-                return True
-            if getattr(user, "is_creator", False) or getattr(user, "admin_rights", None):
-                return True
+            if isinstance(participant, ChannelParticipantCreator) or getattr(
+                user, "is_creator", False
+            ):
+                return True, True
+            if isinstance(participant, ChannelParticipantAdmin) or getattr(
+                user, "admin_rights", None
+            ):
+                is_admin = True
+        return is_admin, is_owner
+    except FloodWaitError:
+        raise
     except Exception:  # noqa: BLE001
-        pass
-
-    if isinstance(entity, Chat):
-        try:
-            full = await client(GetFullChatRequest(chat_id=entity.id))
-            participants = getattr(full.full_chat, "participants", None)
-            for p in getattr(participants, "participants", []) or []:
-                if getattr(p, "user_id", None) != me.id:
-                    continue
-                if isinstance(p, (ChatParticipantCreator, ChatParticipantAdmin)):
-                    return True
-        except Exception:  # noqa: BLE001
-            pass
-
-    return False
+        return None
 
 
-async def _my_group_roles(client, entity, me) -> tuple[bool, bool]:
-    """(is_admin, is_owner). Owner ⇒ is_admin True. Satu get_permissions bila memungkinkan."""
-    is_owner = False
-    is_admin = False
+async def _my_group_roles(client, entity, me) -> tuple[bool, bool, bool]:
+    """(is_admin, is_owner, verified). Owner ⇒ is_admin True.
+
+    verified=False → pemanggil JANGAN anggap 'no' final (sumber not_admin palsu).
+    """
+    flags = _roles_from_channel_entity(entity)
+    if flags is not None:
+        return flags[0], flags[1], True
+
     try:
         perms = await client.get_permissions(entity, me)
         is_owner = bool(getattr(perms, "is_creator", False))
         is_admin = bool(getattr(perms, "is_admin", False) or is_owner)
-        if is_admin or is_owner:
-            return True, is_owner
+        return is_admin, is_owner, True
+    except FloodWaitError:
+        raise
     except Exception:  # noqa: BLE001
         pass
 
-    is_owner = await _is_me_listed_as_owner(client, entity, me)
-    if is_owner:
-        return True, True
-    is_admin = await _is_me_listed_as_admin(client, entity, me)
-    return is_admin, False
+    via_part = await _roles_via_get_participant(client, entity, me)
+    if via_part is not None:
+        return via_part[0], via_part[1], True
+
+    via_list = await _admin_list_role(client, entity, me)
+    if via_list is not None:
+        return via_list[0], via_list[1], True
+
+    if isinstance(entity, Chat):
+        via_chat = await _roles_via_get_participant(client, entity, me)
+        if via_chat is not None:
+            return via_chat[0], via_chat[1], True
+
+    return False, False, False
 
 
 async def _read_own_exported_invite(client, entity) -> str | None:
@@ -928,13 +1092,35 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             # Tandai peer basic usang supaya tidak dobel jika shell ikut terproses.
             if (
                 isinstance(raw_entity, Chat)
-                and getattr(raw_entity, "migrated_to", None) is not None
+                and (
+                    getattr(raw_entity, "migrated_to", None) is not None
+                    or isinstance(entity, Channel)
+                )
                 and isinstance(entity, Channel)
             ):
                 try:
                     seen_peer_ids.add(str(utils.get_peer_id(raw_entity)))
                 except Exception:  # noqa: BLE001
                     pass
+            if isinstance(entity, Channel):
+                mid = getattr(entity, "migrated_from_chat_id", None)
+                if mid is not None:
+                    try:
+                        seen_peer_ids.add(str(-int(mid)))
+                    except (TypeError, ValueError):
+                        pass
+
+            # Basic Chat yang Super-nya sudah diproses (migrated_from) — jangan tulis ID usang.
+            if isinstance(entity, Chat):
+                try:
+                    basic_peer = str(utils.get_peer_id(entity))
+                except Exception:  # noqa: BLE001
+                    try:
+                        basic_peer = str(-int(entity.id))
+                    except (TypeError, ValueError):
+                        basic_peer = None
+                if basic_peer and basic_peer in seen_peer_ids:
+                    continue
 
             if group_id in seen_peer_ids:
                 set_scrape_progress(
@@ -967,8 +1153,11 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             except Exception:  # noqa: BLE001
                 member_count, existing_invite = 0, None
 
+            role_verified = False
+            is_admin_flag = False
+            is_owner_flag = False
             try:
-                is_admin_flag, is_owner_flag = await _count_with_flood_retry(
+                is_admin_flag, is_owner_flag, role_verified = await _count_with_flood_retry(
                     lambda e=entity: _my_group_roles(client, e, me),
                     label="group_roles",
                     session_id=session_id,
@@ -978,12 +1167,25 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
             except ScrapeCancelled:
                 return _cancelled_payload(session_id, groups)
             except FloodWaitError:
-                is_admin_flag = False
-                is_owner_flag = False
-                unverified_role_groups.append(group_id)
+                flags = _roles_from_channel_entity(entity) or _roles_from_channel_entity(
+                    raw_entity
+                )
+                if flags is not None:
+                    is_admin_flag, is_owner_flag = flags
+                    role_verified = True
+                else:
+                    unverified_role_groups.append(group_id)
             except Exception:  # noqa: BLE001
-                is_admin_flag = False
-                is_owner_flag = False
+                flags = _roles_from_channel_entity(entity) or _roles_from_channel_entity(
+                    raw_entity
+                )
+                if flags is not None:
+                    is_admin_flag, is_owner_flag = flags
+                    role_verified = True
+                else:
+                    unverified_role_groups.append(group_id)
+
+            if not role_verified and group_id not in unverified_role_groups:
                 unverified_role_groups.append(group_id)
 
             if is_owner_flag:
@@ -1043,6 +1245,7 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                     "member_count": member_count,
                     "admin_count": admin_count,
                     "owner_count": owner_count,
+                    "_entity_ref": entity,
                 }
             )
 
@@ -1052,13 +1255,84 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
                     session_id,
                     {
                         "status": "running",
-                        "groups": list(groups),
+                        "groups": _groups_for_payload(groups),
                         "count": len(groups),
                         "partial": True,
                         "hint": "PARTIAL_CHECKPOINT",
                         "telegramUser": me_label,
                     },
                 )
+
+        # Retry role untuk grup yang belum terverifikasi — jangan commit massal is_admin=no palsu.
+        if unverified_role_groups:
+            set_scrape_progress(
+                session_id,
+                phase="group",
+                current=total,
+                total=total,
+                label=f"Retrying admin roles ({len(unverified_role_groups)})…",
+            )
+            await asyncio.sleep(
+                jitter_seconds(float(_SCRAPE_DELAY.get("scrape_between_groups_sec", 1.5)), _SCRAPE_DELAY)
+            )
+            still_unverified: list[str] = []
+            unverified_set = set(unverified_role_groups)
+            for group in groups:
+                gid = group["group_id"]
+                if gid not in unverified_set:
+                    continue
+                if is_scrape_cancelled(session_id):
+                    return _cancelled_payload(session_id, groups)
+                ent = group.pop("_entity_ref", None)
+                try:
+                    if ent is None:
+                        ent = await client.get_entity(int(gid))
+                    is_admin_flag, is_owner_flag, role_verified = await _count_with_flood_retry(
+                        lambda e=ent: _my_group_roles(client, e, me),
+                        label="group_roles_retry",
+                        session_id=session_id,
+                        current=total,
+                        total=total,
+                    )
+                    if not role_verified:
+                        flags = _roles_from_channel_entity(ent)
+                        if flags is not None:
+                            is_admin_flag, is_owner_flag = flags
+                            role_verified = True
+                    if role_verified:
+                        if is_owner_flag:
+                            is_admin_flag = True
+                        group["is_admin"] = _admin_label(is_admin_flag)
+                        group["is_owner"] = _admin_label(is_owner_flag)
+                        # Invite: jika baru ketahui admin dan belum ada link, coba resolve sekali.
+                        if is_admin_flag and not group.get("invite_link"):
+                            try:
+                                link = await _resolve_invite_link(
+                                    client,
+                                    ent,
+                                    getattr(ent, "username", None),
+                                    is_admin=True,
+                                    existing_invite=None,
+                                    session_id=session_id,
+                                    current=total,
+                                    total=total,
+                                )
+                                if link:
+                                    group["invite_link"] = link
+                            except ScrapeCancelled:
+                                return _cancelled_payload(session_id, groups)
+                            except Exception:  # noqa: BLE001
+                                pass
+                    else:
+                        still_unverified.append(gid)
+                except ScrapeCancelled:
+                    return _cancelled_payload(session_id, groups)
+                except Exception:  # noqa: BLE001
+                    still_unverified.append(gid)
+            unverified_role_groups = still_unverified
+
+        for group in groups:
+            group.pop("_entity_ref", None)
 
         set_scrape_progress(
             session_id,
@@ -1076,28 +1350,50 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
         # ketemu di audit kode — bukti langsung, bukan tebakan.
         print(
             f"[tg-scrape] sessionId={session_id} me={me_label} summary: "
-            f"discovered={total_on_account} targets={total} written={len(groups)}",
+            f"discovered={total_on_account} targets={total} written={len(groups)} "
+            f"unverified_roles={len(unverified_role_groups)}",
             flush=True,
         )
+
+        # Mass unverified → jangan commit daily (semua/not_admin palsu menghapus data benar).
+        unverified_n = len(unverified_role_groups)
+        if groups and unverified_n > 0:
+            all_unverified = unverified_n >= len(groups)
+            too_many = unverified_n > max(25, len(groups) // 5)
+            if all_unverified or too_many:
+                print(
+                    f"[tg-scrape] sessionId={session_id} abort: SCRAPER_UNVERIFIED_ROLES "
+                    f"({unverified_n}/{len(groups)}) — refuse commit",
+                    flush=True,
+                )
+                return {
+                    "status": "error",
+                    "message": f"SCRAPER_UNVERIFIED_ROLES:{unverified_n}/{len(groups)}",
+                    "valid": False,
+                    "unverifiedRoleCount": unverified_n,
+                    "unverifiedRoleGroupIds": unverified_role_groups[:50],
+                    "groups": _groups_for_payload(groups),
+                    "count": len(groups),
+                }
 
         admin_count = sum(1 for group in groups if group["is_admin"] == "yes")
         payload = {
             "status": "ok",
             "valid": True,
-            "groups": groups,
+            "groups": _groups_for_payload(groups),
             "count": len(groups),
             "adminCount": admin_count,
             "telegramUser": me_label,
             "elapsedMs": int(elapsed_sec * 1000),
-            "unverifiedRoleCount": len(unverified_role_groups),
+            "unverifiedRoleCount": unverified_n,
         }
         hint_parts: list[str] = []
         if unverified_role_groups:
             hint_parts.append(f"UNVERIFIED_ROLES_{len(unverified_role_groups)}")
             payload["unverifiedRoleGroupIds"] = unverified_role_groups[:50]
             print(
-                f"[tg-scrape] sessionId={session_id} roles unread for "
-                f"{len(unverified_role_groups)} group(s) — is_admin recorded as 'no'",
+                f"[tg-scrape] sessionId={session_id} roles still unverified for "
+                f"{len(unverified_role_groups)} group(s) after retry",
                 flush=True,
             )
         if truncated:
@@ -1293,6 +1589,7 @@ async def validate_telegram_session(session_id: str, session_string: str | None 
     from telegram_login import (
         SESSIONS,
         _is_auth_key_dead_message,
+        _is_session_revoked_message,
         _verify_client_live,
         restore_telegram_session,
     )
@@ -1309,6 +1606,15 @@ async def validate_telegram_session(session_id: str, session_string: str | None 
                     "status": "ok",
                     "valid": False,
                     "message": _auth_key_dead_validate_message(msg),
+                }
+            # Session logout/revoked asli di device — jangan bungkus WARM_PENDING (bug regresi
+            # lama): pesan Telethon (AuthKeyUnregistered/UserDeactivated) bisa memuat kata
+            # "timeout"/"connect" secara kebetulan.
+            if msg.startswith("TG_SESSION_DEAD:") or _is_session_revoked_message(msg):
+                return {
+                    "status": "ok",
+                    "valid": False,
+                    "message": msg if msg.startswith("TG_SESSION_DEAD:") else f"TG_SESSION_DEAD: {msg}",
                 }
             if _is_session_warm_pending_message(msg):
                 return {
@@ -1347,6 +1653,12 @@ async def validate_telegram_session(session_id: str, session_string: str | None 
             "status": "ok",
             "valid": False,
             "message": _auth_key_dead_validate_message(err_msg),
+        }
+    if err_msg.startswith("TG_SESSION_DEAD:") or _is_session_revoked_message(err_msg):
+        return {
+            "status": "ok",
+            "valid": False,
+            "message": err_msg if err_msg.startswith("TG_SESSION_DEAD:") else f"TG_SESSION_DEAD: {err_msg}",
         }
     if session.status in ("pending", "confirming") or _is_session_warm_pending_message(err_msg):
         return {

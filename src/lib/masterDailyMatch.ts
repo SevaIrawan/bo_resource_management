@@ -8,12 +8,49 @@ export function normalizeGroupIdForMatch(gid: string): string {
   return trimmed;
 }
 
-/** Kode invite WA — match meski URL prefix beda. */
+const TG_INVITE_PATH_BLOCKLIST = new Set([
+  'joinchat',
+  'addstickers',
+  'share',
+  'proxy',
+  'socks',
+  's',
+  'c',
+]);
+
+/** True jika string terlihat seperti invite URL (WA / TG) — bukan group_id. */
+export function looksLikeInviteLink(value: string | null | undefined): boolean {
+  const s = String(value ?? '').trim().toLowerCase();
+  if (!s) return false;
+  if (s.includes('chat.whatsapp.com/')) return true;
+  if (/(?:^|\b)(?:https?:\/\/)?(?:t\.me|telegram\.me)\//i.test(s)) return true;
+  return false;
+}
+
+/**
+ * Kode invite ternormalisasi — match meski prefix URL beda.
+ * WA: hash chat.whatsapp.com
+ * TG private: t.me/+HASH / joinchat/HASH → tg:+hash
+ * TG public: t.me/username → tg:@username
+ */
 export function normalizeInviteLinkForMatch(link: string | null | undefined): string {
   if (!link) return '';
-  const s = link.trim().toLowerCase();
-  const m = s.match(/(?:chat\.whatsapp\.com\/|joinchat\/)([a-z0-9_-]+)/i);
-  return m ? m[1] : s;
+  const s = link.trim().toLowerCase().replace(/\/+$/, '');
+  const wa = s.match(/chat\.whatsapp\.com\/(?:invite\/)?([a-z0-9_-]+)/i);
+  if (wa?.[1]) return wa[1];
+
+  const tgPlus = s.match(/(?:t\.me|telegram\.me)\/\+([a-z0-9_-]+)/i);
+  if (tgPlus?.[1]) return `tg:+${tgPlus[1]}`;
+
+  const tgJoin = s.match(/(?:t\.me|telegram\.me)\/joinchat\/([a-z0-9_-]+)/i);
+  if (tgJoin?.[1]) return `tg:+${tgJoin[1]}`;
+
+  const tgUser = s.match(/(?:t\.me|telegram\.me)\/([a-z][a-z0-9_]{3,31})(?:[/?#]|$)/i);
+  if (tgUser?.[1] && !TG_INVITE_PATH_BLOCKLIST.has(tgUser[1])) {
+    return `tg:@${tgUser[1]}`;
+  }
+
+  return s;
 }
 
 export function normalizeGroupNameForMatch(name: string | null | undefined): string {

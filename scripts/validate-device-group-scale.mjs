@@ -43,16 +43,36 @@ const executeSyncCheckBody = syncFlow.slice(
 const checks = [
   {
     name: 'TG scrape: shell migrate tidak masuk targets (1 grup 1 ID Super Group saja)',
+    ok: (() => {
+      const resolveMember = tgPy.match(
+        /async def _resolve_member_count[\s\S]*?(?=\n(?:async )?def )/,
+      );
+      return (
+        tgPy.includes('_is_live_group_dialog') &&
+        tgPy.includes('skipped_migrate') &&
+        tgPy.includes('Shell basic setelah migrate') &&
+        tgPy.includes('_upgrade_basic_chat_if_migrated') &&
+        tgPy.includes('_ingest_migrated_from_chat_ids') &&
+        tgPy.includes('_prune_migrated_shells_from_dialogs') &&
+        tgPy.includes('migrated_from_chat_id') &&
+        // Jangan tulis Chat yang masih punya migrated_to.
+        tgPy.includes('isinstance(entity, Chat) and getattr(entity, "migrated_to", None) is not None') &&
+        // migrated_from hanya untuk SKIP shell di discovery — bukan konversi di _resolve_member_count.
+        !tgPy.includes('_basic_chat_peer_id') &&
+        Boolean(resolveMember) &&
+        !resolveMember[0].includes('migrated_from_chat_id')
+      );
+    })(),
+  },
+  {
+    name: 'TG scrape: is_admin dari flags dialog + GetParticipant; mass unverified jangan commit',
     ok:
-      tgPy.includes('_is_live_group_dialog') &&
-      tgPy.includes('skipped_migrate') &&
-      tgPy.includes('Shell basic setelah migrate') &&
-      tgPy.includes('_upgrade_basic_chat_if_migrated') &&
-      // Jangan tulis Chat yang masih punya migrated_to.
-      tgPy.includes('isinstance(entity, Chat) and getattr(entity, "migrated_to", None) is not None') &&
-      // Jangan pakai migrated_from untuk konversi/rank (kontrak: skip shell di discovery).
-      !tgPy.includes('_basic_chat_peer_id') &&
-      !/_resolve_member_count[\s\S]*migrated_from_chat_id/.test(tgPy),
+      tgPy.includes('_roles_from_channel_entity') &&
+      tgPy.includes('GetParticipantRequest') &&
+      tgPy.includes('admin_rights') &&
+      tgPy.includes('SCRAPER_UNVERIFIED_ROLES') &&
+      tgPy.includes('group_roles_retry') &&
+      tgPy.includes('verified'),
   },
   {
     name: 'TG scrape: discovery putus → error (jangan commit daily bolong)',
@@ -78,6 +98,32 @@ const checks = [
     ok: /isinstance\(entity, Chat\) and getattr\(entity, "deactivated", False\)/.test(tgPy),
   },
   {
+    name: 'TG scrape: dialog left=True (sudah leave/kick) tidak ditulis ke daily (anti Junk stale)',
+    ok:
+      /def _is_live_group_dialog[\s\S]*?getattr\(entity, "left", False\)/.test(tgPy) &&
+      tgPy.includes('cache server belum sinkron'),
+  },
+  {
+    name: 'TG scrape: gagal resolve 1 peer discovery = retry lalu DiscoveryIncomplete (bukan diam skip)',
+    ok:
+      tgPy.includes('async def _resolve_dialog_peer_with_retry') &&
+      tgPy.includes('entity = await _resolve_dialog_peer_with_retry(client, raw.peer, session_id)') &&
+      // Loop utama TIDAK boleh lagi diam-diam `continue` saat get_entity gagal (hilang permanen).
+      !/entity = entities\.get\(peer_id\)\s*\n\s*if entity is None:\s*\n\s*try:\s*\n\s*entity = await client\.get_entity\(raw\.peer\)[\s\S]{0,80}except Exception:[\s\S]{0,40}continue/.test(
+        tgPy,
+      ) &&
+      /_resolve_dialog_peer_with_retry\(client, raw\.peer, session_id\)[\s\S]{0,400}raise DiscoveryIncomplete/.test(
+        tgPy,
+      ),
+  },
+  {
+    name: 'TG scrape: chunk penuh 0 peer baru = cursor macet → DiscoveryIncomplete (bukan silent break)',
+    ok:
+      /if new_peers == 0:[\s\S]{0,800}raise DiscoveryIncomplete\(\s*\n\s*"SCRAPER_DISCOVERY_STALLED/.test(
+        tgPy,
+      ),
+  },
+  {
     name: 'TG scrape: invite link DIBACA dulu, ExportChatInvite (membuat link baru) jalan terakhir',
     ok:
       tgPy.includes('GetExportedChatInvitesRequest') &&
@@ -96,7 +142,9 @@ const checks = [
     name: 'TG scrape: checkpoint parsial tidak boleh commit daily (rm_commit menghapus daily akun)',
     ok:
       tgScrape.includes('SCRAPER_PARTIAL_RESULT') &&
-      tgScrape.includes(".partial === true"),
+      tgScrape.includes('.partial === true') &&
+      tgPy.includes('PARTIAL_BEFORE_CANCEL') &&
+      !tgPy.includes('agar Electron bisa commit'),
   },
   {
     name: 'Teardown auto lane idle tidak cancel sidecar (jangan patahkan scrape manual akun sama)',
@@ -235,7 +283,9 @@ const checks = [
       !tgScrape.includes("withNetworkRetry('Telegram scrape'") &&
       tgPy.includes('start_telegram_scrape_job') &&
       read('python-sidecar/main.py').includes('/telegram/scrape/result/') &&
-      read('electron/main/platformLogin/telegramSidecar.ts').includes('SIDECAR_VERSION = 11'),
+      /SIDECAR_VERSION\s*=\s*\d+/.test(
+        read('electron/main/platformLogin/telegramSidecar.ts'),
+      ),
   },
   {
     name: 'TG finishing: reconnect sebelum export + soft-fail setelah write DB',

@@ -204,6 +204,8 @@ export const zh: Messages = {
       exitLeaveDisabledInSettings: '退出（退群）已禁用 — 请在「设置 → Worker → 退群与删除」中启用。',
       exitStatusLeft: '已退群',
       exitStatusFailed: '退群失败',
+      deleteStatusDeleted: '已删除',
+      deleteStatusFailed: '删除失败',
       exitRemarkDeleteAutoPending: '退群完成后将自动排队删除聊天 — 可在 VIEW 重试',
       exitRemarkDeleteQueued: '删除聊天已入队',
       exitRemarkDeleteRunning: '删除聊天进行中',

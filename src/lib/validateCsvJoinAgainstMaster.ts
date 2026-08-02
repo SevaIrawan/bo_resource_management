@@ -1,6 +1,12 @@
 import { TABLES } from '@/config/tables';
 import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import { dedupeDailyRowsByGroupIdKeepLatest } from '@/lib/dedupeScrapeDaily';
+import {
+  looksLikeInviteLink,
+  normalizeGroupIdForMatch,
+  normalizeGroupNameForMatch,
+  normalizeInviteLinkForMatch,
+} from '@/lib/masterDailyMatch';
 import type { Platform } from '@/types/database';
 import type { CsvJoinRow } from './parseCsvJoinImport';
 
@@ -36,8 +42,25 @@ export interface ValidateCsvJoinResult {
   notInMasterCount: number;
 }
 
+function resolveCsvInviteCandidate(csvRow: CsvJoinRow): string | undefined {
+  if (csvRow.inviteLink?.trim()) return csvRow.inviteLink.trim();
+  if (csvRow.groupId && looksLikeInviteLink(csvRow.groupId)) return csvRow.groupId.trim();
+  if (csvRow.groupName && looksLikeInviteLink(csvRow.groupName)) return csvRow.groupName.trim();
+  return undefined;
+}
+
+function displayLabelForUnmatched(csvRow: CsvJoinRow): string {
+  return (
+    csvRow.groupName?.trim() ||
+    csvRow.inviteLink?.trim() ||
+    csvRow.groupId?.trim() ||
+    '—'
+  );
+}
+
 /**
  * Validate parsed CSV rows against groups_master and group_scrape_daily.
+ * Kontrak: group id | group name | invite-only | hybrid — match via id / invite / nama.
  * Returns status per row: matched (can queue), already_joined, or not_in_master.
  */
 export async function validateCsvJoinAgainstMaster(input: {
@@ -73,16 +96,22 @@ export async function validateCsvJoinAgainstMaster(input: {
 
   const masterByGroupId = new Map<string, MasterRow>();
   const masterByNameLower = new Map<string, MasterRow>();
-  const masterByInviteLink = new Map<string, MasterRow>();
+  const masterByInvite = new Map<string, MasterRow>();
 
   for (const m of masterRows) {
     const gid = (m.group_id ?? '').trim();
     if (!gid) continue;
     if (!masterByGroupId.has(gid)) masterByGroupId.set(gid, m);
-    const name = (m.group_name ?? '').trim().toLowerCase();
+    const gidNorm = normalizeGroupIdForMatch(gid);
+    if (gidNorm && !masterByGroupId.has(gidNorm)) masterByGroupId.set(gidNorm, m);
+
+    const name = normalizeGroupNameForMatch(m.group_name);
     if (name && !masterByNameLower.has(name)) masterByNameLower.set(name, m);
-    const link = (m.invite_link ?? '').trim();
-    if (link && !masterByInviteLink.has(link)) masterByInviteLink.set(link, m);
+
+    const invNorm = normalizeInviteLinkForMatch(m.invite_link);
+    if (invNorm && !masterByInvite.has(invNorm)) masterByInvite.set(invNorm, m);
+    const invRaw = (m.invite_link ?? '').trim();
+    if (invRaw && !masterByInvite.has(invRaw)) masterByInvite.set(invRaw, m);
   }
 
   const dailyGroupIds = new Set<string>();
@@ -90,7 +119,11 @@ export async function validateCsvJoinAgainstMaster(input: {
     const deduped = dedupeDailyRowsByGroupIdKeepLatest(dailyRows);
     for (const d of deduped) {
       const gid = (d.group_id ?? '').trim();
-      if (gid) dailyGroupIds.add(gid);
+      if (gid) {
+        dailyGroupIds.add(gid);
+        const norm = normalizeGroupIdForMatch(gid);
+        if (norm) dailyGroupIds.add(norm);
+      }
     }
   }
 
@@ -101,23 +134,29 @@ export async function validateCsvJoinAgainstMaster(input: {
 
   for (const csvRow of csvRows) {
     let master: MasterRow | undefined;
+    const inviteCandidate = resolveCsvInviteCandidate(csvRow);
 
-    if (csvRow.groupId) {
-      master = masterByGroupId.get(csvRow.groupId);
+    if (csvRow.groupId && !looksLikeInviteLink(csvRow.groupId)) {
+      const rawId = csvRow.groupId.trim();
+      master =
+        masterByGroupId.get(rawId) ?? masterByGroupId.get(normalizeGroupIdForMatch(rawId));
     }
-    if (!master && csvRow.inviteLink) {
-      master = masterByInviteLink.get(csvRow.inviteLink);
+    if (!master && inviteCandidate) {
+      const invNorm = normalizeInviteLinkForMatch(inviteCandidate);
+      master =
+        (invNorm ? masterByInvite.get(invNorm) : undefined) ??
+        masterByInvite.get(inviteCandidate.trim());
     }
-    if (!master && csvRow.groupName) {
-      master = masterByNameLower.get(csvRow.groupName.toLowerCase());
+    if (!master && csvRow.groupName && !looksLikeInviteLink(csvRow.groupName)) {
+      master = masterByNameLower.get(normalizeGroupNameForMatch(csvRow.groupName));
     }
 
     if (!master) {
       notInMasterCount++;
       results.push({
-        groupId: csvRow.groupId ?? '',
-        groupName: csvRow.groupName ?? csvRow.groupId ?? '—',
-        inviteLink: '',
+        groupId: csvRow.groupId && !looksLikeInviteLink(csvRow.groupId) ? csvRow.groupId : '',
+        groupName: displayLabelForUnmatched(csvRow),
+        inviteLink: inviteCandidate ?? '',
         status: 'not_in_master',
         csvRow,
       });
@@ -127,7 +166,11 @@ export async function validateCsvJoinAgainstMaster(input: {
     const gid = master.group_id.trim();
     const inviteLink = (master.invite_link ?? '').trim();
 
-    if (dailyGroupIds.has(gid) || busyGroupIds?.has(gid)) {
+    if (
+      dailyGroupIds.has(gid) ||
+      dailyGroupIds.has(normalizeGroupIdForMatch(gid)) ||
+      busyGroupIds?.has(gid)
+    ) {
       alreadyJoinedCount++;
       results.push({
         groupId: gid,

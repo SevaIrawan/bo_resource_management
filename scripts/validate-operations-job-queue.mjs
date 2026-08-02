@@ -313,8 +313,48 @@ const checks = [
         wa.includes('WWebJS.setPicture') &&
         !wa.includes('client.getChatById') &&
         tg.includes('EditPhotoRequest') &&
+        tg.includes('EditChatPhotoRequest') &&
+        tg.includes('isinstance(entity, Chat)') &&
         main.includes('set-group-photo') &&
         brand.includes('brand-group-photos')
+      );
+    })(),
+  },
+  {
+    name: 'TG delete/exit_delete: groupOutcomes + resume filter kinds (no overlap leave)',
+    ok: (() => {
+      const tg = read('electron/main/automation/tgAutomationClient.ts');
+      const helpers = read('electron/main/automation/jobQueueOutcomeHelpers.ts');
+      const runner = read('electron/main/automation/jobQueueRunner.ts');
+      const deleteBlock = tg.split("payload.action === 'delete_group'")[1]?.slice(0, 3500) ?? '';
+      const exitBlock = tg.split("payload.action === 'exit_delete_group'")[1]?.slice(0, 4500) ?? '';
+      return (
+        deleteBlock.includes("deleteStatus: 'deleted'") &&
+        deleteBlock.includes("deleteStatus: 'failed'") &&
+        deleteBlock.includes('attachJobGroupOutcomes') &&
+        exitBlock.includes("deleteStatus: 'deleted'") &&
+        exitBlock.includes("exitStatus: 'left'") &&
+        exitBlock.includes('groupOutcomes') &&
+        helpers.includes("'delete'") &&
+        helpers.includes("'exit_delete'") &&
+        runner.includes("filterGroupsNotDone(groups, job.payload.groupOutcomes, 'delete')") &&
+        runner.includes("r.deleteStatus === 'deleted'") &&
+        runner.includes("r.exitStatus === 'left' && r.deleteStatus === 'deleted'")
+      );
+    })(),
+  },
+  {
+    name: 'VIEW leave/delete: status dari exitStatus/deleteStatus outcomes (satu path)',
+    ok: (() => {
+      const ui = read('src/lib/operationsJobQueueUi.ts');
+      return (
+        ui.includes("job.action === 'leave_group'") &&
+        ui.includes("job.action === 'delete_group'") &&
+        ui.includes("row.deleteStatus === 'deleted'") &&
+        ui.includes('deleteStatusDeleted') &&
+        ui.includes('deleteStatusFailed') &&
+        !ui.includes('isExitDeleteExitJob(job)') &&
+        !ui.includes('isExitDeleteDeleteJob(job)')
       );
     })(),
   },

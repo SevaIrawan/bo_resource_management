@@ -1,16 +1,16 @@
-# Resource Management — Official User Guide (English)
+﻿# Resource Management — Official User Guide (English)
 
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.34 |
+| **App version** | 1.0.35 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (**Settings** → Language) |
 
 This document is the **official guide to every feature** in the current application. For architecture and IT release notes, see [PROJECT.md](../../PROJECT.md).
 
-> **v1.0.34:** Telegram Job Queue **Set admin / Leave / Delete** works on **basic groups** (Super Group = No), not only Super Groups/channels. Telegram **AuthKeyDuplicated** (portable session used on another PC/IP) → session dead — **log in again with QR**. Group matrix **Super Group** column filterable Yes/No (same as account columns). Job Queue join/leave/delete more resilient (transport retry, mid-batch outcomes, safer cancel). Daily scrape stores **is_owner**. Sync↔Job still block each other; scrape reads only groups still on the account; partial Job Queue batch → **Failed**.
+> **v1.0.35:** Join Missing **CSV/XLSX hybrid** (group id / name / invite, WhatsApp + Telegram). Job Queue setup lists **100 rows/page** with scroll viewport ~10. Telegram scrape hardens **left/migrated shells**, DiscoveryIncomplete, and **`TG_SESSION_DEAD`**. Leave/Delete jobs expose per-group **outcomes**; Telegram **set photo** works on basic Chat. (From 1.0.34+: Set admin/Leave/Delete on basic groups; AuthKeyDuplicated → re-login QR; Super Group matrix filter; daily **is_owner**; Sync↔Job mutual block; partial batch → **Failed**.)
 
 ---
 
@@ -666,4 +666,4 @@ Login (Username / Password)
 
 ---
 
-*This guide matches application version **1.0.34**. Update PDF/Word after each release via `npm run build:handbook-docs`.*
+*This guide matches application version **1.0.35**. Update PDF/Word after each release via `npm run build:handbook-docs`.*

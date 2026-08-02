@@ -1,4 +1,4 @@
-"""Set Telegram supergroup profile photo."""
+"""Set Telegram group profile photo — Channel/megagroup + basic Chat."""
 
 from __future__ import annotations
 
@@ -7,9 +7,15 @@ import os
 
 from telethon.errors import FloodWaitError
 from telethon.tl.functions.channels import EditPhotoRequest
-from telethon.tl.types import InputChatUploadedPhoto
+from telethon.tl.functions.messages import EditChatPhotoRequest
+from telethon.tl.types import Channel, Chat, InputChatUploadedPhoto
 
-from telegram_automation import _peer_group_id, _prepare_session, _resolve_group_entity
+from telegram_automation import (
+    _basic_chat_id,
+    _peer_group_id,
+    _prepare_session,
+    _resolve_group_entity,
+)
 from telegram_human_delay import (
     flood_wait_seconds,
     max_floodwait_auto_sleep,
@@ -68,12 +74,22 @@ async def run_set_group_photo(
         for attempt in range(0, max_retry + 1):
             try:
                 uploaded = await client.upload_file(path)
-                await client(
-                    EditPhotoRequest(
-                        channel=entity,
-                        photo=InputChatUploadedPhoto(uploaded),
+                photo = InputChatUploadedPhoto(uploaded)
+                if isinstance(entity, Channel):
+                    await client(EditPhotoRequest(channel=entity, photo=photo))
+                elif isinstance(entity, Chat):
+                    await client(
+                        EditChatPhotoRequest(
+                            chat_id=_basic_chat_id(entity),
+                            photo=photo,
+                        )
                     )
-                )
+                else:
+                    return _err(
+                        action,
+                        f"Unsupported entity type for set photo: {type(entity).__name__}",
+                        error_code="UNSUPPORTED_ENTITY",
+                    )
                 return _ok(
                     action,
                     {

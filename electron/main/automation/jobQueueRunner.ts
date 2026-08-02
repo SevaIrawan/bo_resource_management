@@ -167,12 +167,12 @@ function jobToRunPayload(job: AutomationJobRecord): AutomationRunPayload {
       groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'set_admin');
     } else if (job.action === 'set_group_photo') {
       groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'set_group_photo');
-    } else if (
-      job.action === 'leave_group' ||
-      job.action === 'delete_group' ||
-      job.action === 'exit_delete_group'
-    ) {
+    } else if (job.action === 'leave_group') {
       groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'leave');
+    } else if (job.action === 'delete_group') {
+      groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'delete');
+    } else if (job.action === 'exit_delete_group') {
+      groups = filterGroupsNotDone(groups, job.payload.groupOutcomes, 'exit_delete');
     }
   }
 
@@ -269,12 +269,16 @@ function countDoneOutcomesForAction(
   if (action === 'set_group_photo') {
     return outcomes.filter((r) => r.photoStatus === 'set').length;
   }
-  if (
-    action === 'leave_group' ||
-    action === 'delete_group' ||
-    action === 'exit_delete_group'
-  ) {
+  if (action === 'leave_group') {
     return outcomes.filter((r) => r.exitStatus === 'left').length;
+  }
+  if (action === 'delete_group') {
+    return outcomes.filter((r) => r.deleteStatus === 'deleted').length;
+  }
+  if (action === 'exit_delete_group') {
+    return outcomes.filter(
+      (r) => r.exitStatus === 'left' && r.deleteStatus === 'deleted',
+    ).length;
   }
   if (action === 'create_group') {
     return countCreatedGroupOutcomes(outcomes);

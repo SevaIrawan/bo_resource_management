@@ -251,6 +251,13 @@ async def _verify_client_live(client: TelegramClient) -> tuple[bool, str | None]
         return False, msg
 
 
+async def _client_locally_authorized(client: TelegramClient) -> bool:
+    try:
+        return bool(await client.is_user_authorized())
+    except Exception:  # noqa: BLE001
+        return False
+
+
 async def _apply_login_ready(session: TgLoginSession) -> None:
     ok, err = await _verify_client_live(session.client)
     if ok:
@@ -260,6 +267,13 @@ async def _apply_login_ready(session: TgLoginSession) -> None:
     if err == "2FA":
         session.status = "need_2fa"
         session.error = None
+        return
+    # Windows Errno 22 / soft socket: auth key lokal sudah ada — jangan status=error
+    # (itu memutus export + Scrape Now setelah Clear Session / login ulang).
+    if err and _is_transient_socket_error(err) and await _client_locally_authorized(session.client):
+        session.status = "ready"
+        session.error = None
+        _tg_session_log("", "ready_despite_transient", err)
         return
     session.status = "error"
     session.error = err
@@ -338,6 +352,11 @@ async def _finalize_qr_login_if_live(session: TgLoginSession) -> None:
     if err == "2FA":
         session.status = "need_2fa"
         session.error = None
+        return
+    # Authorized di HP tapi get_me gagal soft (Errno 22) — tetap finalize ready.
+    if err and _is_transient_socket_error(err):
+        session.qr_login = None
+        await _apply_login_ready(session)
 
 
 async def _maybe_rotate_telegram_qr(session: TgLoginSession) -> str | None:
@@ -407,8 +426,16 @@ async def _wait_for_qr_scan(session_id: str) -> None:
                     session.status = "need_2fa"
                     session.error = None
                     return
+                if err and _is_transient_socket_error(err):
+                    session.qr_login = None
+                    await _apply_login_ready(session)
+                    return
         except Exception:  # noqa: BLE001
             pass
+        if _is_transient_socket_error(str(exc)) and await _client_locally_authorized(session.client):
+            session.qr_login = None
+            await _apply_login_ready(session)
+            return
         session.status = "error"
         session.error = str(exc)
 
@@ -551,36 +578,41 @@ async def export_telegram_session(session_id: str) -> dict:
 async def _export_telegram_session_locked(session_id: str) -> dict:
     """
     Export StringSession dari memori.
-    Setelah scrape panjang socket sering drop — reconnect best-effort, tapi
-    serialize session TIDAK bergantung get_me (auth key sudah di StringSession).
+    Urutan akurat: serialize LOKAL dulu (tidak butuh socket), baru cek live.
+    Windows Errno 22 pada connect/get_me jangan gagalkan export / jangan surfacing mentah.
     AUTH_KEY_DUPLICATED → jangan export sebagai OK (string sudah mati di server).
     """
     session = SESSIONS.get(session_id)
     if not session:
         return {"status": "error", "message": "Login session not found. Scan QR again."}
 
+    # 1) Serialize dulu — auth key sudah di StringSession; jangan tunggu reconnect.
+    try:
+        session_string = session.client.session.save()
+    except Exception as exc:  # noqa: BLE001
+        save_err = str(exc) or "Failed to serialize Telegram session"
+        if _is_transient_socket_error(save_err):
+            save_err = "Failed to export Telegram session. Retry."
+        session.status = "error"
+        session.error = save_err
+        return {"status": "error", "message": session.error}
+
+    if not session_string or not str(session_string).strip():
+        session.status = "error"
+        session.error = "Empty Telegram session string. Log in again."
+        return {"status": "error", "message": session.error}
+
+    # 2) Live check best-effort — hanya AUTH_KEY_DEAD yang membatalkan export.
     live_ok = False
     live_err: str | None = None
     try:
         await _ensure_client_connected(session.client)
         live_ok, live_err = await _verify_client_live(session.client)
-        if not live_ok and live_err:
-            if _is_auth_key_dead_message(live_err):
-                _tg_session_log(session_id, "export_auth_key_dead", live_err)
-                session.status = "error"
-                session.error = live_err
-                return {"status": "error", "message": live_err}
-            lower = live_err.lower()
-            if _is_transient_socket_error(live_err) or (
-                "disconnected" in lower or "not connected" in lower or "connection" in lower
-            ):
-                await _force_reconnect(session.client)
-                live_ok, live_err = await _verify_client_live(session.client)
-                if not live_ok and _is_auth_key_dead_message(live_err):
-                    _tg_session_log(session_id, "export_auth_key_dead_after_reconnect", live_err)
-                    session.status = "error"
-                    session.error = live_err
-                    return {"status": "error", "message": live_err or "Session dead"}
+        if not live_ok and live_err and _is_auth_key_dead_message(live_err):
+            _tg_session_log(session_id, "export_auth_key_dead", live_err)
+            session.status = "error"
+            session.error = live_err
+            return {"status": "error", "message": live_err}
     except Exception as exc:  # noqa: BLE001
         live_ok = False
         live_err = str(exc) or "Telegram reconnect failed"
@@ -589,40 +621,22 @@ async def _export_telegram_session_locked(session_id: str) -> dict:
             session.status = "error"
             session.error = live_err
             return {"status": "error", "message": live_err}
+        if not _is_transient_socket_error(live_err):
+            _tg_session_log(session_id, "export_live_warn", live_err)
 
-    try:
-        session_string = session.client.session.save()
-    except Exception as exc:  # noqa: BLE001
-        session.status = "error"
-        session.error = str(exc) or live_err or "Failed to serialize Telegram session"
-        return {
-            "status": "error",
-            "message": session.error,
-        }
-
-    if not session_string or not str(session_string).strip():
-        # Jangan surfacing Errno 22 mentah — itu soft socket, bukan bukti string kosong.
-        if live_err and not _is_transient_socket_error(live_err):
-            empty_msg = live_err
-        else:
-            empty_msg = "Empty Telegram session string. Log in again."
-        session.status = "error"
-        session.error = empty_msg
-        return {
-            "status": "error",
-            "message": session.error,
-        }
-
-    # StringSession lokal valid → export OK meski get_me gagal (finishing scrape),
-    # kecuali AUTH_KEY sudah ditolak di atas.
     session.status = "ready"
     session.error = None
+    warn = (
+        live_err
+        if (not live_ok and live_err and not _is_transient_socket_error(live_err))
+        else None
+    )
     _tg_session_log(session_id, "export_ok", None if live_ok else f"warn={live_err}")
     return {
         "status": "ok",
         "sessionString": str(session_string).strip(),
         "loginMethod": session.mode,
-        **({"warn": live_err} if not live_ok and live_err else {}),
+        **({"warn": warn} if warn else {}),
     }
 
 async def restore_telegram_session(session_id: str, session_string: str) -> dict:
@@ -656,6 +670,11 @@ async def _restore_telegram_session_locked(session_id: str, session_string: str)
                         "status": "error",
                         "message": err,
                     }
+                if err and _is_transient_socket_error(err) and await _client_locally_authorized(
+                    existing.client
+                ):
+                    _tg_session_log(session_id, "restore_reuse_transient", err)
+                    return {"status": "ready", "reused": True, "warn": err}
                 # Soft reconnect pada client yang sama
                 try:
                     await _ensure_client_connected(existing.client)
@@ -667,12 +686,22 @@ async def _restore_telegram_session_locked(session_id: str, session_string: str)
                         _tg_session_log(session_id, "restore_reuse_dead_after_ensure", err2)
                         await cancel_telegram(session_id)
                         return {"status": "error", "message": err2}
+                    if err2 and _is_transient_socket_error(err2) and await _client_locally_authorized(
+                        existing.client
+                    ):
+                        _tg_session_log(session_id, "restore_reuse_transient_after_ensure", err2)
+                        return {"status": "ready", "reused": True, "warn": err2}
                 except Exception as soft_exc:  # noqa: BLE001
                     soft_msg = str(soft_exc)
                     if _is_auth_key_dead_message(soft_msg):
                         _tg_session_log(session_id, "restore_reuse_dead_exc", soft_msg)
                         await cancel_telegram(session_id)
                         return {"status": "error", "message": soft_msg}
+                    if _is_transient_socket_error(soft_msg) and await _client_locally_authorized(
+                        existing.client
+                    ):
+                        _tg_session_log(session_id, "restore_reuse_soft_exc", soft_msg)
+                        return {"status": "ready", "reused": True, "warn": soft_msg}
         except Exception as reuse_exc:  # noqa: BLE001
             _tg_session_log(session_id, "restore_reuse_failed", str(reuse_exc))
 
@@ -688,13 +717,34 @@ async def _restore_telegram_session_locked(session_id: str, session_string: str)
         ok, err = await _verify_client_live(client)
         if not ok:
             _tg_session_log(session_id, "restore_verify_failed", err)
+            if err and _is_auth_key_dead_message(err):
+                try:
+                    await client.disconnect()
+                except Exception:  # noqa: BLE001
+                    pass
+                return {
+                    "status": "error",
+                    "message": err or "Stored Telegram session expired. Log in again.",
+                }
+            # Soft socket (Errno 22): string valid + authorized lokal → treat ready
+            if await _client_locally_authorized(client) and (
+                not err or _is_transient_socket_error(err)
+            ):
+                SESSIONS[session_id] = TgLoginSession(client=client, mode="qr", status="ready")
+                _tg_session_log(session_id, "restore_ready_transient", err)
+                return {"status": "ready", "warn": err}
             try:
                 await client.disconnect()
             except Exception:  # noqa: BLE001
                 pass
+            soft_msg = (
+                "SESSION_WARM_PENDING: Telegram connection busy. Retry."
+                if err and _is_transient_socket_error(err)
+                else (err or "Stored Telegram session expired. Log in again.")
+            )
             return {
                 "status": "error",
-                "message": err or "Stored Telegram session expired. Log in again.",
+                "message": soft_msg,
             }
 
         SESSIONS[session_id] = TgLoginSession(client=client, mode="qr", status="ready")
@@ -705,7 +755,13 @@ async def _restore_telegram_session_locked(session_id: str, session_string: str)
         return {"status": "error", "message": "Telegram connection timed out"}
     except Exception as exc:  # noqa: BLE001
         _tg_session_log(session_id, "restore_error", str(exc))
-        return {"status": "error", "message": str(exc)}
+        msg = str(exc)
+        if _is_transient_socket_error(msg):
+            return {
+                "status": "error",
+                "message": "SESSION_WARM_PENDING: Telegram connection busy. Retry.",
+            }
+        return {"status": "error", "message": msg}
 
 async def cancel_telegram(session_id: str) -> None:
     session = SESSIONS.pop(session_id, None)

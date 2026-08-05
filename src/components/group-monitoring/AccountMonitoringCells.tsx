@@ -26,6 +26,8 @@ import {
 import type { JobQueueTaskType } from '@/lib/operationsJobQueueUi';
 import type { UiScrapeProgress } from '@/types/scrapeProgress';
 
+const EMPTY_SETUP_ACCOUNTS: AccountBrandRow[] = [];
+
 export function PlatformBadge({ platform }: { platform: AccountBrandRow['platform'] }) {
   const asset = platform === 'whatsapp' ? 'whatsapp' : 'telegram';
 
@@ -523,6 +525,16 @@ function AccountRemoveSlotIcon({
     [row.id, validPeers],
   );
 
+  /** Stabilkan referensi — `[row]` baru tiap render memicu reload modal + flicker loading. */
+  const setupSelectedAccounts = useMemo(
+    () => [row],
+    [row.id, row.accountName, row.phoneNumber, row.sessionStatus, row.platform, row.brandName],
+  );
+  const setupTargetCandidates = useMemo(
+    () => (setupTask === 'set_admin' ? validPeers : []),
+    [setupTask, validPeers],
+  );
+
   function openMetricModal(mode: AccountMetricGroupsMode) {
     if (isPending) return;
     if (mode === 'account' && row.groupsCurrent <= 0) return;
@@ -773,9 +785,9 @@ function AccountRemoveSlotIcon({
           taskType={setupTask}
           platform={row.platform}
           activeBrand={row.brandName}
-          selectedAccounts={setupTask === 'set_admin' ? [] : [row]}
+          selectedAccounts={setupTask === 'set_admin' ? EMPTY_SETUP_ACCOUNTS : setupSelectedAccounts}
           superAdminAccount={undefined}
-          targetAccountCandidates={setupTask === 'set_admin' ? validPeers : []}
+          targetAccountCandidates={setupTargetCandidates}
           validAccounts={validPeers}
           ownerAccountCandidates={setupTask === 'set_admin' ? setAdminOwnerCandidates : undefined}
           preferredSetAdminTargetId={setupTask === 'set_admin' ? row.id : undefined}

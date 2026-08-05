@@ -1,7 +1,7 @@
 ﻿# Resource Management — Referensi Master Proyek
 
 **Versi dokumen:** 2026-07-29  
-**Versi aplikasi:** 1.0.35 (`package.json`)  
+**Versi aplikasi:** 1.0.36 (`package.json`)  
 **Audience:** Developer, QA, dan operator teknis yang perlu memahami UI + logic end-to-end  
 
 ## Prinsip dokumen ini
@@ -820,6 +820,7 @@ flowchart TD
 | 2026-06-06 | Audit script `validate:master-reference`; perbaiki endpoint sidecar; hierarki kebenaran; hak akses Sync admin-only |
 | 2026-06-11 | Grid On device / Junk; Clear Session; remove slot rebuild master |
 | 2026-07-24 | Grid UI: Missing / Not admin / Remark (Active/Logout); daftar via klik gap |
+| 2026-08-05 | v1.0.36: Errno 22 export soft (serialize-first) + sidecar v13; Job Queue/CTA setup anti-flicker; UI map Errno 22; docs sync |
 | 2026-08-02 | v1.0.35: Join CSV/XLSX hybrid; Job Queue setup 100/page + scroll; TG scrape left/migrated + TG_SESSION_DEAD; leave/delete outcomes; set photo basic Chat; validator join-csv; docs sync |
 | 2026-07-29 | v1.0.34: TG basic Chat Set admin/Leave/Delete; AuthKeyDuplicated→re-login; Super Group matrix filter; Job Queue harden; is_owner daily (039); Electron typecheck + dead-code audit; docs sync |
 | 2026-07-27 | v1.0.33: Sync↔Job mutual block (execute slot); await WA validate; worker Leave delete/clear-chat defaults ON; validators pre-release gate; docs sync |

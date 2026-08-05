@@ -1257,7 +1257,7 @@ export function OperationsJobQueueSetupModal({
                         </tr>
                       </thead>
                       <tbody>
-                        {loadingJoinGroups ? (
+                        {loadingJoinGroups && visibleJoinGroups.length === 0 ? (
                           <tr>
                             <td
                               colSpan={platform === 'telegram' ? 4 : 2}
@@ -1604,7 +1604,7 @@ export function OperationsJobQueueSetupModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {loadingSetAdminGroupList ? (
+                    {loadingSetAdminGroupList && eligibleSetAdminGroups.length === 0 ? (
                       <tr>
                         <td
                           colSpan={platform === 'telegram' ? 4 : 2}
@@ -1736,7 +1736,7 @@ export function OperationsJobQueueSetupModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {loadingAccountDailyGroups ? (
+                    {loadingAccountDailyGroups && visibleExitGroups.length === 0 ? (
                       <tr>
                         <td
                           colSpan={platform === 'telegram' ? 4 : 3}

@@ -31,7 +31,14 @@ from telegram_human_delay import (
     max_floodwait_auto_sleep,
     merge_delay,
 )
-from telegram_login import SESSIONS, restore_telegram_session, tg_session_lock
+from telegram_login import (
+    SESSIONS,
+    _connect_client,
+    _is_auth_key_dead_message,
+    _is_transient_socket_error,
+    restore_telegram_session,
+    tg_session_lock,
+)
 
 DEVICE_GROUP_TARGET_MAX = 6000
 _DIALOG_CHUNK = 100
@@ -941,7 +948,19 @@ async def _collect_groups_locked(session_id: str, expected_phone: str | None = N
 
     client = session.client
     if not client.is_connected():
-        await client.connect()
+        try:
+            await _connect_client(client)
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc) or "Telegram connect failed"
+            if _is_auth_key_dead_message(msg):
+                return {"status": "error", "message": msg, "valid": False}
+            if _is_transient_socket_error(msg):
+                return {
+                    "status": "error",
+                    "message": "SCRAPER_TG_CONNECT_FAILED",
+                    "valid": False,
+                }
+            return {"status": "error", "message": msg, "valid": False}
     if not await client.is_user_authorized():
         return {"status": "error", "message": "Session is not authorized", "valid": False}
 

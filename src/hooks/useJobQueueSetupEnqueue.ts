@@ -95,6 +95,33 @@ export function useJobQueueSetupEnqueue({
   const [loadingAccountDailyGroups, setLoadingAccountDailyGroups] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  /** Hindari flicker: parent realtime sering re-create array accounts dengan isi sama. */
+  const selectedAccountsRef = useRef(selectedAccounts);
+  selectedAccountsRef.current = selectedAccounts;
+  const validAccountsRef = useRef(validAccounts);
+  validAccountsRef.current = validAccounts;
+  const onFeedbackRef = useRef(onFeedback);
+  onFeedbackRef.current = onFeedback;
+  const tRef = useRef(t);
+  tRef.current = t;
+  const joinableCountRef = useRef(0);
+  joinableCountRef.current = joinableGroups.length;
+  const superAdminCountRef = useRef(0);
+  superAdminCountRef.current = superAdminGroups.length;
+  const exitLoadedRef = useRef(false);
+  exitLoadedRef.current =
+    accountExitGroups.daily.length > 0 || accountExitGroups.junk.length > 0;
+
+  const selectedAccountIdsKey = selectedAccounts
+    .map((row) => row.id)
+    .sort()
+    .join('|');
+  const selectedAccountId = selectedAccounts[0]?.id ?? '';
+  const superAdminAccountId = superAdminAccount?.id ?? '';
+  const validAccountIdsKey = validAccounts
+    .map((row) => row.id)
+    .sort()
+    .join('|');
 
   function beginSubmitting(): void {
     submittingRef.current = true;
@@ -106,164 +133,181 @@ export function useJobQueueSetupEnqueue({
     setSubmitting(false);
   }
 
-  const selectedAccountId = selectedAccounts[0]?.id ?? '';
-  const superAdminAccountId = superAdminAccount?.id ?? '';
+  const reloadMissingGroups = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const accounts = selectedAccountsRef.current;
+      const accountIds = accounts.map((row) => row.id);
+      if (!activeBrand || accountIds.length === 0) {
+        setJoinableGroups([]);
+        setJoinGroupAccountIds({});
+        return;
+      }
 
-  const reloadMissingGroups = useCallback(async () => {
-    const accountIds = selectedAccounts.map((row) => row.id);
-    if (!activeBrand || accountIds.length === 0) {
-      setJoinableGroups([]);
-      setJoinGroupAccountIds({});
-      return;
-    }
+      const silent = options?.silent === true || joinableCountRef.current > 0;
+      if (!silent) setLoadingJoinGroups(true);
+      try {
+        const queueSnapshot = await fetchJobQueueSnapshot({ brandName: activeBrand, platform });
+        const merged = new Map<string, MissingMasterGroupForJoin>();
+        const eligibleByGroup: Record<string, string[]> = {};
 
-    setLoadingJoinGroups(true);
-    try {
-      const queueSnapshot = await fetchJobQueueSnapshot({ brandName: activeBrand, platform });
-      const merged = new Map<string, MissingMasterGroupForJoin>();
-      const eligibleByGroup: Record<string, string[]> = {};
+        const snapshots = await Promise.all(
+          accountIds.map((accountId) =>
+            loadMissingMasterGroupsJoinSnapshot({
+              accountId,
+              brandName: activeBrand,
+              platform,
+            }),
+          ),
+        );
 
-      const snapshots = await Promise.all(
-        accountIds.map((accountId) =>
-          loadMissingMasterGroupsJoinSnapshot({
-            accountId,
-            brandName: activeBrand,
-            platform,
-          }),
-        ),
-      );
+        accountIds.forEach((accountId, index) => {
+          const snapshot = snapshots[index];
+          const busyGroupIds = automationJobBusyGroupIdSet(queueSnapshot?.jobs ?? [], (job) =>
+            job.accountId === accountId &&
+            job.action === 'join_by_invite_link' &&
+            (job.status === 'queued' || job.status === 'running'),
+          );
+          for (const row of snapshot.joinable) {
+            if (busyGroupIds.has(row.groupId)) continue;
+            merged.set(row.groupId, row);
+            if (!eligibleByGroup[row.groupId]) eligibleByGroup[row.groupId] = [];
+            eligibleByGroup[row.groupId].push(accountId);
+          }
+        });
 
-      accountIds.forEach((accountId, index) => {
-        const snapshot = snapshots[index];
+        setJoinableGroups(
+          [...merged.values()].sort((a, b) => a.groupName.localeCompare(b.groupName)),
+        );
+        setJoinGroupAccountIds(eligibleByGroup);
+      } catch {
+        setJoinableGroups([]);
+        setJoinGroupAccountIds({});
+        if (open) onFeedbackRef.current?.(tRef.current('operations.jobQueue.loadMissingFailed'));
+      } finally {
+        setLoadingJoinGroups(false);
+      }
+    },
+    [activeBrand, open, platform],
+  );
+
+  const reloadSuperAdminGroups = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!activeBrand || !superAdminAccountId) {
+        setSuperAdminGroups([]);
+        return;
+      }
+
+      const accountValid = validAccountsRef.current.some((row) => row.id === superAdminAccountId);
+      if (!accountValid) {
+        setSuperAdminGroups([]);
+        return;
+      }
+
+      const silent = options?.silent === true || superAdminCountRef.current > 0;
+      if (!silent) setLoadingSuperAdminGroups(true);
+      try {
+        const rows = await loadSuperAdminGroupsForSetAdmin({
+          accountId: superAdminAccountId,
+          brandName: activeBrand,
+          platform,
+        });
+        const queueSnapshot = await fetchJobQueueSnapshot({ brandName: activeBrand, platform });
         const busyGroupIds = automationJobBusyGroupIdSet(queueSnapshot?.jobs ?? [], (job) =>
-          job.accountId === accountId &&
-          job.action === 'join_by_invite_link' &&
+          job.accountId === superAdminAccountId &&
+          job.action === 'set_admin' &&
           (job.status === 'queued' || job.status === 'running'),
         );
-        for (const row of snapshot.joinable) {
-          if (busyGroupIds.has(row.groupId)) continue;
-          merged.set(row.groupId, row);
-          if (!eligibleByGroup[row.groupId]) eligibleByGroup[row.groupId] = [];
-          eligibleByGroup[row.groupId].push(accountId);
-        }
-      });
+        setSuperAdminGroups(rows.filter((row) => !busyGroupIds.has(row.groupId)));
+      } catch {
+        setSuperAdminGroups([]);
+        if (open) onFeedbackRef.current?.(tRef.current('operations.jobQueue.loadMissingFailed'));
+      } finally {
+        setLoadingSuperAdminGroups(false);
+      }
+    },
+    [activeBrand, open, platform, superAdminAccountId],
+  );
 
-      setJoinableGroups(
-        [...merged.values()].sort((a, b) => a.groupName.localeCompare(b.groupName)),
-      );
-      setJoinGroupAccountIds(eligibleByGroup);
-    } catch {
-      setJoinableGroups([]);
-      setJoinGroupAccountIds({});
-      if (open) onFeedback?.(t('operations.jobQueue.loadMissingFailed'));
-    } finally {
-      setLoadingJoinGroups(false);
-    }
-  }, [activeBrand, onFeedback, open, platform, selectedAccounts, t]);
+  const reloadAccountExitGroups = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!activeBrand || !selectedAccountId || taskType !== 'exit_delete_group') {
+        setAccountExitGroups({ daily: [], junk: [] });
+        setProcessedExitGroupIds(new Set());
+        exitLoadedRef.current = false;
+        return;
+      }
 
-  const reloadSuperAdminGroups = useCallback(async () => {
-    if (!activeBrand || !superAdminAccountId) {
-      setSuperAdminGroups([]);
-      return;
-    }
+      const accountValid = validAccountsRef.current.some((row) => row.id === selectedAccountId);
+      if (!accountValid) {
+        setAccountExitGroups({ daily: [], junk: [] });
+        setProcessedExitGroupIds(new Set());
+        exitLoadedRef.current = false;
+        return;
+      }
 
-    const accountValid = validAccounts.some((row) => row.id === superAdminAccountId);
-    if (!accountValid) {
-      setSuperAdminGroups([]);
-      return;
-    }
-
-    setLoadingSuperAdminGroups(true);
-    try {
-      const rows = await loadSuperAdminGroupsForSetAdmin({
-        accountId: superAdminAccountId,
-        brandName: activeBrand,
-        platform,
-      });
-      const queueSnapshot = await fetchJobQueueSnapshot({ brandName: activeBrand, platform });
-      const busyGroupIds = automationJobBusyGroupIdSet(queueSnapshot?.jobs ?? [], (job) =>
-        job.accountId === superAdminAccountId &&
-        job.action === 'set_admin' &&
-        (job.status === 'queued' || job.status === 'running'),
-      );
-      setSuperAdminGroups(rows.filter((row) => !busyGroupIds.has(row.groupId)));
-    } catch {
-      setSuperAdminGroups([]);
-      if (open) onFeedback?.(t('operations.jobQueue.loadMissingFailed'));
-    } finally {
-      setLoadingSuperAdminGroups(false);
-    }
-  }, [activeBrand, onFeedback, open, platform, superAdminAccountId, t, validAccounts]);
-
-  const reloadAccountExitGroups = useCallback(async (options?: { silent?: boolean }) => {
-    if (!activeBrand || !selectedAccountId || taskType !== 'exit_delete_group') {
-      setAccountExitGroups({ daily: [], junk: [] });
-      setProcessedExitGroupIds(new Set());
-      return;
-    }
-
-    const accountValid = validAccounts.some((row) => row.id === selectedAccountId);
-    if (!accountValid) {
-      setAccountExitGroups({ daily: [], junk: [] });
-      setProcessedExitGroupIds(new Set());
-      return;
-    }
-
-    if (!options?.silent) {
-      setLoadingAccountDailyGroups(true);
-    }
-    try {
-      const snapshot = await loadAccountExitGroupsSnapshot({
-        accountId: selectedAccountId,
-        brandName: activeBrand,
-        platform,
-      });
-      const queueSnapshot = await fetchJobQueueSnapshot({ brandName: activeBrand, platform });
-      setProcessedExitGroupIds(
-        exitDeleteProcessedGroupIdSet(queueSnapshot?.jobs ?? [], selectedAccountId),
-      );
-      setAccountExitGroups({
-        daily: snapshot.daily,
-        junk: snapshot.junk,
-      });
-    } catch {
-      setAccountExitGroups({ daily: [], junk: [] });
-      setProcessedExitGroupIds(new Set());
-      if (open) onFeedback?.(t('operations.jobQueue.loadDailyGroupsFailed'));
-    } finally {
-      setLoadingAccountDailyGroups(false);
-    }
-  }, [
-    activeBrand,
-    onFeedback,
-    open,
-    platform,
-    selectedAccountId,
-    t,
-    taskType,
-    validAccounts,
-  ]);
+      const silent = options?.silent === true || exitLoadedRef.current;
+      if (!silent) setLoadingAccountDailyGroups(true);
+      try {
+        const snapshot = await loadAccountExitGroupsSnapshot({
+          accountId: selectedAccountId,
+          brandName: activeBrand,
+          platform,
+        });
+        const queueSnapshot = await fetchJobQueueSnapshot({ brandName: activeBrand, platform });
+        setProcessedExitGroupIds(
+          exitDeleteProcessedGroupIdSet(queueSnapshot?.jobs ?? [], selectedAccountId),
+        );
+        setAccountExitGroups({
+          daily: snapshot.daily,
+          junk: snapshot.junk,
+        });
+      } catch {
+        setAccountExitGroups({ daily: [], junk: [] });
+        setProcessedExitGroupIds(new Set());
+        if (open) onFeedbackRef.current?.(tRef.current('operations.jobQueue.loadDailyGroupsFailed'));
+      } finally {
+        setLoadingAccountDailyGroups(false);
+      }
+    },
+    [activeBrand, open, platform, selectedAccountId, taskType],
+  );
 
   useEffect(() => {
     if (taskType !== 'join' || !open) return;
     void reloadMissingGroups();
-  }, [taskType, open, reloadMissingGroups]);
+  }, [taskType, open, activeBrand, platform, selectedAccountIdsKey, reloadMissingGroups]);
 
   useEffect(() => {
     if (taskType !== 'set_admin' || !open) return;
     void reloadSuperAdminGroups();
-  }, [taskType, open, reloadSuperAdminGroups]);
+  }, [
+    taskType,
+    open,
+    activeBrand,
+    platform,
+    superAdminAccountId,
+    validAccountIdsKey,
+    reloadSuperAdminGroups,
+  ]);
 
   useEffect(() => {
     if (taskType !== 'exit_delete_group' || !open) return;
     void reloadAccountExitGroups();
-  }, [taskType, open, reloadAccountExitGroups]);
+  }, [
+    taskType,
+    open,
+    activeBrand,
+    platform,
+    selectedAccountId,
+    validAccountIdsKey,
+    reloadAccountExitGroups,
+  ]);
 
   useEffect(() => {
     return subscribeJobQueueChanged(() => {
       if (submittingRef.current || open) return;
-      if (taskType === 'join') void reloadMissingGroups();
-      if (taskType === 'set_admin') void reloadSuperAdminGroups();
+      if (taskType === 'join') void reloadMissingGroups({ silent: true });
+      if (taskType === 'set_admin') void reloadSuperAdminGroups({ silent: true });
       if (taskType === 'exit_delete_group') void reloadAccountExitGroups({ silent: true });
     });
   }, [open, taskType, reloadAccountExitGroups, reloadMissingGroups, reloadSuperAdminGroups]);

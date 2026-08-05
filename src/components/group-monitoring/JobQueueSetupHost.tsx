@@ -93,7 +93,7 @@ export function JobQueueSetupHost({
       return;
     }
     setPickedCreateAccountId(selectedAccounts[0]?.id ?? '');
-  }, [open, pickCreateAccountInModal, selectedAccounts]);
+  }, [open, pickCreateAccountInModal, selectedAccounts[0]?.id]);
 
   const resolvedSuperAdmin = useMemo(() => {
     if (pickOwnerInModal) {

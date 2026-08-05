@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.35 |
+| **App version** | 1.0.36 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (**Settings** → Language) |
 
 This document is the **official guide to every feature** in the current application. For architecture and IT release notes, see [PROJECT.md](../../PROJECT.md).
 
-> **v1.0.35:** Join Missing **CSV/XLSX hybrid** (group id / name / invite, WhatsApp + Telegram). Job Queue setup lists **100 rows/page** with scroll viewport ~10. Telegram scrape hardens **left/migrated shells**, DiscoveryIncomplete, and **`TG_SESSION_DEAD`**. Leave/Delete jobs expose per-group **outcomes**; Telegram **set photo** works on basic Chat. (From 1.0.34+: Set admin/Leave/Delete on basic groups; AuthKeyDuplicated → re-login QR; Super Group matrix filter; daily **is_owner**; Sync↔Job mutual block; partial batch → **Failed**.)
+> **v1.0.36:** Telegram **Errno 22** / export-session soft (serialize StringSession first; Clear Session → re-login + Scrape Now no longer fail fatally on Windows socket noise). Job Queue / CTA **Join Missing** and **Leave & delete** setup modals no longer flicker while selecting rows (stable account IDs + silent reload). Sidecar **v13**. (From 1.0.35+: Join CSV/XLSX hybrid; setup 100/page; TG scrape left/migrated + `TG_SESSION_DEAD`; leave/delete outcomes.)
 
 ---
 
@@ -666,4 +666,4 @@ Login (Username / Password)
 
 ---
 
-*This guide matches application version **1.0.35**. Update PDF/Word after each release via `npm run build:handbook-docs`.*
+*This guide matches application version **1.0.36**. Update PDF/Word after each release via `npm run build:handbook-docs`.*

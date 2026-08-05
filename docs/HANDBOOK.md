@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.35 |
+| **Versi app** | 1.0.36 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Settings → Language) |
@@ -123,7 +123,7 @@ Angka berubah sesuai tab aktif.
 | Online | Akun dengan session **Active** |
 | Aligned | Akun Remark **Aligned** (tanpa gap Junk/Missing/Not admin) |
 
-**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. Batch besar auto-split 30 grup per job; batch partial → **Failed** (bukan Completed). **v1.0.35:** Join Missing CSV/XLSX hybrid (id/nama/invite); setup table 100 row/page + scroll ~10; TG scrape filter left/migrated + `TG_SESSION_DEAD`; leave/delete outcomes + set photo basic Chat. (1.0.34+: TG Set admin/Leave/Delete basic Chat; Super Group filter; AuthKeyDuplicated → re-login; Sync↔Job saling blokir.) Execute slots max **10**/platform; auto scrape brands max **6**.
+**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. Batch besar auto-split 30 grup per job; batch partial → **Failed** (bukan Completed). **v1.0.36:** fix Errno 22 export session (serialize-first); setup Join/Leave modal anti-flicker; sidecar v13. (1.0.35+: Join CSV hybrid; 100/page + scroll; TG scrape left/migrated + `TG_SESSION_DEAD`.) Execute slots max **10**/platform; auto scrape brands max **6**.
 
 > Tidak ada tab Ticket / Reporting di shell. Issue = KPI Account + gap kolom + Remark. Matrix = modal dari badge grup.
 
@@ -479,4 +479,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.35**.*
+*Handbook ini selaras dengan aplikasi versi **1.0.36**.*

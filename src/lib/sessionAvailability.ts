@@ -66,8 +66,17 @@ export async function backfillPlatformSessionIfNeeded(input: {
   });
   if (!warmed) return;
 
-  await persistLoginSessionAfterSuccess({
-    userId: input.userId,
-    account: input.account,
-  });
+  try {
+    await persistLoginSessionAfterSuccess({
+      userId: input.userId,
+      account: input.account,
+    });
+  } catch (err) {
+    // Soft: Errno 22 / export gagal sementara — jangan blokir Scrape Now.
+    // Session masih di sidecar memory; scrape bisa lanjut + persist setelah write.
+    console.warn(
+      '[backfillPlatformSession] persist after warm failed (continuing scrape):',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
 }

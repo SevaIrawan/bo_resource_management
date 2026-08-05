@@ -41,7 +41,11 @@ function isTelegramTransportError(err: unknown): boolean {
     msg.includes('econnreset') ||
     msg.includes('etimedout') ||
     msg.includes('socket hang up') ||
-    msg.includes('empty response')
+    msg.includes('empty response') ||
+    // Windows/Telethon soft socket — map ke SCRAPER_TG_CONNECT_FAILED, jangan Errno mentah.
+    msg.includes('errno 22') ||
+    msg.includes('winerror 10022') ||
+    msg.includes('invalid argument')
   );
 }
 

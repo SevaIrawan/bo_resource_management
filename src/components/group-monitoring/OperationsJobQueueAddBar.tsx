@@ -22,6 +22,9 @@ import type { AutomationJobRecord } from '@/types/automationJob';
 import type { AccountBrandGroup, AccountBrandRow } from '@/types/accountMonitoringUi';
 import type { Platform } from '@/types/database';
 
+/** Referensi stabil — hindari `[]` literal tiap render (memicu reload setup modal). */
+const EMPTY_SETUP_ACCOUNTS: AccountBrandRow[] = [];
+
 interface OperationsJobQueueAddBarProps {
   groups: AccountBrandGroup[];
   platform: Platform;
@@ -177,7 +180,10 @@ export function OperationsJobQueueAddBar({
   }, [createEligibleAccounts, selectedAccountId, taskType]);
 
   const superAdminAccount = validAccounts.find((row) => row.id === superAdminAccountId);
-  const setAdminTargetCandidates = validAccounts.filter((row) => row.id !== superAdminAccountId);
+  const setAdminTargetCandidates = useMemo(
+    () => validAccounts.filter((row) => row.id !== superAdminAccountId),
+    [superAdminAccountId, validAccounts],
+  );
 
   const workerSettings =
     platform === 'telegram' ? readTelegramWorkerSettings() : readWhatsAppWorkerSettings();
@@ -358,7 +364,7 @@ export function OperationsJobQueueAddBar({
           taskType={taskType}
           platform={platform}
           activeBrand={activeBrand}
-          selectedAccounts={taskType === 'set_admin' ? [] : selectedAccounts}
+          selectedAccounts={taskType === 'set_admin' ? EMPTY_SETUP_ACCOUNTS : selectedAccounts}
           superAdminAccount={superAdminAccount}
           targetAccountCandidates={setAdminTargetCandidates}
           validAccounts={validAccounts}

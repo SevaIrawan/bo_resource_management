@@ -288,11 +288,11 @@ const checks = [
       ),
   },
   {
-    name: 'TG finishing: reconnect sebelum export + soft-fail setelah write DB',
+    name: 'TG finishing: serialize-first export + soft-fail setelah write DB',
     ok:
       read('python-sidecar/telegram_login.py').includes('_ensure_client_connected') &&
       read('python-sidecar/telegram_login.py').includes('_force_reconnect') &&
-      read('python-sidecar/telegram_login.py').includes('serialize session TIDAK bergantung get_me') &&
+      read('python-sidecar/telegram_login.py').includes('serialize LOKAL dulu') &&
       read('python-sidecar/telegram_scraper.py').includes('payload["sessionString"]') &&
       read('src/lib/runAccountScraper.ts').includes('session export warning') &&
       read('src/lib/runAccountScraper.ts').includes('fromScrape') &&

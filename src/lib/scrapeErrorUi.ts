@@ -47,11 +47,11 @@ export function isScrapeConnectionModalCode(
   );
 }
 
-/** Bersihkan bungkus IPC Electron `Error invoking remote method 'scraper:run'|'scraper:run-auto'`. */
+/** Bersihkan bungkus IPC Electron `Error invoking remote method 'scraper:…'. */
 export function normalizeScrapeErrorMessage(message: string): string {
   const trimmed = message.trim();
   const invokeMatch = trimmed.match(
-    /Error invoking remote method 'scraper:run(?:-auto)?':\s*(?:Error:\s*)?([\s\S]+)/i,
+    /Error invoking remote method 'scraper:(?:run(?:-auto)?|export-telegram-session|restore-telegram-session)':\s*(?:Error:\s*)?([\s\S]+)/i,
   );
   if (invokeMatch?.[1]) return invokeMatch[1].trim();
   return trimmed;
@@ -171,6 +171,14 @@ export function isTgSidecarConnectFailedMessage(message: string | undefined): bo
   const normalized = normalizeScrapeErrorMessage(message);
   const lower = normalized.toLowerCase();
   if (lower === 'scraper_tg_connect_failed' || lower.startsWith('scraper_tg_connect_failed')) {
+    return true;
+  }
+  // Windows/Telethon soft socket — bukan session mati / bukan suruh QR ulang.
+  if (
+    lower.includes('errno 22') ||
+    lower.includes('winerror 10022') ||
+    lower.includes('invalid argument')
+  ) {
     return true;
   }
   if (lower.includes('typeerror') && lower.includes('fetch failed')) return true;

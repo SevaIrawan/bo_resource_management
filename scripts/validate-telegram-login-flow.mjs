@@ -44,12 +44,15 @@ const checks = [
     })(),
   },
   {
-    name: 'Export session reconnect jika disconnected',
+    name: 'Export session serialize-first (Errno 22 soft; AUTH_KEY_DEAD tetap fatal)',
     ok:
       tgPy.includes('_ensure_client_connected') &&
       tgPy.includes('_force_reconnect') &&
-      tgPy.includes('serialize session TIDAK bergantung get_me') &&
-      tgPy.includes('Cannot send request while disconnected'),
+      tgPy.includes('serialize LOKAL dulu') &&
+      tgPy.includes('session.client.session.save()') &&
+      tgPy.includes('_is_auth_key_dead_message') &&
+      tgPy.includes('_is_transient_socket_error') &&
+      tgPy.includes('ready_despite_transient'),
   },
   {
     name: 'Restore reuse client ready (hindari AUTH_KEY_DUPLICATED dual connect)',

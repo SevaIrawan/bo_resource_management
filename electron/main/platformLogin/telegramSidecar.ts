@@ -10,7 +10,7 @@ import { withNetworkRetry } from '../lib/networkRetry';
 const SIDECAR_URL = 'http://127.0.0.1:8765';
 export { SIDECAR_URL };
 const SIDECAR_PORT = 8765;
-const SIDECAR_VERSION = 12;
+const SIDECAR_VERSION = 13;
 const pollTimers = new Map<string, ReturnType<typeof setInterval>>();
 const pollErrorStreak = new Map<string, number>();
 const POLL_ERROR_MAX_STREAK = 8;

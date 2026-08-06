@@ -833,8 +833,8 @@
   .operations-job-queue-table-wrap--scroll-body .operations-job-queue-table thead th {
     position: sticky;
     top: 0;
-    z-index: 2;
-    background: rgb(18, 22, 32);
+    z-index: 3;
+    background: var(--color-bg-card);
     box-shadow: 0 1px 0 var(--color-border-subtle);
   }
 
@@ -868,8 +868,8 @@
   .operations-job-queue-table--exit-groups thead th {
     position: sticky;
     top: 0;
-    z-index: 1;
-    background: rgb(18, 22, 32);
+    z-index: 3;
+    background: var(--color-bg-card);
     box-shadow: 0 1px 0 var(--color-border-subtle);
   }
 
@@ -915,7 +915,9 @@
 
   .operations-job-queue-table {
     width: 100%;
-    border-collapse: collapse;
+    /* separate: sticky thead andal di Chromium (collapse sering overlap baris pertama). */
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.8125rem;
   }
 
@@ -931,7 +933,9 @@
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--color-text-muted);
-    background: rgba(255, 255, 255, 0.03);
+    vertical-align: middle;
+    /* Opaque — sticky harus menutupi baris data di bawah, bukan tembus. */
+    background: var(--color-bg-card);
   }
 
   .operations-job-queue-empty {
@@ -965,6 +969,11 @@
   .operations-job-status--completed {
     background: rgba(34, 197, 94, 0.18);
     color: #86efac;
+  }
+
+  .operations-job-status--partial {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
   }
 
   .operations-job-status--failed {
@@ -1082,10 +1091,13 @@
     overflow: auto;
   }
 
+  /* Sticky freeze header — di atas tbody, tidak tumpang tindih / tembus data. */
   .operations-job-queue-zone--table .operations-job-queue-table thead th {
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 3;
+    background: var(--color-bg-card);
+    box-shadow: 0 1px 0 var(--color-border-subtle);
   }
 
   .operations-job-queue-add {

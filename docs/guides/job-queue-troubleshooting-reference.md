@@ -1,7 +1,7 @@
-﻿# GM App — Job Queue & Execute Worker Troubleshooting Reference
+# GM App — Job Queue & Execute Worker Troubleshooting Reference
 
 **Product:** Resource Management (Electron)  
-**Version:** v1.0.36  
+**Version:** v1.0.37  
 **Audience:** Developers and ops maintaining WhatsApp / Telegram automation  
 **Scope:** Job Queue, execute slot pool, Sync / Scrape interaction — not Reporting or Supabase schema
 
@@ -14,6 +14,8 @@
 | Nothing runs; all actions queue | `executeSlotsActive` vs max (**10** per platform WA/TG) | Ghost slot after crash **or** 10 real jobs running on that platform |
 | One account stuck; others OK | Row busy indicator / job table | Scrape + job conflict, settling, or active job on that account |
 | Job `failed` immediately | Job error / `errorCode` | Invalid session, payload, or platform error |
+| Badge **Partial** (amber) | Progress `X/Y` with X>0 | Some groups succeeded — not “all failed”; use VIEW |
+| Badge **Failed** (red) | Progress `0/Y` or no success | Zero successful steps |
 | Job `running` forever | Duration vs action timeout | Chrome hang; wait 90m stale sweep or restart app |
 | TG jobs fail in batch | `FLOOD_WAIT` in error | Telegram rate limit exceeded |
 | Sync blocked right after job | Within ~15s of job end | `SESSION_SETTLING` — **expected** |

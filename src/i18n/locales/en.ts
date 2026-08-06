@@ -297,6 +297,7 @@ export const en = {
       statusRunning: 'Running',
       statusProcess: 'Process {{current}}/{{total}}',
       statusCompleted: 'Completed',
+      statusPartial: 'Partial',
       statusFailed: 'Failed',
       statusCancelled: 'Cancelled',
       statusJobPaused: 'Paused',

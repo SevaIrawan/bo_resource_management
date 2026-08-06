@@ -286,6 +286,7 @@ export const zh: Messages = {
       statusRunning: '执行中',
       statusProcess: '进度 {{current}}/{{total}}',
       statusCompleted: '已完成',
+      statusPartial: '部分完成',
       statusFailed: '失败',
       statusCancelled: '已取消',
       statusJobPaused: '已暂停',

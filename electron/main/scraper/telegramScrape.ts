@@ -28,7 +28,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isTelegramSoftSocketError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  // Windows/Telethon soft socket — SESSION_WARM_PENDING, bukan "restart app".
+  return (
+    msg.includes('errno 22') ||
+    msg.includes('winerror 10022') ||
+    msg.includes('invalid argument')
+  );
+}
+
 function isTelegramTransportError(err: unknown): boolean {
+  if (isTelegramSoftSocketError(err)) return false;
   const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
   const name = err instanceof Error ? err.name.toLowerCase() : '';
   return (
@@ -41,19 +52,20 @@ function isTelegramTransportError(err: unknown): boolean {
     msg.includes('econnreset') ||
     msg.includes('etimedout') ||
     msg.includes('socket hang up') ||
-    msg.includes('empty response') ||
-    // Windows/Telethon soft socket — map ke SCRAPER_TG_CONNECT_FAILED, jangan Errno mentah.
-    msg.includes('errno 22') ||
-    msg.includes('winerror 10022') ||
-    msg.includes('invalid argument')
+    msg.includes('empty response')
   );
 }
 
-/** Jangan surfacing TypeError/TimeoutError mentah ke UI. */
+/** Jangan surfacing TypeError/TimeoutError/Errno mentah ke UI. */
 function toTelegramScrapeError(err: unknown): Error {
   if (err instanceof Error) {
     if (err.message.startsWith('SCRAPER_')) return err;
     if (err.message === 'SCRAPER_CANCELLED') return err;
+    if (err.message.startsWith('SESSION_WARM_PENDING')) return err;
+  }
+  if (isTelegramSoftSocketError(err)) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return new Error(`SESSION_WARM_PENDING: ${detail}`);
   }
   if (isTelegramTransportError(err)) {
     return new Error(TG_CONNECT_FAILED);
@@ -377,7 +389,14 @@ async function runTelegramScrapeInner(
 
   if (json.status === 'error') {
     const raw = json.message ?? 'Telegram scrape failed';
-    const message = isTelegramTransportError(new Error(raw)) ? TG_CONNECT_FAILED : raw;
+    const soft = isTelegramSoftSocketError(new Error(raw))
+      ? `SESSION_WARM_PENDING: ${raw}`
+      : null;
+    const message = soft
+      ? soft
+      : isTelegramTransportError(new Error(raw))
+        ? TG_CONNECT_FAILED
+        : raw;
     emitScrapeProgress({ sessionId, phase: 'error', label: message });
     throw new Error(message);
   }

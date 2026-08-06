@@ -247,9 +247,9 @@ body.confluence-document {
   <header class="doc-cover">
     <h1>Resource Management</h1>
     <p class="subtitle">Official User Guide</p>
-    <p class="meta">Version 1.0.36</p>
+    <p class="meta">Version 1.0.37</p>
   </header>
-  <p>﻿# Resource Management — Official User Guide (English)</p>
+  <h1>Resource Management — Official User Guide (English)</h1>
 <table>
 <thead>
 <tr>
@@ -263,7 +263,7 @@ body.confluence-document {
 </tr>
 <tr>
 <td><strong>App version</strong></td>
-<td>1.0.36</td>
+<td>1.0.37</td>
 </tr>
 <tr>
 <td><strong>Audience</strong></td>
@@ -280,7 +280,7 @@ body.confluence-document {
 </tbody></table>
 <p>This document is the <strong>official guide to every feature</strong> in the current application. For architecture and IT release notes, see <a href="../../PROJECT.md">PROJECT.md</a>.</p>
 <blockquote>
-<p><strong>v1.0.36:</strong> Telegram <strong>Errno 22</strong> / export-session soft (serialize StringSession first; Clear Session → re-login + Scrape Now no longer fail fatally on Windows socket noise). Job Queue / CTA <strong>Join Missing</strong> and <strong>Leave &amp; delete</strong> setup modals no longer flicker while selecting rows (stable account IDs + silent reload). Sidecar <strong>v13</strong>. (From 1.0.35+: Join CSV/XLSX hybrid; setup 100/page; TG scrape left/migrated + <code>TG_SESSION_DEAD</code>; leave/delete outcomes.)</p>
+<p><strong>v1.0.37:</strong> Telegram Sync harden — app quit kills sidecar on port <strong>8765</strong> (no orphan); soft <strong>Errno 22</strong> → tap Sync again (not “restart app”); sidecar <strong>v14</strong>. Job Queue: sticky table header; badge <strong>Partial</strong> (some groups succeeded) vs <strong>Failed</strong> (none succeeded). (From 1.0.36+: export-session serialize-first; setup anti-flicker. From 1.0.35+: Join CSV/XLSX hybrid; setup 100/page; TG scrape left/migrated + <code>TG_SESSION_DEAD</code>.)</p>
 </blockquote>
 <hr>
 <h2>Table of contents</h2>
@@ -1583,7 +1583,7 @@ body.confluence-document {
 </tr>
 </tbody></table>
 <hr>
-<p><em>This guide matches application version <strong>1.0.36</strong>. Update PDF/Word after each release via <code>npm run build:handbook-docs</code>.</em></p>
+<p><em>This guide matches application version <strong>1.0.37</strong>. Update PDF/Word after each release via <code>npm run build:handbook-docs</code>.</em></p>
 
 </body>
 </html>

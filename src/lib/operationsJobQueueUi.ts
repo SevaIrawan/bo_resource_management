@@ -216,6 +216,61 @@ export function jobQueueBatchTotalText(job: AutomationJobRecord): string {
   return total > 0 ? String(total) : '—';
 }
 
+/** Jumlah step yang sudah sukses (join/create/admin/exit/dll) — untuk bedakan Partial vs Failed. */
+export function jobQueueSuccessCount(job: AutomationJobRecord): number {
+  const outcomes = job.payload.groupOutcomes;
+  if (outcomes && outcomes.length > 0) {
+    let fromOutcomes = 0;
+    for (const row of outcomes) {
+      if (row.joinStatus === 'joined' || row.joinStatus === 'already_member') {
+        fromOutcomes += 1;
+        continue;
+      }
+      if (row.createStatus === 'created') {
+        fromOutcomes += 1;
+        continue;
+      }
+      if (row.adminStatus === 'promoted') {
+        fromOutcomes += 1;
+        continue;
+      }
+      if (row.exitStatus === 'left') {
+        fromOutcomes += 1;
+        continue;
+      }
+      if (row.deleteStatus === 'deleted') {
+        fromOutcomes += 1;
+        continue;
+      }
+      if (row.photoStatus === 'set') {
+        fromOutcomes += 1;
+      }
+    }
+    // Outcomes ada → sukses HANYA dari outcomes.
+    // Jangan fallback ke progress (progress bisa >0 meski semua row failed).
+    return fromOutcomes;
+  }
+  return Math.max(0, Math.floor(Number(job.progress?.current) || 0));
+}
+
+/**
+ * Partial = ada yang sukses DAN belum semua selesai.
+ * Failed = 0 sukses / semua error (status DB tetap failed).
+ * Cancelled tanpa bukti sukses (outcomes) → tetap Cancelled, bukan Partial palsu.
+ */
+export function isJobQueuePartialOutcome(job: AutomationJobRecord): boolean {
+  if (job.status !== 'failed' && job.status !== 'cancelled') return false;
+  // Cancelled tanpa outcomes: jangan tebak Partial dari progress saja (UI jadi Partial + "—").
+  if (job.status === 'cancelled' && !(job.payload.groupOutcomes?.length)) {
+    return false;
+  }
+  const success = jobQueueSuccessCount(job);
+  if (success <= 0) return false;
+  const total = accountJobStepTotal(job);
+  if (total > 0 && success >= total) return false;
+  return true;
+}
+
 export function jobQueueStatusLabel(
   job: AutomationJobRecord,
   t: (key: string, vars?: Record<string, string | number>) => string,
@@ -243,6 +298,9 @@ export function jobQueueStatusLabel(
       total: step.total,
     });
   }
+  if (isJobQueuePartialOutcome(job)) {
+    return t('operations.jobQueue.statusPartial');
+  }
   return t(jobQueueStatusKey(job.status));
 }
 
@@ -254,16 +312,22 @@ export function jobQueueResultText(
   const step = jobQueueStepProgress(job);
   const progress = batch ?? step;
 
-  if (job.status === 'failed') {
+  if (job.status === 'failed' || job.status === 'cancelled') {
     const raw = (job.error?.trim() || job.message?.trim() || '').trim();
     const err =
       !raw || raw.length <= 3 || /^r(:\s*r)?$/i.test(raw)
-        ? 'WhatsApp store flake — retry'
+        ? job.status === 'cancelled'
+          ? ''
+          : 'WhatsApp store flake — retry'
         : raw;
     if (progress && progress.total > 0) {
-      return `${progress.current}/${progress.total} — ${err}`;
+      return err ? `${progress.current}/${progress.total} — ${err}` : `${progress.current}/${progress.total}`;
     }
-    return err || '—';
+    if (err) return err;
+    if (job.status === 'cancelled') {
+      return t ? t('operations.jobQueue.statusCancelled') : 'Cancelled';
+    }
+    return '—';
   }
 
   if (progress && (job.status === 'running' || job.status === 'queued')) {
@@ -296,6 +360,9 @@ export function jobQueueStatusClass(job: AutomationJobRecord): string {
   }
   if (isJobQueueStepInProgress(job)) {
     return OPERATIONS_JOB_STATUS_CLASS.running;
+  }
+  if (isJobQueuePartialOutcome(job)) {
+    return 'operations-job-status--partial';
   }
   return OPERATIONS_JOB_STATUS_CLASS[job.status];
 }

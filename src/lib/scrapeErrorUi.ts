@@ -117,6 +117,10 @@ export function isDeviceBusyMessage(message: string | undefined): boolean {
     lower.includes('browser is already running') ||
     lower.includes('still starting from a previous attempt') ||
     lower.includes('session_warm_pending') ||
+    // Windows/Telethon soft socket — retry Sync, bukan modal "restart app".
+    lower.includes('errno 22') ||
+    lower.includes('winerror 10022') ||
+    lower.includes('invalid argument') ||
     lower.includes('session check timed out') ||
     lower.includes('session_check_timeout') ||
     (lower.includes('timed out') && lower.includes('restore device session'))
@@ -165,20 +169,13 @@ export function scrapeFailureNeedsLoginModal(message: string): boolean {
 /**
  * Sidecar TG / fetch ke localhost gagal atau AbortSignal timeout —
  * bukan logout akun; coba lagi / restart app.
+ * Errno 22 / WinError 10022 = soft socket → isDeviceBusyMessage (bukan di sini).
  */
 export function isTgSidecarConnectFailedMessage(message: string | undefined): boolean {
   if (!message) return false;
   const normalized = normalizeScrapeErrorMessage(message);
   const lower = normalized.toLowerCase();
   if (lower === 'scraper_tg_connect_failed' || lower.startsWith('scraper_tg_connect_failed')) {
-    return true;
-  }
-  // Windows/Telethon soft socket — bukan session mati / bukan suruh QR ulang.
-  if (
-    lower.includes('errno 22') ||
-    lower.includes('winerror 10022') ||
-    lower.includes('invalid argument')
-  ) {
     return true;
   }
   if (lower.includes('typeerror') && lower.includes('fetch failed')) return true;
@@ -531,6 +528,18 @@ export function resolveSyncFlowAlertMessage(
       return t('groupMonitoring.sync.tgAuthKeyDuplicated');
     }
     return t('groupMonitoring.sync.sessionWarmPending');
+  }
+  // Sidecar lama / pesan mentah Errno 22 — sama seperti warm pending (bukan restart app).
+  {
+    const lower = code.toLowerCase();
+    if (
+      !isTelegramAuthKeyDeadMessage(code) &&
+      (lower.includes('errno 22') ||
+        lower.includes('winerror 10022') ||
+        lower.includes('invalid argument'))
+    ) {
+      return t('groupMonitoring.sync.sessionWarmPending');
+    }
   }
   if (code === 'SESSION_SETTLING' || code === 'SESSION_CHECK_BUSY') {
     return t('groupMonitoring.sync.sessionCheckBusy');

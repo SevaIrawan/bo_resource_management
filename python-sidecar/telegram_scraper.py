@@ -1581,12 +1581,22 @@ async def scrape_telegram_groups(
 
 
 def _is_session_warm_pending_message(msg: str) -> bool:
-    """Soft: client masih start/timeout — BUKAN AuthKeyDuplicated (substring 'connect' di InitConnectionRequest)."""
+    """Soft: client masih start/timeout/socket — BUKAN AuthKeyDuplicated.
+
+    Jangan pakai substring 'connect'/'connection' luas (InitConnectionRequest di
+    AuthKeyDuplicated). Errno 22 / WinError 10022 = soft Windows socket.
+    """
     from telegram_login import _is_auth_key_dead_message
 
     if _is_auth_key_dead_message(msg):
         return False
     lower = str(msg).lower()
+    if (
+        "errno 22" in lower
+        or "winerror 10022" in lower
+        or "invalid argument" in lower
+    ):
+        return True
     return (
         "not ready" in lower
         or "still starting" in lower

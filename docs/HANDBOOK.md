@@ -1,9 +1,9 @@
-﻿# Handbook — Panduan Penggunaan Resource Management
+# Handbook — Panduan Penggunaan Resource Management
 
 | | |
 |---|---|
 | **Produk** | Backend Operation — Resource Management |
-| **Versi app** | 1.0.36 |
+| **Versi app** | 1.0.37 |
 | **Audiens** | Tim operasional internal (marketing / monitoring grup WA & Telegram) |
 | **Platform** | Desktop Windows / macOS / Linux (installer per OS) |
 | **Bahasa UI** | English / 中文 (Settings → Language) |
@@ -123,7 +123,7 @@ Angka berubah sesuai tab aktif.
 | Online | Akun dengan session **Active** |
 | Aligned | Akun Remark **Aligned** (tanpa gap Junk/Missing/Not admin) |
 
-**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. Batch besar auto-split 30 grup per job; batch partial → **Failed** (bukan Completed). **v1.0.36:** fix Errno 22 export session (serialize-first); setup Join/Leave modal anti-flicker; sidecar v13. (1.0.35+: Join CSV hybrid; 100/page + scroll; TG scrape left/migrated + `TG_SESSION_DEAD`.) Execute slots max **10**/platform; auto scrape brands max **6**.
+**Tab Operations (Job Queue):** antrian task per akun — Join missing / Create group / Set admin / Leave group (+ set photo & delete chat otomatis). SETUP modal create group (batch + permission + foto wajib); VIEW create → Queue Set Photo. Batch besar auto-split 30 grup per job; batch tidak 100% → **Partial** (ada sukses) atau **Failed** (0 sukses) — bukan Completed. Header tabel antrian sticky. **v1.0.37:** TG Sync anti-orphan sidecar v14 + Errno 22 soft; Job Queue Partial vs Failed + sticky header. (1.0.36+: Errno 22 export serialize-first; setup anti-flicker; 1.0.35+: Join CSV hybrid; 100/page; TG scrape left/migrated + `TG_SESSION_DEAD`.) Execute slots max **10**/platform; auto scrape brands max **6**.
 
 > Tidak ada tab Ticket / Reporting di shell. Issue = KPI Account + gap kolom + Remark. Matrix = modal dari badge grup.
 
@@ -479,4 +479,4 @@ Login
 
 ---
 
-*Handbook ini selaras dengan aplikasi versi **1.0.36**.*
+*Handbook ini selaras dengan aplikasi versi **1.0.37**.*

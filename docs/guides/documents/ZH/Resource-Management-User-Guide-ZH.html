@@ -247,9 +247,9 @@ body.confluence-document {
   <header class="doc-cover">
     <h1>资源管理</h1>
     <p class="subtitle">官方用户手册</p>
-    <p class="meta">Version 1.0.36</p>
+    <p class="meta">Version 1.0.37</p>
   </header>
-  <p>﻿# 资源管理 — 官方用户手册（中文）</p>
+  <h1>资源管理 — 官方用户手册（中文）</h1>
 <table>
 <thead>
 <tr>
@@ -263,7 +263,7 @@ body.confluence-document {
 </tr>
 <tr>
 <td><strong>应用版本</strong></td>
-<td>1.0.36</td>
+<td>1.0.37</td>
 </tr>
 <tr>
 <td><strong>适用对象</strong></td>
@@ -280,7 +280,7 @@ body.confluence-document {
 </tbody></table>
 <p>本文档为当前应用中<strong>全部功能的官方使用说明</strong>。架构与 IT 发布说明请参阅 <a href="../../PROJECT.md">PROJECT.md</a>。</p>
 <blockquote>
-<p><strong>v1.0.36：</strong> Telegram <strong>Errno 22</strong> / 导出会话软失败（先序列化 StringSession；Clear Session → 重新登录 + Scrape Now 不再因 Windows 套接字噪声致命失败）。Job Queue / CTA <strong>Join Missing</strong> 与 <strong>Leave &amp; delete</strong> 设置弹窗选择行时不再闪烁（稳定账号 ID + 静默刷新）。Sidecar <strong>v13</strong>。（1.0.35+：Join CSV/XLSX 混合；每页 100 行；TG 抓取已退出/已迁移 + <code>TG_SESSION_DEAD</code>；退群/删群 outcomes。）</p>
+<p><strong>v1.0.37：</strong> Telegram Sync 加固 — 退出应用时按端口 <strong>8765</strong> 结束 sidecar（防孤儿进程）；<strong>Errno 22</strong> 软失败 → 再点 Sync（不是“重启应用”）；sidecar <strong>v14</strong>。Job Queue：表头 sticky；徽章 <strong>部分完成 Partial</strong>（有成功）vs <strong>失败 Failed</strong>（0 成功）。（1.0.36+：导出会话先序列化；设置弹窗防闪烁。1.0.35+：Join CSV/XLSX；每页 100 行；TG 抓取已退出/已迁移 + <code>TG_SESSION_DEAD</code>。）</p>
 </blockquote>
 <hr>
 <h2>目录</h2>
@@ -1563,7 +1563,7 @@ body.confluence-document {
 </tr>
 </tbody></table>
 <hr>
-<p><em>本手册对应应用版本 <strong>1.0.36</strong>。每次发布后请运行 <code>npm run build:handbook-docs</code> 更新 PDF/Word。</em></p>
+<p><em>本手册对应应用版本 <strong>1.0.37</strong>。每次发布后请运行 <code>npm run build:handbook-docs</code> 更新 PDF/Word。</em></p>
 
 </body>
 </html>

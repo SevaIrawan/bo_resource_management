@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Rebuild handbook HTML only (skip PDF/DOCX when Chrome unavailable).
  * Usage: node scripts/build-handbook-html-only.mjs
  */
@@ -51,7 +51,7 @@ function extractMeta(md) {
 
 function mdToHtmlDocument(md, guide) {
   const meta = extractMeta(md);
-  const version = meta['App version'] || meta['应用版本'] || '1.0.36';
+  const version = meta['App version'] || meta['应用版本'] || '1.0.37';
   const body = marked.parse(md);
   return `<!DOCTYPE html>
 <html lang="${guide.lang}">

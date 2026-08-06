@@ -1,16 +1,16 @@
-﻿# 资源管理 — 官方用户手册（中文）
+# 资源管理 — 官方用户手册（中文）
 
 | | |
 |---|---|
 | **产品** | 后端运营 — 资源管理（Backend Operation — Resource Management） |
-| **应用版本** | 1.0.36 |
+| **应用版本** | 1.0.37 |
 | **适用对象** | 内部运营团队（营销 / WhatsApp 与 Telegram 群组监控） |
 | **平台** | Windows / macOS / Linux 桌面安装包 |
 | **界面语言** | English / 中文（**设置** → **语言**） |
 
 本文档为当前应用中**全部功能的官方使用说明**。架构与 IT 发布说明请参阅 [PROJECT.md](../../PROJECT.md)。
 
-> **v1.0.36：** Telegram **Errno 22** / 导出会话软失败（先序列化 StringSession；Clear Session → 重新登录 + Scrape Now 不再因 Windows 套接字噪声致命失败）。Job Queue / CTA **Join Missing** 与 **Leave & delete** 设置弹窗选择行时不再闪烁（稳定账号 ID + 静默刷新）。Sidecar **v13**。（1.0.35+：Join CSV/XLSX 混合；每页 100 行；TG 抓取已退出/已迁移 + `TG_SESSION_DEAD`；退群/删群 outcomes。）
+> **v1.0.37：** Telegram Sync 加固 — 退出应用时按端口 **8765** 结束 sidecar（防孤儿进程）；**Errno 22** 软失败 → 再点 Sync（不是“重启应用”）；sidecar **v14**。Job Queue：表头 sticky；徽章 **部分完成 Partial**（有成功）vs **失败 Failed**（0 成功）。（1.0.36+：导出会话先序列化；设置弹窗防闪烁。1.0.35+：Join CSV/XLSX；每页 100 行；TG 抓取已退出/已迁移 + `TG_SESSION_DEAD`。）
 
 ---
 
@@ -654,4 +654,4 @@ Telegram 在会话**在线**时其他 PC 可用（会话在云端）。交接请
 
 ---
 
-*本手册对应应用版本 **1.0.36**。每次发布后请运行 `npm run build:handbook-docs` 更新 PDF/Word。*
+*本手册对应应用版本 **1.0.37**。每次发布后请运行 `npm run build:handbook-docs` 更新 PDF/Word。*

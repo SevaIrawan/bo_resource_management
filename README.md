@@ -1,10 +1,12 @@
-﻿# Resource Management
+# Resource Management
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.36` (lihat `package.json`)
+**Versi saat ini:** `1.0.37` (lihat `package.json`)
 
-**Rilis 1.0.36:** Fix Telegram `[Errno 22] Invalid argument` pada export session (Scrape Now / Clear Session → login ulang) — serialize StringSession dulu, soft socket tidak matiin session; sidecar v13; Job Queue/CTA setup modal anti-flicker (reload silent + stabilkan account ID); UI map Errno 22 → connect-failed; docs sync.
+**Rilis 1.0.37:** Telegram Sync harden — quit app kill sidecar by port 8765 (anti-orphan); jangan reuse orphan sehat; Errno 22 → `SESSION_WARM_PENDING` (bukan modal “restart app”); transport gagal → restart sidecar sekali; sidecar **v14**. Job Queue: header tabel sticky tanpa overlap; status **Partial** (ada sukses) vs **Failed** (0 sukses). Docs sync.
+
+**Rilis 1.0.36:** Fix Telegram `[Errno 22] Invalid argument` pada export session — serialize StringSession dulu; soft socket; sidecar v13; Job Queue/CTA setup anti-flicker; docs sync.
 
 **Rilis 1.0.35:** Telegram scrape harden (filter left/migrated shell, DiscoveryIncomplete, `TG_SESSION_DEAD`); Job Queue leave/delete outcomes + set photo basic Chat; Join Missing CSV/XLSX hybrid (id/nama/invite, WA+TG); setup Job Queue 100 row/page + scroll viewport 10; validator join-csv; docs sync.
 

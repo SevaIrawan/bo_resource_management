@@ -1,16 +1,16 @@
-﻿# Resource Management — Official User Guide (English)
+# Resource Management — Official User Guide (English)
 
 | | |
 |---|---|
 | **Product** | Backend Operation — Resource Management |
-| **App version** | 1.0.36 |
+| **App version** | 1.0.37 |
 | **Audience** | Internal operations team (marketing / monitoring of WhatsApp & Telegram groups) |
 | **Platform** | Windows / macOS / Linux desktop installers |
 | **UI languages** | English / 中文 (**Settings** → Language) |
 
 This document is the **official guide to every feature** in the current application. For architecture and IT release notes, see [PROJECT.md](../../PROJECT.md).
 
-> **v1.0.36:** Telegram **Errno 22** / export-session soft (serialize StringSession first; Clear Session → re-login + Scrape Now no longer fail fatally on Windows socket noise). Job Queue / CTA **Join Missing** and **Leave & delete** setup modals no longer flicker while selecting rows (stable account IDs + silent reload). Sidecar **v13**. (From 1.0.35+: Join CSV/XLSX hybrid; setup 100/page; TG scrape left/migrated + `TG_SESSION_DEAD`; leave/delete outcomes.)
+> **v1.0.37:** Telegram Sync harden — app quit kills sidecar on port **8765** (no orphan); soft **Errno 22** → tap Sync again (not “restart app”); sidecar **v14**. Job Queue: sticky table header; badge **Partial** (some groups succeeded) vs **Failed** (none succeeded). (From 1.0.36+: export-session serialize-first; setup anti-flicker. From 1.0.35+: Join CSV/XLSX hybrid; setup 100/page; TG scrape left/migrated + `TG_SESSION_DEAD`.)
 
 ---
 
@@ -666,4 +666,4 @@ Login (Username / Password)
 
 ---
 
-*This guide matches application version **1.0.36**. Update PDF/Word after each release via `npm run build:handbook-docs`.*
+*This guide matches application version **1.0.37**. Update PDF/Word after each release via `npm run build:handbook-docs`.*

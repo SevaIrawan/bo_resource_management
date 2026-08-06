@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Build HTML Confluence paste dari docs/PANDUAN-PENGGUNA-SIMPLE.md
  * Jalankan: node scripts/build-panduan-confluence.mjs
@@ -56,7 +56,7 @@ function stripMetaAndToc(md) {
 
 function extractVersion(md) {
   const m = md.match(/\*\*Versi app:\*\*\s*([^\n]+)/);
-  return m ? m[1].trim() : '1.0.36';
+  return m ? m[1].trim() : '1.0.37';
 }
 
 function extractIntro(md) {

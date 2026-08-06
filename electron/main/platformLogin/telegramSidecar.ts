@@ -1,5 +1,5 @@
 import type { BrowserWindow } from 'electron';
-import { spawn, exec, type ChildProcessByStdio } from 'child_process';
+import { spawn, exec, execSync, type ChildProcessByStdio } from 'child_process';
 import type { Readable } from 'stream';
 import fs from 'fs';
 import path from 'path';
@@ -10,7 +10,8 @@ import { withNetworkRetry } from '../lib/networkRetry';
 const SIDECAR_URL = 'http://127.0.0.1:8765';
 export { SIDECAR_URL };
 const SIDECAR_PORT = 8765;
-const SIDECAR_VERSION = 13;
+/** Bump bareng `"version"` di python-sidecar/main.py — orphan/stale wajib diganti. */
+const SIDECAR_VERSION = 14;
 const pollTimers = new Map<string, ReturnType<typeof setInterval>>();
 const pollErrorStreak = new Map<string, number>();
 const POLL_ERROR_MAX_STREAK = 8;
@@ -122,12 +123,36 @@ function killProcessOnPort(port: number): Promise<void> {
   return new Promise((resolve) => {
     if (process.platform === 'win32') {
       const cmd = `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"`;
-      exec(cmd, () => resolve());
+      exec(cmd, { windowsHide: true }, () => resolve());
       return;
     }
 
     exec(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, () => resolve());
   });
+}
+
+/** Sync — dipakai di before-quit agar orphan di port 8765 tidak bertahan setelah app tutup. */
+function killProcessOnPortSync(port: number): void {
+  try {
+    if (process.platform === 'win32') {
+      execSync(
+        `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"`,
+        { windowsHide: true, timeout: 8_000, stdio: 'ignore' },
+      );
+      return;
+    }
+    execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null || true`, {
+      timeout: 8_000,
+      stdio: 'ignore',
+      shell: '/bin/bash',
+    });
+  } catch {
+    // best-effort — jangan blok quit
+  }
+}
+
+function ownsLiveSidecarChild(): boolean {
+  return Boolean(sidecarProcess && !sidecarProcess.killed && sidecarProcess.exitCode === null);
 }
 
 export async function ensureSidecarRunning() {
@@ -141,11 +166,22 @@ export async function ensureSidecarRunning() {
       try {
         await waitForHealth(1200);
         const health = await readSidecarHealth();
-        if (health?.version === SIDECAR_VERSION) return;
+        // Health OK + version match + owned child → reuse.
+        // Health OK tanpa owned child = orphan setelah app restart/crash — jangan early-return
+        // (orphan hung sering soft-fail Errno 22 / validate timeout padahal /health 200).
+        if (health?.version === SIDECAR_VERSION && ownsLiveSidecarChild()) {
+          return;
+        }
+
+        if (health?.version === SIDECAR_VERSION && !ownsLiveSidecarChild()) {
+          console.warn(
+            '[telegram-sidecar] healthy orphan on port — replacing with owned process',
+          );
+        }
 
         // Version beda = kode scrape lama di memori. WAJIB restart meski ada scrape aktif —
         // kalau tidak, edit disk tidak pernah masuk (gejala restart/scrape berkali-kali sama saja).
-        if (health && health.activeScrapes > 0) {
+        if (health && health.version !== SIDECAR_VERSION && health.activeScrapes > 0) {
           console.warn(
             `[telegram-sidecar] version=${health.version}≠${SIDECAR_VERSION} with ${health.activeScrapes} scrape(s) — force restart to load new scrape engine`,
           );
@@ -190,6 +226,29 @@ export async function ensureSidecarRunning() {
   })();
 
   await sidecarStarting;
+}
+
+/**
+ * Kill proses di port 8765 lalu spawn ulang (owned).
+ * Hanya untuk transport gagal (ECONNREFUSED / timeout) — jangan panggil per-akun
+ * pada SESSION_WARM_PENDING (multi-akun share satu sidecar).
+ */
+export async function forceRestartTelegramSidecar(): Promise<void> {
+  if (sidecarStarting) {
+    await sidecarStarting.catch(() => undefined);
+  }
+  if (sidecarProcess) {
+    try {
+      sidecarProcess.kill();
+    } catch {
+      // ignore
+    }
+    sidecarProcess = null;
+  }
+  sidecarStarting = null;
+  await killProcessOnPort(SIDECAR_PORT);
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  await ensureSidecarRunning();
 }
 
 function stopPolling(sessionId: string) {
@@ -497,15 +556,22 @@ export async function stopTelegramLogin(sessionId: string) {
 }
 
 export function shutdownSidecar() {
-  for (const sessionId of pollTimers.keys()) {
+  for (const sessionId of [...pollTimers.keys()]) {
     stopPolling(sessionId);
   }
 
   if (sidecarProcess) {
-    sidecarProcess.kill();
+    try {
+      sidecarProcess.kill();
+    } catch {
+      // ignore
+    }
     sidecarProcess = null;
-    sidecarStarting = null;
   }
+  sidecarStarting = null;
+  // WAJIB kill by port — child terlacak saja tidak cukup (orphan setelah crash/quit
+  // prematur tetap listen 8765 → ensureSidecar early-return ke proses hung).
+  killProcessOnPortSync(SIDECAR_PORT);
 }
 
 // Backward-compatible alias

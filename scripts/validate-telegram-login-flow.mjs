@@ -192,6 +192,41 @@ const checks = [
       userActionSession.includes("kind: 'device_busy'") &&
       userActionSession.includes("kind: 'device_failed'"),
   },
+  {
+    name: 'Quit app kill sidecar by port (bukan hanya child terlacak)',
+    ok:
+      sidecarTs.includes('killProcessOnPortSync') &&
+      /shutdownSidecar[\s\S]*?killProcessOnPortSync\(SIDECAR_PORT\)/.test(sidecarTs),
+  },
+  {
+    name: 'ensureSidecar: jangan reuse orphan sehat tanpa owned child',
+    ok:
+      sidecarTs.includes('ownsLiveSidecarChild') &&
+      sidecarTs.includes('healthy orphan on port') &&
+      sidecarTs.includes('forceRestartTelegramSidecar'),
+  },
+  {
+    name: 'Errno 22 → SESSION_WARM_PENDING (bukan SCRAPER_TG_CONNECT_FAILED / restart app)',
+    ok: (() => {
+      const scrapePy = read('python-sidecar/telegram_scraper.py');
+      const validateTs = read('electron/main/scraper/validateSession.ts');
+      const tgScrapeTs = read('electron/main/scraper/telegramScrape.ts');
+      const connectFn =
+        scrapeErrorUi.match(
+          /export function isTgSidecarConnectFailedMessage[\s\S]*?\nexport function /,
+        )?.[0] ?? '';
+      return (
+        /_is_session_warm_pending_message[\s\S]*?errno 22[\s\S]*?winerror 10022/.test(scrapePy) &&
+        /isDeviceBusyMessage[\s\S]*?errno 22/.test(scrapeErrorUi) &&
+        Boolean(connectFn) &&
+        !connectFn.toLowerCase().includes('errno 22') &&
+        validateTs.includes('forceRestartTelegramSidecar') &&
+        validateTs.includes('isValidateTransportError') &&
+        tgScrapeTs.includes('isTelegramSoftSocketError') &&
+        tgScrapeTs.includes('SESSION_WARM_PENDING')
+      );
+    })(),
+  },
 ];
 
 let failed = 0;

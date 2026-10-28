@@ -21,7 +21,12 @@ Jika user mengetik **hi** di sesi mana pun, wajib (sebelum menjawab): baca penuh
 - Ringkasan seluruh isi repo agar tidak membaca ulang semua file tiap sesi. Baris "Snapshot dari commit" menandai versi kode yang dipotret.
 - Setiap commit yang mengubah perilaku/struktur kode **wajib** memperbarui snapshot di commit yang sama (termasuk baris commit-nya).
 - Snapshot hanya peta; untuk mengerjakan tugas tetap baca kode asli.
-- Push langsung ke `main` (instruksi user).
+
+## Git — hanya branch `main`
+
+- Semua commit dan push **langsung ke `main`** (instruksi user).
+- **Dilarang membuat branch lain** (lokal maupun di GitHub), termasuk branch sesi otomatis seperti `claude/*`. Jika sesi dimulai di branch lain, pindah ke `main` (`git checkout -B main origin/main`) sebelum commit.
+- Push ke `main` yang mengubah `package.json` / `src/` / `electron/` / `scripts/` / `resources/` memicu workflow rilis; naiknya `version` = rilis + auto-update ke semua user. Sampaikan ke user sebelum push seperti itu.
 
 ## Saat menjawab bug / perilaku sistem
 

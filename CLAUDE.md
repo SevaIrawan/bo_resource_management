@@ -12,6 +12,17 @@ Repo: **Resource Management** (`SevaIrawan/bo_resource_management`) — aplikasi
 6. **Izin default hanya membaca** source yang relevan dengan perintah user.
 7. **Tanya jika kurang jelas** — lebih baik bertanya daripada salah eksekusi.
 
+## Perintah "hi"
+
+Jika user mengetik **hi** di sesi mana pun, wajib (sebelum menjawab): baca penuh semua aturan (`CLAUDE.md`, `.cursorrules`, `.cursor/rules/*.mdc`) dan potret repo `docs/REPO-SNAPSHOT.md`; jalankan `git log --oneline <commit-snapshot>..HEAD --stat` dan baca file yang berubah sejak snapshot; lalu laporkan aturan yang berlaku, kondisi repo, dan bagian snapshot yang usang. Hook `.claude/hooks/hi-bootstrap.mjs` menyisipkan instruksi ini otomatis.
+
+## Potret repo (`docs/REPO-SNAPSHOT.md`)
+
+- Ringkasan seluruh isi repo agar tidak membaca ulang semua file tiap sesi. Baris "Snapshot dari commit" menandai versi kode yang dipotret.
+- Setiap commit yang mengubah perilaku/struktur kode **wajib** memperbarui snapshot di commit yang sama (termasuk baris commit-nya).
+- Snapshot hanya peta; untuk mengerjakan tugas tetap baca kode asli.
+- Push langsung ke `main` (instruksi user).
+
 ## Saat menjawab bug / perilaku sistem
 
 - Ikuti juga `.cursorrules` dan `.cursor/rules/*.mdc` (kontrak bisnis 5 tipe issue, multi-akun, alur scrape → daily → master, larangan mock/dummy).

@@ -519,7 +519,8 @@ Session login/logout **bukan** ticket/issue.
 
 ```
 accountMasterDailyCompare.ts  →  computeAccountTicketBreakdown (in-memory)
-buildTicketSummariesFromEngine.ts  →  kartu KPI Issue
+accountGapMetrics.ts          →  computeAccountGapMetrics (kolom Junk / Missing / Not admin)
+monitoringKpis.ts             →  computeAccountKpis (kartu KPI Account)
 ```
 
 ### 12.3 Kapan grid & matrix refresh
@@ -534,7 +535,7 @@ buildTicketSummariesFromEngine.ts  →  kartu KPI Issue
 |---------|------|
 | Scrape tulis daily + master (RPC atomik) | `accountScraper.ts` → `rm_commit_account_scrape` → `invalidateMasterDailyCacheForScrape` |
 | Breakdown Issue | `accountMasterDailyCompare.ts` → `loadMasterDailyForAccount({ forceFresh: true })` |
-| Kartu Issue UI | `buildTicketSummariesFromEngine.ts` |
+| Gap UI (grid) + KPI | `accountGapMetrics.ts`, `monitoringKpis.ts` |
 | Patch grid | `patchAccountGridAfterDailyWrite.ts`, `hydrateAccountMetricsFromDaily.ts` |
 
 ---
@@ -719,7 +720,7 @@ UI lock: `PermissionLockedButton` di sel terkunci.
 | `accountActionColumn.ts` | Logic kolom Action |
 | `sessionColumnFlowSpec.ts` | Spec matrix session column |
 | `accountMasterDailyCompare.ts` | Engine Y/X + ticket breakdown (in-memory) |
-| `buildTicketSummariesFromEngine.ts` | Kartu Issue dari engine |
+| `accountGapMetrics.ts` | Gap Junk / Missing / Not admin dari engine (kolom grid) |
 | `clearAccountSession.ts` | Clear Session — purge lokal + invalidate DB |
 | `messagingAccounts.ts` | Remove slot + rebuild master |
 

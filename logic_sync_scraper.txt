@@ -36,7 +36,7 @@ BAGIAN 4: PERFORMA (hingga 5000–6000 grup per akun)
 - Incomplete store (kurang dari ~85% count device) → **bukan** sukses; error SCRAPER_INCOMPLETE + coba lagi.
 - Idle watchdog + dua fase WA (metadata + invite serial).
 - Agregasi master↔daily: accountMasterDailyCompare.ts + RPC rm_commit_account_scrape.
-- Issue/kartu: buildTicketSummariesFromEngine.ts; patch grid via patchAccountGridAfterDailyWrite.
+- Issue/gap: kolom grid via accountGapMetrics.ts (computeAccountGapMetrics); KPI via monitoringKpis.ts (computeAccountKpis); patch grid via patchAccountGridAfterDailyWrite.
 
 BAGIAN 5: CLEAR SESSION (tombol X di kolom Session Valid, hover baris)
 Purge session lokal (WA: wa-sessions) + platform_sessions is_active=false + UI Invalid.
@@ -44,7 +44,7 @@ Sync berikutnya → open_login (QR bersih). Bukan remove slot. File: clearAccoun
 
 BAGIAN 6: METRIK GRID, ISSUE & MODAL GROUP LINK (satu engine)
 - Y/X groups & admin: accountMasterDailyCompare.ts — dedupe group_id raw; X = master brand.
-- Kartu Issue: buildTicketSummariesFromEngine.ts — angka dari engine (bukan hitung baris DB mentah).
+- Gap Junk/Missing/Not admin di grid: accountGapMetrics.ts — angka dari engine (bukan hitung baris DB mentah). Kartu Ticket lama (buildTicketSummariesFromEngine.ts) dihapus di 1.0.24.
 - Breakdown ticket: computeAccountTicketBreakdown (in-memory; sama dengan grid).
 - Modal Admin vs master list: fetchAccountGroupLinks — hanya baris master (X).
 - Modal Groups on account: fetchAccountDailyGroupLinks — daily akun.
@@ -64,7 +64,7 @@ BAGIAN 8: DATA FRESH & REALTIME (1.0.17+)
 - Matrix filter kolom Yes/No kosong: header tabel tetap + Back to all groups.
 
 Implementasi: useAccountSyncFlow.ts, clearAccountSession.ts, accountMasterDailyCompare.ts,
-buildTicketSummariesFromEngine.ts, accountGroupLinks.ts, GroupLinksModal.tsx, BrandMasterGroupsModal.tsx,
+accountGapMetrics.ts, monitoringKpis.ts, accountGroupLinks.ts, GroupLinksModal.tsx, BrandMasterGroupsModal.tsx,
 ReportingJoinMatrixTable.tsx, loadJoinGroupReport.ts, masterDailyLoadCache.ts, accountSessionResolve.ts,
 PlatformLoginModal.tsx, GroupMonitoringProvider.tsx, useRealtimeMonitoring.ts,
 electron/main/scraper/whatsappScrape.ts, whatsappGroupInviteLink.ts,

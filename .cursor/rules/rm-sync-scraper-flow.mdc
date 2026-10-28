@@ -29,7 +29,7 @@ alwaysApply: true
 # Engine tunggal grid + Issue + modal
 
 - `accountMasterDailyCompare.ts` — Y/X, dedupe group_id raw, `computeAccountTicketBreakdown` (in-memory)
-- `buildTicketSummariesFromEngine.ts` — kartu Issue
+- `accountGapMetrics.ts` (`computeAccountGapMetrics`) — kolom Junk/Missing/Not admin; `monitoringKpis.ts` (`computeAccountKpis`) — kartu KPI. (`buildTicketSummariesFromEngine.ts` dihapus di 1.0.24)
 - `fetchAccountGroupLinks` — modal Admin vs master (X saja)
 - `fetchAccountDailyGroupLinks` — modal Groups on account (daily)
 - Realtime reload: `GroupMonitoringProvider.scheduleMonitoringReload` (bukan dispatch ganda dari caller scrape)

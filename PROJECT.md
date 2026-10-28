@@ -238,7 +238,7 @@ Halaman primer untuk preferensi & worker. Route `/admin` **redirect ke** `/setti
 | Platform | Kunci device | Batasan |
 |----------|--------------|---------|
 | WhatsApp | `resolveDeviceSessionId()` → LocalAuth `clientId` / folder `wa-sessions/session-{id}` | Lock per session; user pool max **10** Chrome; auto scrape brand slots max **6** (terpisah); TG user/auto kuota sendiri; **device key = UUID baris grid** |
-| Telegram | UUID `messaging_accounts.id` → sidecar `SESSIONS[session_id]` | Poll QR v3; tidak cancel `wait_task` saat finalize |
+| Telegram | UUID `messaging_accounts.id` → sidecar `SESSIONS[session_id]` | Sidecar v14 (`SIDECAR_VERSION` = `/health` version); tidak cancel `wait_task` saat finalize |
 
 Validasi sebelum rilis: `npm run validate:desktop`
 

@@ -1,6 +1,6 @@
 # REPO-SNAPSHOT — Potret isi repo (untuk sesi Claude)
 
-> **Snapshot dari commit:** `f0bc642` (main) · **Versi app:** `1.0.37` · **Dibuat:** 2026-10-28
+> **Snapshot dari commit:** `f0bc642` (main) · **Versi app:** `1.0.37` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-10-28 (dokumen aturan usang diselaraskan; kode tidak berubah)
 >
 > Cara pakai: baca file ini dulu, lalu cek perubahan sejak snapshot:
 > `git log --oneline f0bc642..HEAD --stat` → baca hanya file yang berubah, laporkan bagian snapshot yang usang.
@@ -67,7 +67,7 @@
 ## 6. Engine issue & metrik (in-memory)
 
 - `src/lib/accountMasterDailyCompare.ts` → `computeAccountTicketBreakdown`, 5 tipe: `daily_junk_group`, `missing_group`, `not_admin`, `duplicate_group_id`, `duplicate_group_name`. Tidak ada tabel ticket (dihapus migrasi 033/034).
-- UI grid hanya menampilkan Junk / Missing / Not admin (+ On device). Dua tipe duplicate dihitung tapi tidak dipakai UI.
+- UI grid hanya menampilkan Junk / Missing / Not admin (+ On device) lewat `computeAccountGapMetrics` (`src/lib/accountGapMetrics.ts`); kartu KPI Account lewat `computeAccountKpis` (`src/lib/monitoringKpis.ts`: brands, accounts, logout, not aligned). Picker Job Queue (join/set admin/leave) memakai `computeAccountTicketBreakdown`. Dua tipe duplicate dihitung tapi tidak dipakai UI. Kartu Ticket lama (`buildTicketSummariesFromEngine.ts`) dihapus di 1.0.24 (`d004c78`).
 - Realtime (`src/hooks/useRealtimeMonitoring.ts`): snapshots, brands, messaging_accounts, scrape_runs, groups_master, group_scrape_daily, new_register → patch grid + `rm-reporting-reload` (Group matrix `BrandMasterGroupsModal`). Session: `useRealtimeAccountSessions.ts`.
 
 ## 7. Job Queue (tab Operations)
@@ -109,15 +109,14 @@
 
 ## 11. Temuan terverifikasi (belum diperbaiki — bukan perintah)
 
-1. `buildTicketSummariesFromEngine.ts` tidak ada, masih dirujuk `docs/PROJECT-MASTER-REFERENCE.md` (baris 522, 537, 722).
-2. Runbook/README migrasi berhenti di 036.
-3. Tanggal scrape ditulis UTC (`accountScraper.ts:228`) tapi cek "daily hari ini" pakai tanggal lokal (`accountMonitoringEngine.ts` `todayScrapeDate`).
-4. Service role key di renderer + terbundel installer; password `users` plaintext.
-5. Lock automation per akun berhenti menunggu setelah 90 s lalu tetap jalan (`automationAccountLock.ts`).
-6. `jobQueue:cancel` melepas execute slot walau kerja lama mungkin masih jalan (`electron/main/automation/index.ts:79`, disengaja per komentar).
-7. Operasi WA (`waAutomation.ts`) tidak menyimpan outcome per grup di tengah batch (TG menyimpan).
-8. `isRetryableNetworkError` menganggap `timeout`/`abort`/`not found` retryable (`electron/main/lib/networkRetry.ts`) — berpotensi mengulang aksi non-idempoten.
-9. Recovery create TG mencocokkan judul grup di 40 dialog terakhir (`telegram_automation.py` `_find_recent_group_by_title`) — bisa salah ambil grup lama bernama sama.
-10. `scraper:cancel` (manual) selalu memanggil cancel sidecar TG untuk session yang sama dengan lane auto (`electron/main/scraper/index.ts`).
-11. Auto-update `quitAndInstall` tanpa cek job berjalan (`electron/main/autoUpdate.ts:80,209`).
-12. Sidecar FastAPI tanpa auth, CORS `*` (`python-sidecar/main.py:69`).
+1. Runbook/README migrasi berhenti di 036.
+2. Tanggal scrape ditulis UTC (`accountScraper.ts:228`) tapi cek "daily hari ini" pakai tanggal lokal (`accountMonitoringEngine.ts` `todayScrapeDate`).
+3. Service role key di renderer + terbundel installer; password `users` plaintext.
+4. Lock automation per akun berhenti menunggu setelah 90 s lalu tetap jalan (`automationAccountLock.ts`).
+5. `jobQueue:cancel` melepas execute slot walau kerja lama mungkin masih jalan (`electron/main/automation/index.ts:79`, disengaja per komentar).
+6. Operasi WA (`waAutomation.ts`) tidak menyimpan outcome per grup di tengah batch (TG menyimpan).
+7. `isRetryableNetworkError` menganggap `timeout`/`abort`/`not found` retryable (`electron/main/lib/networkRetry.ts`) — berpotensi mengulang aksi non-idempoten.
+8. Recovery create TG mencocokkan judul grup di 40 dialog terakhir (`telegram_automation.py` `_find_recent_group_by_title`) — bisa salah ambil grup lama bernama sama.
+9. `scraper:cancel` (manual) selalu memanggil cancel sidecar TG untuk session yang sama dengan lane auto (`electron/main/scraper/index.ts`).
+10. Auto-update `quitAndInstall` tanpa cek job berjalan (`electron/main/autoUpdate.ts:80,209`).
+11. Sidecar FastAPI tanpa auth, CORS `*` (`python-sidecar/main.py:69`).

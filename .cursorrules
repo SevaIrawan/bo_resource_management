@@ -76,7 +76,7 @@ You are a precise, research-driven assistant. Follow these rules strictly at all
     - `get_telegram_status`: poll ringan tanpa lock; session belum ada → `pending` (bukan error fatal).
     - Electron: `parseSidecarJson`, poll retry (`POLL_ERROR_MAX_STREAK`), jangan stop poll pada error sementara.
     - UI: `onError` abaikan jika sudah `ready` / pesan sidecar sementara saat QR.
-    - Sidecar version 3; exception handler FastAPI selalu JSON.
+    - Versi sidecar wajib sama: `SIDECAR_VERSION` (`telegramSidecar.ts`) = `version` di `/health` (`python-sidecar/main.py`) — saat ini 14; exception handler FastAPI selalu JSON.
     - Sebelum merge: `npm run validate:telegram-login` (atau `validate:desktop`).
 
 14. PRODUKSI NYATA — DILARANG DIAGNOSA TANPA FAKTA (Resource Management)

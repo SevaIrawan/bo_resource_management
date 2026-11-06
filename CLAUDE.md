@@ -26,7 +26,11 @@ Jika user mengetik **hi** di sesi mana pun, wajib (sebelum menjawab): baca penuh
 
 - Semua commit dan push **langsung ke `main`** (instruksi user).
 - **Dilarang membuat branch lain** (lokal maupun di GitHub), termasuk branch sesi otomatis seperti `claude/*`. Jika sesi dimulai di branch lain, pindah ke `main` (`git checkout -B main origin/main`) sebelum commit.
-- Push ke `main` yang mengubah `package.json` / `src/` / `electron/` / `scripts/` / `resources/` memicu workflow rilis; naiknya `version` = rilis + auto-update ke semua user. Sampaikan ke user sebelum push seperti itu.
+- **Dilarang memicu rilis tanpa perintah eksplisit user.** GM Apps dipakai banyak user aktif — bukan project mainan.
+  - Push ke `main` yang mengubah `package.json` / `src/` / `electron/` / `scripts/` / `resources/` / `.github/workflows/release-multiplatform.yml` / `.github/FORCE_REBUILD_*` memicu workflow rilis. Naiknya `version` = rilis + auto-update ke semua user.
+  - Selama file `.github/FORCE_REBUILD_*` masih ada, push ke path di atas membangun ulang installer dan menimpa file rilis versi berjalan **walaupun version tidak naik**.
+  - Perubahan yang hanya menyentuh `docs/`, `CLAUDE.md`, `.claude/`, `.cursor/`, `.cursorrules`, file `.md`/`.txt` di root, dan `supabase/` tidak memicu rilis — tetap butuh izin commit/push seperti biasa.
+  - Sebelum push yang menyentuh path pemicu: sebutkan ke user file yang berubah dan dampak rilisnya, lalu tunggu perintah eksplisit.
 
 ## Saat menjawab bug / perilaku sistem
 

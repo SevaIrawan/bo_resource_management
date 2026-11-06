@@ -2,7 +2,7 @@
 
 | Versi | Tanggal | Snapshot dari commit | Sumber |
 |---|---|---|---|
-| **v1** | 2026-11-06 | `24d2764` (main) · app `1.0.37` · sidecar v14 | 5 subagent scan end-to-end + verifikasi ulang kode, Telethon 1.45 & data Supabase |
+| **v1.1** | 2026-11-06 | `24d2764` (main) · app `1.0.37` · sidecar v14 | 5 subagent scan end-to-end + verifikasi ulang kode, Telethon 1.45 & data Supabase + audit independen (v1.1) |
 
 **Cara pakai:** baca file ini sebelum menganalisis apa pun soal Telegram. Lalu cek perubahan sejak snapshot:
 `git log --oneline 24d2764..HEAD --stat -- python-sidecar electron/main/platformLogin electron/main/scraper electron/main/automation src supabase`
@@ -60,7 +60,9 @@ Prinsip: **session TG tersimpan di Supabase** (portabel antar PC). Sidecar menyi
 
 - **Spawn:** packaged → `resources/sidecar/rm-telegram-sidecar(.exe)`; dev → `py -3` / `python3 python-sidecar/main.py` (`telegramSidecar.ts:40-58`).
 - **Env:** seluruh `process.env` Electron + `RM_ENV_FILE=userData/.env` diteruskan (`:61-67`). `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` dibaca Python dari env (`telegram_login.py:156-157`), asalnya `org-default.env` yang ikut installer.
-- **`ensureSidecarRunning`** (`:158-229`): dipanggil di setiap request & tiap tick polling login. Pemanggil bersamaan **berbagi satu proses start** (`sidecarStarting`) → jika start gagal (tidak sehat dalam 25 s → `Telegram sidecar failed to start`, `:97`), semua pemanggil ikut gagal.
+- **`ensureSidecarRunning`** (`:158-229`): dipanggil oleh `postJson` (login), tiap tick polling status login, restore/export/start scrape, automation, dan validate — **tidak** oleh polling progress/result scrape maupun cancel. Pemanggil bersamaan **berbagi satu proses start** (`sidecarStarting`) → jika start gagal (tidak sehat dalam 25 s → `Telegram sidecar failed to start`, `:97`), semua pemanggil ikut gagal. Tunggu sehat dibungkus `withNetworkRetry` tetapi pesan itu tidak termasuk pola retry, jadi efektif satu percobaan 25 s (`:217`). Versi tidak cocok setelah start → `API version mismatch` (`:219-222`).
+- **Kapan port di-kill:** hanya jika `/health` **menjawab** dalam 1,2 s tetapi versi beda atau proses bukan milik app. Jika `/health` tidak menjawab (proses macet/sibuk), error ditelan lalu langsung spawn **tanpa** kill — proses macet tetap memegang port 8765 sehingga spawn baru gagal (`:166-195`).
+- **Handler `exit`** mengosongkan `sidecarStarting` tanpa cek child mana yang keluar (`:212-215`) → child yang langsung mati bisa membuka jalan spawn ganda.
 - **Kill orphan:** Windows `Get-NetTCPConnection -LocalPort 8765 | Stop-Process -Force`; mac/Linux `lsof -ti:8765 | xargs kill -9` (`:125-130`) — membunuh proses apa pun di port itu.
 - **Quit:** `before-quit` → `shutdownSidecar` (kill child + kill port) (`:558-575`).
 - **Restart paksa:** hanya dari validate saat error transport/timeout (`validateSession.ts:73-76`) — mematikan sidecar bersama semua akun.
@@ -74,7 +76,7 @@ Prinsip: **session TG tersimpan di Supabase** (portabel antar PC). Sidecar menyi
 - **Pindah PC:** PC B memuat string dari DB → `restore`. PC A tidak diberi tahu; dua PC memakai key yang sama bisa memicu `AUTH_KEY_DUPLICATED`.
 - **QR:** `qr/start` (dalam lock) → `qr_login()` → `wait()` maks 180 s. QR diperbarui jika umur ≥ 25 s lewat `recreate()` (`telegram_login.py:374-388`). Finalize: `is_user_authorized` → `get_me` → `ready` / `need_2fa`.
 - **Phone:** `phone/start` (tanpa lock) → `send_code_request` → `code` → `2fa` (dalam lock).
-- **Polling login (Electron):** `setInterval` 300 ms, fetch timeout 30 s, berhenti pada ready / need_code / need_2fa / error non-retry / 8 error beruntun (`telegramSidecar.ts:368-408`).
+- **Polling login (Electron):** `setInterval` 300 ms, fetch timeout 30 s, berhenti pada ready / need_code / need_2fa / error non-retry / 8 error **yang dilempar** beruntun (`telegramSidecar.ts:368-408`). Balasan `{status:'error'}` dengan pesan retryable tidak dilempar dan mereset hitungan → polling bisa berjalan tanpa batas (`:358-363, 376`).
 - **Export/restore:** export (dalam lock) `session.save()` lalu cek hidup; hanya auth-key-dead yang membatalkan. Restore memakai ulang client jika string sama.
 - **Clear Session:** batalkan scrape → `/cancel` → nonaktifkan baris DB. **Tidak memanggil `log_out()`**; key tetap berlaku di server Telegram.
 
@@ -106,7 +108,7 @@ FloodWait scrape: tidur otomatis maks 120 s (+5 s). Tidak ada env var di scraper
 
 - Sama dengan WA: `writeScrapeDailyRows` → RPC `rm_commit_account_scrape` (040) → hapus daily akun → insert → bangun ulang master brand+platform. Gate master: ≥1 admin **dan** ≥1 invite valid per `group_id`.
 - **Invite valid (TG):** `^https?://(t\.me|telegram\.me)/[A-Za-z0-9_+/=-]+$`.
-- Session string disimpan ulang setelah scrape (sukses maupun gagal non-cancel); `loginMethod` default `qr`.
+- Session string disimpan ulang setelah scrape (sukses maupun gagal non-cancel). Setiap restore membuat session dengan `mode="qr"` (`telegram_login.py:733, 750`) dan scrape mengembalikan `loginMethod = session.mode` (`telegram_scraper.py:1438`) → akun yang login via phone tersimpan ulang sebagai `qr`.
 - Basic chat yang di-upgrade ke supergroup mendapat ID baru `-100…`; ID lama & baru dianggap grup berbeda di engine (Junk/Missing).
 - **Edge function `telegram-sheets-sync`:** dipicu webhook DB (konfigurasi di Dashboard), tanpa auth (`verify_jwt=false`), daftar akun JMMY/STMY hard-coded, menulis tab Full Group / Full Admin / Junk ke Google Sheets, kolom Remark dipertahankan.
 
@@ -114,7 +116,7 @@ FloodWait scrape: tidur otomatis maks 120 s (+5 s). Tidak ada env var di scraper
 
 ## 7. Job Queue — aksi Telegram
 
-Electron `tgAutomationClient.ts` → `POST /telegram/automation/{aksi}/{session}`. Timeout default 600 s (create 20 menit). `withNetworkRetry` (3×) kecuali create & join.
+Electron `tgAutomationClient.ts` → `POST /telegram/automation/{aksi}/{session}`. Timeout default 600 s, minimal 60 s; create 20 menit; join 120 s per request (`:40, 185, 754`). `withNetworkRetry` (3×) kecuali create & join.
 
 | Aksi | Panggilan Telethon | Catatan |
 |---|---|---|
@@ -123,9 +125,9 @@ Electron `tgAutomationClient.ts` → `POST /telegram/automation/{aksi}/{session}
 | Set admin | `EditAdminRequest` (supergroup) / `EditChatAdminRequest` (basic) | Maks 5 target; sukses jika ≥1 target; outcome hanya di akhir |
 | Set foto | `upload_file` → `EditPhotoRequest` / `EditChatPhotoRequest` | Outcome hanya di akhir |
 | Leave | `LeaveChannelRequest` / `DeleteChatUserRequest(me)` | `UserNotParticipant` = sudah keluar |
-| Delete | `delete_dialog` (+ opsional `DeleteHistoryRequest`) — **tidak membubarkan grup** | Semua jalur enqueue memaksa `requireOwnerForDelete:false` |
+| Delete | `delete_dialog` (+ opsional `DeleteHistoryRequest`) | Sidecar **bisa** membubarkan grup (`DeleteChannelRequest`/`DeleteChatRequest`) jika `require_owner=true` (`telegram_delete_group.py:155-180`); setting UI default `true` dan jalur `exit_delete_group` meneruskannya (`tgAutomationClient.ts:380, 449`). Saat ini **tidak ada** jalur enqueue `exit_delete_group`, dan semua enqueue `delete_group` memaksa `false` → praktiknya hanya hapus dialog |
 
-FloodWait automation: sidecar tidur otomatis sampai **7200 s (+90 s)** di dalam request yang timeout-nya 600 s, sambil memegang lock session.
+FloodWait automation: sidecar tidur otomatis sampai **7200 s** (+ `flood_wait_extra_sec`: default sidecar 5 s; dari setting UI default 90 s, create minimal 90 s) di dalam request (umumnya timeout 600 s), sambil memegang lock session. Join: FloodWait > 60 s dikembalikan ke Electron (`telegram_automation.py:979`).
 
 ---
 
@@ -157,3 +159,4 @@ Validator TG (`validate:telegram-login`, `device-group-scale`, `real-operations-
 | Versi | Tanggal | Perubahan |
 |---|---|---|
 | v1 | 2026-11-06 | Versi pertama: scan 5 subagent (login/sidecar, scraper sidecar, Electron/UI/DB, Job Queue, config/build/validator) + verifikasi ulang (termasuk Telethon 1.45) + data produksi. |
+| v1.1 | 2026-11-06 | Audit independen: koreksi pemanggil `ensureSidecarRunning` & kapan port di-kill, tambah perilaku handler exit / retry boot / polling tanpa batas, `loginMethod` qr setelah restore, timeout join & minimal, asal +90 s, kemampuan sidecar membubarkan grup. |

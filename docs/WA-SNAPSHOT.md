@@ -2,7 +2,7 @@
 
 | Versi | Tanggal | Snapshot dari commit | Sumber |
 |---|---|---|---|
-| **v1** | 2026-11-06 | `af2f9a9` (main) · app `1.0.37` | 5 subagent scan end-to-end + verifikasi ulang kode & data Supabase |
+| **v1.1** | 2026-11-06 | `af2f9a9` (main) · app `1.0.37` | 5 subagent scan end-to-end + verifikasi ulang kode & data Supabase + audit independen (v1.1) |
 
 **Cara pakai:** baca file ini sebelum menganalisis apa pun soal WhatsApp. Lalu cek perubahan sejak snapshot:
 `git log --oneline af2f9a9..HEAD --stat -- electron/main/platformLogin electron/main/scraper electron/main/automation src supabase python-sidecar`
@@ -82,7 +82,7 @@ Prinsip: **auth WA hanya di disk PC** tempat QR di-scan; Supabase hanya menyimpa
 - **Supabase** `resource_management_platform_sessions`: `session_type='whatsapp_local_auth'`, `session_data` = clientId, disimpan via RPC `rm_save_platform_session` (`platformSessions.ts:310`). "Valid" = ada baris `is_active=true`.
 - **`resolveDeviceSessionId`** (WA): pakai `session_data` baris aktif terbaru, kalau tidak ada pakai `accountId` (`deviceSessionId.ts:5-17`).
 - **QR login** (`startWhatsAppQrLogin`, `whatsapp.ts:784-828`, di dalam lock): forceRelease → pakai ulang client CONNECTED → restore disk (opsional) → client baru → `initializeClientWithRetry`. QR dikirim `platform-login:qr` dengan `generation`. Timer hanya mengirim pesan, tidak mematikan Chrome.
-- **Pairing code** (`:830-852`): selalu purge LocalAuth dulu, lalu `pairWithPhoneNumber`. Nomor dikirim apa adanya (tanpa tambah kode negara).
+- **Pairing code** (`:830-852`): selalu purge LocalAuth dulu, lalu `pairWithPhoneNumber`. Nomor dibersihkan jadi digit saja (minimal 8 digit, selain itu `Invalid phone number`), **tanpa** menambah kode negara (`:111-117, 839-840`).
 - **Probe/Sync check:** `getState()`; `CONNECTED`=linked, `OPENING/UNLAUNCHED/PAIRING`=loading, `UNPAIRED*`, `TOS_BLOCK`, `PROXYBLOCK`, `DEPRECATED_VERSION`, `CONFLICT`, `TIMEOUT`, `null` = unlinked (`whatsappLinkState.ts:19-26`). Batas 90 s (`RM_SESSION_CHECK_TIMEOUT_MS`).
 - **Clear Session:** cancel scrape → release + purge disk → nonaktifkan baris DB → log logout (`clearAccountSession.ts:43-90`).
 
@@ -91,9 +91,9 @@ Prinsip: **auth WA hanya di disk PC** tempat QR di-scan; Supabase hanya menyimpa
 ## 4. Client lifecycle, lock, pool
 
 - **`withWaSessionLock`** = rantai promise per session, **tanpa timeout** (`whatsapp.ts:79-89`). `withWhatsAppClient` memegang lock **selama seluruh scrape/automation** (`:696-708`). Satu operasi yang macet → semua operasi berikutnya untuk akun itu ikut tertahan.
-- **`ensureWhatsAppClientInner`** (`:636-690`): `freshBoot` (auto lane) menghancurkan client di memori dulu; client CONNECTED dipakai ulang; selain itu buat client baru dan tunggu `ready`. Scrape memakai `readyTimeoutMs:0` → **tanpa batas waktu** (`:333-338`, `whatsappScrape.ts:304-308`).
+- **`ensureWhatsAppClientInner`** (`:636-690`): `freshBoot` (auto lane) menghancurkan client di memori dulu. Client CONNECTED dipakai ulang. Client yang **sudah ada tapi belum CONNECTED ditunggu sampai `ready`** (bukan dibuat ulang). Client baru hanya dibuat jika belum ada atau `getState()` error (`:645-661`). Scrape memakai `readyTimeoutMs:0` → **tanpa batas waktu** (`:333-338`, `whatsappScrape.ts:304-308`). Sebelum kembali, fungsi ini juga menunggu store siap (`waitForWhatsAppStoreReady`, scrape `storeWaitMs` ≈ 36,6 menit, `whatsapp.ts:651/680/688`, `whatsappScrape.ts:307`) — semuanya di luar watchdog.
 - **Menutup Chrome:** `closeWhatsAppPuppeteer` (`:277-299`) memanggil `pupBrowser.catch(...)`, padahal di whatsapp-web.js `pupBrowser` adalah objek Browser, bukan Promise (`Client.js:477`) → error ditelan, lalu `client.destroy()`. `destroy()` milik library **hanya menutup browser kalau `isConnected()`** (`Client.js:1277-1283`).
-- **Saat app ditutup:** `before-quit` hanya mematikan sidecar Telegram; Chrome WA tidak ditutup (`main/index.ts:93-96`, `platformLogin/index.ts:197-199`).
+- **Saat app ditutup:** `before-quit` hanya mematikan sidecar Telegram; GM tidak menutup Chrome WA secara eksplisit (`main/index.ts:93-96`, `platformLogin/index.ts:197-199`). Puppeteer sendiri mematikan Chrome (`taskkill /T /F` di Windows) saat proses app **keluar normal** (`@puppeteer/browsers` `launch.js:189, 243-286`) — Chrome tertinggal hanya jika app crash / ditutup paksa.
 - **Pool Chrome:** user 10 (`RM_WA_MAX_CONCURRENT_BROWSERS`, maks 10), auto 6 (tetap). Hanya membungkus `initialize()`; Chrome yang sudah hidup tidak dibatasi (`whatsapp.ts:491-520`).
 
 ---
@@ -105,7 +105,7 @@ Prinsip: **auth WA hanya di disk PC** tempat QR di-scan; Supabase hanya menyimpa
 | Langkah | Detail | Rujukan |
 |---|---|---|
 | 1. Buka client | Lock → `ensureWhatsAppClientInner`, tanpa timeout ready | `whatsapp.ts:636` |
-| 2. Watchdog mulai | **Baru aktif di sini** (setelah client siap). Idle = 900 s + 216 ms×6000 = **2.196.000 ms (~36,6 menit)** | `whatsappScrape.ts:404-407`, `deviceGroupScale.ts:70-74` |
+| 2. Watchdog mulai | **Baru aktif di sini** (setelah client siap). Idle = 900 s + 216 ms×6000 = **2.196.000 ms (~36,6 menit)** | `whatsappScrape.ts:404-407, 541-546`, `deviceGroupScale.ts:70-74` |
 | 3. Cek nomor | `client.info.wid.user` vs nomor akun (digit, sama atau berakhiran) → `WA_ACCOUNT_MISMATCH` | `:61-81` |
 | 4. Cek state | Harus `CONNECTED` → `WA_NOT_CONNECTED` | `:417-422` |
 | 5. Tunggu store | Hingga ~36,6 menit, poll 250 ms → `WA_STORE_NOT_READY` | `:433` |
@@ -114,7 +114,7 @@ Prinsip: **auth WA hanya di disk PC** tempat QR di-scan; Supabase hanya menyimpa
 | 8. Fase 1 metadata | 4 paralel; per grup retry 6× di page (+ `syncHistory` mulai percobaan ke-3) | `:148-171`, store `:161-206` |
 | 9. Fase 2 invite | Hanya grup admin tanpa link, **satu per satu**; 6 percobaan × 20 s; jeda 600 ms + 0–400 ms | `:229-262`, invite `:126-165` |
 | 10. Quality gate | Lihat tabel di bawah | `:455-504` |
-| 11. Output | `{groups, count, loggedInAs, hint, deviceGroupCount}`; owner ⇒ admin | `scrapeOutput.ts:9` |
+| 11. Output | `{ok, groups, count, loggedInAs, elapsedMs, hint, deviceGroupCount}`; owner ⇒ admin | `whatsappScrape.ts:531-539`, `scrapeOutput.ts:9` |
 
 **Skip reason fase 1** (`whatsappGroupScrapeStore.ts`):
 | Reason | Retry? | Dihitung |
@@ -129,6 +129,8 @@ Prinsip: **auth WA hanya di disk PC** tempat QR di-scan; Supabase hanya menyimpa
 
 **`SCRAPER_INCOMPLETE` muncul jika:** inbox kosong/tidak stabil (final < 85% puncak) · grup terlisting < 85% hitungan inbox (jika > 50) · 0 baris padahal ada grup live · baris < 85% grup live saat ada incompleteStore (jika > 50).
 
+**Cap 6000:** list sudah dipotong 6000 di discovery, sehingga `truncated` (`whatsappScrape.ts:113`) selalu false — hint `TRUNCATED_6000` tidak pernah muncul dan akun > 6000 grup terpotong tanpa tanda.
+
 **Checkpoint:** `userData/scrape-checkpoints/{id}.json`, maks 24 jam, simpan tiap 25 grup; **hanya invite link yang dipakai ulang**, keanggotaan selalu di-scan ulang dari nol (`:122-135, 207`).
 
 **Kode error utama:** `WA_ACCOUNT_MISMATCH`, `WA_NOT_CONNECTED`, `WA_STORE_NOT_READY`, `WA_CLIENT_NOT_READY`, `SCRAPER_INCOMPLETE`, `SCRAPER_NO_GROUPS`, `SCRAPER_WA_CONNECT_FAILED`, `SCRAPER_WA_SESSION_UNLINKED`, `SCRAPER_CANCELLED`, `SCRAPER_IDLE_STUCK`, `AUTO_SCRAPE_USER_LANE_BUSY:*`, `AUTO_SCRAPE_LANE_BUSY`, `JOB_QUEUE_EXECUTE_FULL`, `SESSION_SETTLING`.
@@ -139,7 +141,7 @@ Prinsip: **auth WA hanya di disk PC** tempat QR di-scan; Supabase hanya menyimpa
 
 - **Sync (↻):** Session Invalid → modal login. Valid → probe device → (busy = alert, gagal = invalidate + login) → modal **Scrape Now | Later**. Later = update session saja (`useAccountSyncFlow.ts:392-552, 860, 885`).
 - **Scrape Now:** `runScrapeInBackground` → `runScrapeFlow` → `executeScrapeRun` → `runAccountScraper` (IPC) → commit DB → patch grid (`useAccountSyncFlow.ts:621`, `scrapeFlowService.ts:80`).
-- **Auto scrape (Settings):** jadwal default jam 12 **waktu lokal PC**, sekali per hari, hanya jika app sudah terbuka sebelum jam itu (tanpa catch-up) (`autoScrapeSchedule.ts:13, 109-133`). Brand×platform jalan paralel (maks 6 brand per platform), akun dalam 1 brand berurutan dengan jeda 30 s. Akun tunggu siap maks 3 menit (poll 10 s), jika tidak → `busy`. Setiap akun selesai → `teardownAutoScrapeDevice` → IPC `cancel-auto`; kalau lane auto tidak aktif → `stopWhatsAppLogin` (`runAutoAccountScrape.ts:274-277`, `scraper/index.ts:164-184`). Mode Scrape Now selesai → setting di-reset ke default pabrik (`useAutoAccountSync.ts:404-406`).
+- **Auto scrape (Settings):** jadwal default jam 12 **waktu lokal PC**, sekali per hari, hanya jika app sudah terbuka sebelum jam itu (tanpa catch-up) (`autoScrapeSchedule.ts:13, 107-136`). Brand×platform jalan paralel (maks 6 brand per platform), akun dalam 1 brand berurutan dengan jeda 30 s. Akun tunggu siap maks 3 menit (poll 10 s), jika tidak → `busy`. Setiap akun selesai → `teardownAutoScrapeDevice` → IPC `cancel-auto`; kalau lane auto tidak aktif → `stopWhatsAppLogin` (`runAutoAccountScrape.ts:274-277`, `scraper/index.ts:164-184`). Mode Scrape Now selesai → setting di-reset ke default pabrik (`useAutoAccountSync.ts:404-406`).
 - **`scrape_runs`:** baris dibuat `status='running'`, `trigger_type='manual'` **selalu** (termasuk auto) sebelum IPC; diselesaikan `completed/failed` setelah itu. App tertutup/crash di tengah → baris tetap `running` selamanya (`scrapeRuns.ts:17-18`, `runAccountScraper.ts:98, 162-221`).
 
 ---
@@ -156,14 +158,14 @@ Prinsip: **auth WA hanya di disk PC** tempat QR di-scan; Supabase hanya menyimpa
 
 ## 8. Job Queue — aksi WhatsApp
 
-Penyimpanan `userData/automation-job-queue.json` (per PC). Slot 10/platform, 1 job per akun. Settle 15 s. Stale 90 menit. Timeout per aksi: join 20 m, set admin/leave/delete 25 m, foto 35 m, create 90 m (atau langkah×5 m).
+Penyimpanan `userData/automation-job-queue.json` (per PC). Slot 10/platform, 1 job per akun. Settle 15 s. Stale 90 menit. Timeout per aksi = max(dasar aksi, jumlah langkah × 5 m) untuk **semua** aksi; dasar: join 20 m, set admin/leave/delete 25 m, foto 35 m, create 90 m (`jobQueueRunner.ts:52-76`).
 
 | Aksi | Panggilan WA | Jeda default | Catatan |
 |---|---|---|---|
 | Join | `client.acceptInvite(code)` (timeout 120 s), cek via `queryAndUpdateGroupMetadataById` + `getChat` | 30–60 s, tiap 10 join 180–360 s | Outcome disimpan di akhir saja |
 | Create | `client.createGroup` (tanpa timeout) → `setGroupProperty` (announcement, member_add_mode, restrict) → ambil invite | antar grup ≥180 s, setelah create ≥150 s (dipaksa) | Outcome disimpan per grup |
 | Set admin | `WAWebModifyParticipantsGroupAction.promoteParticipants`, target via `enforceLidAndPnRetrieval` | antar target 30 s, antar grup 180 s | Maks 5 target; sukses jika ≥1 target |
-| Set foto | `WWebJS.setPicture` (120 s, 3×) | antar grup ≥180 s | Tanpa cek akun & tanpa cek stop |
+| Set foto | `WWebJS.setPicture` (120 s, 3×, hard-coded) | antar grup = setting (default 180 s); ≥180 s hanya untuk job foto otomatis setelah create | Tanpa cek akun & tanpa cek stop |
 | Leave | `WAWebExitGroupAction.sendExitGroup` (+ fallback) | 60 s | Tanpa cek akun & tanpa cek stop |
 | Delete | `WWebJS.sendClearChat` + `sendDeleteChat` (**hapus chat lokal, bukan bubarkan grup**) | 60 s | `requireOwnerForDelete` tidak dipakai di WA |
 
@@ -184,7 +186,7 @@ Rantai otomatis: create → set foto, leave → delete (chunk 30). Sumber grup S
 | `RM_WA_INVITE_EXPORT_RETRY_SEC` | 5 | tidak pernah berlaku |
 | `RM_SESSION_CHECK_TIMEOUT_MS`, `RM_SCRAPE_IDLE_MS`, `RM_SCRAPE_BASE_MS`, `RM_SCRAPE_PER_GROUP_MS` | 90 s, 900 s, 120 s, 3,5 s | dibaca saat modul dimuat |
 
-Setting UI WA disimpan di localStorage `rm_worker_settings_whatsapp` (per PC). Validator WA (`validate:multi-account-wa`, `wa-qr-login`, `device-group-scale`, `real-operations-data`, `session-flow`) **mayoritas cek teks statis**; hanya `validate:puppeteer-chrome` yang cek file Chrome nyata.
+Setting UI WA disimpan di localStorage `rm_worker_settings_whatsapp` (per PC). Setting `inviteExportRetries`, `inviteExportRetrySec`, `setPhotoMaxRetry` ikut masuk payload job tetapi **tidak dibaca** jalur WA (retry invite dari env, set foto tetap 3×) (`workerPlatformSettings.ts:462-474`). Validator WA (`validate:multi-account-wa`, `wa-qr-login`, `device-group-scale`, `real-operations-data`, `session-flow`) **mayoritas cek teks statis**; hanya `validate:puppeteer-chrome` yang cek file Chrome nyata.
 
 ---
 
@@ -208,3 +210,4 @@ Dipindah ke file terpisah: **[`WA-FINDINGS.md`](./WA-FINDINGS.md)** — daftar t
 | Versi | Tanggal | Perubahan |
 |---|---|---|
 | v1 | 2026-11-06 | Versi pertama: scan 5 subagent (login/session, scrape main, alur UI & DB, Job Queue, config/build/validator) + verifikasi ulang + data produksi Supabase. Temuan dipisah ke `WA-FINDINGS.md`. |
+| v1.1 | 2026-11-06 | Audit independen: koreksi pairing code, client belum CONNECTED (ditunggu, bukan dibuat ulang) + store wait di luar watchdog, Chrome saat quit (Puppeteer mematikan saat keluar normal), output scrape, cap 6000/`truncated`, rumus timeout job, jeda set foto, setting WA yang tidak dibaca, nomor baris. |

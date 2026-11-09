@@ -1,6 +1,6 @@
 # REPO-SNAPSHOT — Potret isi repo (untuk sesi Claude)
 
-> **Snapshot dari commit:** `f0bc642` (main) · **Versi app:** `1.0.37` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-10-28 (dokumen aturan usang diselaraskan; kode tidak berubah)
+> **Snapshot dari commit:** `f0bc642` (main) · **Versi app:** `1.0.37` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-11-09 (migrasi 041 alert Telegram; kode app tidak berubah)
 >
 > Cara pakai: baca file ini dulu, lalu cek perubahan sejak snapshot:
 > `git log --oneline f0bc642..HEAD --stat` → baca hanya file yang berubah, laporkan bagian snapshot yang usang.
@@ -29,7 +29,7 @@
 | `electron/preload/index.ts` | `contextBridge` → `window.electronAPI` (app, platform-login, scraper, jobQueue, brandGroupPhoto, executeSlots) |
 | `python-sidecar/` | `main.py` (endpoint), `telegram_login.py`, `telegram_scraper.py`, `telegram_automation.py`, `telegram_{leave,delete,set_group_photo}*.py`, `telegram_human_delay.py` |
 | `src/` | UI React: `pages/`, `providers/GroupMonitoringProvider.tsx`, `hooks/`, `services/`, `lib/` (engine & data), `config/` |
-| `supabase/migrations/` | Skema & RPC (003, 017–040; nomor bolong ada) |
+| `supabase/migrations/` | Skema & RPC (003, 017–041; nomor bolong ada) |
 | `scripts/` | Build installer, validator `validate-*.mjs`, audit |
 | `.github/workflows/` | `release-multiplatform.yml` (+ 2 workflow repair manual) |
 | `docs/` | Dokumen proyek, panduan user (PDF/DOCX EN+ZH) |
@@ -99,7 +99,8 @@
 - PK `groups_master` = `(brand, platform, group_id)` (migrasi 036). Daily punya kolom `is_owner` (039).
 - RPC dipakai app: `rm_commit_account_scrape`, `rm_rebuild_brand_groups_master` (hanya saat hapus akun), `rm_save_platform_session`, `rm_deactivate_platform_sessions`, `rm_log_session_activity`. Definisi terbaru scrape/master: migrasi **040**.
 - RLS aktif tapi policy `USING (true)` untuk anon/authenticated.
-- `SUPABASE_RUNBOOK.md` & `supabase/migrations/README.md` hanya sampai migrasi **036** (037–040 belum tercatat).
+- **Alert Telegram (migrasi 041):** tabel `resource_management_alerts` (RLS tanpa policy → hanya service role). Insert → trigger `rm_alert_send()` kirim ke Telegram Bot API via `pg_net`; token/chat id dari Vault (`gm_alert_bot_token`, `gm_alert_chat_id`); dedupe 60 menit per `dedupe_key`; tanpa secret → `send_status='no_config'`. Cron `rm_alert_stuck_runs` (tiap 5 menit) → `rm_alert_check_stuck_runs()`: run `running` dengan `metadata.heartbeat_at` basi > 20 menit, atau tanpa heartbeat > 6 jam → `failed` + alert `scrape_stuck`. `rm_alert_test()` untuk uji. App belum menulis alert/heartbeat (direncanakan Fase 2).
+- `SUPABASE_RUNBOOK.md` & `supabase/migrations/README.md` hanya sampai migrasi **036** (037–041 belum tercatat).
 
 ## 10. Build, CI, validator
 

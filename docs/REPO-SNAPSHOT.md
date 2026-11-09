@@ -1,6 +1,6 @@
 # REPO-SNAPSHOT — Potret isi repo (untuk sesi Claude)
 
-> **Snapshot dari commit:** `f0bc642` (main) · **Versi app:** `1.0.37` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-11-09 (migrasi 041 alert Telegram; kode app tidak berubah)
+> **Snapshot dari commit:** `f0bc642` (main) · **Versi app:** `1.0.38` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-11-09 (1.0.38: invite link WA via lazy bundle; migrasi 041 alert Telegram)
 >
 > Cara pakai: baca file ini dulu, lalu cek perubahan sejak snapshot:
 > `git log --oneline f0bc642..HEAD --stat` → baca hanya file yang berubah, laporkan bagian snapshot yang usang.
@@ -58,7 +58,7 @@
 
 - Spec: `logic_sync_scraper.txt`, `.cursor/rules/rm-sync-scraper-flow.mdc`. Orkestrator `src/hooks/useAccountSyncFlow.ts` → `services/syncFlowService.ts` / `scrapeFlowService.ts` → `lib/runAccountScraper.ts` → IPC `scraper:run` / `scraper:run-auto`.
 - Session INVALID + Sync → modal login. VALID + Sync → probe device (busy → alert, bukan login palsu) → modal **Scrape Now | Later**. Tidak ada tombol Run di grid.
-- **WA scrape** (`electron/main/scraper/whatsappScrape.ts`): tunggu store + inbox stabil → fase 1 metadata paralel (pool) → fase 2 invite link **serial** khusus grup admin. Checkpoint `userData/scrape-checkpoints/{id}.json` (maks 24 jam). Cap 6000 grup. Gagal lengkap (<85%) → `SCRAPER_INCOMPLETE`. Watchdog idle → `SCRAPER_IDLE_STUCK`.
+- **WA scrape** (`electron/main/scraper/whatsappScrape.ts`): tunggu store + inbox stabil → fase 1 metadata paralel (pool) → fase 2 invite link **serial** khusus grup admin (`whatsappGroupInviteLink.ts`: sejak 1.0.38 memuat lazy bundle `WAWebGroupInviteLinkDrawer.react` via `Bootloader` sebelum `WAWebMexFetchGroupInviteCodeJob`; error in-page dicatat; modul tak tersedia → `WA_INVITE_MODULE_UNAVAILABLE` tanpa retry per grup). Log `waWebVersion=` di awal scrape. Checkpoint `userData/scrape-checkpoints/{id}.json` (maks 24 jam). Cap 6000 grup. Gagal lengkap (<85%) → `SCRAPER_INCOMPLETE`. Watchdog idle → `SCRAPER_IDLE_STUCK`.
 - **TG scrape** (`python-sidecar/telegram_scraper.py`): `GetDialogsRequest` paginasi sendiri; skip shell `migrated_to`/deactivated; invite: username → exported_invite → `getExportedChatInvites` → `ExportChatInvite` terakhir. Hasil `partial:true` ditolak Electron (`SCRAPER_PARTIAL_RESULT`, `telegramScrape.ts:408`).
 - **Tulis DB:** `writeScrapeDailyRows` (`src/lib/accountScraper.ts`) → RPC **`rm_commit_account_scrape`** atomik: DELETE daily akun → INSERT daily → DELETE + rebuild `groups_master` brand+platform.
 - **Master gate (migrasi 040):** per `group_id`, `bool_or(is_admin='yes') AND bool_or(invite valid)` — boleh dari akun/baris berbeda.

@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.37` (lihat `package.json`)
+**Versi saat ini:** `1.0.38` (lihat `package.json`)
+
+**Rilis 1.0.38:** WhatsApp invite link kembali terisi — WA Web (~Sep 2026) memuat modul invite (`WAWebMexFetchGroupInviteCodeJob`) secara lazy; scrape sekarang memuat bundle `WAWebGroupInviteLinkDrawer.react` lewat Bootloader sebelum fetch (pola wa-js PR #3654), error in-page dicatat (bukan ditelan), retry per grup dihentikan bila modul tidak tersedia (`WA_INVITE_MODULE_UNAVAILABLE`), dan versi WA Web dicatat di log (`waWebVersion=`). Teruji: FWSG Jessy 0 → 186/186 link.
 
 **Rilis 1.0.37:** Telegram Sync harden — quit app kill sidecar by port 8765 (anti-orphan); jangan reuse orphan sehat; Errno 22 → `SESSION_WARM_PENDING` (bukan modal “restart app”); transport gagal → restart sidecar sekali; sidecar **v14**. Job Queue: header tabel sticky tanpa overlap; status **Partial** (ada sukses) vs **Failed** (0 sukses). Docs sync.
 

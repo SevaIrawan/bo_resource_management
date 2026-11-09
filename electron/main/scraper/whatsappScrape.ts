@@ -421,6 +421,9 @@ async function runWhatsAppScrapeLane(opts: WaScrapeLaneOpts): Promise<{
               );
             }
 
+            const waWebVersion = await client.getWWebVersion().catch(() => 'unknown');
+            console.info(`[${opts.logTag}] sessionId=${sessionId} waWebVersion=${waWebVersion}`);
+
             emitScrapeProgress({
               sessionId,
               phase: 'connect',

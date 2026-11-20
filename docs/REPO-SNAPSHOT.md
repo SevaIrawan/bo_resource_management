@@ -1,6 +1,6 @@
 # REPO-SNAPSHOT — Potret isi repo (untuk sesi Claude)
 
-> **Snapshot dari commit:** `f2e7edf` (main) · **Versi app:** `1.0.38` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-11-20 (migrasi 043 label batch WA — sudah dijalankan ke Supabase produksi 2026-11-20; kode app belum diubah)
+> **Snapshot dari commit:** `7d13052` + commit Fase 1 label batch (main) · **Versi app:** `1.0.38` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-11-20 (migrasi 043 label batch WA sudah dijalankan; Fase 1 app: scrape WA kirim `group_created_at` — belum dirilis; `.github/FORCE_REBUILD_V1.0.19` dihapus → push tanpa naik version tidak membangun installer)
 >
 > Cara pakai: baca file ini dulu, lalu cek perubahan sejak snapshot:
 > `git log --oneline f0bc642..HEAD --stat` → baca hanya file yang berubah, laporkan bagian snapshot yang usang.
@@ -103,6 +103,8 @@
 - **Alert Telegram (migrasi 041):** tabel `resource_management_alerts` (RLS tanpa policy → hanya service role). Insert → trigger `rm_alert_send()` kirim ke Telegram Bot API via `pg_net`; token/chat id dari Vault (`gm_alert_bot_token`, `gm_alert_chat_id`); dedupe 60 menit per `dedupe_key`; tanpa secret → `send_status='no_config'`. Cron `rm_alert_stuck_runs` (tiap 5 menit) → `rm_alert_check_stuck_runs()`: run `running` dengan `metadata.heartbeat_at` basi > 20 menit, atau tanpa heartbeat > 6 jam → `failed` + alert `scrape_stuck`. `rm_alert_test()` untuk uji. App belum menulis alert/heartbeat (direncanakan Fase 2).
 - **Label batch WA (migrasi 043 — SUDAH dijalankan ke Supabase produksi 2026-11-20 lewat SQL Editor, tidak tercatat di `supabase_migrations`; kode app belum memakai):**
   - Kondisi setelah apply: 55 akun WA = `OLD`, 45 akun TG = NULL; label batch masih 0 baris — pembagian awal menunggu semua grup master punya `group_created_at` (app v1.0.38 belum mengirim field ini).
+  - **App Fase 1 (di `main`, belum dirilis):** scrape WA membaca `groupMetadata.creation` (unix detik) di `whatsappGroupScrapeStore.ts` → ISO, atau `null` bila tidak ada / < 2009 / masa depan. Field `group_created_at` dibawa `ScrapedGroupRow` → `normalizeScrapedGroup` → `dedupeScrapedGroupsByGroupId` (dupe: ambil yang terisi, paling awal) → `buildScrapeRows` (TG selalu `null`) → RPC. Belum diuji scrape nyata.
+  - Rencana fase berikut (belum ditulis): Fase 2 batch akun di Add/Edit + grid; Fase 3 filter master per batch akun (engine + 4 pembaca master langsung + patch X); Fase 4 CSV Join per akun, kolom Batch di laporan, validator.
   - Tabel `resource_management_group_batch_labels` (PK brand+platform+group_id, WA saja): batch A..ZZ maks 400 grup, status `active`/`missing`/`released`; hanya SELECT untuk app (tulis lewat fungsi SECURITY DEFINER).
   - Tabel `resource_management_account_scrape_commits`: waktu commit scrape terakhir per akun (jam server) — dasar aturan release slot.
   - Kolom baru: `group_created_at` (daily + master), `messaging_accounts.wa_batch` (`A`..`ZZ` / `FULL` / `OLD`; akun WA lama → `OLD`, perilaku sama dengan FULL).

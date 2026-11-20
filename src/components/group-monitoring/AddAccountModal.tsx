@@ -5,6 +5,8 @@ import { BrandImage } from '@/components/brand/BrandImage';
 import { AddAccountPlatformBadge } from '@/components/group-monitoring/AddAccountHeaderMenu';
 import { AccountOpsRoleSelect } from '@/components/group-monitoring/AccountOpsRoleSelect';
 import { LocationDeviceSelect } from '@/components/group-monitoring/LocationDeviceSelect';
+import { WaBatchSelect } from '@/components/group-monitoring/WaBatchSelect';
+import { normalizeWaBatch } from '@/config/waBatch';
 import { normalizeAccountOpsRole, type AccountOpsRole } from '@/config/accountOpsRole';
 import { normalizePhoneDigits } from '@/lib/phoneNormalize';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -15,6 +17,8 @@ export interface AddAccountFormValues {
   phoneNumber: string;
   locationDevice: string;
   opsRole: AccountOpsRole;
+  /** WA: A..ZZ / FULL (wajib). Telegram: null. */
+  waBatch: string | null;
 }
 
 interface AddAccountModalProps {
@@ -42,6 +46,7 @@ export function AddAccountModal({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [locationDevice, setLocationDevice] = useState('');
   const [opsRole, setOpsRole] = useState<AccountOpsRole | ''>('');
+  const [waBatch, setWaBatch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,6 +57,7 @@ export function AddAccountModal({
     setPhoneNumber('');
     setLocationDevice('');
     setOpsRole('');
+    setWaBatch('');
     setLocalError(null);
   }, [open, platform]);
 
@@ -93,6 +99,12 @@ export function AddAccountModal({
       return;
     }
 
+    const batch = selectedPlatform === 'whatsapp' ? normalizeWaBatch(waBatch) : null;
+    if (selectedPlatform === 'whatsapp' && !batch) {
+      setLocalError(t('groupMonitoring.accountCard.waBatchRequired'));
+      return;
+    }
+
     setLocalError(null);
     onSubmit(
       {
@@ -100,6 +112,7 @@ export function AddAccountModal({
         phoneNumber: phone,
         locationDevice: locationDevice.trim(),
         opsRole: role,
+        waBatch: batch,
       },
       selectedPlatform,
     );
@@ -236,6 +249,24 @@ export function AddAccountModal({
                   />
                 </div>
               </div>
+
+              {selectedPlatform === 'whatsapp' ? (
+                <>
+                  <label htmlFor="add-account-wa-batch" className="brand-modal-label">
+                    {t('groupMonitoring.accountCard.waBatchLabel')}
+                  </label>
+                  <WaBatchSelect
+                    id="add-account-wa-batch"
+                    brandName={brandName}
+                    value={waBatch}
+                    disabled={saving}
+                    onChange={(value) => {
+                      setWaBatch(value);
+                      if (localError) setLocalError(null);
+                    }}
+                  />
+                </>
+              ) : null}
             </>
           )}
 

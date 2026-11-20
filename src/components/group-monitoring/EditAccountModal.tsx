@@ -4,6 +4,8 @@ import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
 import { AddAccountPlatformBadge } from '@/components/group-monitoring/AddAccountHeaderMenu';
 import { AccountOpsRoleSelect } from '@/components/group-monitoring/AccountOpsRoleSelect';
 import { LocationDeviceSelect } from '@/components/group-monitoring/LocationDeviceSelect';
+import { WaBatchSelect } from '@/components/group-monitoring/WaBatchSelect';
+import { effectiveWaBatch, normalizeWaBatch } from '@/config/waBatch';
 import { normalizeAccountOpsRole, type AccountOpsRole } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { normalizePhoneDigits } from '@/lib/phoneNormalize';
@@ -15,6 +17,8 @@ export interface EditAccountFormValues {
   phoneNumber: string;
   locationDevice: string;
   opsRole: AccountOpsRole;
+  /** WA: A..ZZ / FULL / OLD (wajib). Telegram: null. */
+  waBatch: string | null;
 }
 
 interface EditAccountModalProps {
@@ -41,6 +45,7 @@ export function EditAccountModal({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [locationDevice, setLocationDevice] = useState('');
   const [opsRole, setOpsRole] = useState<AccountOpsRole | ''>('');
+  const [waBatch, setWaBatch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,6 +55,8 @@ export function EditAccountModal({
     setPhoneNumber(account.phoneNumber ?? '');
     setLocationDevice(normalizeLocationDeviceOption(account.locationDevice ?? ''));
     setOpsRole(normalizeAccountOpsRole(account.opsRole) ?? '');
+    // NULL di DB = OLD (akun lama) — tampil sebagai OLD.
+    setWaBatch(account.platform === 'whatsapp' ? effectiveWaBatch(account.waBatch) : '');
     setLocalError(null);
   }, [open, account]);
 
@@ -86,12 +93,20 @@ export function EditAccountModal({
       return;
     }
 
+    const isWa = account?.platform === 'whatsapp';
+    const batch = isWa ? normalizeWaBatch(waBatch) : null;
+    if (isWa && !batch) {
+      setLocalError(t('groupMonitoring.accountCard.waBatchRequired'));
+      return;
+    }
+
     setLocalError(null);
     onSubmit({
       accountName: name,
       phoneNumber: phone,
       locationDevice: locationDevice.trim(),
       opsRole: role,
+      waBatch: batch,
     });
   }
 
@@ -195,6 +210,25 @@ export function EditAccountModal({
               />
             </div>
           </div>
+
+          {account.platform === 'whatsapp' ? (
+            <>
+              <label htmlFor="edit-account-wa-batch" className="brand-modal-label">
+                {t('groupMonitoring.accountCard.waBatchLabel')}
+              </label>
+              <WaBatchSelect
+                id="edit-account-wa-batch"
+                brandName={brandName}
+                value={waBatch}
+                currentValue={effectiveWaBatch(account.waBatch)}
+                disabled={saving}
+                onChange={(value) => {
+                  setWaBatch(value);
+                  if (localError) setLocalError(null);
+                }}
+              />
+            </>
+          ) : null}
 
           {displayError ? <p className="brand-modal-error">{displayError}</p> : null}
 

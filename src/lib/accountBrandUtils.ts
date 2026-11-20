@@ -4,6 +4,7 @@ import {
   type AccountOpsRole,
 } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
+import { normalizeWaBatch } from '@/config/waBatch';
 import { buildStandardCountByPlatformFromRows } from '@/lib/brandStandardCount';
 import { ensureBrand } from '@/lib/brands';
 import type { Dispatch, SetStateAction } from 'react';
@@ -122,6 +123,7 @@ export function addAccountToGroup(
     phoneNumber: phone,
     locationDevice: locationDevice || undefined,
     opsRole: effectiveAccountOpsRole(input.opsRole),
+    waBatch: input.platform === 'whatsapp' ? normalizeWaBatch(input.waBatch) : null,
     brandName: group.brandName,
     status: 'logout' as const,
     groupsCurrent: 0,
@@ -254,6 +256,7 @@ export function patchAccountDetailsInGroups(
     phoneNumber: string;
     locationDevice: string;
     opsRole: AccountOpsRole;
+    waBatch?: string | null;
   },
 ): AccountBrandGroup[] {
   return patchBrandGroup(groups, groupId, (group) => ({
@@ -266,6 +269,10 @@ export function patchAccountDetailsInGroups(
             phoneNumber: patch.phoneNumber.trim(),
             locationDevice: normalizeLocationDeviceOption(patch.locationDevice) || undefined,
             opsRole: effectiveAccountOpsRole(patch.opsRole),
+            waBatch:
+              account.platform === 'whatsapp'
+                ? normalizeWaBatch(patch.waBatch) ?? account.waBatch ?? null
+                : null,
           }
         : account,
     ),

@@ -3,6 +3,7 @@ import {
   type AccountOpsRole,
 } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
+import { normalizeWaBatch } from '@/config/waBatch';
 import { ensureBrand } from '@/lib/brands';
 import { markPlatformSessionInvalid } from '@/lib/platformSessions';
 import { invalidatePlatformSessionEverywhere } from '@/lib/platformSessionSync';
@@ -18,8 +19,15 @@ export interface CreateMessagingAccountInput {
   phoneNumber?: string;
   locationDevice?: string;
   opsRole: AccountOpsRole;
+  /** Batch akun WA (043): A..ZZ / FULL. Kosong → NULL (diperlakukan OLD). Telegram diabaikan. */
+  waBatch?: string | null;
   brand: string;
   brandId?: string;
+}
+
+/** wa_batch untuk ditulis ke DB — Telegram selalu null (constraint 043). */
+function waBatchForDb(platform: Platform, value: string | null | undefined): string | null {
+  return platform === 'whatsapp' ? normalizeWaBatch(value) : null;
 }
 
 function buildAccountMetadata(
@@ -63,6 +71,8 @@ async function reactivateInactiveMessagingAccount(input: {
   phoneNumber?: string;
   locationDevice?: string;
   opsRole: AccountOpsRole;
+  platform: Platform;
+  waBatch?: string | null;
 }): Promise<string> {
   const supabase = getSupabase();
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED');
@@ -76,6 +86,7 @@ async function reactivateInactiveMessagingAccount(input: {
       brand_id: input.brandId,
       phone_number: phone || null,
       location_device: normalizeLocationDevice(input.locationDevice),
+      wa_batch: waBatchForDb(input.platform, input.waBatch),
       metadata: buildAccountMetadata(input.brandName, input.opsRole),
       notes: null,
       updated_at: new Date().toISOString(),
@@ -127,6 +138,8 @@ export async function createMessagingAccount(
       phoneNumber: input.phoneNumber,
       locationDevice: input.locationDevice,
       opsRole: input.opsRole,
+      platform: input.platform,
+      waBatch: input.waBatch,
     });
   }
 
@@ -139,6 +152,7 @@ export async function createMessagingAccount(
       label,
       phone_number: phone || null,
       location_device: normalizeLocationDevice(input.locationDevice),
+      wa_batch: waBatchForDb(input.platform, input.waBatch),
       metadata: buildAccountMetadata(input.brand, input.opsRole),
     })
     .select('id')
@@ -227,6 +241,8 @@ export interface UpdateMessagingAccountDetailsInput {
   locationDevice?: string;
   opsRole: AccountOpsRole;
   brandName: string;
+  /** WA: batch baru (A..ZZ / FULL / OLD). undefined = tidak diubah. Telegram diabaikan. */
+  waBatch?: string | null;
 }
 
 export async function updateMessagingAccountDetails(
@@ -254,15 +270,20 @@ export async function updateMessagingAccountDetails(
     throw new Error('ACCOUNT_LABEL_IN_USE');
   }
 
+  const patch: Record<string, unknown> = {
+    label,
+    phone_number: phone || null,
+    location_device: normalizeLocationDevice(input.locationDevice),
+    metadata: buildAccountMetadata(input.brandName, input.opsRole),
+    updated_at: new Date().toISOString(),
+  };
+  if (input.platform === 'whatsapp' && input.waBatch !== undefined) {
+    patch.wa_batch = waBatchForDb(input.platform, input.waBatch);
+  }
+
   const { error } = await supabase
     .from(TABLES.messagingAccounts)
-    .update({
-      label,
-      phone_number: phone || null,
-      location_device: normalizeLocationDevice(input.locationDevice),
-      metadata: buildAccountMetadata(input.brandName, input.opsRole),
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq('id', input.accountId);
 
   if (error) {

@@ -1,6 +1,7 @@
 import type { EditAccountFormValues } from '@/components/group-monitoring/EditAccountModal';
 import { effectiveAccountOpsRole, normalizeAccountOpsRole } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
+import { normalizeWaBatch } from '@/config/waBatch';
 import { updateMessagingAccountDetails } from '@/lib/messagingAccounts';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 
@@ -16,6 +17,7 @@ export function normalizeEditAccountFormValues(
     phoneNumber: values.phoneNumber.trim(),
     locationDevice: normalizeLocationDeviceOption(values.locationDevice),
     opsRole,
+    waBatch: normalizeWaBatch(values.waBatch),
   };
 }
 
@@ -41,6 +43,8 @@ export async function commitAccountDetailsEdit(input: {
     locationDevice: normalized.locationDevice || undefined,
     opsRole: effectiveAccountOpsRole(normalized.opsRole),
     brandName: input.brandName,
+    // WA: batch dari form (wajib di modal). Telegram: diabaikan service.
+    waBatch: input.account.platform === 'whatsapp' ? normalized.waBatch : undefined,
   });
 
   return normalized;

@@ -2,7 +2,7 @@ import { GROUP_SCRAPE_SELECT } from '@/config/groupScrapeColumns';
 import { MASTER_GROUP_SELECT } from '@/config/masterGroupColumns';
 
 export const MESSAGING_ACCOUNT_SELECT =
-  'id, user_id, brand_id, platform, label, phone_number, location_device, metadata, is_active, created_at, updated_at';
+  'id, user_id, brand_id, platform, label, phone_number, location_device, wa_batch, metadata, is_active, created_at, updated_at';
 
 export const MESSAGING_ACCOUNT_MATCH_SELECT =
   'id, label, metadata, phone_number, location_device, brand_id';

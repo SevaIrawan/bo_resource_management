@@ -45,6 +45,8 @@ export interface AccountBrandRow {
   locationDevice?: string;
   /** Role operasi — Master boleh Create Group; GCS selain Create. */
   opsRole?: AccountOpsRole;
+  /** Batch akun WA (043): A..ZZ / FULL / OLD; null = OLD (WA) atau Telegram. */
+  waBatch?: string | null;
 }
 
 export interface AccountBrandEmptySlot {
@@ -75,6 +77,8 @@ export interface AddAccountInput {
   locationDevice?: string;
   /** Wajib saat add dari UI — Master | GCS. */
   opsRole: AccountOpsRole;
+  /** Wajib untuk WA saat add dari UI (A..ZZ / FULL). Telegram: null. */
+  waBatch?: string | null;
   slotId?: string;
   dbAccountId?: string;
 }

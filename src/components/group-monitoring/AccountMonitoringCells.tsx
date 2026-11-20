@@ -14,6 +14,7 @@ import {
 import { accountNeedsRelogin } from '@/lib/platformSyncCopy';
 import { computeAccountGapMetrics } from '@/lib/accountGapMetrics';
 import { cn } from '@/lib/utils';
+import { WA_BATCH_FULL, WA_BATCH_OLD, effectiveWaBatch } from '@/config/waBatch';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { AccountBrandEmptySlot, AccountBrandRow } from '@/types/accountMonitoringUi';
@@ -61,15 +62,42 @@ export function SessionBadge({ status }: { status: AccountBrandRow['sessionStatu
   );
 }
 
-function AccountOpsRoleCell({ role }: { role: AccountBrandRow['opsRole'] }) {
+function AccountOpsRoleCell({
+  role,
+  platform,
+  waBatch,
+}: {
+  role: AccountBrandRow['opsRole'];
+  platform: AccountBrandRow['platform'];
+  waBatch: AccountBrandRow['waBatch'];
+}) {
   const { t } = useLanguage();
   const isMaster = role === 'master';
+  const roleText = isMaster
+    ? t('groupMonitoring.accountCard.opsRoleMaster')
+    : t('groupMonitoring.accountCard.opsRoleGcs');
 
+  // Batch akun WA (043): NULL = OLD. Telegram tanpa batch.
+  let batchText: string | null = null;
+  if (platform === 'whatsapp') {
+    const batch = effectiveWaBatch(waBatch);
+    batchText =
+      batch === WA_BATCH_FULL
+        ? t('groupMonitoring.accountCard.waBatchFull')
+        : batch === WA_BATCH_OLD
+          ? t('groupMonitoring.accountCard.waBatchOld')
+          : t('groupMonitoring.accountCard.waBatchShort', { batch });
+  }
+
+  if (!batchText) {
+    return <span className="brand-account-role-text">{roleText}</span>;
+  }
+
+  // Kolom Role sempit (7%) — batch di baris kedua supaya tidak terpotong.
   return (
-    <span className="brand-account-role-text">
-      {isMaster
-        ? t('groupMonitoring.accountCard.opsRoleMaster')
-        : t('groupMonitoring.accountCard.opsRoleGcs')}
+    <span className="flex min-w-0 flex-col leading-tight" title={`${roleText} · ${batchText}`}>
+      <span className="brand-account-role-text">{roleText}</span>
+      <span className="brand-account-role-text truncate">{batchText}</span>
     </span>
   );
 }
@@ -621,7 +649,7 @@ function AccountRemoveSlotIcon({
         ) : null}
         <td className="brand-col-cell brand-col-cell--role">
           <div className="brand-col-cell-inner">
-            <AccountOpsRoleCell role={row.opsRole} />
+            <AccountOpsRoleCell role={row.opsRole} platform={row.platform} waBatch={row.waBatch} />
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--location">

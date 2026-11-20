@@ -1,4 +1,7 @@
--- 043 — Label batch grup WhatsApp per brand (DRAFT, belum dijalankan ke mana pun)
+-- 043 — Label batch grup WhatsApp per brand
+-- SUDAH DIJALANKAN ke Supabase produksi 2026-11-20 lewat SQL Editor dashboard
+-- (tidak tercatat di supabase_migrations.schema_migrations). Isi fungsi terverifikasi identik
+-- dengan uji lokal (beda hanya akhir baris CRLF). Jangan dijalankan ulang tanpa cek kondisi DB.
 --
 -- Aturan (disepakati user):
 --   1. Label hanya untuk group_id di groups_master WA, kunci (brand, platform, group_id).

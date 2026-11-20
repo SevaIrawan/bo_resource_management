@@ -1,4 +1,6 @@
--- ROLLBACK 043 — kembalikan Supabase ke kondisi sebelum 043 (DRAFT, belum dijalankan)
+-- ROLLBACK 043 — kembalikan Supabase ke kondisi sebelum 043
+-- Status: siap pakai, BELUM dijalankan (043 aktif di produksi sejak 2026-11-20).
+-- Jalankan hanya atas perintah eksplisit; data label batch & wa_batch akan hilang.
 --
 -- Urutan:
 --   1. Pulihkan rm_commit_account_scrape & rm_rebuild_brand_groups_master ke definisi 040

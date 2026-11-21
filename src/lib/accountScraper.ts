@@ -202,9 +202,6 @@ function buildScrapeRows(input: {
     brand,
     acc_name: accName,
     phone_number: input.phoneNumber,
-    // Migrasi 043: dasar urutan label batch WA. RPC: '' / null → NULL.
-    group_created_at:
-      input.platform === 'whatsapp' ? (group.group_created_at ?? null) : null,
   }));
 }
 

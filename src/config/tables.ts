@@ -14,8 +14,6 @@ export const TABLES = {
   /** Metrik bisnis harian — line = brand RM, bukan tabel RM core. */
   newRegister: 'new_register',
   accountSnapshots: 'resource_management_account_snapshots',
-  /** Label batch grup WA per brand (043) — read-only untuk app, ditulis RPC scrape. */
-  groupBatchLabels: 'resource_management_group_batch_labels',
 } as const;
 
 /** Tabel RM + Realtime publication (017). */

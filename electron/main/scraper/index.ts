@@ -66,8 +66,6 @@ export interface ScrapedGroupRow {
   member_count: number;
   admin_count: number;
   owner_count: number;
-  /** ISO waktu grup dibuat (WA `groupMetadata.creation`); TG / tidak tersedia → null. */
-  group_created_at?: string | null;
 }
 
 function guardAccountExecute(sessionId: string, accountId?: string): void {

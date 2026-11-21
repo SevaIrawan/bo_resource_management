@@ -1,7 +1,6 @@
 import type { EditAccountFormValues } from '@/components/group-monitoring/EditAccountModal';
 import { effectiveAccountOpsRole, normalizeAccountOpsRole } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
-import { effectiveWaBatch, normalizeWaBatch } from '@/config/waBatch';
 import { updateMessagingAccountDetails } from '@/lib/messagingAccounts';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 
@@ -17,7 +16,6 @@ export function normalizeEditAccountFormValues(
     phoneNumber: values.phoneNumber.trim(),
     locationDevice: normalizeLocationDeviceOption(values.locationDevice),
     opsRole,
-    waBatch: normalizeWaBatch(values.waBatch),
   };
 }
 
@@ -34,9 +32,6 @@ export async function commitAccountDetailsEdit(input: {
     throw new Error('SUPABASE_NOT_CONFIGURED');
   }
 
-  const isWa = input.account.platform === 'whatsapp';
-  const waBatchChanged = isWa && normalized.waBatch !== effectiveWaBatch(input.account.waBatch);
-
   await updateMessagingAccountDetails({
     accountId: input.account.id,
     userId: input.userId,
@@ -46,14 +41,7 @@ export async function commitAccountDetailsEdit(input: {
     locationDevice: normalized.locationDevice || undefined,
     opsRole: effectiveAccountOpsRole(normalized.opsRole),
     brandName: input.brandName,
-    // WA: tulis hanya bila batch benar-benar diganti (NULL tampil OLD tidak diubah jadi 'OLD').
-    // Telegram: diabaikan service.
-    waBatch: waBatchChanged ? normalized.waBatch : undefined,
   });
 
-  // Patch grid lokal = nilai yang benar-benar ada di DB.
-  return {
-    ...normalized,
-    waBatch: waBatchChanged ? normalized.waBatch : normalizeWaBatch(input.account.waBatch),
-  };
+  return normalized;
 }

@@ -80,8 +80,6 @@ async function evaluateWhatsAppGroupFromStore(
       formattedTitle?: string;
       name?: string;
       groupMetadata?: {
-        /** Waktu grup dibuat (unix detik) — sumber GroupChat.createdAt whatsapp-web.js. */
-        creation?: unknown;
         participants?: {
           serialize?: () => SerializedParticipant[];
           forEach?: (fn: (p: { serialize?: () => SerializedParticipant }) => void) => void;
@@ -235,19 +233,6 @@ async function evaluateWhatsAppGroupFromStore(
     const memberCount = participants.length;
     const groupName = String(chat.formattedTitle ?? chat.name ?? gid).trim() || gid;
 
-    // Label batch WA (migrasi 043): urutan pembagian awal = waktu grup dibuat.
-    // Tidak ada / tidak valid → null (DB menunggu, tidak menebak).
-    let groupCreatedAt: string | null = null;
-    const rawCreation = Number(chat.groupMetadata?.creation);
-    if (Number.isFinite(rawCreation) && rawCreation > 0) {
-      const ms = rawCreation > 1e12 ? rawCreation : rawCreation * 1000;
-      const minMs = Date.UTC(2009, 0, 1);
-      const maxMs = Date.now() + 86_400_000;
-      if (ms >= minMs && ms <= maxMs) {
-        groupCreatedAt = new Date(ms).toISOString();
-      }
-    }
-
     return {
       group_id: gid,
       group_name: groupName,
@@ -256,7 +241,6 @@ async function evaluateWhatsAppGroupFromStore(
       member_count: memberCount,
       admin_count: adminCount,
       owner_count: ownerCount,
-      group_created_at: groupCreatedAt,
     };
   }, groupId, retryDelaysMs);
 }

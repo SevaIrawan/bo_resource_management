@@ -7,21 +7,7 @@ export type ScrapedGroupPayload = {
   member_count: number;
   admin_count: number;
   owner_count: number;
-  /** ISO waktu grup dibuat (WA); TG / tidak tersedia → null. */
-  group_created_at?: string | null;
 };
-
-/** Ambil yang terisi; dua-duanya terisi → yang paling awal. */
-function pickGroupCreatedAt(
-  a: string | null | undefined,
-  b: string | null | undefined,
-): string | null {
-  const ma = a ? Date.parse(a) : Number.NaN;
-  const mb = b ? Date.parse(b) : Number.NaN;
-  if (!Number.isFinite(ma)) return Number.isFinite(mb) ? (b as string) : null;
-  if (!Number.isFinite(mb)) return a as string;
-  return ma <= mb ? (a as string) : (b as string);
-}
 
 function mergeScrapedGroupDupes(
   prev: ScrapedGroupPayload,
@@ -49,7 +35,6 @@ function mergeScrapedGroupDupes(
     member_count: Math.max(prev.member_count || 0, next.member_count || 0),
     admin_count: Math.max(prev.admin_count || 0, next.admin_count || 0),
     owner_count: Math.max(prev.owner_count || 0, next.owner_count || 0),
-    group_created_at: pickGroupCreatedAt(prev.group_created_at, next.group_created_at),
   };
 }
 

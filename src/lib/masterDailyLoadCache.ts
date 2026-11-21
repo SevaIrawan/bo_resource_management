@@ -101,64 +101,35 @@ export async function warmMasterDailyLoadCache(
   await Promise.all([...masterFetches, partitionDailyBatch(accountIds)]);
 }
 
-/**
- * Akun per kelompok query daily. Semua baris satu akun selalu ada di satu kelompok
- * (urutan halaman di dalam kelompok tetap), dedupe juga per akun — jadi hasil sama
- * dengan versi berurutan, hanya kelompok diambil paralel.
- */
-const DAILY_IN_CHUNK = 10;
-/** Kelompok yang diambil bersamaan — 66k+ baris daily berurutan bisa > 45 dtk. */
-const DAILY_CHUNK_CONCURRENCY = 5;
-
-async function fetchDailyRowsForChunk(chunk: string[]): Promise<DailyRowRaw[]> {
-  const supabase = getSupabase();
-  if (!supabase || chunk.length === 0) return [];
-
-  const rows: DailyRowRaw[] = [];
-  let from = 0;
-  for (;;) {
-    const to = from + SUPABASE_FETCH_PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from(TABLES.groupScrapeDaily)
-      .select('account_id, group_id, group_name, invite_link, is_admin, scraped_at')
-      .in('account_id', chunk)
-      .order('account_id', { ascending: true })
-      .order('group_id', { ascending: true })
-      .order('scrape_date', { ascending: true })
-      .order('id', { ascending: true })
-      .range(from, to);
-    if (error) throw error;
-    const page = (data ?? []) as DailyRowRaw[];
-    rows.push(...page);
-    if (page.length < SUPABASE_FETCH_PAGE_SIZE) break;
-    from += SUPABASE_FETCH_PAGE_SIZE;
-  }
-  return rows;
-}
+const DAILY_IN_CHUNK = 40;
 
 async function fetchDailyRowsForAccounts(accountIds: string[]): Promise<DailyRowRaw[]> {
-  if (!getSupabase() || accountIds.length === 0) return [];
+  const supabase = getSupabase();
+  if (!supabase || accountIds.length === 0) return [];
 
-  const chunks: string[][] = [];
+  const rows: DailyRowRaw[] = [];
   for (let i = 0; i < accountIds.length; i += DAILY_IN_CHUNK) {
-    chunks.push(accountIds.slice(i, i + DAILY_IN_CHUNK));
-  }
-
-  const results: DailyRowRaw[][] = new Array(chunks.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < chunks.length) {
-      const index = next;
-      next += 1;
-      results[index] = await fetchDailyRowsForChunk(chunks[index]);
+    const chunk = accountIds.slice(i, i + DAILY_IN_CHUNK);
+    let from = 0;
+    for (;;) {
+      const to = from + SUPABASE_FETCH_PAGE_SIZE - 1;
+      const { data, error } = await supabase
+        .from(TABLES.groupScrapeDaily)
+        .select('account_id, group_id, group_name, invite_link, is_admin, scraped_at')
+        .in('account_id', chunk)
+        .order('account_id', { ascending: true })
+        .order('group_id', { ascending: true })
+        .order('scrape_date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      const page = (data ?? []) as DailyRowRaw[];
+      rows.push(...page);
+      if (page.length < SUPABASE_FETCH_PAGE_SIZE) break;
+      from += SUPABASE_FETCH_PAGE_SIZE;
     }
   }
-  await Promise.all(
-    Array.from({ length: Math.min(DAILY_CHUNK_CONCURRENCY, chunks.length) }, () => worker()),
-  );
-
-  // Gabung sesuai urutan kelompok (sama seperti versi berurutan).
-  return results.flat();
+  return rows;
 }
 
 async function partitionDailyBatch(accountIds: string[]): Promise<void> {

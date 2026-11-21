@@ -34,8 +34,6 @@ export interface MessagingAccount {
   label: string;
   phone_number: string | null;
   location_device: string | null;
-  /** Batch akun WA (043): A..ZZ / FULL / OLD; null = OLD (WA) atau Telegram. */
-  wa_batch?: string | null;
   is_active: boolean;
   notes: string | null;
   metadata: Record<string, unknown>;

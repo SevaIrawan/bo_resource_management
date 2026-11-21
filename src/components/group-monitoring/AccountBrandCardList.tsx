@@ -157,7 +157,6 @@ export function AccountBrandCardList({
         phoneNumber: input.phoneNumber,
         locationDevice: input.locationDevice,
         opsRole: input.opsRole,
-        waBatch: input.waBatch,
         brand: group.brandName,
         brandId: group.dbBrandId,
       });

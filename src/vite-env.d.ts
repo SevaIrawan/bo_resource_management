@@ -16,8 +16,6 @@ interface ScrapedGroupRow {
   member_count: number;
   admin_count: number;
   owner_count: number;
-  /** ISO waktu grup dibuat (WA); TG / tidak tersedia → null. */
-  group_created_at?: string | null;
 }
 
 interface PlatformLoginEvent {

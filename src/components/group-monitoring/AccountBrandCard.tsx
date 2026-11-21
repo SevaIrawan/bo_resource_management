@@ -181,7 +181,6 @@ export function AccountBrandCard({
         phoneNumber: values.phoneNumber,
         locationDevice: values.locationDevice,
         opsRole: values.opsRole,
-        waBatch: values.waBatch,
         slotId: addSlotId,
       });
       setAddModalOpen(false);

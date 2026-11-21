@@ -497,7 +497,7 @@ const checks = [
         provider.includes('LOAD_ACCOUNTS_TIMEOUT') &&
         provider.includes('translateRef') &&
         provider.includes('!timedOut') &&
-        provider.includes('120_000')
+        provider.includes('45_000')
       );
     })(),
   },

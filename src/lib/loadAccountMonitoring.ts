@@ -25,7 +25,6 @@ import {
   readOpsRoleFromMetadata,
 } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
-import { normalizeWaBatch } from '@/config/waBatch';
 import { readPhoneFromAccount } from '@/lib/accountPhone';
 import { loadUserBrands } from '@/lib/brands';
 import { TABLES } from '@/config/tables';
@@ -74,7 +73,6 @@ function accountRowFromDb(
     phoneNumber: readPhoneFromAccount(account),
     locationDevice: readLocationDevice(account) || undefined,
     opsRole: effectiveAccountOpsRole(readOpsRoleFromMetadata(account.metadata)),
-    waBatch: account.platform === 'whatsapp' ? normalizeWaBatch(account.wa_batch) : null,
     brandName,
     status,
     groupsCurrent: 0,

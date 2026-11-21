@@ -86,7 +86,10 @@ async function reactivateInactiveMessagingAccount(input: {
       brand_id: input.brandId,
       phone_number: phone || null,
       location_device: normalizeLocationDevice(input.locationDevice),
-      wa_batch: waBatchForDb(input.platform, input.waBatch),
+      // waBatch tidak dikirim (mis. auto-create dari scrape) → batch lama dipertahankan.
+      ...(input.waBatch !== undefined
+        ? { wa_batch: waBatchForDb(input.platform, input.waBatch) }
+        : {}),
       metadata: buildAccountMetadata(input.brandName, input.opsRole),
       notes: null,
       updated_at: new Date().toISOString(),

@@ -4,6 +4,9 @@ import { WA_BATCH_FULL, WA_BATCH_OLD, normalizeWaBatch } from '@/config/waBatch'
 import { useLanguage } from '@/hooks/useLanguage';
 import { fetchBrandWaBatchSummary, type WaBatchSummary } from '@/lib/waBatchLabels';
 
+/** Label batch tidak boleh mengunci modal — lewat batas ini, hanya Full Group yang tersedia. */
+const BATCH_LABELS_TIMEOUT_MS = 15_000;
+
 interface WaBatchSelectProps {
   id: string;
   brandName: string;
@@ -35,7 +38,13 @@ export function WaBatchSelect({
     let cancelled = false;
     setLoading(true);
     setLoadFailed(false);
-    fetchBrandWaBatchSummary(brandName)
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    Promise.race([
+      fetchBrandWaBatchSummary(brandName),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('WA_BATCH_LABELS_TIMEOUT')), BATCH_LABELS_TIMEOUT_MS);
+      }),
+    ])
       .then((rows) => {
         if (!cancelled) setSummary(rows);
       })
@@ -47,10 +56,12 @@ export function WaBatchSelect({
         }
       })
       .finally(() => {
+        if (timer !== undefined) clearTimeout(timer);
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
     };
   }, [brandName]);
 
@@ -89,7 +100,7 @@ export function WaBatchSelect({
         value={normalizeWaBatch(value) ?? ''}
         onChange={(next) => onChange(normalizeWaBatch(next) ?? '')}
         options={options}
-        disabled={disabled || loading}
+        disabled={disabled}
         ariaLabel={t('groupMonitoring.accountCard.waBatchLabel')}
         className="brand-modal-select-wrap"
         triggerClassName="brand-modal-select-trigger"

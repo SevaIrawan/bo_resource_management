@@ -145,7 +145,8 @@ export function GroupMonitoringProvider({ children }: GroupMonitoringProviderPro
     setLoading(true);
     setError(null);
 
-    const LOAD_ACCOUNTS_TIMEOUT_MS = 45_000;
+    /** 100 akun / 66k+ baris daily: 45 dtk terlampaui (terukur 51–68 dtk sebelum fetch daily paralel). */
+    const LOAD_ACCOUNTS_TIMEOUT_MS = 120_000;
     let timedOut = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 

@@ -21,6 +21,7 @@ import {
 import { buildCreateGroupAccountSelectModel } from '@/lib/createGroupAccountEligibility';
 import { fetchJobQueueSnapshot } from '@/lib/automationJobQueueClient';
 import { parseJoinImportFile } from '@/lib/parseCsvJoinImport';
+import { accountSeesOnlyBatch } from '@/lib/waAccountBatch';
 import { telegramSuperGroupLabel } from '@/lib/telegramGroupKind';
 import {
   validateCsvJoinAgainstMaster,
@@ -99,7 +100,9 @@ interface OperationsJobQueueSetupModalProps {
   loadingAccountDailyGroups: boolean;
   saving: boolean;
   onSaveJoin: (groupIds: string[]) => Promise<string | null>;
-  onSaveJoinCsv: (groups: Array<{ groupId: string; groupName: string; inviteLink: string }>) => Promise<string | null>;
+  onSaveJoinCsv: (
+    groups: Array<{ groupId: string; groupName: string; inviteLink: string; batch?: string | null }>,
+  ) => Promise<string | null>;
   onSaveCreate: (draft: JobQueueCreateGroupDraft) => Promise<string | null>;
   onSaveSetAdmin: (draft: JobQueueSetAdminDraft) => Promise<string | null>;
   onSaveExitDelete: (groupIds: string[]) => Promise<string | null>;
@@ -535,6 +538,10 @@ export function OperationsJobQueueSetupModal({
         brandName: activeBrand,
         platform,
         accountIds,
+        accountBatches: selectedAccounts.map((account) => ({
+          accountId: account.id,
+          onlyBatch: accountSeesOnlyBatch(account.platform, account.waBatch),
+        })),
       });
       setCsvValidatedRows(result.rows);
     } catch {
@@ -844,6 +851,7 @@ export function OperationsJobQueueSetupModal({
             groupId: r.groupId,
             groupName: r.groupName,
             inviteLink: r.inviteLink,
+            batch: r.batch,
           })),
         );
       } else if (joinActiveSource === 'master' && selectedJoinGroupIds.size > 0) {
@@ -1173,7 +1181,9 @@ export function OperationsJobQueueSetupModal({
                                   ? t('operations.jobQueue.csvStatusMatched')
                                   : row.status === 'already_joined'
                                     ? t('operations.jobQueue.csvStatusAlreadyJoined')
-                                    : t('operations.jobQueue.csvStatusNotInMaster')}
+                                    : row.status === 'outside_batch'
+                                      ? t('operations.jobQueue.csvStatusOutsideBatch')
+                                      : t('operations.jobQueue.csvStatusNotInMaster')}
                               </span>
                             </td>
                           </tr>

@@ -15,6 +15,7 @@ import type {
   JobQueueViewTableRow,
 } from '@/lib/operationsJobQueueUi';
 import type { AutomationJobAction } from '@/types/automationJob';
+import { computeAccountGapMetrics } from '@/lib/accountGapMetrics';
 
 function stamp() {
   const now = new Date();
@@ -29,27 +30,23 @@ function saveWorkbook(workbook: XLSX.WorkBook, filename: string) {
 }
 
 function accountRowsForExport(rows: AccountBrandRow[]) {
-  return rows.map((row) => ({
-    Brand: row.brandName,
-    Account: row.accountName,
-    Platform: row.platform === 'whatsapp' ? 'WhatsApp' : 'Telegram',
-    Phone: row.phoneNumber || '',
-    Status: row.syncState === 'pending' ? 'Pending sync' : row.status,
-    'On device': row.syncState === 'pending' ? '' : row.groupsCurrent,
-    Junk: row.syncState === 'pending' ? '' : Math.max(0, row.groupsCurrent - row.joinedInMaster),
-    Missing: row.syncState === 'pending' ? '' : Math.max(0, row.groupsTotal - row.joinedInMaster),
-    'Not admin':
-      row.syncState === 'pending' ? '' : Math.max(0, row.joinedInMaster - row.adminCurrent),
-    Remark:
-      row.syncState === 'pending'
-        ? ''
-        : Math.max(0, row.groupsCurrent - row.joinedInMaster) === 0 &&
-            Math.max(0, row.groupsTotal - row.joinedInMaster) === 0 &&
-            Math.max(0, row.joinedInMaster - row.adminCurrent) === 0
-          ? 'Aligned'
-          : 'Not Aligned',
-    'Group link': '',
-  }));
+  return rows.map((row) => {
+    const gaps = computeAccountGapMetrics(row);
+    const pending = row.syncState === 'pending';
+    return {
+      Brand: row.brandName,
+      Account: row.accountName,
+      Platform: row.platform === 'whatsapp' ? 'WhatsApp' : 'Telegram',
+      Phone: row.phoneNumber || '',
+      Status: pending ? 'Pending sync' : row.status,
+      'On device': pending ? '' : row.groupsCurrent,
+      Junk: pending ? '' : gaps.junk,
+      Missing: pending ? '' : gaps.missing,
+      'Not admin': pending ? '' : gaps.notAdmin,
+      Remark: pending ? '' : gaps.isClean ? 'Aligned' : 'Not Aligned',
+      'Group link': '',
+    };
+  });
 }
 
 function safeFilePart(value: string) {
@@ -241,6 +238,7 @@ export function exportReportingMatrixExcel(input: {
         ...(input.meta.platform === 'telegram'
           ? { 'Super Group': telegramSuperGroupYesNo(row.groupId) }
           : {}),
+        ...(input.meta.platform === 'whatsapp' ? { Batch: row.batch?.trim() || '' } : {}),
         'Group Link': row.inviteLink ?? '',
         Status: REPORTING_STOCK_EXPORT_LABEL[row.stockStatus ?? 'review'],
       };

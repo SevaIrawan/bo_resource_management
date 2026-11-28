@@ -20,6 +20,7 @@ import {
   stockPrefixConfigEquals,
   type StockPrefixCategoryConfig,
 } from '@/config/stockPrefixCategoryConfig';
+import { BatchLabelRenameSection } from '@/components/admin/BatchLabelRenameSection';
 import { AdminExpandCard } from '@/components/admin/AdminExpandCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -437,6 +438,7 @@ export function OperationsStockBrandPolicyCard() {
 
 export function OperationsStockSopNamingCard() {
   const { t } = useLanguage();
+  const { brandNames, loading } = useUserBrandNames();
   const [savedPrefix, setSavedPrefix] = useState<StockPrefixCategoryConfig>(() =>
     readStockPrefixCategoryConfig(),
   );
@@ -500,6 +502,7 @@ export function OperationsStockSopNamingCard() {
         onSave={handleSave}
         onDiscard={handleDiscard}
       />
+      <BatchLabelRenameSection brandNames={brandNames} loadingBrands={loading} />
     </AdminExpandCard>
   );
 }

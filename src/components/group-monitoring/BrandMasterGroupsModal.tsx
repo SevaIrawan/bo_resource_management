@@ -265,6 +265,7 @@ export function BrandMasterGroupsModal({
               brandName={brandName}
               mode={mode}
               showSuperGroupColumn={platform === 'telegram'}
+              showBatchColumn={platform === 'whatsapp'}
               pageOffset={matrixPage.pageOffset}
               columnFilter={columnFilter}
               onColumnFilterChange={setColumnFilter}

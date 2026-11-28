@@ -11,6 +11,7 @@ export const MASTER_GROUP_COLUMNS = [
   'admin_count',
   'member_count',
   'member_non_admin',
+  'batch',
 ] as const;
 
 export const MASTER_GROUP_SELECT = MASTER_GROUP_COLUMNS.join(', ');

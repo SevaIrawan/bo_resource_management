@@ -45,6 +45,14 @@ export interface AccountBrandRow {
   locationDevice?: string;
   /** Role operasi — Master boleh Create Group; GCS selain Create. */
   opsRole?: AccountOpsRole;
+  /** WhatsApp: huruf batch, OLD, atau null. Telegram tidak diisi. */
+  waBatch?: string | null;
+  /** Pernah ada scrape commit atau snapshot last_sync. */
+  waScrapedOnce?: boolean;
+  /** New Acc: jumlah master di batch akun yang belum di-join. */
+  batchMissing?: number;
+  /** New Acc: jumlah grup di batch akun yang sudah join tapi belum admin. */
+  batchNotAdmin?: number;
 }
 
 export interface AccountBrandEmptySlot {
@@ -73,8 +81,10 @@ export interface AddAccountInput {
   accountName: string;
   phoneNumber?: string;
   locationDevice?: string;
-  /** Wajib saat add dari UI — Master | GCS. */
+  /** Wajib saat add dari UI — Master | GCS. WhatsApp baru tetap GCS. */
   opsRole: AccountOpsRole;
+  /** WhatsApp: huruf New Acc atau OLD. */
+  waBatch?: string | null;
   slotId?: string;
   dbAccountId?: string;
 }

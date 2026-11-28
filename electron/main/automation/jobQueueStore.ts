@@ -13,6 +13,7 @@ import {
   countCreatedGroupOutcomes,
   mergeJobGroupOutcomes,
 } from './jobQueueOutcomeHelpers';
+import { scheduleWaGroupExitRecording } from './recordWaGroupExits';
 import type {
   AutomationJobEnqueueInput,
   AutomationJobListFilter,
@@ -79,6 +80,22 @@ function touchImmediate(mutator: () => void): void {
   touch(mutator);
 }
 
+function queueWaExitRecording(jobId: string): void {
+  const job = jobs.find((row) => row.id === jobId);
+  if (!job) return;
+  scheduleWaGroupExitRecording(job, (groupId, kind) => {
+    touchImmediate(() => {
+      const current = jobs.find((row) => row.id === jobId);
+      const outcome = current?.payload.groupOutcomes?.find(
+        (row) => String(row.groupId ?? '').trim() === groupId,
+      );
+      if (!outcome) return;
+      if (kind === 'leave') outcome.exitRecorded = true;
+      if (kind === 'delete') outcome.deleteRecorded = true;
+    });
+  });
+}
+
 function queueFilePath(): string {
   return path.join(app.getPath('userData'), 'automation-job-queue.json');
 }
@@ -97,6 +114,7 @@ function ensureLoaded(): void {
         delete job.startedAt;
       }
     }
+    for (const job of jobs) queueWaExitRecording(job.id);
   } catch {
     jobs = [];
     runnerPaused = false;
@@ -550,6 +568,7 @@ export function attachJobGroupOutcomes(
       job.progressUpdatedAt = new Date().toISOString();
     }
   });
+  queueWaExitRecording(jobId);
 }
 
 /** Pause cooperative selesai — demote running → queued+paused; persist outcomes + progress. */
@@ -599,6 +618,7 @@ export function demoteRunningJobToPaused(
     };
     markSessionSettleAfterJob(job.sessionId);
   });
+  queueWaExitRecording(jobId);
 }
 
 export function getAutomationJobStatus(jobId: string): AutomationJobStatus | null {
@@ -753,6 +773,7 @@ export function markJobFinished(
       );
     }
   });
+  queueWaExitRecording(jobId);
 }
 
 function parseBatchSuccessFromMessage(message?: string): number | undefined {

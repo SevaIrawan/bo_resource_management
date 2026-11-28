@@ -1,6 +1,6 @@
 # REPO-SNAPSHOT — Potret isi repo (untuk sesi Claude)
 
-> **Snapshot dari commit:** `f0bc642` (main) · **Versi app:** `1.0.38` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-11-09 (1.0.38: invite link WA via lazy bundle; migrasi 041 alert Telegram)
+> **Snapshot dari commit:** `f0bc642` (main) · **Versi app:** `1.0.39` · **Dibuat:** 2026-10-28 · **Diperbarui:** 2026-11-28 (1.0.39: label batch WA per brand, migrasi 043–046; join/set-admin tidak Completed palsu; FORCE_REBUILD v1.0.19 dihapus)
 >
 > Cara pakai: baca file ini dulu, lalu cek perubahan sejak snapshot:
 > `git log --oneline f0bc642..HEAD --stat` → baca hanya file yang berubah, laporkan bagian snapshot yang usang.
@@ -29,7 +29,7 @@
 | `electron/preload/index.ts` | `contextBridge` → `window.electronAPI` (app, platform-login, scraper, jobQueue, brandGroupPhoto, executeSlots) |
 | `python-sidecar/` | `main.py` (endpoint), `telegram_login.py`, `telegram_scraper.py`, `telegram_automation.py`, `telegram_{leave,delete,set_group_photo}*.py`, `telegram_human_delay.py` |
 | `src/` | UI React: `pages/`, `providers/GroupMonitoringProvider.tsx`, `hooks/`, `services/`, `lib/` (engine & data), `config/` |
-| `supabase/migrations/` | Skema & RPC (003, 017–041; nomor bolong ada) |
+| `supabase/migrations/` | Skema & RPC (003, 017–046; nomor bolong ada). 043–046 = label batch WA |
 | `scripts/` | Build installer, validator `validate-*.mjs`, audit |
 | `.github/workflows/` | `release-multiplatform.yml` (+ 2 workflow repair manual) |
 | `docs/` | Dokumen proyek, panduan user (PDF/DOCX EN+ZH) |
@@ -67,7 +67,7 @@
 ## 6. Engine issue & metrik (in-memory)
 
 - `src/lib/accountMasterDailyCompare.ts` → `computeAccountTicketBreakdown`, 5 tipe: `daily_junk_group`, `missing_group`, `not_admin`, `duplicate_group_id`, `duplicate_group_name`. Tidak ada tabel ticket (dihapus migrasi 033/034).
-- UI grid hanya menampilkan Junk / Missing / Not admin (+ On device) lewat `computeAccountGapMetrics` (`src/lib/accountGapMetrics.ts`); kartu KPI Account lewat `computeAccountKpis` (`src/lib/monitoringKpis.ts`: brands, accounts, logout, not aligned). Picker Job Queue (join/set admin/leave) memakai `computeAccountTicketBreakdown`. Dua tipe duplicate dihitung tapi tidak dipakai UI. Kartu Ticket lama (`buildTicketSummariesFromEngine.ts`) dihapus di 1.0.24 (`d004c78`).
+- UI grid hanya menampilkan Junk / Missing / Not admin (+ On device) lewat `computeAccountGapMetrics` (`src/lib/accountGapMetrics.ts`); kartu KPI Account lewat `computeAccountKpis` (`src/lib/monitoringKpis.ts`: brands, accounts, logout, not aligned). Akun WhatsApp yang punya token batch menghitung Missing/Not admin hanya untuk grup batch itu (`groupVisibleInBatch`), dihitung ulang dari cache master+daily saat tampil. Picker Job Queue (join/set admin/leave) memakai `computeAccountTicketBreakdown`. Dua tipe duplicate dihitung tapi tidak dipakai UI. Kartu Ticket lama (`buildTicketSummariesFromEngine.ts`) dihapus di 1.0.24 (`d004c78`).
 - Realtime (`src/hooks/useRealtimeMonitoring.ts`): snapshots, brands, messaging_accounts, scrape_runs, groups_master, group_scrape_daily, new_register → patch grid + `rm-reporting-reload` (Group matrix `BrandMasterGroupsModal`). Session: `useRealtimeAccountSessions.ts`.
 
 ## 7. Job Queue (tab Operations)
@@ -81,30 +81,31 @@
 
 | Operasi | WhatsApp | Telegram (sidecar) |
 |---|---|---|
-| Join | `client.acceptInvite`, jeda 30–60 s (+ jeda panjang tiap 10) | `ImportChatInviteRequest` / `JoinChannelRequest` |
-| Create | `client.createGroup` + set property + invite link | `CreateChannelRequest(megagroup)` + export invite |
-| Set admin | `promoteParticipants` | `EditAdminRequest` / `EditChatAdminRequest` |
+| Join | `client.acceptInvite`; sukses hanya jika invite mengembalikan id, atau probe member (`Chat.get`, akun ada di participants) mengonfirmasi keanggotaan. Chat palsu dari `findOrCreateLatestChat` bukan bukti join | `ImportChatInviteRequest` / `JoinChannelRequest` |
+| Create | `client.createGroup` + set property + invite link; tanpa `group_id` → `CREATE_GROUP_FAILED` | `CreateChannelRequest(megagroup)` + export invite |
+| Set admin | `promoteParticipants`; `ok` hanya jika semua target naik dan tidak ada error | `EditAdminRequest` / `EditChatAdminRequest`; `ok` hanya jika semua target naik, tanpa error/skip |
 | Set photo | `setPicture` (foto brand dari Storage `brand-group-photos`) | `EditPhotoRequest` |
 | Leave | `sendExitGroup` | `LeaveChannelRequest` / `DeleteChatUserRequest` |
 | Delete | `sendDeleteChat` (lokal) | `delete_dialog` (atau dissolve bila owner & require_owner) |
 
 ## 8. Settings & auto scrape
 
-- Semua setting di **localStorage per PC** (worker WA/TG `rm_worker_settings_*`, auto-scrape `rm_auto_scrape_*`, stock policy) — tidak tersimpan di DB.
+- Setting worker, auto-scrape, SOP prefix, dan stock policy tetap **localStorage per PC**. Nama label batch WhatsApp disimpan di DB (`rm_group_batch_labels`, `groups_master.batch`, `messaging_accounts.wa_batch`) dan diganti per brand lewat Settings → SOP Naming & Batch Label (`rm_rename_brand_wa_batches`). Token 1–32 karakter; penugasan akun ke batch tetap terkunci di Edit Account.
 - Auto scrape: `src/hooks/useAutoAccountSync.ts`, admin saja, maks sekali per hari lokal, lane auto terpisah (pool 6).
 
 ## 9. Supabase
 
 - Tabel (`src/config/tables.ts`): `users`, `resource_management_{brands, messaging_accounts, platform_sessions, platform_session_logs, sync_activity_logs, scrape_runs, group_scrape_daily, groups_master, account_snapshots}`, `new_register`.
 - PK `groups_master` = `(brand, platform, group_id)` (migrasi 036). Daily punya kolom `is_owner` (039).
-- RPC dipakai app: `rm_commit_account_scrape`, `rm_rebuild_brand_groups_master` (hanya saat hapus akun), `rm_save_platform_session`, `rm_deactivate_platform_sessions`, `rm_log_session_activity`. Definisi terbaru scrape/master: migrasi **040**.
+- RPC dipakai app: `rm_commit_account_scrape`, `rm_rebuild_brand_groups_master` (hanya saat hapus akun), `rm_rename_brand_wa_batches`, `rm_save_platform_session`, `rm_deactivate_platform_sessions`, `rm_log_session_activity`. Definisi scrape/master: migrasi **040**, lalu timeout + sync batch di **045**. Rename label: **046**.
+- Label batch WA (043–046): `rm_group_batch_labels`; `groups_master.batch` dan `messaging_accounts.wa_batch` menerima token (bukan hanya A–ZZ) atau `OLD`. Sync label memakai satu temp table + index daily `(brand, platform, group_id)`. `rm_commit_account_scrape` dan `rm_rebuild_brand_groups_master` punya `statement_timeout` 180s (045).
 - RLS aktif tapi policy `USING (true)` untuk anon/authenticated.
 - **Alert Telegram (migrasi 041):** tabel `resource_management_alerts` (RLS tanpa policy → hanya service role). Insert → trigger `rm_alert_send()` kirim ke Telegram Bot API via `pg_net`; token/chat id dari Vault (`gm_alert_bot_token`, `gm_alert_chat_id`); dedupe 60 menit per `dedupe_key`; tanpa secret → `send_status='no_config'`. Cron `rm_alert_stuck_runs` (tiap 5 menit) → `rm_alert_check_stuck_runs()`: run `running` dengan `metadata.heartbeat_at` basi > 20 menit, atau tanpa heartbeat > 6 jam → `failed` + alert `scrape_stuck`. `rm_alert_test()` untuk uji. App belum menulis alert/heartbeat (direncanakan Fase 2).
 - `SUPABASE_RUNBOOK.md` & `supabase/migrations/README.md` hanya sampai migrasi **036** (037–041 belum tercatat).
 
 ## 10. Build, CI, validator
 
-- CI `release-multiplatform.yml`: push ke `main` pada path `package.json`, `src/**`, `electron/**`, `scripts/**`, `resources/**`, workflow; rilis hanya jika tag `v<version>` belum ada (artinya saat version naik). Secret `ORG_ENV_FILE`. Tidak ada CI untuk PR.
+- CI `release-multiplatform.yml`: push ke `main` pada path `package.json`, `src/**`, `electron/**`, `scripts/**`, `resources/**`, workflow, atau `.github/FORCE_REBUILD_*`. Gate melewatkan build bila tag `v<version>` sudah ada, kecuali ada file `FORCE_REBUILD_*` (itu memaksa timpa installer versi berjalan). File `FORCE_REBUILD_V1.0.19` dihapus 2026-11-28. Secret `ORG_ENV_FILE`. Tidak ada CI untuk PR.
 - Validator `npm run validate:*`: mayoritas **statis** (cek string di source/SQL). `validate:grid-db-live` mengakses DB live (read-only). `validate:desktop` = gate utama; `validate:pre-release` = gate lengkap + typecheck.
 - Audit `npm run validate:master-reference` saat snapshot dibuat: **1 check FAIL** (`column count not 9`).
 

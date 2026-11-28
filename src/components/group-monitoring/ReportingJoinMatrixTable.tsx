@@ -22,6 +22,8 @@ interface ReportingJoinMatrixTableProps {
   mode?: ReportingMatrixMode;
   /** Telegram only — kolom Super Group dari Group ID (-100…). */
   showSuperGroupColumn?: boolean;
+  /** WhatsApp only — huruf batch master. Tidak menyaring baris. */
+  showBatchColumn?: boolean;
   pageOffset?: number;
   columnFilter: ReportingMatrixColumnFilter;
   onColumnFilterChange: (filter: ReportingMatrixColumnFilter) => void;
@@ -178,6 +180,7 @@ export function ReportingJoinMatrixTable({
   brandName,
   mode = 'join',
   showSuperGroupColumn = false,
+  showBatchColumn = false,
   pageOffset = 0,
   columnFilter,
   onColumnFilterChange,
@@ -187,7 +190,7 @@ export function ReportingJoinMatrixTable({
   onClearStockStatusFilter,
 }: ReportingJoinMatrixTableProps) {
   const { t } = useLanguage();
-  const columnCount = 5 + (showSuperGroupColumn ? 1 : 0) + accounts.length;
+  const columnCount = 5 + (showSuperGroupColumn ? 1 : 0) + (showBatchColumn ? 1 : 0) + accounts.length;
   const hasGroupNameSearch = groupNameSearch.trim().length > 0;
   const hasStockStatusFilter = stockStatusFilter !== 'all';
   const showFilteredEmpty =
@@ -217,6 +220,7 @@ export function ReportingJoinMatrixTable({
               />
             </th>
           ) : null}
+          {showBatchColumn ? <th>{t('groupMonitoring.reporting.colBatch')}</th> : null}
           <th>{t('groupMonitoring.reporting.colGroupLink')}</th>
           <th>{t('groupMonitoring.reporting.colStatus')}</th>
           {accounts.map((acc) => (
@@ -296,6 +300,9 @@ export function ReportingJoinMatrixTable({
                   no: t('groupMonitoring.reporting.joinNo'),
                 })}
               </td>
+            ) : null}
+            {showBatchColumn ? (
+              <td className="join-report-table__mono">{row.batch?.trim() || '—'}</td>
             ) : null}
             <td>
               {row.inviteLink ? (

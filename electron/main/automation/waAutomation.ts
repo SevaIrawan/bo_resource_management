@@ -145,6 +145,103 @@ async function probeGroupViaPage(
 }
 
 /**
+ * Anggota sungguhan: chat sudah ada di daftar akun DAN wid akun ada di participants.
+ * Jangan pakai findOrCreateLatestChat — itu membuat chat dari group_id tanpa join.
+ */
+async function probeAccountIsGroupMember(
+  client: InstanceType<typeof Client>,
+  chatIdRaw: string,
+): Promise<{ id: string; name?: string } | null> {
+  const chatId = normalizeGroupChatId(chatIdRaw);
+  const page = client.pupPage;
+  if (!chatId || !page) return null;
+
+  try {
+    const found = await withDetachedFrameRetry('probeAccountIsGroupMember', () =>
+      withPromiseTimeout(
+        page.evaluate(async (gid: string) => {
+          type ChatRef = {
+            id?: { _serialized?: string };
+            name?: string;
+            formattedTitle?: string;
+            groupMetadata?: {
+              participants?: {
+                getModels?: () => Array<{ id?: unknown }>;
+                _models?: Array<{ id?: unknown }>;
+              };
+            };
+          };
+          const w = window as unknown as {
+            require?: (name: string) => {
+              Chat?: { get?: (id: unknown) => ChatRef | undefined };
+              createWid?: (id: string) => unknown;
+              getMaybeMePnUser?: () => unknown;
+              getMaybeMeLidUser?: () => unknown;
+            };
+          };
+
+          const idKey = (value: unknown): string => {
+            if (!value) return '';
+            if (typeof value === 'string') return value;
+            if (typeof value === 'object') {
+              const rec = value as { _serialized?: string; user?: string };
+              return String(rec._serialized || rec.user || '');
+            }
+            return '';
+          };
+          const same = (left: unknown, right: unknown): boolean => {
+            const a = idKey(left);
+            const b = idKey(right);
+            if (!a || !b) return false;
+            if (a === b) return true;
+            const au = a.split('@')[0];
+            const bu = b.split('@')[0];
+            return Boolean(au && au === bu);
+          };
+
+          const collections = w.require?.('WAWebCollections');
+          const factory = w.require?.('WAWebWidFactory');
+          const wid = factory?.createWid?.(gid);
+          const chat =
+            (wid ? collections?.Chat?.get?.(wid) : undefined) ||
+            collections?.Chat?.get?.(gid);
+          if (!chat?.groupMetadata?.participants) return null;
+
+          const me = w.require?.('WAWebUserPrefsMeUser');
+          const mePn = me?.getMaybeMePnUser?.();
+          const meLid = me?.getMaybeMeLidUser?.();
+          const raw = chat.groupMetadata.participants;
+          const list = raw.getModels?.() ?? raw._models ?? [];
+          const member = list.some((row) => same(row?.id ?? row, mePn) || same(row?.id ?? row, meLid));
+          if (!member) return null;
+
+          const name =
+            typeof chat.name === 'string'
+              ? chat.name
+              : typeof chat.formattedTitle === 'string'
+                ? chat.formattedTitle
+                : undefined;
+          return { id: chat.id?._serialized || gid, name };
+        }, chatId),
+        WA_CHAT_LOOKUP_TIMEOUT_MS,
+        'probeAccountIsGroupMember',
+      ),
+    );
+    if (!found?.id) return null;
+    return {
+      id: String(found.id).replace(/@g\.us$/i, ''),
+      name: found.name,
+    };
+  } catch (error) {
+    console.warn(
+      `[wa-automation] probeAccountIsGroupMember failed (${chatId}):`,
+      isCrypticWaEvaluateError(error) ? 'cryptic evaluate error' : errorMessage(error),
+    );
+    return null;
+  }
+}
+
+/**
  * Promote admin langsung di page (sama path wwebjs GroupChat.promoteParticipants).
  * Return terstruktur — jangan throw dari evaluate (Puppeteer sering jadi Error "r").
  */
@@ -546,6 +643,14 @@ async function runCreateGroup(
   }
 
   const groupId = gid.replace(/@g\.us$/i, '');
+  if (!groupId) {
+    return {
+      status: 'error',
+      action: 'create_group',
+      message: 'Create group returned no id',
+      errorCode: 'CREATE_GROUP_FAILED',
+    };
+  }
   let invite_link: string | null = null;
   if (gid) {
     try {
@@ -671,13 +776,16 @@ async function runSetAdmin(
     }
   }
 
+  const allPromoted = limitedIds.length > 0 && promoted.length === limitedIds.length && errors.length === 0;
   return {
-    status: promoted.length ? 'ok' : 'error',
+    status: allPromoted ? 'ok' : 'error',
     action: 'set_admin',
-    message: promoted.length
-      ? `Promoted ${promoted.length}/${limitedIds.length} in ${chatId.replace(/@g\.us$/i, '')}`
-      : errors[0]?.error ?? 'No targets promoted',
-    errorCode: promoted.length ? undefined : 'SET_ADMIN_FAILED',
+    message: `Promoted ${promoted.length}/${limitedIds.length} in ${chatId.replace(/@g\.us$/i, '')}`,
+    errorCode: allPromoted
+      ? undefined
+      : promoted.length
+        ? 'SET_ADMIN_PARTIAL'
+        : 'SET_ADMIN_FAILED',
     result: { promoted, errors, group_id: chatId.replace(/@g\.us$/i, '') },
   };
 }
@@ -784,15 +892,15 @@ async function runJoinByInviteLink(
       };
     }
     if (payload.groupId?.trim()) {
-      const resolved = await resolveGroupChatOptional(client, payload.groupId.trim());
-      if (resolved?.isGroup) {
-        groupName = resolved.name?.trim() || '';
+      const member = await probeAccountIsGroupMember(client, payload.groupId.trim());
+      if (member) {
+        groupName = member.name?.trim() || '';
         onProgress?.(1, 1, groupName || 'Joined');
         return {
           status: 'ok',
           action: 'join_by_invite_link',
           result: {
-            group_id: resolved.id.replace(/@g\.us$/i, ''),
+            group_id: member.id,
             group_name: groupName,
             invite_link: link,
             already_member: false,
@@ -808,47 +916,40 @@ async function runJoinByInviteLink(
     };
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);
+    const expectedId = payload.groupId?.trim();
+    const member = expectedId ? await probeAccountIsGroupMember(client, expectedId) : null;
+    if (member && /already/i.test(raw)) {
+      return {
+        status: 'ok',
+        action: 'join_by_invite_link',
+        result: {
+          group_id: member.id,
+          group_name: member.name ?? '',
+          invite_link: link,
+          already_member: true,
+        },
+      };
+    }
+    if (member && (/timeout/i.test(raw) || isCrypticWaEvaluateError(err))) {
+      onProgress?.(1, 1, member.name?.trim() || 'Joined');
+      return {
+        status: 'ok',
+        action: 'join_by_invite_link',
+        result: {
+          group_id: member.id,
+          group_name: member.name ?? '',
+          invite_link: link,
+          already_member: false,
+        },
+      };
+    }
     if (/already/i.test(raw)) {
-      const expectedId = payload.groupId?.trim();
-      if (expectedId) {
-        const resolved = await resolveGroupChatOptional(client, expectedId);
-        if (resolved?.isGroup) {
-          return {
-            status: 'ok',
-            action: 'join_by_invite_link',
-            result: {
-              group_id: resolved.id.replace(/@g\.us$/i, ''),
-              group_name: resolved.name ?? '',
-              invite_link: link,
-              already_member: true,
-            },
-          };
-        }
-      }
       return {
         status: 'error',
         action: 'join_by_invite_link',
         message: 'Already a member but group id unresolved',
         errorCode: 'JOIN_PEER_UNRESOLVED',
       };
-    }
-    // Timeout / cryptic evaluate: verifikasi membership lewat groupId payload.
-    const expectedId = payload.groupId?.trim();
-    if (expectedId) {
-      const resolved = await resolveGroupChatOptional(client, expectedId);
-      if (resolved?.isGroup) {
-        onProgress?.(1, 1, resolved.name?.trim() || 'Joined');
-        return {
-          status: 'ok',
-          action: 'join_by_invite_link',
-          result: {
-            group_id: resolved.id.replace(/@g\.us$/i, ''),
-            group_name: resolved.name ?? '',
-            invite_link: link,
-            already_member: /already|timeout/i.test(raw) || isCrypticWaEvaluateError(err),
-          },
-        };
-      }
     }
     const msg = humanizeJoinError(raw, link);
     return {

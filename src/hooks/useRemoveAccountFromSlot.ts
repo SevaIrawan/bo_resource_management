@@ -46,7 +46,12 @@ export function useRemoveAccountFromSlot(
 
     try {
       if (userId) {
-        await deactivateMessagingAccount(account.id, account.platform);
+        await deactivateMessagingAccount(
+          account.id,
+          account.platform,
+          'removed_from_slot',
+          account.brandName,
+        );
       }
 
       let groupsAfterRemove: AccountBrandGroup[] = [];

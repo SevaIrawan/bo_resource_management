@@ -15,6 +15,7 @@ import {
 import { automationJobBusyGroupIdSet } from '@/lib/automationJobBusyGroups';
 import { exitDeleteProcessedGroupIdSet } from '@/lib/exitDeleteFlow';
 import { loadMissingMasterGroupsJoinSnapshot } from '@/lib/loadMissingMasterGroupsForJoin';
+import { accountSeesOnlyBatch, groupVisibleInBatch } from '@/lib/waAccountBatch';
 import {
   loadAccountExitGroupsSnapshot,
   type AccountExitGroupsSnapshot,
@@ -151,13 +152,15 @@ export function useJobQueueSetupEnqueue({
         const eligibleByGroup: Record<string, string[]> = {};
 
         const snapshots = await Promise.all(
-          accountIds.map((accountId) =>
-            loadMissingMasterGroupsJoinSnapshot({
+          accountIds.map((accountId) => {
+            const account = accounts.find((row) => row.id === accountId);
+            return loadMissingMasterGroupsJoinSnapshot({
               accountId,
               brandName: activeBrand,
               platform,
-            }),
-          ),
+              onlyBatch: account ? accountSeesOnlyBatch(account.platform, account.waBatch) : null,
+            });
+          }),
         );
 
         accountIds.forEach((accountId, index) => {
@@ -392,7 +395,7 @@ export function useJobQueueSetupEnqueue({
   }
 
   async function saveJoinCsvBatch(
-    groups: Array<{ groupId: string; groupName: string; inviteLink: string }>,
+    groups: Array<{ groupId: string; groupName: string; inviteLink: string; batch?: string | null }>,
   ): Promise<string | null> {
     if (selectedAccounts.length === 0 || groups.length === 0) return null;
 
@@ -406,9 +409,12 @@ export function useJobQueueSetupEnqueue({
 
     try {
       for (const account of selectedAccounts) {
-        const chunks: Array<typeof groups> = [];
-        for (let i = 0; i < groups.length; i += maxPerRun) {
-          chunks.push(groups.slice(i, i + maxPerRun));
+        const onlyBatch = accountSeesOnlyBatch(account.platform, account.waBatch);
+        const allowed = groups.filter((group) => groupVisibleInBatch(group.batch, onlyBatch));
+        if (allowed.length === 0) continue;
+        const chunks: Array<typeof allowed> = [];
+        for (let i = 0; i < allowed.length; i += maxPerRun) {
+          chunks.push(allowed.slice(i, i + maxPerRun));
         }
 
         const ctx = await buildAutomationJobRunContext(account, 'join_by_invite_link');

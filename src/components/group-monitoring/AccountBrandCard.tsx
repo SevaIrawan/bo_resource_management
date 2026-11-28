@@ -181,6 +181,7 @@ export function AccountBrandCard({
         phoneNumber: values.phoneNumber,
         locationDevice: values.locationDevice,
         opsRole: values.opsRole,
+        waBatch: values.waBatch,
         slotId: addSlotId,
       });
       setAddModalOpen(false);
@@ -365,7 +366,7 @@ export function AccountBrandCard({
           <div className="brand-card-body">
               <table className="brand-card-table">
                 <AccountMonitoringTableColGroup />
-                <AccountMonitoringTableHead />
+                <AccountMonitoringTableHead platform={headerPlatform} />
                 <tbody>
                   {group.accounts.map((row) => (
                     <AccountTableRow

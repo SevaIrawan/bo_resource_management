@@ -23,6 +23,8 @@ interface GroupLinksModalProps {
   accountName: string;
   platform: 'whatsapp' | 'telegram';
   accountId?: string;
+  /** New Acc: sembunyikan grup/link di luar batch ini. */
+  onlyBatch?: string | null;
   /** Mode terkunci dari klik kolom — tanpa tab ganti konteks. */
   initialViewMode?: AccountMetricGroupsMode;
   onClose: () => void;
@@ -44,12 +46,14 @@ async function loadLinksForMode(
   brandName: string,
   platform: 'whatsapp' | 'telegram',
   accountId?: string,
+  onlyBatch?: string | null,
 ): Promise<AccountGroupLinkRow[]> {
+  const options = { onlyBatch };
   if (mode === 'missing' || mode === 'notAdmin') {
-    const gaps = await fetchAccountMasterGapGroupLinks(brandName, platform, accountId);
+    const gaps = await fetchAccountMasterGapGroupLinks(brandName, platform, accountId, options);
     return mode === 'missing' ? gaps.missing : gaps.notAdmin;
   }
-  const details = await fetchAccountDetailsGroupLinks(brandName, platform, accountId);
+  const details = await fetchAccountDetailsGroupLinks(brandName, platform, accountId, options);
   return mode === 'junk' ? details.junk : details.account;
 }
 
@@ -59,6 +63,7 @@ export function GroupLinksModal({
   accountName,
   platform,
   accountId,
+  onlyBatch = null,
   initialViewMode = 'account',
   onClose,
   onExited,
@@ -102,7 +107,7 @@ export function GroupLinksModal({
         setLinks([]);
       }
 
-      void loadLinksForMode(viewMode, brandName, platform, accountId)
+      void loadLinksForMode(viewMode, brandName, platform, accountId, onlyBatch)
         .then((next) => {
           if (cancelled) return;
           setLinks(next);
@@ -133,7 +138,7 @@ export function GroupLinksModal({
       cancelled = true;
       window.removeEventListener('rm-reporting-reload', onDataRefresh);
     };
-  }, [accountId, brandName, open, platform, t, viewMode]);
+  }, [accountId, brandName, onlyBatch, open, platform, t, viewMode]);
 
   const pageCount = Math.max(1, Math.ceil(links.length / GROUP_LINKS_PAGE_SIZE));
   const currentPage = Math.min(Math.max(1, page), pageCount);

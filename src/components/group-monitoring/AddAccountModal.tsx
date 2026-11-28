@@ -1,12 +1,14 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { BrandModalRoot } from '@/components/ui/BrandModalRoot';
+import { DarkSelect } from '@/components/ui/DarkSelect';
 import { BrandImage } from '@/components/brand/BrandImage';
 import { AddAccountPlatformBadge } from '@/components/group-monitoring/AddAccountHeaderMenu';
 import { AccountOpsRoleSelect } from '@/components/group-monitoring/AccountOpsRoleSelect';
 import { LocationDeviceSelect } from '@/components/group-monitoring/LocationDeviceSelect';
 import { normalizeAccountOpsRole, type AccountOpsRole } from '@/config/accountOpsRole';
 import { normalizePhoneDigits } from '@/lib/phoneNormalize';
+import { listBrandWaBatchLetters, waBatchToken } from '@/lib/waAccountBatch';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { Platform } from '@/types/database';
 
@@ -15,6 +17,8 @@ export interface AddAccountFormValues {
   phoneNumber: string;
   locationDevice: string;
   opsRole: AccountOpsRole;
+  /** WhatsApp: huruf New Acc atau OLD. */
+  waBatch?: string | null;
 }
 
 interface AddAccountModalProps {
@@ -42,7 +46,11 @@ export function AddAccountModal({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [locationDevice, setLocationDevice] = useState('');
   const [opsRole, setOpsRole] = useState<AccountOpsRole | ''>('');
+  const [statusAcc, setStatusAcc] = useState<'new' | 'old' | ''>('');
+  const [batchLetter, setBatchLetter] = useState('');
+  const [batchLetters, setBatchLetters] = useState<string[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
+  const isWhatsApp = selectedPlatform === 'whatsapp';
 
   useEffect(() => {
     if (!open) return;
@@ -52,8 +60,29 @@ export function AddAccountModal({
     setPhoneNumber('');
     setLocationDevice('');
     setOpsRole('');
+    setStatusAcc('');
+    setBatchLetter('');
+    setBatchLetters([]);
     setLocalError(null);
   }, [open, platform]);
+
+  useEffect(() => {
+    if (!open || selectedPlatform !== 'whatsapp') return;
+    let cancelled = false;
+    void listBrandWaBatchLetters(brandName)
+      .then((letters) => {
+        if (!cancelled) setBatchLetters(letters);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setBatchLetters([]);
+          setLocalError(err instanceof Error ? err.message : t('groupMonitoring.accountCard.saveAccountFailed'));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedPlatform, brandName, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -76,7 +105,6 @@ export function AddAccountModal({
 
     const name = accountName.trim();
     const phone = phoneNumber.trim();
-    const role = normalizeAccountOpsRole(opsRole);
 
     if (!name) {
       setLocalError(t('groupMonitoring.accountCard.accNameRequired'));
@@ -88,6 +116,31 @@ export function AddAccountModal({
       return;
     }
 
+    if (selectedPlatform === 'whatsapp') {
+      if (statusAcc !== 'new' && statusAcc !== 'old') {
+        setLocalError(t('groupMonitoring.accountCard.statusAccRequired'));
+        return;
+      }
+      const batchToken = waBatchToken(batchLetter);
+      if (statusAcc === 'new' && !batchToken) {
+        setLocalError(t('groupMonitoring.accountCard.batchRequired'));
+        return;
+      }
+      setLocalError(null);
+      onSubmit(
+        {
+          accountName: name,
+          phoneNumber: phone,
+          locationDevice: locationDevice.trim(),
+          opsRole: 'gcs',
+          waBatch: statusAcc === 'new' ? batchToken! : 'OLD',
+        },
+        selectedPlatform,
+      );
+      return;
+    }
+
+    const role = normalizeAccountOpsRole(opsRole);
     if (!role) {
       setLocalError(t('groupMonitoring.accountCard.opsRoleRequired'));
       return;
@@ -106,6 +159,21 @@ export function AddAccountModal({
   }
 
   const displayError = localError ?? error;
+  const statusOptions = useMemo(
+    () => [
+      { value: '', label: t('groupMonitoring.accountCard.statusAccPlaceholder') },
+      { value: 'new', label: t('groupMonitoring.accountCard.statusAccNew') },
+      { value: 'old', label: t('groupMonitoring.accountCard.statusAccOld') },
+    ],
+    [t],
+  );
+  const batchOptions = useMemo(
+    () => [
+      { value: '', label: t('groupMonitoring.accountCard.batchSelectPlaceholder') },
+      ...batchLetters.map((letter) => ({ value: letter, label: letter })),
+    ],
+    [batchLetters, t],
+  );
 
   return (
     <BrandModalRoot open={open} onBackdropClick={saving ? undefined : onClose}>
@@ -222,20 +290,83 @@ export function AddAccountModal({
                   />
                 </div>
                 <div className="brand-modal-field-col">
-                  <label htmlFor="add-account-ops-role" className="brand-modal-label">
-                    {t('groupMonitoring.accountCard.opsRoleLabel')}
-                  </label>
-                  <AccountOpsRoleSelect
-                    id="add-account-ops-role"
-                    value={opsRole}
-                    disabled={saving}
-                    onChange={(value) => {
-                      setOpsRole(value);
-                      if (localError) setLocalError(null);
-                    }}
-                  />
+                  {isWhatsApp ? (
+                    <>
+                      <label htmlFor="add-account-status-acc" className="brand-modal-label">
+                        {t('groupMonitoring.accountCard.statusAccLabel')}
+                      </label>
+                      <DarkSelect
+                        id="add-account-status-acc"
+                        value={statusAcc}
+                        options={statusOptions}
+                        disabledValues={batchLetters.length === 0 ? ['new'] : []}
+                        disabled={saving}
+                        ariaLabel={t('groupMonitoring.accountCard.statusAccLabel')}
+                        className="brand-modal-select-wrap"
+                        triggerClassName="brand-modal-select-trigger"
+                        menuPlacement="up"
+                        onChange={(next) => {
+                          const status = next === 'new' || next === 'old' ? next : '';
+                          setStatusAcc(status);
+                          if (status !== 'new') setBatchLetter('');
+                          if (localError) setLocalError(null);
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <label htmlFor="add-account-ops-role" className="brand-modal-label">
+                        {t('groupMonitoring.accountCard.opsRoleLabel')}
+                      </label>
+                      <AccountOpsRoleSelect
+                        id="add-account-ops-role"
+                        value={opsRole}
+                        disabled={saving}
+                        onChange={(value) => {
+                          setOpsRole(value);
+                          if (localError) setLocalError(null);
+                        }}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
+              {isWhatsApp ? (
+                <div className="brand-modal-field-col">
+                  <label htmlFor="add-account-batch" className="brand-modal-label">
+                    {t('groupMonitoring.accountCard.batchLabel')}
+                  </label>
+                  {statusAcc === 'new' ? (
+                    <DarkSelect
+                      id="add-account-batch"
+                      value={batchLetter}
+                      options={batchOptions}
+                      disabled={saving || batchLetters.length === 0}
+                      ariaLabel={t('groupMonitoring.accountCard.batchLabel')}
+                      className="brand-modal-select-wrap"
+                      triggerClassName="brand-modal-select-trigger"
+                      menuPlacement="up"
+                      onChange={(next) => {
+                        setBatchLetter(next);
+                        if (localError) setLocalError(null);
+                      }}
+                    />
+                  ) : (
+                    <input
+                      id="add-account-batch"
+                      className="brand-modal-input"
+                      value={statusAcc === 'old' ? t('groupMonitoring.accountCard.oldAcc') : '—'}
+                      readOnly
+                      disabled
+                    />
+                  )}
+                  {batchLetters.length === 0 ? (
+                    <p className="brand-modal-label-optional">
+                      {t('groupMonitoring.accountCard.noBatchYet')}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </>
           )}
 

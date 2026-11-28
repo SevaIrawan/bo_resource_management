@@ -45,10 +45,16 @@ export function AccountMonitoringTableColGroup({
 
 export function AccountMonitoringTableHead({
   layout = 'brandCard',
+  platform = 'whatsapp',
 }: {
   layout?: AccountMonitoringTableLayout;
+  platform?: 'whatsapp' | 'telegram' | 'all';
 }) {
   const { t } = useLanguage();
+  const roleOrBatchLabel =
+    platform === 'telegram'
+      ? t('groupMonitoring.accountCard.colRole')
+      : t('groupMonitoring.accountCard.colBatch');
 
   if (layout === 'flat') {
     return (
@@ -61,7 +67,7 @@ export function AccountMonitoringTableHead({
             {t('groupMonitoring.accountCard.colBrand')}
           </th>
           <th className="brand-col-head brand-col-head--role">
-            {t('groupMonitoring.accountCard.colRole')}
+            {roleOrBatchLabel}
           </th>
           <th className="brand-col-head brand-col-head--location">
             {t('groupMonitoring.accountCard.colLocation')}
@@ -108,7 +114,7 @@ export function AccountMonitoringTableHead({
           {t('groupMonitoring.accountCard.colAccount')}
         </th>
         <th className="brand-col-head brand-col-head--role">
-          {t('groupMonitoring.accountCard.colRole')}
+          {roleOrBatchLabel}
         </th>
         <th className="brand-col-head brand-col-head--location">
           {t('groupMonitoring.accountCard.colLocation')}

@@ -6,6 +6,7 @@ import {
 } from '@/lib/dedupeScrapeDaily';
 import { buildMasterGroupIdSet, isDailyGroupIdInMaster } from '@/lib/masterDailyMatch';
 import { computeReportingStockStatus } from '@/lib/reportingStockStatus';
+import { groupVisibleInBatch, inviteLinkForBatch } from '@/lib/waAccountBatch';
 import { TABLES } from '@/config/tables';
 import { fetchAllSupabaseRows } from '@/lib/supabasePagedSelect';
 import type { GroupStockBucket } from '@/types/groupStock';
@@ -47,32 +48,23 @@ async function fetchDailyForAccount(accountId: string, keepLatest = false): Prom
   return keepLatest ? dedupeDailyRowsByGroupIdKeepLatest(rows) : dedupeDailyRowsByGroupId(rows);
 }
 
-async function fetchMasterForBrand(
-  brand: string,
-  platform: Platform,
-): Promise<
-  {
-    group_id: string;
-    group_name: string;
-    invite_link: string;
-    member_non_admin: number;
-  }[]
-> {
-  const rows = await fetchAllSupabaseRows<{
-    group_id: string;
-    group_name: string;
-    invite_link: string;
-    member_non_admin: number;
-  }>(TABLES.groupsMaster, 'group_id, group_name, invite_link, member_non_admin', [
+type MasterLinkRow = {
+  group_id: string;
+  group_name: string;
+  invite_link: string;
+  member_non_admin: number;
+  batch?: string | null;
+};
+
+async function fetchMasterForBrand(brand: string, platform: Platform): Promise<MasterLinkRow[]> {
+  const rows = await fetchAllSupabaseRows<MasterLinkRow>(
+    TABLES.groupsMaster,
+    'group_id, group_name, invite_link, member_non_admin, batch',
+    [
     { column: 'brand', value: brand.trim() },
     { column: 'platform', value: platform },
   ]);
-  return dedupeMasterRowsByGroupId(rows) as {
-    group_id: string;
-    group_name: string;
-    invite_link: string;
-    member_non_admin: number;
-  }[];
+  return dedupeMasterRowsByGroupId(rows);
 }
 
 function mapDailyToLinkRow(
@@ -102,6 +94,7 @@ export async function fetchAccountDetailsGroupLinks(
   brand: string,
   platform: Platform,
   accountId?: string,
+  options?: { onlyBatch?: string | null },
 ): Promise<{ account: AccountGroupLinkRow[]; junk: AccountGroupLinkRow[] }> {
   const dbId = accountId ? normalizeDbAccountId(accountId) : null;
   if (!dbId) return { account: [], junk: [] };
@@ -111,6 +104,10 @@ export async function fetchAccountDetailsGroupLinks(
     fetchMasterForBrand(brand, platform),
   ]);
   const masterIdSet = buildMasterGroupIdSet(master);
+  const batchByGroupId = new Map(
+    master.map((row) => [String(row.group_id).trim(), row.batch ?? null]),
+  );
+  const onlyBatch = options?.onlyBatch ?? null;
 
   const account: AccountGroupLinkRow[] = [];
   const junk: AccountGroupLinkRow[] = [];
@@ -119,6 +116,14 @@ export async function fetchAccountDetailsGroupLinks(
     if (!gid) continue;
     const inMaster = isDailyGroupIdInMaster(gid, masterIdSet);
     const row = mapDailyToLinkRow(d, inMaster);
+    if (onlyBatch) {
+      const link = inviteLinkForBatch(
+        row.inviteLink,
+        inMaster ? (batchByGroupId.get(gid) ?? null) : null,
+        onlyBatch,
+      );
+      row.inviteLink = link || null;
+    }
     account.push(row);
     if (!inMaster) junk.push(row);
   }
@@ -161,6 +166,7 @@ export async function fetchAccountGroupLinks(
   brand: string,
   platform: Platform,
   accountId?: string,
+  options?: { onlyBatch?: string | null },
 ): Promise<AccountGroupLinkRow[]> {
   const dbId = accountId ? normalizeDbAccountId(accountId) : null;
   const daily = dbId ? await fetchDailyForAccount(dbId, true) : [];
@@ -170,9 +176,12 @@ export async function fetchAccountGroupLinks(
   const rows: AccountGroupLinkRow[] = [];
   const brandTrimmed = brand.trim();
 
+  const onlyBatch = options?.onlyBatch ?? null;
+
   for (const m of master) {
     const gid = String(m.group_id).trim();
     if (!gid) continue;
+    if (!groupVisibleInBatch(m.batch, onlyBatch)) continue;
     const d = dailyByGid.get(gid);
     const groupName = (m.group_name ?? '').trim() || 'Group';
     const memberNonAdmin = Math.max(0, Number(m.member_non_admin) || 0);
@@ -199,8 +208,9 @@ export async function fetchAccountMasterGapGroupLinks(
   brand: string,
   platform: Platform,
   accountId?: string,
+  options?: { onlyBatch?: string | null },
 ): Promise<{ missing: AccountGroupLinkRow[]; notAdmin: AccountGroupLinkRow[] }> {
-  const all = await fetchAccountGroupLinks(brand, platform, accountId);
+  const all = await fetchAccountGroupLinks(brand, platform, accountId, options);
   const missing: AccountGroupLinkRow[] = [];
   const notAdmin: AccountGroupLinkRow[] = [];
   for (const row of all) {

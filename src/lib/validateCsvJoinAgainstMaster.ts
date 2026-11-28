@@ -7,15 +7,22 @@ import {
   normalizeGroupNameForMatch,
   normalizeInviteLinkForMatch,
 } from '@/lib/masterDailyMatch';
+import { groupVisibleInBatch, waBatchToken } from '@/lib/waAccountBatch';
 import type { Platform } from '@/types/database';
 import type { CsvJoinRow } from './parseCsvJoinImport';
 
-export type CsvJoinValidationStatus = 'matched' | 'already_joined' | 'not_in_master';
+export type CsvJoinValidationStatus =
+  | 'matched'
+  | 'already_joined'
+  | 'not_in_master'
+  | 'outside_batch';
 
 export interface ValidatedCsvJoinRow {
   groupId: string;
   groupName: string;
   inviteLink: string;
+  /** Huruf batch master. Dipakai filter antrian per akun. */
+  batch?: string | null;
   status: CsvJoinValidationStatus;
   /** Original CSV row reference */
   csvRow: CsvJoinRow;
@@ -25,6 +32,7 @@ interface MasterRow {
   group_id: string;
   group_name: string | null;
   invite_link: string | null;
+  batch?: string | null;
   [key: string]: unknown;
 }
 
@@ -68,6 +76,8 @@ export async function validateCsvJoinAgainstMaster(input: {
   brandName: string;
   platform: Platform;
   accountIds: string[];
+  /** New Acc membatasi grup yang boleh masuk antrian akun itu. */
+  accountBatches?: Array<{ accountId: string; onlyBatch: string | null }>;
   busyGroupIds?: ReadonlySet<string>;
 }): Promise<ValidateCsvJoinResult> {
   const { csvRows, brandName, platform, accountIds, busyGroupIds } = input;
@@ -79,7 +89,7 @@ export async function validateCsvJoinAgainstMaster(input: {
   const [masterRows, ...dailyArrays] = await Promise.all([
     fetchAllSupabaseRows<MasterRow>(
       TABLES.groupsMaster,
-      'group_id, group_name, invite_link',
+      'group_id, group_name, invite_link, batch',
       [
         { column: 'brand', value: brandName },
         { column: 'platform', value: platform },
@@ -194,11 +204,28 @@ export async function validateCsvJoinAgainstMaster(input: {
       continue;
     }
 
+    const batch = waBatchToken(typeof master.batch === 'string' ? master.batch : null);
+    const accountBatches =
+      input.accountBatches ?? input.accountIds.map((accountId) => ({ accountId, onlyBatch: null }));
+    const visible = accountBatches.some((account) => groupVisibleInBatch(batch, account.onlyBatch));
+    if (!visible) {
+      results.push({
+        groupId: gid,
+        groupName: (master.group_name ?? '').trim() || csvRow.groupName || 'Group',
+        inviteLink,
+        batch,
+        status: 'outside_batch',
+        csvRow,
+      });
+      continue;
+    }
+
     matchedCount++;
     results.push({
       groupId: gid,
       groupName: (master.group_name ?? '').trim() || csvRow.groupName || 'Group',
       inviteLink,
+      batch,
       status: 'matched',
       csvRow,
     });

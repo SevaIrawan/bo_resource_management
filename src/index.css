@@ -7223,6 +7223,78 @@
     appearance: textfield;
   }
 
+  .batch-label-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    width: 100%;
+  }
+
+  .batch-label-brand__caption {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .batch-label-brand .dark-select-wrap {
+    width: 100%;
+  }
+
+  .batch-label-table-wrap {
+    width: 100%;
+  }
+
+  .batch-label-table {
+    width: 100%;
+  }
+
+  .batch-label-col {
+    width: 50%;
+  }
+
+  .batch-label-old {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  .batch-label-input {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    border-radius: 0.375rem;
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-card);
+    padding: 0.3125rem 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: left;
+    color: var(--color-text-primary);
+  }
+
+  .batch-label-input::placeholder {
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .batch-label-input:focus {
+    outline: none;
+    border-color: var(--color-border);
+  }
+
+  .batch-label-row--changed td {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .batch-label-footer__error {
+    color: #f87171;
+  }
+
   .operations-stock-policy-table__input::-webkit-outer-spin-button,
   .operations-stock-policy-table__input::-webkit-inner-spin-button {
     margin: 0;

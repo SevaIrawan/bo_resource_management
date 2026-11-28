@@ -122,6 +122,8 @@ export function addAccountToGroup(
     phoneNumber: phone,
     locationDevice: locationDevice || undefined,
     opsRole: effectiveAccountOpsRole(input.opsRole),
+    waBatch: input.platform === 'whatsapp' ? (input.waBatch ?? 'OLD') : null,
+    waScrapedOnce: false,
     brandName: group.brandName,
     status: 'logout' as const,
     groupsCurrent: 0,

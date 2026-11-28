@@ -15,6 +15,7 @@ import { accountNeedsRelogin } from '@/lib/platformSyncCopy';
 import { computeAccountGapMetrics } from '@/lib/accountGapMetrics';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
+import { accountSeesOnlyBatch, whatsAppBatchLabel } from '@/lib/waAccountBatch';
 import { formatLastSyncAt } from '@/lib/formatLastSync';
 import type { AccountBrandEmptySlot, AccountBrandRow } from '@/types/accountMonitoringUi';
 import { ScraperStatusMarquee } from '@/components/group-monitoring/ScraperStatusMarquee';
@@ -57,6 +58,22 @@ export function SessionBadge({ status }: { status: AccountBrandRow['sessionStatu
       {isValid
         ? t('groupMonitoring.accountCard.sessionValid')
         : t('groupMonitoring.accountCard.sessionInvalid')}
+    </span>
+  );
+}
+
+function AccountBatchCell({ row }: { row: AccountBrandRow }) {
+  const { t } = useLanguage();
+  if (row.platform === 'telegram') {
+    return <AccountOpsRoleCell role={row.opsRole} />;
+  }
+  return (
+    <span className="brand-account-role-text">
+      {whatsAppBatchLabel({
+        waBatch: row.waBatch,
+        scrapedOnce: Boolean(row.waScrapedOnce),
+        oldLabel: t('groupMonitoring.accountCard.oldAcc'),
+      })}
     </span>
   );
 }
@@ -528,7 +545,15 @@ function AccountRemoveSlotIcon({
   /** Stabilkan referensi — `[row]` baru tiap render memicu reload modal + flicker loading. */
   const setupSelectedAccounts = useMemo(
     () => [row],
-    [row.id, row.accountName, row.phoneNumber, row.sessionStatus, row.platform, row.brandName],
+    [
+      row.id,
+      row.accountName,
+      row.phoneNumber,
+      row.sessionStatus,
+      row.platform,
+      row.brandName,
+      row.waBatch,
+    ],
   );
   const setupTargetCandidates = useMemo(
     () => (setupTask === 'set_admin' ? validPeers : []),
@@ -621,7 +646,7 @@ function AccountRemoveSlotIcon({
         ) : null}
         <td className="brand-col-cell brand-col-cell--role">
           <div className="brand-col-cell-inner">
-            <AccountOpsRoleCell role={row.opsRole} />
+            <AccountBatchCell row={row} />
           </div>
         </td>
         <td className="brand-col-cell brand-col-cell--location">
@@ -756,6 +781,7 @@ function AccountRemoveSlotIcon({
         accountName={row.accountName}
         platform={row.platform}
         accountId={row.id}
+        onlyBatch={accountSeesOnlyBatch(row.platform, row.waBatch)}
         initialViewMode={linksMode}
         onClose={() => setLinksOpen(false)}
         onExited={() => {

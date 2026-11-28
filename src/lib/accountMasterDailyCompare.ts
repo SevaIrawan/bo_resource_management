@@ -32,6 +32,7 @@ export type CompareMasterRow = {
   group_id: string;
   group_name: string | null;
   invite_link: string | null;
+  batch?: string | null;
 };
 
 export interface TicketCompareRow {
@@ -220,7 +221,10 @@ export async function loadMasterDailyForAccount(input: {
   }
 
   const [master, daily] = await Promise.all([
-    fetchAllSupabaseRows<CompareMasterRow>(TABLES.groupsMaster, 'group_id, group_name, invite_link', [
+    fetchAllSupabaseRows<CompareMasterRow>(
+      TABLES.groupsMaster,
+      'group_id, group_name, invite_link, batch',
+      [
       { column: 'brand', value: brand },
       { column: 'platform', value: input.platform },
     ]),

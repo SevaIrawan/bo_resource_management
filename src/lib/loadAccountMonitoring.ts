@@ -8,7 +8,14 @@ import {
   brandPlatformCacheKey,
   buildStandardCountByPlatformFromRows,
 } from '@/lib/brandStandardCount';
-import { countCachedMasterDistinct, warmMasterDailyLoadCache } from '@/lib/masterDailyLoadCache';
+import {
+  countCachedMasterDistinct,
+  getCachedDailyRows,
+  getCachedMasterRows,
+  warmMasterDailyLoadCache,
+} from '@/lib/masterDailyLoadCache';
+import { computeAccountTicketBreakdown } from '@/lib/accountMasterDailyCompare';
+import { accountSeesOnlyBatch, groupVisibleInBatch } from '@/lib/waAccountBatch';
 import {
   applyMasterStatsToAccountRow,
   buildMetricsFromScrapeDaily,
@@ -20,6 +27,7 @@ import {
   upsertAccountSnapshot,
 } from '@/lib/accountSnapshots';
 import { MESSAGING_ACCOUNT_SELECT } from '@/config/dbColumns';
+import { TABLES } from '@/config/tables';
 import {
   effectiveAccountOpsRole,
   readOpsRoleFromMetadata,
@@ -27,7 +35,6 @@ import {
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { readPhoneFromAccount } from '@/lib/accountPhone';
 import { loadUserBrands } from '@/lib/brands';
-import { TABLES } from '@/config/tables';
 import { fetchLastActivityAtByAccount } from '@/lib/lastAccountUpdate';
 import { fetchActiveSessionAccountIdSet } from '@/lib/platformSessions';
 import { getSupabase } from '@/lib/supabase';
@@ -56,11 +63,50 @@ function readLocationDevice(account: MessagingAccount): string {
   return normalizeLocationDeviceOption(String(meta?.location_device ?? ''));
 }
 
+async function loadWaScrapedAccountIds(accountIds: string[]): Promise<Set<string>> {
+  if (accountIds.length === 0) return new Set();
+  const supabase = getSupabase();
+  if (!supabase) return new Set();
+  const { data, error } = await supabase
+    .from(TABLES.accountScrapeCommits)
+    .select('account_id')
+    .in('account_id', accountIds);
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => String((row as { account_id: string }).account_id)));
+}
+
+function letterBatchGap(
+  brandName: string,
+  platform: Platform,
+  accountId: string,
+  waBatch: string | null | undefined,
+): { batchMissing: number; batchNotAdmin: number } | null {
+  const onlyBatch = accountSeesOnlyBatch(platform, waBatch);
+  if (!onlyBatch) return null;
+  const master = (getCachedMasterRows(brandName, platform) ?? []).filter((row) =>
+    groupVisibleInBatch(row.batch, onlyBatch),
+  );
+  const breakdown = computeAccountTicketBreakdown(master, getCachedDailyRows(accountId) ?? []);
+  return {
+    batchMissing: breakdown.missing.length,
+    batchNotAdmin: breakdown.notAdmin.length,
+  };
+}
+
+function accountWasScraped(
+  accountId: string,
+  snap: AccountSnapshot | undefined,
+  scrapedIds: Set<string>,
+): boolean {
+  return scrapedIds.has(accountId) || Boolean(snap?.last_sync_at);
+}
+
 function accountRowFromDb(
   account: MessagingAccount,
   brandName: string,
   hasSession: boolean,
-  snap?: AccountSnapshot,
+  snap: AccountSnapshot | undefined,
+  scrapedIds: Set<string>,
 ): AccountBrandRow {
   // Badge session = platform_sessions aktif; akun baru tanpa baris aktif → default INVALID.
   const sessionStatus = hasSession ? 'valid' : 'invalid';
@@ -73,6 +119,9 @@ function accountRowFromDb(
     phoneNumber: readPhoneFromAccount(account),
     locationDevice: readLocationDevice(account) || undefined,
     opsRole: effectiveAccountOpsRole(readOpsRoleFromMetadata(account.metadata)),
+    waBatch: account.platform === 'whatsapp' ? (account.wa_batch ?? null) : null,
+    waScrapedOnce:
+      account.platform === 'whatsapp' ? accountWasScraped(account.id, snap, scrapedIds) : false,
     brandName,
     status,
     groupsCurrent: 0,
@@ -115,6 +164,10 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
       }),
     loadAccountSnapshotsForUser(userId),
   ]);
+
+  const scrapedIds = await loadWaScrapedAccountIds(
+    accounts.filter((account) => account.platform === 'whatsapp').map((account) => account.id),
+  );
 
   const brandById = new Map(brands.map((b) => [b.id, b]));
   const accountsByBrand = new Map<string, MessagingAccount[]>();
@@ -173,7 +226,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
 
         const snap = snapshots.get(account.id);
         const hasSession = activeSessionIds.has(account.id);
-        let row = accountRowFromDb(account, brand.name, hasSession, snap);
+        let row = accountRowFromDb(account, brand.name, hasSession, snap, scrapedIds);
         const master = masterByAccount.get(account.id);
 
         const { result } = await buildMetricsFromScrapeDaily({
@@ -192,6 +245,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
           joinedInMaster: master?.joinedInMaster ?? 0,
           adminCurrent: result.adminCurrent,
           adminTotal: result.adminTotal,
+          ...letterBatchGap(brand.name, account.platform, account.id, row.waBatch),
           isMisaligned: isMisalignedFromSyncResult(result),
           syncState: lastActivityAt || result.groupsCurrent > 0 || snap ? 'synced' : row.syncState,
           lastSyncAt: lastActivityAt ?? null,
@@ -261,7 +315,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
     const rows: AccountBrandRow[] = [];
     for (const account of orphanAccounts) {
       const hasSession = activeSessionIds.has(account.id);
-      let row = accountRowFromDb(account, name, hasSession, snapshots.get(account.id));
+      let row = accountRowFromDb(account, name, hasSession, snapshots.get(account.id), scrapedIds);
       const master = masterByAccount.get(account.id);
       const { result } = await buildMetricsFromScrapeDaily({
         accountId: account.id,
@@ -277,6 +331,7 @@ export async function loadAccountMonitoringGroups(userId: string): Promise<Accou
         joinedInMaster: master?.joinedInMaster ?? 0,
         adminCurrent: result.adminCurrent,
         adminTotal: result.adminTotal,
+        ...letterBatchGap(name, account.platform, account.id, row.waBatch),
         isMisaligned: isMisalignedFromSyncResult(result),
         syncState: lastActivityAt ? 'synced' : row.syncState,
         lastSyncAt: lastActivityAt ?? null,

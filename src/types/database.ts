@@ -37,6 +37,9 @@ export interface MessagingAccount {
   is_active: boolean;
   notes: string | null;
   metadata: Record<string, unknown>;
+  /** WhatsApp: huruf A..ZZ, OLD, atau null. Telegram selalu null. */
+  wa_batch?: string | null;
+  wa_batch_locked?: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -140,6 +143,8 @@ export interface GroupsMaster {
   admin_count: number;
   member_count: number;
   member_non_admin: number;
+  /** Huruf batch aktif. Null bila grup tidak sedang memegang slot. */
+  batch?: string | null;
 }
 
 export interface AccountSnapshot {

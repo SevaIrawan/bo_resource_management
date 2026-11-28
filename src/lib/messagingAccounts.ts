@@ -4,6 +4,7 @@ import {
 } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { ensureBrand } from '@/lib/brands';
+import { waAccountBatchColumns } from '@/lib/waAccountBatch';
 import { markPlatformSessionInvalid } from '@/lib/platformSessions';
 import { invalidatePlatformSessionEverywhere } from '@/lib/platformSessionSync';
 import { rebuildBrandGroupsMaster } from '@/lib/syncMasterAfterScrape';
@@ -18,6 +19,8 @@ export interface CreateMessagingAccountInput {
   phoneNumber?: string;
   locationDevice?: string;
   opsRole: AccountOpsRole;
+  /** WhatsApp: huruf New Acc atau OLD. */
+  waBatch?: string | null;
   brand: string;
   brandId?: string;
 }
@@ -63,6 +66,8 @@ async function reactivateInactiveMessagingAccount(input: {
   phoneNumber?: string;
   locationDevice?: string;
   opsRole: AccountOpsRole;
+  waBatch?: string | null;
+  platform: Platform;
 }): Promise<string> {
   const supabase = getSupabase();
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED');
@@ -77,6 +82,7 @@ async function reactivateInactiveMessagingAccount(input: {
       phone_number: phone || null,
       location_device: normalizeLocationDevice(input.locationDevice),
       metadata: buildAccountMetadata(input.brandName, input.opsRole),
+      ...waAccountBatchColumns(input.platform, input.waBatch),
       notes: null,
       updated_at: new Date().toISOString(),
     })
@@ -127,6 +133,8 @@ export async function createMessagingAccount(
       phoneNumber: input.phoneNumber,
       locationDevice: input.locationDevice,
       opsRole: input.opsRole,
+      waBatch: input.waBatch,
+      platform: input.platform,
     });
   }
 
@@ -140,6 +148,7 @@ export async function createMessagingAccount(
       phone_number: phone || null,
       location_device: normalizeLocationDevice(input.locationDevice),
       metadata: buildAccountMetadata(input.brand, input.opsRole),
+      ...waAccountBatchColumns(input.platform, input.waBatch),
     })
     .select('id')
     .single();
@@ -193,13 +202,15 @@ export async function removeMessagingAccountFromSlot(
   accountId: string,
   platform: Platform,
   reason = 'removed_from_slot',
+  knownBrand?: string | null,
 ): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) {
     throw new Error('SUPABASE_NOT_CONFIGURED');
   }
 
-  const brandName = await fetchBrandNameForAccount(accountId);
+  const lookedUp = await fetchBrandNameForAccount(accountId);
+  const brandName = lookedUp ?? (knownBrand?.trim() || null);
 
   if (window.electronAPI?.isElectron) {
     await invalidatePlatformSessionEverywhere(accountId, reason, platform, {
@@ -278,6 +289,7 @@ export async function deactivateMessagingAccount(
   accountId: string,
   platform: Platform,
   reason = 'removed_from_slot',
+  knownBrand?: string | null,
 ): Promise<void> {
-  return removeMessagingAccountFromSlot(accountId, platform, reason);
+  return removeMessagingAccountFromSlot(accountId, platform, reason, knownBrand);
 }

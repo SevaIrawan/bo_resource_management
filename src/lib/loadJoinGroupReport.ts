@@ -20,6 +20,8 @@ export type JoinGroupMatrixRow = {
   groupName: string;
   groupId: string;
   inviteLink: string | null;
+  /** WhatsApp: huruf batch aktif. Null bila slot tidak aktif. */
+  batch?: string | null;
   stockStatus: GroupStockBucket;
   /** accountId → joined (Yes) */
   joinByAccountId: Record<string, boolean>;
@@ -41,7 +43,8 @@ export async function loadJoinGroupMatrix(input: {
       group_name: string | null;
       invite_link: string | null;
       member_non_admin: number;
-    }>(TABLES.groupsMaster, 'group_id, group_name, invite_link, member_non_admin', [
+      batch?: string | null;
+    }>(TABLES.groupsMaster, 'group_id, group_name, invite_link, member_non_admin, batch', [
       { column: 'brand', value: brand },
       { column: 'platform', value: input.platform },
     ]),
@@ -87,6 +90,7 @@ export async function loadJoinGroupMatrix(input: {
       groupName,
       groupId: gid,
       inviteLink: m.invite_link?.trim() || null,
+      batch: m.batch?.trim() || null,
       stockStatus: computeReportingStockStatus(groupName, memberNonAdmin, brand),
       joinByAccountId,
       adminByAccountId,

@@ -5,6 +5,7 @@ import {
   AccountMonitoringTableHead,
 } from '@/components/group-monitoring/AccountMonitoringTableParts';
 import { flattenBrandAccounts } from '@/lib/accountBrandUtils';
+import { useGroupMonitoring } from '@/hooks/useGroupMonitoring';
 import { useLanguage } from '@/hooks/useLanguage';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { AccountBrandGroup } from '@/types/accountMonitoringUi';
@@ -16,15 +17,20 @@ interface AccountBrandTableViewProps {
 /** Table view — satu tabel flat semua brand; read-only kolom Account/Session, tanpa Last update. */
 export function AccountBrandTableView({ groups }: AccountBrandTableViewProps) {
   const { t } = useLanguage();
+  const { accountFilters } = useGroupMonitoring();
   const { canOperatePlatform } = usePermissions();
   const rows = flattenBrandAccounts(groups);
+  const headerPlatform =
+    accountFilters.platform === 'telegram' || accountFilters.platform === 'whatsapp'
+      ? accountFilters.platform
+      : 'all';
 
   return (
     <div className="account-table-view">
       <div className="account-table-view-scroll">
         <table className="brand-card-table brand-card-table--flat">
           <AccountMonitoringTableColGroup layout="flat" />
-          <AccountMonitoringTableHead layout="flat" />
+          <AccountMonitoringTableHead layout="flat" platform={headerPlatform} />
           <tbody>
             {rows.length > 0 ? (
               rows.map((row) => (

@@ -7,6 +7,7 @@ import { LocationDeviceSelect } from '@/components/group-monitoring/LocationDevi
 import { normalizeAccountOpsRole, type AccountOpsRole } from '@/config/accountOpsRole';
 import { normalizeLocationDeviceOption } from '@/config/locationDeviceOptions';
 import { normalizePhoneDigits } from '@/lib/phoneNormalize';
+import { whatsAppBatchLabel } from '@/lib/waAccountBatch';
 import { useLanguage } from '@/hooks/useLanguage';
 import type { AccountBrandRow } from '@/types/accountMonitoringUi';
 
@@ -181,18 +182,39 @@ export function EditAccountModal({
               />
             </div>
             <div className="brand-modal-field-col">
-              <label htmlFor="edit-account-ops-role" className="brand-modal-label">
-                {t('groupMonitoring.accountCard.opsRoleLabel')}
-              </label>
-              <AccountOpsRoleSelect
-                id="edit-account-ops-role"
-                value={opsRole}
-                disabled={saving}
-                onChange={(value) => {
-                  setOpsRole(value);
-                  if (localError) setLocalError(null);
-                }}
-              />
+              {account.platform === 'whatsapp' ? (
+                <>
+                  <label htmlFor="edit-account-batch" className="brand-modal-label">
+                    {t('groupMonitoring.accountCard.colBatch')}
+                  </label>
+                  <input
+                    id="edit-account-batch"
+                    className="brand-modal-input"
+                    value={whatsAppBatchLabel({
+                      waBatch: account.waBatch,
+                      scrapedOnce: Boolean(account.waScrapedOnce),
+                      oldLabel: t('groupMonitoring.accountCard.oldAcc'),
+                    })}
+                    readOnly
+                    disabled
+                  />
+                </>
+              ) : (
+                <>
+                  <label htmlFor="edit-account-ops-role" className="brand-modal-label">
+                    {t('groupMonitoring.accountCard.opsRoleLabel')}
+                  </label>
+                  <AccountOpsRoleSelect
+                    id="edit-account-ops-role"
+                    value={opsRole}
+                    disabled={saving}
+                    onChange={(value) => {
+                      setOpsRole(value);
+                      if (localError) setLocalError(null);
+                    }}
+                  />
+                </>
+              )}
             </div>
           </div>
 

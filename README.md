@@ -2,7 +2,9 @@
 
 Desktop dashboard untuk group monitoring — WhatsApp & Telegram scraper summary.
 
-**Versi saat ini:** `1.0.38` (lihat `package.json`)
+**Versi saat ini:** `1.0.39` (lihat `package.json`)
+
+**Rilis 1.0.39:** Label batch WhatsApp per brand bisa diganti dari Settings (SOP Naming & Batch Label); simpan menulis tabel label, `groups_master`, dan akun brand itu saja. Kolom Missing mengikuti batch akun. Job Queue join, set admin, dan create group hanya Completed bila device benar-benar selesai. Butuh migrasi Supabase 045 (timeout rebuild) dan 046 (rename label) sudah dijalankan.
 
 **Rilis 1.0.38:** WhatsApp invite link kembali terisi — WA Web (~Sep 2026) memuat modul invite (`WAWebMexFetchGroupInviteCodeJob`) secara lazy; scrape sekarang memuat bundle `WAWebGroupInviteLinkDrawer.react` lewat Bootloader sebelum fetch (pola wa-js PR #3654), error in-page dicatat (bukan ditelan), retry per grup dihentikan bila modul tidak tersedia (`WA_INVITE_MODULE_UNAVAILABLE`), dan versi WA Web dicatat di log (`waWebVersion=`). Teruji: FWSG Jessy 0 → 186/186 link.
 

@@ -849,12 +849,13 @@ async def run_set_admin(
             if index < len(normalized) - 1:
                 await sleep_key(delay_cfg, "between_targets_sec", default=3.0)
 
-        status = "ok" if promoted and not errors else ("error" if not promoted else "ok")
         detail_bits: list[str] = []
         for row in skipped:
             detail_bits.append(f"{row.get('target')}:{row.get('reason')}")
         for row in errors:
             detail_bits.append(f"{row.get('target')}:{row.get('error')}")
+        complete = len(promoted) == len(normalized) and not errors and not skipped
+        status = "ok" if complete else "error"
         payload = {
             "status": status,
             "action": action,
@@ -865,10 +866,10 @@ async def run_set_admin(
                 "group_id": _peer_group_id(entity) if entity else str(group_id or ""),
             },
         }
-        if status == "error" and not promoted:
+        if status == "error":
             detail = "; ".join(detail_bits)[:400] if detail_bits else "No targets promoted"
-            payload["message"] = detail if detail_bits else "No targets promoted"
-            payload["errorCode"] = "SET_ADMIN_FAILED"
+            payload["message"] = f"Promoted {len(promoted)}/{len(normalized)}. {detail}"
+            payload["errorCode"] = "SET_ADMIN_PARTIAL" if promoted else "SET_ADMIN_FAILED"
         return payload
 
 

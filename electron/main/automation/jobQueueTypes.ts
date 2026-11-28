@@ -75,7 +75,11 @@ export interface AutomationJobPayload {
     photoError?: string;
     exitStatus?: 'left' | 'failed' | 'pending';
     exitError?: string;
+    /** RPC rm_record_group_exit action=leave sudah berhasil. */
+    exitRecorded?: boolean;
     deleteStatus?: 'deleted' | 'failed' | 'pending' | 'skipped';
+    /** RPC rm_record_group_exit action=delete sudah berhasil. */
+    deleteRecorded?: boolean;
   }>;
 }
 

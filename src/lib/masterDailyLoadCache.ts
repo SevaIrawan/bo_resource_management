@@ -89,7 +89,7 @@ export async function warmMasterDailyLoadCache(
   const masterFetches = [...brandPlatformPairs.values()].map(async ({ brand, platform }) => {
     const rows = await fetchAllSupabaseRows<CompareMasterRow>(
       TABLES.groupsMaster,
-      'group_id, group_name, invite_link',
+      'group_id, group_name, invite_link, batch',
       [
         { column: 'brand', value: brand },
         { column: 'platform', value: platform },

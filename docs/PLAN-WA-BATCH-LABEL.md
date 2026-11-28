@@ -1,8 +1,9 @@
 # Planning — Label Batch Grup WhatsApp per Brand
 
-> Status: **PLANNING (belum dieksekusi)**. Disepakati dengan user 2026-11-21.
+> Status: **PLANNING (belum dieksekusi)** — langkah **E1 (trace) selesai** 2026-11-28.
+> Disepakati dengan user 2026-11-21 s/d 2026-11-28.
 > Setiap langkah eksekusi (bagian E) wajib izin eksplisit user per langkah (`CLAUDE.md` aturan 5).
-> Repo saat planning ditulis = isi v1.0.38 (`f2e7edf`, di-restore lewat `ed61848`).
+> Rujukan `file:baris` di dokumen ini = kode v1.0.38 (`f2e7edf`; `main` di-restore lewat `ed61848`).
 
 ---
 
@@ -25,10 +26,11 @@
 9. **closed tidak pernah aktif lagi** (grup closed/dihapus dianggap tidak berlaku).
 10. **Brand dihapus dari UI** → label brand itu **tetap tercatat** apa adanya.
 11. **Master tetap yang berlaku**: tabel `groups_master` diberi kolom **`batch`** yang diisi dari tabel label.
+12. **Kolom Batch hanya tampil di Group matrix header card** (modal dari badge grup), **setelah kolom Group ID**, dan ikut di export. WA saja.
 
 ## G. Aturan bisnis — batch akun
 
-1. **Card brand (UI):** kolom **Role** diganti kolom **Batch**. **Modal Add akun:** field Role diganti field Batch. Batch **tidak bisa diubah lewat Edit**. (Logika Role / izin Create Group dibahas terpisah — di luar planning ini.)
+1. **Card brand mode WA:** kolom **Role** diganti kolom **Batch**. **Modal Add akun WA:** field Role diganti field Batch. Batch **tidak bisa diubah lewat Edit**. (Logika Role / izin Create Group dibahas terpisah — di luar planning ini.)
 2. **Modal Add akun WA** — dropdown **Status Acc**: **New** / **Old**.
    - **New Acc** → dropdown Batch aktif (A, B, C … yang ada di tabel label brand itu).
    - **Old Acc** → dropdown Batch terkunci; card menampilkan **"-"** sebelum akun di-scrape, **"Old Acc"** setelah scrape.
@@ -37,8 +39,11 @@
    - Semua grup di **1 batch** → batch akun **ikut batch grup itu** (sama/beda dari pilihan Add).
    - Grup di **≥ 2 batch berbeda** → **Old Acc**.
    Setelah scrape pertama batch tidak berubah lagi; **Old Acc final**.
-4. **New Acc hanya menampilkan invite link grup di batch-nya.** **Old Acc** melihat semua grup master brand (perilaku sekarang).
-5. Akun WA yang sudah ada (**55 akun**) = **Old Acc**. **Tidak ada FULL.**
+4. **Akun batch (A/B/C …)**: Junk, Missing, Not admin, Join list Job Queue, dan semua daftar invite link dihitung **hanya terhadap grup batch-nya**; grup master batch lain di akun itu dihitung **Junk**. Angka grid = jumlah baris modal (satu engine).
+5. **Old Acc**: semua dihitung terhadap **seluruh master brand** (perilaku sekarang).
+6. Akun WA yang sudah ada (**55 akun**) = **Old Acc**. **Tidak ada FULL.**
+7. **Table view** (tombol *Card view / Table view* di slicer halaman Account): kolom **Role** juga diganti **Batch** — baris WA menampilkan batch akun; baris TG menampilkan **"-"** (batch tidak berlaku untuk Telegram).
+8. **Telegram tidak berubah**: card brand mode TG tetap kolom **Role**; modal Add akun TG tetap field **Role**.
 
 ---
 
@@ -55,14 +60,62 @@
 ### Kode app v1.0.38
 - Master dibangun ulang dari daily semua akun brand tiap scrape (`rm_commit_account_scrape`, migrasi 040). Akun banned/belum scrape tetap menyumbang daily terakhirnya ke master.
 - Hapus akun → daily terhapus (`ON DELETE CASCADE`, `supabase/migrations/017_rm_full_reset.sql:158`) → `rm_rebuild_brand_groups_master` (`src/lib/messagingAccounts.ts:216-218`; dilewati bila `brand_card_removed`).
-- Hasil Job Queue (Create/Leave/Delete) hanya disimpan **lokal** di `userData/automation-job-queue.json` (`electron/main/automation/jobQueueTypes.ts:62-78`); folder `electron/main/automation/` tidak menulis ke Supabase. Grup hasil Leave: `exitStatus === 'left'` (`src/lib/exitDeleteFlow.ts` `resolveLeftGroupsFromExitJob`).
 - Akun baru setelah Add: status `logout`, session `invalid`, grup 0 (`src/lib/accountBrandUtils.ts:118-136`) — grup baru diketahui setelah login + scrape pertama.
-- Group matrix header card: `BrandMasterGroupsModal` → `loadJoinGroupMatrix` (`src/lib/loadJoinGroupReport.ts:44`) → export `exportReportingMatrixExcel` (`src/lib/exportExcel.ts:229`).
-- Invite link master per akun ditampilkan di (daftar awal, trace lengkap di langkah E1):
-  - modal Missing / Not admin — `fetchAccountGroupLinks` / `fetchAccountMasterGapGroupLinks` (`src/lib/accountGroupLinks.ts:160-216`);
-  - Join list Job Queue — `loadMissingMasterGroupsJoinSnapshot` (`src/lib/loadMissingMasterGroupsForJoin.ts`);
-  - validasi CSV Join — `validateCsvJoinAgainstMaster` (`src/lib/validateCsvJoinAgainstMaster.ts:69+`).
-- Kolom Role card: header `src/components/group-monitoring/AccountMonitoringTableParts.tsx:18,33,64,111`; sel `AccountMonitoringCells.tsx:64-75, 622-627, 824-828`; CSS `src/index.css:2819, 6335`. Field Role modal Add: `AddAccountModal.tsx:44, 79-94, 224-237`.
+
+---
+
+## E1 — Hasil trace (rencana file:baris)
+
+### 1. Batch akun — card, Table view, Add akun (G1, G2, G7, G8)
+
+| Bagian | File:baris (v1.0.38) | Rencana |
+|---|---|---|
+| Card hanya akun satu platform (WA/TG) | `src/components/group-monitoring/AccountBrandCard.tsx:106, 125` | judul kolom ikut platform card: WA = Batch, TG = Role |
+| Header kolom Role (card + Table view) | `src/components/group-monitoring/AccountMonitoringTableParts.tsx:18, 33, 63-65, 110-112` | judul → Batch (card WA, Table view); card TG tetap Role |
+| Table view (semua akun semua brand) | `src/components/group-monitoring/AccountBrandTableView.tsx:17-46`, `AccountMonitoringBody.tsx:74-76` | kolom Batch; baris TG "-" |
+| Sel Role baris akun | `src/components/group-monitoring/AccountMonitoringCells.tsx:64-75, 622-627` | WA: huruf batch / "Old Acc" / "-"; TG card: role (tetap) |
+| Sel Role slot kosong | `AccountMonitoringCells.tsx:824-828` | tetap "—" |
+| Lebar kolom | `src/index.css:2819, 6335` | tetap |
+| Field Role modal Add | `src/components/group-monitoring/AddAccountModal.tsx:44, 79-94, 224-237` | WA: Status Acc (New/Old) + Batch menggantikan Role; TG: tetap Role |
+| Simpan akun | `AccountBrandCard.tsx:177-185` → `AccountBrandCardList.tsx:148-170` → `src/lib/messagingAccounts.ts:93-156` (insert), `59-91` (reaktivasi) | tulis `wa_batch` |
+| Row grid dari DB | `src/lib/loadAccountMonitoring.ts:60-97`, `src/config/dbColumns.ts:4-5`, `src/types/accountMonitoringUi.ts:21-48, 71-80`, `src/types/database.ts:29-42` | tambah batch + penanda sudah scrape |
+| Row lokal setelah Add | `src/lib/accountBrandUtils.ts:112-136` | tambah batch |
+| Teks UI | `src/i18n/locales/en.ts`, `zh.ts` (blok `accountCard`) | Batch / Status Acc / New / Old / Old Acc |
+
+Fakta terdampak: modal Add WA saat ini wajib role (`AddAccountModal.tsx:91-94`); bila field diganti, akun WA baru tersimpan dengan role default kode (`effectiveAccountOpsRole` → `gcs`, `src/config/accountOpsRole.ts`). Modal Edit tidak disentuh. (Logika Role dibahas terpisah.)
+
+### 2. Pemicu 2 — catat Leave/Delete Job Queue (A8)
+
+- Proses main Electron **tidak punya koneksi Supabase** (satu-satunya `createClient` di `electron/` = client WhatsApp, `electron/main/platformLogin/whatsapp.ts:301`) → pencatatan dari **renderer**.
+- Hasil per grup ditulis saat job selesai: `markJobFinished` + `groupOutcomes` (`electron/main/automation/jobQueueRunner.ts:370-392, 555`), juga saat batal/pause/timeout (`:419, 443, 457, 485`). Status: `exitStatus === 'left'` / `deleteStatus === 'deleted'` (`:273-280`).
+- `accountId` job = UUID akun DB (`src/hooks/useJobQueueSetupEnqueue.ts:364, 420, 497`).
+- Pendengar perubahan Job Queue (`subscribeJobQueueChanged`, `src/lib/automationJobQueueClient.ts:142`; snapshot `:13`) saat ini hanya di panel Operations / modal setup (`OperationsGlobalJobQueuePanel.tsx:70`, `useJobQueueSetupEnqueue.ts:307`).
+- **Rencana:** pencatat baru di `GroupMonitoringProvider` (selalu aktif setelah login, `src/components/layout/DashboardLayout.tsx:17`): saat app dibuka + setiap Job Queue berubah → pindai job dengan grup `left`/`deleted` → `rm_record_group_exit` (idempoten, tidak dobel).
+
+### 3. Kolom Batch di Group matrix (A11, A12)
+
+| Bagian | File:baris | Rencana |
+|---|---|---|
+| Loader | `src/lib/loadJoinGroupReport.ts:19-28, 38-48` | select + tipe `batch` |
+| Tabel | `src/components/group-monitoring/ReportingJoinMatrixTable.tsx:209-221, 284-286` | kolom Batch setelah Group ID (WA) |
+| Export | `BrandMasterGroupsModal.tsx:286` → `src/lib/exportExcel.ts:229-260` | kolom Batch setelah Group ID (WA) |
+
+### 4. Hitungan & invite link per batch akun (G4, G5)
+
+- Angka grid: Junk = Y − joined, Missing = X − joined, Not admin = joined − admin (`src/lib/accountGapMetrics.ts:18-21`); X = total master yang dipakai engine.
+- Engine master/daily per akun: `loadMasterDailyForAccount` (`src/lib/accountMasterDailyCompare.ts:198-247`) + cache master per brand (`src/lib/masterDailyLoadCache.ts`) → **filter master per batch akun di sini**.
+- Penimpa X per akun yang harus ikut batch: `patchBrandStandardCountForPlatform` (`src/lib/accountBrandUtils.ts:287-309`), `patchMasterTotalsOnRow` (`src/lib/accountSyncData.ts:162-179`), `buildBrandStandardFromCache` (`src/lib/loadAccountMonitoring.ts:37-50`).
+- Pembaca master langsung per akun (filter yang sama):
+
+| Titik | File:baris |
+|---|---|
+| Modal Missing / Not admin / Admin vs master | `GroupLinksModal.tsx:42-54` → `src/lib/accountGroupLinks.ts:50-75, 160-216` |
+| Join list Job Queue | `useJobQueueSetupEnqueue.ts:155` → `src/lib/loadMissingMasterGroupsForJoin.ts:21-55` (lewat engine) |
+| Validasi CSV Join | `OperationsJobQueueSetupModal.tsx:533` → `src/lib/validateCsvJoinAgainstMaster.ts:69-130` |
+| Leave/Delete (Junk) | `src/lib/loadAccountDailyGroupsForLeaveDelete.ts:60` |
+| Set admin target (Not admin) | `src/lib/loadSuperAdminGroupsForSetAdmin.ts` (lewat engine) |
+
+- Badge jumlah grup header brand tetap **total master brand** (bukan per akun).
 
 ---
 
@@ -76,28 +129,28 @@
 3. Kolom **`batch`** di `groups_master` — diisi dari tabel label **di transaksi yang sama** dengan rebuild master (TG: kosong).
 4. Batch akun:
    - constraint `wa_batch`: huruf A..ZZ atau `OLD` (hapus `FULL`);
-   - penanda "sudah scrape" per akun (untuk tampilan "-" dan pengecekan scrape pertama);
+   - penanda "sudah scrape" per akun (tampilan "-" dan pengecekan scrape pertama); akun yang sudah pernah scrape sebelum 044 dianggap sudah scrape;
    - pengecekan G3 dijalankan di `rm_commit_account_scrape` hanya pada commit scrape pertama akun.
 5. Sync label dijalankan di: `rm_commit_account_scrape` (scrape), `rm_rebuild_brand_groups_master` (hapus akun), `rm_record_group_exit` (Leave/Delete). Error sync **tidak** menggagalkan commit scrape.
 6. Kompatibel app v1.0.38: signature fungsi yang dipakai app tidak berubah; gate master 040 tidak berubah; app membaca master dengan daftar kolom eksplisit (`src/config/masterGroupColumns.ts`).
 7. Repo = DB: file 043 dimasukkan kembali + file 044 + skrip rollback 044.
 
-## C. Perubahan app
+## C. Perubahan app (ringkas — rinci di E1)
 
-1. **Pemicu 2:** Leave/Delete sukses di Job Queue → panggil `rm_record_group_exit` (retry bila gagal/offline). Titik file:baris — hasil trace E1.
-2. **Kolom Batch hanya di Group matrix header card** (`BrandMasterGroupsModal`): loader tambah `batch`, kolom Batch di tabel matrix, kolom Batch di export — WA saja.
-3. **Batch akun (G):** kolom Role → Batch di card; modal Add: Status Acc (New/Old) + dropdown Batch menggantikan field Role; simpan `wa_batch`; tampilan "-" / huruf batch / "Old Acc".
-4. **New Acc hanya invite link batch-nya:** filter di semua titik invite link per akun (daftar final hasil trace E1).
+1. **Pemicu 2:** pencatat Leave/Delete di `GroupMonitoringProvider` → `rm_record_group_exit` (E1 §2).
+2. **Kolom Batch di Group matrix** + export, setelah Group ID, WA saja (E1 §3).
+3. **Batch akun:** card WA + Table view kolom Batch; modal Add WA Status Acc + Batch; simpan `wa_batch` (E1 §1).
+4. **Hitungan & invite link per batch** untuk akun batch; Old Acc seluruh master (E1 §4).
 5. Butuh **rilis app** (naik versi) — hanya atas perintah eksplisit user.
 
 ## D. Uji
 
 1. **DB (replika lokal skema produksi):** pembagian awal; grup baru mengisi batch; missing → active; hapus akun → closed; Leave/Delete → closed; masih ada pemegang lain → tetap missing; closed tidak aktif lagi; hapus brand → label tetap; id tidak dobel; `batch` master terisi benar; G3 (0 / 1 batch / ≥ 2 batch, hanya scrape pertama); TG tidak tersentuh; error sync tidak menggagalkan scrape. Rollback 044 diuji sampai identik dengan kondisi sebelum 044.
-2. **App:** typecheck, validator terkait, uji read-only ke DB produksi, tes di PC user (`npm.cmd run dev`) sebelum rilis.
+2. **App:** typecheck, validator terkait, uji read-only ke DB produksi (metrik Old Acc identik dengan v1.0.38), tes di PC user (`npm.cmd run dev`) sebelum rilis.
 
 ## E. Urutan eksekusi (masing-masing tunggu izin user)
 
-1. Trace (baca saja): Add akun, kolom card, Job Queue Leave/Delete, Group matrix, semua titik invite link per akun → rencana file:baris.
+1. ~~Trace (baca saja) → rencana file:baris~~ — **selesai** (bagian E1).
 2. Tulis 044 + rollback → uji lokal (D1).
 3. User menjalankan 044 di SQL Editor → verifikasi read-only.
 4. Tulis kode app (C) → uji (D2).
